@@ -1,5 +1,5 @@
 (in-package :sandbox)
-;;shapes are add-only.
+
 ;;to add to a shape, we push the vertices to the front of the
 ;;vertex list and the indices to the index list, but we
 ;;increase the indices by the vertlength amount.
@@ -11,6 +11,7 @@
   (indexlength 0))
 
 (defun tringulate (verts)
+  "take some verts and make a polygon instead"
   (let ((len (length verts)))
     (make-shape
      :is (let ((tris nil))
@@ -27,6 +28,7 @@
      :vertlength len)))
 
 (defun add-shape (s1 small2 &key (target s1))
+  "merge two shapes into one"
   (let ((new-2-indices
 	 (let ((offset (shape-vertlength s1))
 	       (ans nil))
@@ -45,6 +47,7 @@
     target))
 
 (defun add-verts (s1 verts)
+  "add vertices to a shape, expanding it"
   (let* ((len (length verts))
 	 (offset (shape-vertlength s1)))
     (dotimes (n (- len 2))

@@ -8,6 +8,7 @@
   :depends-on (#:cl-opengl
                #:lispbuilder-sdl
                #:cl-utilities
+	       #:chipz
 	       #:opticl)
 
   :serial t

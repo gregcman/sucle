@@ -290,14 +290,14 @@
 (defvar caption "default")
 (defvar little-caption "default little caption")
 
-(defun push-dimensions ()
+(defun push-dimensions (&optional (resizable nil))
   (setq window
 	(sdl:window width height
 		    :opengl t
 		    :opengl-attributes
 		    '((:sdl-gl-depth-size 16)
 		      (:sdl-gl-doublebuffer 1))
-		    :resizable nil))
+		    :resizable resizable))
   (setq pushed-width width
 	pushed-height height))
 

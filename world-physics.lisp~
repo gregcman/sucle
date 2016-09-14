@@ -1,0 +1,352 @@
+(in-package :sandbox)
+
+(defparameter onground nil)
+(defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
+
+(defun physics (camera)
+  "a messy function for the bare bones physics"
+  (let* ((newpos (mat:add (simplecam-pos camera) cameraVelocity))
+	 (blockid (mat-pos newpos)))
+
+    (let ((wowzer
+	   (get-blocks-around-player
+	    (vector
+	     (row-major-aref (simplecam-pos camera) 0)
+	     (row-major-aref (simplecam-pos camera) 1)
+	     (row-major-aref (simplecam-pos camera) 2))
+	    (vector
+	     (row-major-aref cameraVelocity 0)
+	     (row-major-aref cameraVelocity 1)
+	     (row-major-aref cameraVelocity 2)))))
+
+      (mat:add!
+       (simplecam-pos camera)
+       (if wowzer
+	   (progn
+	     (print wowzer)
+	     (setf onground t)
+	     (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
+	     (mat:onebyfour (list (elt wowzer 0) (elt wowzer 1) (elt wowzer 2) 0)))
+	   (progn
+	     (setf onground nil)
+	     cameraVelocity))))
+    (progno
+     (if (not (= 0 blockid))
+	 (progn
+	   (setf (row-major-aref (simplecam-pos camera) 1)
+		 (- (ceiling (row-major-aref (simplecam-pos camera) 1)) 0.5))
+	   (setf (row-major-aref cameraVelocity 1) 0)
+	   (setf onground t))
+	 (setf onground nil)))
+    (if (> 0 (row-major-aref (simplecam-pos camera) 1))
+	(progn	  
+	  (setf (row-major-aref cameraVelocity 1) 0)
+	  (setf (row-major-aref (simplecam-pos camera) 1) 0)
+	  (setf (simplecam-pos camera) (mat:onebyfour '(0 128 0 1))))))
+
+  (mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0)))
+  (let ((airscaled (mat:onebyfour (list
+				   (row-major-aref cameraVelocity 0)
+				   0
+				   (row-major-aref cameraVelocity 2)
+				   0))))
+    (mat:scale! airscaled (* 0.6 0.91 0.5))
+    (setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
+    (setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
+  (setf (row-major-aref cameraVelocity 1) (* (expt 0.98 tickscale) (row-major-aref cameraVelocity 1))))
+
+(defun get-blocks-around-player (vec3player vel)
+  (let ((places nil))
+    (dotimes (x 3)
+      (dotimes (y 4)
+	(dotimes (z 3)
+	  (let ((blockx (round (1- (+ x (elt vec3player 0)))))
+		(blocky (round (1- (ceiling (+ y (elt vec3player 1))))))
+		(blockz (round (1- (+ z (elt vec3player 2))))))
+	    (let ((blockid (mat-pos (vector blockx blocky blockz))))
+	      (if (not (zerop blockid))
+		  (let ((vec
+			 (%aabb-intersect
+			  (player-aabb)
+			  vec3player
+			  (block-aabb)
+			  (vector blockx blocky blockz)
+			  vel)))
+		    (let ((stuffs (remove nil vec)))
+		      (if stuffs
+			  (push
+			   stuffs
+			   places))))))))))
+    (first (first places))))
+
+
+(defun mat-pos (mat)
+  (getblock
+   (round (row-major-aref mat 0))
+   (round (row-major-aref mat 1))
+   (round (row-major-aref mat 2))))
+
+(defun controls (camera)
+  "mice look and keys move"
+  (mouse-looking camera)
+  (mat:add!
+   cameraVelocity
+   (keymovement camera))
+
+  (in:p+1 3 (lambda () (aplatform
+			(mat-world-pos (simplecam-pos camera))
+			(random 97))))
+  (in:p+1 2 (lambda () (notaplatform (mat-world-pos (simplecam-pos camera))))))
+
+(defun mat-world-pos (mat)
+  (vector
+   (round (row-major-aref mat 0))
+   (round (row-major-aref mat 1))
+   (round (row-major-aref mat 2))))
+
+(defun mouse-looking (camera)
+  (let* ((change (in:delta))
+	 (x (* 1/360 (aref change 0)))
+	 (y (* 1/360 (aref change 1))))
+    (setf
+     (simplecam-yaw camera)
+     (mod (+ (simplecam-yaw camera) x) (* 2 pi)))
+    (setf (simplecam-pitch camera)
+	  (anothershit
+	   (+ (simplecam-pitch camera) y) (/ pi 2)))))
+
+(defun anothershit (x whatthefuck)
+  "used to clamp the pitch"
+  (if (> x whatthefuck)
+      whatthefuck
+      (if (< x (- whatthefuck))
+	  (- whatthefuck)
+	  x)))
+
+(defun good-func (some-number)
+  "maps keys to vectors"
+  (lambda (x)
+    (if (in:key-p (first x))
+	(mat:add! some-number
+		  (mat:onebyfour (second x))))))
+
+(defun empty-vec4 ()
+  (mat:onebyfour '(0 0 0 0)))
+
+(defun key-legs ()
+  "keys for walking"
+  (let* ((delta (empty-vec4))
+	 (lemod (good-func delta)))
+    (mapcar
+     lemod
+     '((#\d ( 1  0  0  0))
+       (#\e (-1  0  0  0))
+       (#\s ( 0  0  1  0))
+       (#\f ( 0  0 -1  0))))
+    (mat:scale! (mat:normalize! delta) (* 0.7 (expt tickscale 2)))
+    delta))
+
+(defun key-jumps ()
+  "keys for jumping"
+  (let* ((delta (empty-vec4))
+	 (lemod (good-func delta)))
+    (if onground
+	
+	(mapcar
+	 lemod
+	 `((#\Space (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
+    delta))
+
+(defun keymovement (camera)
+  "total keymovement"
+  (mat:mmul! (mat:add (key-legs) (key-jumps))
+	     (mat:rotation-matrix 0 1 0
+				  (simplecam-yaw camera))))
+
+
+(defun seed (times val rad)
+  (dotimes (n times)
+    (setblock
+     (+ 0 (random rad))
+     (+ 64 (random rad))
+     (+ 0 (random rad))
+     val)))
+
+(defun aplatform (pos blockid)
+  (let ((i (elt pos 0))
+	(j (elt pos 1))
+	(k (elt pos 2)))
+    (dotimes (a 3)
+      (dotimes (b 3)
+	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid)))))
+
+(defun notaplatform (pos)
+  (let ((i (elt pos 0))
+	(j (elt pos 1))
+	(k (elt pos 2)))
+    (dotimes (a 3)
+      (dotimes (b 3)
+	(setblock-with-update (+ a i -1) (1+ j) (+ b k -1) 0)))))
+
+(defun yay (x)
+  (- (random (+ x x)) x))
+
+(defstruct aabb
+  (minx -0.5)
+  (miny -0.5)
+  (minz -0.5)
+  (maxx 0.5)
+  (maxy 0.5)
+  (maxz 0.5))
+
+(defun block-aabb ()
+  (make-aabb))
+
+(defun player-aabb ()
+  (make-aabb
+   :minx -0.3
+   :miny 0
+   :minz -0.3
+   :maxx 0.3
+   :maxy 1.62
+   :maxz 0.3))
+
+(defstruct rectangle
+  minx
+  miny
+  maxx
+  maxy
+  z)
+
+(defun rect-intersect (a b)
+  (if (and (<= (rectangle-minx a) (rectangle-maxx b))
+	   (<= (rectangle-minx b) (rectangle-maxx a))
+	   (<= (rectangle-miny a) (rectangle-maxy b))
+	   (<= (rectangle-miny b) (rectangle-maxy a)))
+      t
+      nil))
+
+(defun translate-rect (rect vec2)
+  (incf (rectangle-minx rect) (elt vec2 0))
+  (incf (rectangle-maxx rect) (elt vec2 0))
+  (incf (rectangle-miny rect) (elt vec2 1))
+  (incf (rectangle-maxy rect) (elt vec2 1))
+  rect)
+
+;;diff is the perpendicular distance between the parallel rectangles in
+;;3d
+(defun %rect-intersect (a b vec3) 
+  (let* ((diff (- (rectangle-z b) (rectangle-z a))))
+    (if (not (zerop (elt vec3 2)))
+	(let ((ratio (/ diff (elt vec3 2))))
+	  (if (< 0 ratio 1)
+	      (let* ((tranxs (* ratio (elt vec3 0)))
+		     (tranys (* ratio (elt vec3 1)))
+		     (moveda
+		      (translate-rect
+		       (copy-rectangle a)
+		       (vector tranxs tranys))))
+		(if (rect-intersect moveda b)
+		    (vector tranxs tranys diff)
+		    nil))
+	      (if (rect-intersect a b)
+		  (vector 0 0 0)
+		  nil)))
+	(if (rect-intersect a b)
+	    vec3
+	    nil))))
+
+(defun my-helper-func (x)
+  (if (evenp x)
+      (1+ x)
+      (1- x)))
+
+(defun bleck (x)
+  (floor (/ x 2)))
+
+(defun some-rect (vec4 num)
+  (make-rectangle
+   :minx (elt vec4 0)
+   :maxx (elt vec4 1)
+   :miny (elt vec4 2)
+   :maxy (elt vec4 3)
+   :z num))
+
+(defun opposite-signs (x y)
+  (if (or (< x 0 y)
+	  (< y 0 x))
+      t
+      nil))
+
+(defun aabb-to-rects (abba pos vec3 flag)
+  (let ((rectlist
+	 (vector
+	  (+ (elt pos 0) (aabb-minx abba))
+	  (+ (elt pos 0) (aabb-maxx abba))
+	  (+ (elt pos 1) (aabb-miny abba))
+	  (+ (elt pos 1) (aabb-maxy abba))
+	  (+ (elt pos 2) (aabb-minz abba))
+	  (+ (elt pos 2) (aabb-maxz abba))))
+	(shitlist nil))
+    (dotimes (x 6)
+      (if (not (zerop (elt vec3 (bleck x))))
+	  (if (let ((huh
+		     (opposite-signs
+		      (elt vec3 (bleck x))
+		      (- (mod x 2) 0.5))))
+		(if flag
+		    (not huh)
+		    huh)) 
+	      (let* ((alist (vector 0 1 2 3 4 5))
+		     (another (remove (my-helper-func x)
+				      (remove x alist)))
+		     (arect (some-rect
+			     (let ((sometin (make-array 4)))
+			       (dotimes (n 4)
+				 (setf (aref sometin n) (aref rectlist (aref another n))))
+			       sometin)
+			     (aref rectlist x))))
+		(push 
+		 arect
+		 shitlist))
+	      (push nil shitlist))
+	  (push nil shitlist)))
+    (reverse shitlist)))
+
+(defun %aabb-intersect (aabb1 pos1 aabb2 pos2 vec3)
+  (let ((onerects  (aabb-to-rects aabb1 pos1 vec3 t))
+	(tworects  (aabb-to-rects aabb2 pos2 vec3 nil))
+	(somelist nil))
+    (dotimes (x 3)
+      (let* ((alist (vector 0 1 2))
+	     (beeter (remove x alist))
+	     (wow (concatenate 'vector beeter (vector x)))
+	     (wut (let ((huh (make-array 3)))
+		    (dotimes (x 3)
+		      (setf (aref huh x) (aref vec3 (aref wow x))))
+		    huh)))
+
+	(let* ((stuff (elt onerects (+ x x)))
+	       (stuff0 (elt onerects (+ x x 1)))
+	       (stuff1 (elt tworects (+ x x)))
+	       (stuff2 (elt tworects (+ x x 1)))
+	       (erect
+		(if (and (or stuff stuff0)
+			 (or stuff1 stuff2))
+		    (%rect-intersect
+		     (or stuff stuff0)
+		     (or stuff1 stuff2)
+		     wut)))
+	       (umm (let ((huh (make-array 3)))
+		      (dotimes (x 3)
+			(setf (aref huh (aref wow x)) x))
+		      huh))
+	       (wtf (if erect
+			(let ((huh (make-array 3)))
+			  (dotimes (x 3)
+			    (setf (aref huh x) (aref erect (aref umm x))))
+			  huh))))
+	  (push
+	   wtf
+	   somelist))))
+    (reverse somelist)))

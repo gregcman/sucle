@@ -1,71 +1,52 @@
-(in-package :sandbox) 
+(in-package :sandbox)
 
-(defun caption-info ()
-  (window:set-caption
-   (concatenate 'string
-		in::pressed-keys '(#\:)
-		in::down-keys '(#\:)
-		in::released-keys)))
-
-(defun draw ()
-  (caption-info)
-  (gl:clear :color-buffer-bit :depth-buffer-bit)
-  (render)
-  (gl:flush)
-  (sdl:update-display))
+;;this file is the place where all the generic rendering shit goes.
+;;creating vaos, loading shaders
 
 (defun sizeof (type-keyword)
+  "gets the size of a foreign c type"
   (cffi:foreign-type-size type-keyword))
+
 (defun rad-deg (rad)
+  "converts radians to degrees"
   (* rad 180 (/ 1 pi)))
 (defun deg-rad (deg)
+  "converts degrees to radians"
   (* deg pi 1/180))
 
-(defparameter cameraPos (mat:onebyfour '(0.0 0.0 0.0 1)))
-(defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
-(defparameter up (mat:onebyfour '(0.0 1.0 0.0 0)))
-(defparameter yaw 0)
-(defparameter pitch 0)
+(defstruct simplecam
+  (pos (mat:onebyfour '(0.0 0.0 0.0 1)))
+  (up (mat:onebyfour '(0.0 1.0 0.0 0)))
+  (yaw 0)
+  (pitch 0)
+  (fov 100))
 
 (defparameter shaderProgram nil)
 
-(defparameter fov 100)
-
 (defun set-matrix (name matrix)
+  "sets a uniform matrix"
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location shaderProgram name)
    (mat:to-flat matrix)))
 
 (defun set-int (name thenumber)
+  "sets a uniform integer"
   (gl:uniformi
    (gl:get-uniform-location shaderProgram name)
    thenumber))
 
 (defun load-and-make-shader (vpath fpath)
+  "loads a shader from a filepath and puts it into a program"
   (make-shader-program-from-strings
    (load-shader-file vpath)
    (load-shader-file fpath)))
 
-(defun glinnit ()
-  (if nil
-      (gl:clear-color 0 0 0 0)
-      (gl:clear-color 0.68 0.8 1.0 1.0))
-  (gl:enable :depth-test)
-  (gl:disable :blend)
-  (gl:enable :cull-face)
-  (gl:cull-face :back)
-  (gl:blend-func :src-alpha :one-minus-src-alpha)
-  (gl:active-texture :texture0)
-  
-  (setq shaderProgram
-	(load-and-make-shader
-	 "transforms.vs" "basictexcoord.frag"))
-  (gl:use-program shaderProgram))
-
 (defun glActiveTexture (num)
+  "sets the active texture"
   (gl:active-texture (+ num (get-gl-constant :texture0))))
 
 (defun get-gl-constant (keyword)
+  "gets a gl-constant"
   (cffi:foreign-enum-value '%gl:enum keyword))
 
 (defstruct vao
@@ -75,6 +56,7 @@
   indices)
 
 (defun squish (the-list type &key (biglength (length the-list)))
+  "turns a list of identical vertices/indicis into a flat array for opengl"
   (let* ((verts (make-array (* (length (car the-list)) biglength) :element-type type))
 	 (counter 0))
     (dolist (vert the-list)
@@ -84,6 +66,7 @@
     verts))
 
 (defun shape-vao (s)
+  "converts a shape into a vao"
   (let ((verts (squish (reverse (shape-vs s)) :float :biglength (shape-vertlength s)))
 	(indicies (squish (shape-is s) :unsigned-int)))
     (create-vao
@@ -94,6 +77,7 @@
                     &key
                       (length (length seq))
                       (array (gl:alloc-gl-array type length)))
+  "writes an array for opengl usage"
   (declare (optimize speed))
   (let ((pointer (gl::gl-array-pointer array)))
     (dotimes (i length)
@@ -101,9 +85,11 @@
   array)
 
 (defun destroy-vao (vao)
+  "currently unused function to destroy vaos which are done"
   (gl:delete-vertex-arrays (list (vao-id vao))))
 
 (defun create-vao (vertices indices)
+  "creates a vao from a list of vertices and indices"
   (let ((vertex-array-object (gl:gen-vertex-array))
 	(glverts (to-gl-array vertices :float))
 	(glindices (to-gl-array indices :unsigned-int)))
@@ -131,6 +117,8 @@
 
     (gl:vertex-attrib-pointer
      4 4 :float :false (* 9 (sizeof :float)) (* 5 (sizeof :float)))
+     (gl:enable-vertex-attrib-array 4)
+    
     (gl:free-gl-array glverts)
     (gl:free-gl-array glindices)
 
@@ -142,6 +130,7 @@
      :indices glindices)))
 
 (defun draw-vao (some-vao)
+  "draws a vao struct"
   (gl:bind-vertex-array (vao-id some-vao))
   (gl:draw-elements
    :triangles
@@ -150,6 +139,7 @@
   (gl:bind-vertex-array 0))
 
 (defun create-texture-wot (tex-data width height)
+  "creates an opengl texture from data"
   (let ((the-shit (car (gl:gen-textures 1))))
     (gl:bind-texture :texture-2d the-shit)
     (gl:tex-parameter :texture-2d :texture-min-filter :nearest)
@@ -164,11 +154,13 @@
     the-shit))
 
 (defun bind-shit (name)
+  "bind a texture located in the texture library"
   (let ((num (gethash name texture-library)))
     (gl:bind-texture :texture-2d num)))
 
 (defun make-shader-program-from-strings
     (vertex-shader-string fragment-shader-string)
+     "makes a shader program from strings. makes noises if something goes wrong"
   (let ((vertexShader (gl:create-shader :vertex-shader))
 	(fragmentShader (gl:create-shader :fragment-shader))
 	(shaderProgram (gl:create-program)))
