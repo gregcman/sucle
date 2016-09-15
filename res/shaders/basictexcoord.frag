@@ -1,4 +1,4 @@
- #version 330 core
+ #version 130
 in vec2 TexCoord;
 in vec4 mycolor;
 
@@ -14,5 +14,5 @@ void main()
 	if(color.a < 0.1)
 			discard;
 	
-	color = mix(color, vec4(1.0, 1.0, 1.0, 1.0), dist/50);
+	//color = mix(color, vec4(1.0, 1.0, 1.0, 1.0), dist/50);
 }

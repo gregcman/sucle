@@ -1,7 +1,11 @@
 (in-package #:sandbox)
 
-(defparameter resdir
-  #P"/home/imac/quicklisp/local-projects/cocktus/res/")
+(defparameter ourdir
+  (make-pathname :host (pathname-host #.(or *compile-file-truename*
+					    *load-truename*))
+		 :directory (pathname-directory #.(or *compile-file-truename*
+						      *load-truename*))))
+(defparameter resdir (merge-pathnames #P"res/" ourdir))
 (defparameter shaderdir #P "shaders/")
 
 (defparameter texture-library (make-hash-table :test 'equal))
@@ -38,7 +42,7 @@
 	(setf (aref data n) (read-byte stream)))
       data)))
 
-(defparameter testchunk (sandbox::byte-read "/home/imac/Downloads/cNBT-master/testdata/hell.mcr"))
+;(defparameter testchunk (sandbox::byte-read "/home/imac/Downloads/cNBT-master/testdata/hell.mcr"))
 (defun tonum (nums)
   (let ((danum 1))
     (setf nums (reverse nums))

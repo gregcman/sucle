@@ -1,8 +1,8 @@
 
-#version 330 core
-layout (location = 0) in vec3 position;
-layout (location = 4) in vec4 color;
-layout (location = 2) in vec2 texCoord;
+#version 130
+in vec3 position;
+in vec2 texCoord;
+in vec4 color;
 
 out vec2 TexCoord;
 out vec4 mycolor;

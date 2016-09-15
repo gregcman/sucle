@@ -79,9 +79,33 @@
                       (array (gl:alloc-gl-array type length)))
   "writes an array for opengl usage"
   (declare (optimize speed))
+  (time
+   (let ((pointer (gl::gl-array-pointer array)))
+     (print length)
+     (dotimes (i length)
+       (setf (cffi:mem-aref pointer type i) (row-major-aref seq i)))))
+  array)
+
+(defun to-gl-array-uint (seq
+			 &key
+			 (length (length seq))
+			 (array (gl:alloc-gl-array :unsigned-int length)))
+  "writes an array for opengl usage"
+  (declare (optimize speed))
   (let ((pointer (gl::gl-array-pointer array)))
     (dotimes (i length)
-      (setf (cffi:mem-aref pointer type i) (row-major-aref seq i))))
+      (setf (cffi:mem-aref pointer :unsigned-int i) (row-major-aref seq i))))
+  array)
+
+(defun to-gl-array-float (seq
+			  &key
+			  (length (length seq))
+			  (array (gl:alloc-gl-array :float length)))
+  "writes an array for opengl usage"
+  (declare (optimize speed))
+  (let ((pointer (gl::gl-array-pointer array)))
+    (dotimes (i length)
+      (setf (cffi:mem-aref pointer :float i) (row-major-aref seq i))))
   array)
 
 (defun destroy-vao (vao)
@@ -91,8 +115,8 @@
 (defun create-vao (vertices indices)
   "creates a vao from a list of vertices and indices"
   (let ((vertex-array-object (gl:gen-vertex-array))
-	(glverts (to-gl-array vertices :float))
-	(glindices (to-gl-array indices :unsigned-int)))
+	(glverts (to-gl-array-float vertices))
+	(glindices (to-gl-array-uint indices)))
     (gl:bind-vertex-array vertex-array-object)
      
     (gl:bind-buffer :array-buffer (gl:gen-buffer))
@@ -102,7 +126,6 @@
     (gl:buffer-data :element-array-buffer :static-draw
 		    glindices) 
      ;;position attribute
-
 
     (gl:vertex-attrib-pointer
      0 3 :float :false (* 9 (sizeof :float)) 0)
@@ -164,6 +187,9 @@
   (let ((vertexShader (gl:create-shader :vertex-shader))
 	(fragmentShader (gl:create-shader :fragment-shader))
 	(shaderProgram (gl:create-program)))
+    (gl:bind-attrib-location shaderprogram 0 "position")
+    (gl:bind-attrib-location shaderprogram 2 "texCoord")
+    (gl:bind-attrib-location shaderprogram 4 "color")
     (gl:shader-source vertexShader vertex-shader-string)
     (gl:compile-shader vertexShader)
     (let ((success (gl:get-shader-info-log vertexShader)))
