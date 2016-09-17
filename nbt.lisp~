@@ -1,0 +1,91 @@
+(in-package :sandbox)
+
+(defparameter apath #P"/home/imac/Downloads/cNBT-master/")
+(pushnew apath cffi:*foreign-library-directories*
+	 :test #'equal)
+
+(cffi:load-foreign-library '(:default "libnbt"))
+
+(cffi:define-foreign-library libnbt
+  (t (:default "libnbt")))
+
+(cffi:use-foreign-library libnbt)
+
+(cffi:defcfun "nbt_parse_path" :pointer
+  (str :pointer))
+
+(cffi:defcfun "nbt_parse" :pointer
+  (mem :pointer)
+  (size :unsigned-int))
+
+(cffi:defcfun "nbt_dump_ascii" :pointer
+  (letree :pointer))
+
+(defun cstringtolisp (cstring)
+  (cffi:foreign-string-to-lisp cstring))
+
+(defun mytestic (lispstring)
+  (let ((node nil))
+    (cffi:with-foreign-pointer-as-string (str (1+ (length lispstring)))
+      (setf node
+	    (nbt-parse-path
+	     (cffi:lisp-string-to-foreign lispstring str (1+ (length lispstring))))))
+    (if (cffi:null-pointer-p node)
+	nil
+	node)))
+
+(defun ummm (vec)
+  (let ((node nil))
+    (setf node
+	  (nbt-parse
+	   (cffi:foreign-alloc :unsigned-char :initial-contents vec)
+	   (length vec)))
+    (if (cffi:null-pointer-p node)
+	nil
+	node)))
+
+(defun wowzee (lispstring)
+  (let ((node nil)
+	(len (+ 1 (length lispstring))))
+    (cffi:with-foreign-pointer-as-string (str len)
+      (setf node
+	    (nbt-parse
+	     (cffi:lisp-string-to-foreign lispstring str len)
+	     len)))
+    (if (cffi:null-pointer-p node)
+	nil
+	node)))
+
+(defparameter issue18
+  (chipz:decompress
+   nil
+   'chipz:zlib
+   (byte-read "/home/imac/Downloads/cNBT-master/testdata/issue_18.nbt")))
+
+(defparameter hello_world
+  (chipz:decompress
+   nil
+   'chipz:gzip
+   (byte-read "/home/imac/Downloads/cNBT-master/testdata/hello_world.nbt")))
+
+(defun 1test (huh x y)
+  (case huh
+    (0 (mytestic "/home/imac/Downloads/cNBT-master/testdata/hello_world.nbt"))
+    (1 (mytestic "lol"))
+    (2 (cstringtolisp (nbt-dump-ascii (ummm hello_world))))
+    (3 (cstringtolisp (nbt-dump-ascii (ummm issue18))))
+    (t (wowzee (bytetostring (mcr-chunk testchunk x y))))))
+
+(defun dumptree (tree)
+  (let ((thetree (ummm tree)))
+    (if (cffi:null-pointer-p thetree)
+	(print "damn null pointers")
+	(cstringtolisp
+	 (nbt-dump-ascii thetree)))))
+
+(defun dumpchunk (data x y)
+  (let ((thechunk (mcr-chunk data x y)))
+    (if thechunk
+	(dumptree thechunk)
+	(print "nochunk"))))
+

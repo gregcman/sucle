@@ -41,8 +41,8 @@
       (dotimes (n len)
 	(setf (aref data n) (read-byte stream)))
       data)))
+(defparameter testchunk (byte-read "/home/imac/Downloads/cNBT-master/testdata/hell.mcr"))
 
-;(defparameter testchunk (sandbox::byte-read "/home/imac/Downloads/cNBT-master/testdata/hell.mcr"))
 (defun tonum (nums)
   (let ((danum 1))
     (setf nums (reverse nums))
@@ -50,26 +50,6 @@
       (incf danum (* (expt 256 n) (elt nums n))))
     danum))
 
-(defun my-subseq (array start amount)
-  (subseq array start (+ start amount)))
-
-(defun mcr-chunk (mcrdata x z)
-  (let* ((initial (chunk-byte-offset x z))
-	 (firstdata (subseq mcrdata initial (+ initial 4)))
-	 (region-offset (tonum (subseq firstdata 0 3)))
-	 (page-length (elt firstdata 3))
-	 (time-stamp (tonum (my-subseq mcrdata (+ 4096 initial) 4)))
-	 (chunkdata (my-subseq mcrdata (* 4096 region-offset) (* page-length 4096)))
-	 (chunklength (tonum (my-subseq chunkdata 0 4)))
-	 (compression-type (elt chunkdata 4))
-	 (compressed-chunk-data (my-subseq chunkdata 5 (1- chunklength))))
-    (print (list region-offset page-length time-stamp))
-    (if (= 2 compression-type)
-	(chipz:decompress nil 'chipz:zlib compressed-chunk-data)
-	(chipz:decompress nil 'chipz:gzip compressed-chunk-data))))
-
-(defun nbt-compound ())
-(defun nbt-list ())
 
 (defun flatten (obj)
   (do* ((result (list obj))
@@ -169,6 +149,6 @@
       ("title/"
        "black.png" "mclogo.png" "mojang.png"))))
 
-(eval-when (:load-toplevel :execute)
-  (get-all-mc-textures))
+(progno (eval-when (:load-toplevel :execute)
+	  (get-all-mc-textures)))
 
