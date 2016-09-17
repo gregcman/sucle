@@ -52,7 +52,7 @@
   (in:p+1 #\ (lambda () (setq kill-button nil)))
   (in:p+1 #\v (lambda () (leresize t)))
   (in:p+1 #\r (function window:toggle-mouse-capture))
-
+  (loadletextures)
   
   (load-shit
    (fatten

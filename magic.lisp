@@ -149,6 +149,11 @@
       ("title/"
        "black.png" "mclogo.png" "mojang.png"))))
 
-(progno (eval-when (:load-toplevel :execute)
-	  (get-all-mc-textures)))
+(defparameter texturesloaded? nil)
+
+(defun loadletextures ()
+  (if (not texturesloaded?)
+      (progn
+	(get-all-mc-textures)
+	(setf texturesloaded? t))))
 

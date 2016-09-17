@@ -264,7 +264,7 @@
 					;,  /* char *, 8 bits, unsigned, TAG_INT length */
        (:TAG_STRING
 	(cstringtolisp
-	 (cffi:foreign-slot-pointer payload '(:union apayload) 'tag_string)))
+	 (cffi:foreign-slot-value payload '(:union apayload) 'tag_string)))
 					;,  /* char *, 8 bits, signed, TAG_SHORT length */
        (:TAG_LIST
 	(let ((theunits
