@@ -107,7 +107,20 @@
   (entry (:pointer (:struct list_head))))
 
 (defun cstringtolisp (cstring)
-  (cffi:foreign-string-to-lisp cstring))
+  (let ((dastring))
+    (tagbody
+       (handler-bind
+	   ((error
+	     (lambda (condition)
+	       (print condition)
+	       (restart-case
+		   (let ((r (find-restart 'my-restart)))
+		     (invoke-restart r))
+		 (my-restart () (go huh))))))
+	 (setf dastring (cffi:foreign-string-to-lisp cstring)))
+       (return-from cstringtolisp dastring)
+     huh
+       (return-from cstringtolisp nil))))
 
 (defun mytestic (lispstring)
   (let ((node nil))
@@ -211,8 +224,10 @@
       (lenext))
     (nreverse places)))
 
-(defun actuallywtf ()
-  (cffi:foreign-slot-offset (quote (:struct nbt_list)) 'entry))
+(defun actuallywtf (ptr)
+  (cffi:inc-pointer
+   ptr
+   (- (cffi:foreign-slot-offset (quote (:struct nbt_list)) 'entry))))
 
 (defun nbt-dump-tree (treepointer)
   (let ((type (cffi:foreign-slot-value treepointer '(:struct nbt_node) 'type))
@@ -223,7 +238,7 @@
      type
      (cstringtolisp name)
      (case type
-       (:TAG_INVALID nil)
+       (:TAG_INVALID :tag_invalid)
 					;  /* tag_end, but we don't use it in the in-memory representation. */
        (:TAG_BYTE
 	(cffi:foreign-slot-value payload '(:union apayload) 'tag_byte))
@@ -257,7 +272,7 @@
 		(cffi:foreign-slot-value payload '(:union apayload) 'tag_list)))
 	      (oursub nil))
 	  (dolist (n theunits)
-	    (let ((thepoint (thefuck n)))
+	    (let ((thepoint (actuallywtf n)))
 	      (push
 	       (nbt-dump-tree
 		(cffi:foreign-slot-value thepoint '(:struct nbt_list) 'data))
@@ -270,7 +285,7 @@
 		(cffi:foreign-slot-value payload '(:union apayload) 'tag_compound)))
 	      (oursub nil))
 	  (dolist (n theunits)
-	    (let ((thepoint (thefuck n)))
+	    (let ((thepoint (actuallywtf n)))
 	      (push
 	       (nbt-dump-tree
 		(cffi:foreign-slot-value thepoint '(:struct nbt_list) 'data))
