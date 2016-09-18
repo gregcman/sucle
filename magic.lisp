@@ -28,29 +28,6 @@
       (read-sequence data stream)
       data)))
 
-(defun chunk-byte-offset (x z)
-  (* 4
-     (+
-      (mod x 32)
-      (* 32 (mod z 32)))))
-
-(defun byte-read (path)
-  (with-open-file (stream path :element-type '(unsigned-byte 8))
-    (let* ((len (file-length stream))
-	   (data (make-array len :element-type '(unsigned-byte 8))))
-      (dotimes (n len)
-	(setf (aref data n) (read-byte stream)))
-      data)))
-(defparameter testchunk (byte-read "/home/imac/Downloads/cNBT-master/testdata/hell.mcr"))
-
-(defun tonum (nums)
-  (let ((danum 1))
-    (setf nums (reverse nums))
-    (dotimes (n (length nums))
-      (incf danum (* (expt 256 n) (elt nums n))))
-    danum))
-
-
 (defun flatten (obj)
   (do* ((result (list obj))
         (node result))

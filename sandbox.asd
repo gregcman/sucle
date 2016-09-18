@@ -8,18 +8,18 @@
   :depends-on (#:cl-opengl
                #:lispbuilder-sdl
                #:cl-utilities
-	       #:chipz
-	       #:opticl)
+	       
+	           #:opticl
+#:cl-mc-shit
+#:the-matrix-is-everywhere)
 
   :serial t
   :components  
   ((:file "package")
    (:file "window")
    (:file "magic")
-   (:file "mat")
    (:file "mesh")
    (:file "render")
-   (:file "nbt")
    (:file "blocks")
    (:file "chunk")
    (:file "chunk-meshing")
