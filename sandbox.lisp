@@ -53,11 +53,10 @@
   (in:p+1 #\v (lambda () (leresize t)))
   (in:p+1 #\r (function window:toggle-mouse-capture))
   (loadletextures)
+
+  (load-into-texture-library "items.png")
+  (load-into-texture-library "terrain.png")
   
-  (load-shit
-   (fatten
-    (gethash "terrain.png" picture-library))
-   "terrain.png" 256 256)
   (bind-shit "terrain.png")
 
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 0 0 0)))
@@ -76,6 +75,14 @@
   (unwind-protect
        (injection)
     (sb-thread:terminate-thread physthread)))
+
+(defun load-into-texture-library (name &optional (othername name))
+  (let ((thepic (gethash name picture-library)))
+    (if thepic
+	(let ((dims (array-dimensions thepic)))
+	    (load-shit
+	     (fatten thepic)
+	     othername (first dims) (second dims))))))
 
 (defun leresize (option)
   (out:push-dimensions option)
