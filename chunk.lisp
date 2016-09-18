@@ -18,7 +18,20 @@
       (dotimes (j y)
 	(dotimes (k z)
 	  (setf (row-major-aref new-chunk (+ (* i) (* j x) (* k x y)))
-		(aref data (+ (* i 16) (* j 16 16) (* k)))))))
+		(aref data (+ (* z i) (* j x y) (* k)))))))
+    new-chunk))
+
+(defun flat2-chunk (data x y z)
+  "takes flat chunk data and packs it into a chunk"
+  (let ((new-chunk (make-array (list x y z))))
+    (let ((counter 0))
+      (dotimes (i x)
+	(dotimes (k z)
+	  (dotimes (j y)	  
+	    (setf (aref new-chunk
+			(* i ) (* j) (* k))
+	     (elt data counter))
+	    (incf counter)))))
     new-chunk))
 
 (defmacro chunk-block (chunk i j k)
@@ -75,6 +88,25 @@ others know what happened"
 	(setf (gethash (list (- x 0) p (- y 0)) chunkhash)
 	      (flat-chunk (elt achunk p) 16 16 16))))))
 
+(defun someseq (x y)
+  (let ((thechunk (sandbox::anotherchunk x y)))
+    (if thechunk
+	(setf (gethash (list x 0 y) chunkhash)
+	      (sandbox::flat2-chunk thechunk  16 128 16))))
+  (print "yello"))
+
+(defun anotherchunk (x y)
+  (let ((thechunk  (cl-mc-shit:mcr-chunk cl-mc-shit::testchunk x y)))
+    (if thechunk
+	(third
+	 (first
+	  (last
+	   (third
+	    (first
+	     (third
+	      (cl-mc-shit:chunk-data
+	       thechunk)))))))
+	nil)))
 ;;achunk is some test data ripped from the cnbt project
 (defparameter achunk
   (list

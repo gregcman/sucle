@@ -200,6 +200,10 @@
    cameraVelocity
    (keymovement camera))
 
+  (in:p+1 #\g (lambda () (someseq
+			  (floor (row-major-aref (simplecam-pos camera) 0) 16)
+			  (floor (row-major-aref (simplecam-pos camera) 2) 16))))
+
   (in:p+1 3 (lambda () (aplatform
 			(mat-world-pos (simplecam-pos camera))
 			(random 97))))

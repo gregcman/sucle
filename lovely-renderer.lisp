@@ -36,7 +36,8 @@
 (defun update-world-vao ()
   "updates all of the vaos in the chunkhash. takes a long time"
   (maphash
-   #'update-chunk-vao
+   (lambda (k v)
+     (pushnew k dirtychunks))
    chunkhash))
 
 (defmacro progno (&rest nope))
