@@ -24,15 +24,27 @@
 (defun flat2-chunk (data x y z)
   "takes flat chunk data and packs it into a chunk"
   (let ((new-chunk (make-array (list x y z))))
-    (let ((counter 0))
+    (dotimes (j y)	  
       (dotimes (i x)
 	(dotimes (k z)
-	  (dotimes (j y)	  
-	    (setf (aref new-chunk
-			(* i ) (* j) (* k))
-	     (elt data counter))
-	    (incf counter)))))
+	  (setf (aref new-chunk
+		      (* i ) (* j) (* k))
+		(elt data (+ j (* k 128) (* i 16 128)))))))
     new-chunk))
+
+(defun flat3-chunk (data)
+  "takes flat chunk data and packs it into a chunk"
+  (let ((ourans nil))
+    (dotimes (wow 8)
+      (let ((new-chunk (make-array '(16 16 16))))
+	(dotimes (j 16)
+	  (dotimes (i 16)
+	    (dotimes (k 16)
+	      (setf (aref new-chunk
+			  (* i ) (+ j) (* k))
+		    (elt data (+ (+ j (* 16 wow)) (* k 128) (* i 16 128)))))))
+	(push new-chunk ourans)))
+    (nreverse ourans)))
 
 (defmacro chunk-block (chunk i j k)
   `(aref ,chunk ,i ,j ,k))
@@ -91,9 +103,12 @@ others know what happened"
 (defun someseq (x y)
   (let ((thechunk (sandbox::anotherchunk x y)))
     (if thechunk
-	(setf (gethash (list x 0 y) chunkhash)
-	      (sandbox::flat2-chunk thechunk  16 128 16))))
-  (print "yello"))
+	(progn
+	  (let ((counter 0))
+	    (dolist(n (sandbox::flat3-chunk thechunk))
+	      (setf (gethash (list x counter y) chunkhash) n)
+	      (pushnew (list x counter y) dirtychunks)
+	      (incf counter)))))))
 
 (defun anotherchunk (x y)
   (let ((thechunk  (cl-mc-shit:mcr-chunk cl-mc-shit::testchunk x y)))

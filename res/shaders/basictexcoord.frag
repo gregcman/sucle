@@ -10,9 +10,9 @@ uniform sampler2D ourTexture;
 
 void main()
 {	
-    color = mycolor * texture(ourTexture, TexCoord);
+    color = texture(ourTexture, TexCoord) * mycolor;
 	if(color.a < 0.1)
 			discard;
 	
-	//color = mix(color, vec4(1.0, 1.0, 1.0, 1.0), dist/50);
+	
 }

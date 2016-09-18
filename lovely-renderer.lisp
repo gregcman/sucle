@@ -52,8 +52,8 @@
 
 (defun glinnit ()
   "opengl initializing things"
-  (if t
-      (gl:clear-color 0 0 0 0)
+  (if nil
+      (gl:clear-color 1 1 1 1)
       (gl:clear-color 0.68 0.8 1.0 1.0))
   (gl:enable :depth-test)
   (gl:disable :blend)

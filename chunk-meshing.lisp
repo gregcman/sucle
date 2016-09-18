@@ -190,7 +190,7 @@ a table of numbers and closures"
       lefaces))
     (dolist (f lefaces)
       (increment-verts i j k f)
-      (fuck-verts -0.5 -0.5 -0.5 1.0 f))
+      (fuck-verts -0.0 -0.0 -0.0 1.0 f))
     lefaces))
 
 (defun get-a-default-block-shape (getempty skin i j k)
@@ -217,5 +217,5 @@ a table of numbers and closures"
     (dolist (face faces)
       (%damn-fuck face skin)
       (increment-verts i j k face)
-      (fuck-verts -0.5 -0.5 -0.5 1.0 face))
+      (fuck-verts -0.0 -0.0 -0.0 0.0 face))
     faces))
