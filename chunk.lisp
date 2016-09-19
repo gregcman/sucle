@@ -7,6 +7,7 @@
 ;;chunkhash stores all of the chunks in a hasmap.
 ;;chunks accessed by '(x y z) in chunk coords
 (defparameter chunkhash (make-hash-table :test (function equal)))
+(defparameter lighthash (make-hash-table :test (function equal)))
 
 ;;dirty chunks is a list of modified chunks 
 (defparameter dirtychunks nil)
@@ -59,6 +60,16 @@
 	      (chunk-block chunk xd yd zd)
 	      0))))))
 
+(defun getlight (i j k)
+  "gets a generic block in space"
+  (multiple-value-bind (x xd) (floor i 16)
+    (Multiple-value-bind (y yd) (floor j 16)
+      (multiple-value-bind (z zd) (floor k 16)
+	(let ((chunk (gethash (list x y z) lighthash)))
+	  (if chunk
+	      (chunk-block chunk xd yd zd)
+	      0))))))
+
 (defun empty-chunk-at (key)
   "puts an empty chunk at the specified coords"
   (let ((newchunk (empty-chunk)))
@@ -101,27 +112,70 @@ others know what happened"
 	      (flat-chunk (elt achunk p) 16 16 16))))))
 
 (defun someseq (x y)
-  (let ((thechunk (sandbox::anotherchunk x y)))
+  (let* ((thechunk (helpchunk x y)))
     (if thechunk
 	(progn
-	  (let ((counter 0))
-	    (dolist(n (sandbox::flat3-chunk thechunk))
-	      (setf (gethash (list x counter y) chunkhash) n)
-	      (pushnew (list x counter y) dirtychunks)
-	      (incf counter)))))))
+	  (let ((light (getlightlizz thechunk))
+		(blocks (getblockslizz thechunk)))
+	    (let ((counter 0))
+	      (dolist (n (sandbox::flat3-chunk light))
+		(setf (gethash (list x counter y) lighthash) n)
+		(incf counter)))
+	    (let ((counter 0))
+	      (dolist (n (sandbox::flat3-chunk blocks))
+		(setf (gethash (list x counter y) chunkhash) n)
+		(pushnew (list x counter y) dirtychunks)
+		(incf counter))))))))
 
-(defun anotherchunk (x y)
-  (let ((thechunk  (cl-mc-shit:mcr-chunk cl-mc-shit::testchunk x y)))
-    (if thechunk
-	(third
-	 (first
-	  (last
+(defun helpchunk (x y)
+   (let ((thechunk  (cl-mc-shit:mcr-chunk cl-mc-shit::testchunk x y)))
+     (if thechunk
+	 (cl-mc-shit:chunk-data
+	       thechunk)
+	 nil)))
+
+(defun expand-nibbles (vec)
+  (let* ((len (length vec))
+	 (newvec (make-array (* 2 len))))
+    (dotimes (x len)
+      (multiple-value-bind (a b) (floor (aref vec x) 16)
+	(setf (aref newvec (* 2 x)) b)
+	(setf (aref newvec (1+ (* 2 x))) a)))
+    newvec))
+
+(defun getlightlizz (lizz)
+  (expand-nibbles
+   (gettag "BlockLight"
 	   (third
 	    (first
 	     (third
-	      (cl-mc-shit:chunk-data
-	       thechunk)))))))
-	nil)))
+	      lizz))))) )
+
+(defun gettag (lestring lizz)
+  (dolist (tag lizz)
+    (if (equal lestring (second tag))
+	(return-from gettag (third tag)))))
+
+;;"Data" 
+;;"Entities" 
+;;"LastUpdate" 
+;;"xPos" 
+;;"zPos" 
+;;"TileEntities" 
+;;"TerrainPopulated" 
+;;"SkyLight" 
+;;"HeightMap" 
+;;"BlockLight" 
+;;"Blocks"
+
+
+(defun getblockslizz (lizz)
+  (gettag
+   "Blocks"
+   (third
+    (first
+     (third
+      lizz)))))
 ;;achunk is some test data ripped from the cnbt project
 (defparameter achunk
   (list

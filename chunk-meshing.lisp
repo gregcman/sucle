@@ -6,36 +6,69 @@
 
 ;;a list of faces and colors which are
 ;;not abstracted away
-(defparameter i-face
-  '((-0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6)
-    (-0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6 )
-    (-0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6 )
-    (-0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6 )))
-(defparameter i+face
-  '((0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6)
-    (0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6)
-    (0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6)
-    (0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6 )))
-(defparameter j-face
-  '((-0.5 -0.5 -0.5  0.0 0.0  0.3 0.3 0.3 0.3)
-    (0.5 -0.5 -0.5  1.0 0.0  0.3 0.3 0.3 0.3)
-    (0.5 -0.5  0.5  1.0 1.0  0.3 0.3 0.3 0.3)
-    (-0.5 -0.5  0.5  0.0 1.0  0.3 0.3 0.3 0.3)))
-(defparameter j+face
-  '((-0.5 0.5 0.5 0.0 1.0  1.0 1.0 1.0 1.0)
-    (0.5 0.5 0.5 1.0 1.0  1.0 1.0 1.0 1.0)
-    (0.5 0.5 -0.5 1.0 0.0  1.0 1.0 1.0 1.0)
-    (-0.5 0.5 -0.5 0.0 0.0  1.0 1.0 1.0 1.0)))
-(defparameter k-face
-  '((-0.5 0.5 -0.5 0.0 1.0  0.8 0.8 0.8 0.8)
-    (0.5 0.5 -0.5 1.0 1.0  0.8 0.8 0.8 0.8)
-    (0.5 -0.5 -0.5 1.0 0.0  0.8 0.8 0.8 0.8)
-    (-0.5 -0.5 -0.5 0.0 0.0  0.8 0.8 0.8 0.8)))
-(defparameter k+face
-  '((-0.5 -0.5  0.5  0.0 0.0 0.8 0.8 0.8 0.8 )
-    (0.5 -0.5  0.5  1.0 0.0  0.8 0.8 0.8 0.8 )
-    (0.5  0.5  0.5  1.0 1.0  0.8 0.8 0.8 0.8)
-    (-0.5  0.5  0.5  0.0 1.0 0.8 0.8 0.8 0.8)))
+(progn
+  (defparameter i-face
+    '((-0.5  0.5  0.5  1.0 1.0  1.0 1.0 1.0 1.0)
+      (-0.5  0.5 -0.5  0.0 1.0  1.0 1.0 1.0 1.0)
+      (-0.5 -0.5 -0.5  0.0 0.0  1.0 1.0 1.0 1.0)
+      (-0.5 -0.5  0.5  1.0 0.0  1.0 1.0 1.0 1.0 )))
+  (defparameter i+face
+    '((0.5 -0.5  0.5  1.0 0.0 1.0 1.0 1.0 1.0 )
+      (0.5 -0.5 -0.5  0.0 0.0  1.0 1.0 1.0 1.0)
+      (0.5  0.5 -0.5  0.0 1.0  1.0 1.0 1.0 1.0)
+      (0.5  0.5  0.5  1.0 1.0 1.0 1.0 1.0 1.0 )))
+  (defparameter j-face
+    '((-0.5 -0.5 -0.5  0.0 0.0  1.0 1.0 1.0 1.0)
+      (0.5 -0.5 -0.5  1.0 0.0 1.0 1.0 1.0 1.0 )
+      (0.5 -0.5  0.5  1.0 1.0  1.0 1.0 1.0 1.0)
+      (-0.5 -0.5  0.5  0.0 1.0  1.0 1.0 1.0 1.0)))
+  (defparameter j+face
+    '((-0.5 0.5 0.5 0.0 1.0  1.0 1.0 1.0 1.0)
+      (0.5 0.5 0.5 1.0 1.0  1.0 1.0 1.0 1.0)
+      (0.5 0.5 -0.5 1.0 0.0  1.0 1.0 1.0 1.0)
+      (-0.5 0.5 -0.5 0.0 0.0  1.0 1.0 1.0 1.0)))
+  (defparameter k-face
+    '((-0.5 0.5 -0.5 0.0 1.0  1.0 1.0 1.0 1.0)
+      (0.5 0.5 -0.5 1.0 1.0  1.0 1.0 1.0 1.0)
+      (0.5 -0.5 -0.5 1.0 0.0  1.0 1.0 1.0 1.0)
+      (-0.5 -0.5 -0.5 0.0 0.0  1.0 1.0 1.0 1.0)))
+  (defparameter k+face
+    '((-0.5 -0.5  0.5  0.0 0.0 1.0 1.0 1.0 1.0)
+      (0.5 -0.5  0.5  1.0 0.0  1.0 1.0 1.0 1.0)
+      (0.5  0.5  0.5  1.0 1.0  1.0 1.0 1.0 1.0)
+      (-0.5  0.5  0.5  0.0 1.0 1.0 1.0 1.0 1.0))))
+
+(progn
+  (defparameter i-face
+    '((-0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6)
+      (-0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6 )
+      (-0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6 )
+      (-0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6 )))
+  (defparameter i+face
+    '((0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6)
+      (0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6)
+      (0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6)
+      (0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6 )))
+  (defparameter j-face
+    '((-0.5 -0.5 -0.5  0.0 0.0  0.5 0.5 0.5 0.3 )
+      (0.5 -0.5 -0.5  1.0 0.0 0.5 0.5 0.5 0.3 )
+      (0.5 -0.5  0.5  1.0 1.0  0.5 0.5 0.5 0.3)
+      (-0.5 -0.5  0.5  0.0 1.0  0.5 0.5 0.5 0.3)))
+  (defparameter j+face
+    '((-0.5 0.5 0.5 0.0 1.0  1.0 1.0 1.0 1.0)
+      (0.5 0.5 0.5 1.0 1.0  1.0 1.0 1.0 1.0)
+      (0.5 0.5 -0.5 1.0 0.0  1.0 1.0 1.0 1.0)
+      (-0.5 0.5 -0.5 0.0 0.0  1.0 1.0 1.0 1.0)))
+  (defparameter k-face
+    '((-0.5 0.5 -0.5 0.0 1.0  0.8 0.8 0.8 0.8)
+      (0.5 0.5 -0.5 1.0 1.0  0.8 0.8 0.8 0.8)
+      (0.5 -0.5 -0.5 1.0 0.0  0.8 0.8 0.8 0.8)
+      (-0.5 -0.5 -0.5 0.0 0.0  0.8 0.8 0.8 0.8)))
+  (defparameter k+face
+    '((-0.5 -0.5  0.5  0.0 0.0 0.8 0.8 0.8 0.8 )
+      (0.5 -0.5  0.5  1.0 0.0  0.8 0.8 0.8 0.8 )
+      (0.5  0.5  0.5  1.0 1.0  0.8 0.8 0.8 0.8)
+      (-0.5  0.5  0.5  0.0 1.0 0.8 0.8 0.8 0.8))))
 
 ;;current layout: 3 position floats, 2 texcoord floats, 4 color floats
 
@@ -88,6 +121,15 @@
     (incf (ninth n) a))
   verts)
 
+(defun cunt-verts (r g b a verts)
+  "linear translation of vertices"
+  (dolist (n verts)
+    (setf (sixth n) (* (sixth n) r))
+    (setf (seventh n) (* (seventh n) g))
+    (setf (eighth n) (* (eighth n) b))
+    (setf (ninth n) (* (ninth n) a)))
+  verts)
+
 (defun %damn-fuck (verts num)
   "converts 0-1 texcoords to terrain.png coords"
   (let* ((xtrans (mod num 16))
@@ -100,6 +142,10 @@
 (defun something... (a b c d e f)
   "get a block"
   (getblock (+ a (* 16 d)) (+ b (* 16 e))(+ c (* 16 f))))
+
+(defun something2... (a b c d e f)
+  "get a block"
+  (getlight (+ a (* 16 d)) (+ b (* 16 e))(+ c (* 16 f))))
 
 (defun chunk-shape (chunk coords)
   "turn a chunk into a shape, complete
@@ -123,22 +169,30 @@ with positions, textures, and colors. no normals tho or smooth lighting"
 		  (/= 0 (chunk-block chunk x y z))
 		  nil
 		  (= 0 (something... x y z io jo ko)))
-		 (= 0 (something... x y z io jo ko)))))
+		 (= 0 (something... x y z io jo ko))))
+	   (getlight (x y z)
+	     (something2... x y z io jo ko)))
       (dotimes (i il)
 	(dotimes (j jl)
 	  (dotimes (k kl)
 	    (let ((blockid (getblock i j k)))
 	      (if (not (zerop blockid))
-		  (let ((the-skin (aref blockIndexInTexture blockid)))
-		    (if (numberp the-skin)
-			(reduce
-			 #'add-verts
-			 (get-a-default-block-shape #'getempty the-skin i j k)
-			 :initial-value new-shape)
-			(reduce
-			 #'add-verts
-			 (get-a-variable-block-shape #'getempty i j k the-skin)
-			 :initial-value new-shape)))))))))
+		  (if (< blockid (length blockIndexInTexture))
+		      (let ((the-skin (aref blockIndexInTexture blockid)))
+			(if (numberp the-skin)
+			    (progn
+			      (let ((fineshape
+				     (get-a-default-block-shape #'getempty #'getlight
+								the-skin i j k)))
+				(reduce
+				 #'add-verts
+				 fineshape
+				 :initial-value new-shape)))
+			    (progn
+			      (reduce
+			       #'add-verts
+			       (get-a-variable-block-shape #'getempty i j k the-skin)
+			       :initial-value new-shape)))))))))))
     new-shape))
 
 (defun get-a-variable-block-shape (getempty i j k func)
@@ -193,29 +247,53 @@ a table of numbers and closures"
       (fuck-verts -0.0 -0.0 -0.0 1.0 f))
     lefaces))
 
-(defun get-a-default-block-shape (getempty skin i j k)
+(defun get-a-default-block-shape (getempty getlight skin i j k)
   "the default block shape. same texture every side."
   (let* ((faces nil))
     (if
      (funcall getempty (1+ i) j k)
-     (push (copy-tree i+face) faces))
+     (let ((lightface (funcall getlight (+ 1 i) (+ j) (+ k)))
+	   (newvert (copy-tree i+face)))
+       (lightvert newvert lightface)
+       (push newvert faces)))
     (if
      (funcall getempty (1- i) j k)
-     (push (copy-tree i-face) faces))
+     (let ((lightface (funcall getlight (+ -1 i) (+ j) (+ k)))
+	   (newvert (copy-tree i-face)))
+       (lightvert newvert lightface)
+       (push newvert faces)))
     (if
      (funcall getempty i (1+ j) k)
-     (push (copy-tree j+face) faces))
+     (let ((lightface (funcall getlight (+ i) (+ 1 j) (+ k)))
+	   (newvert (copy-tree j+face)))
+       (lightvert newvert lightface)
+       (push newvert faces)) )
     (if
      (funcall getempty i (1- j) k)
-     (push (copy-tree j-face) faces))
+     (let ((lightface (funcall getlight (+ i) (+ -1 j) (+ k)))
+	   (newvert (copy-tree j-face)))
+       (lightvert newvert lightface)
+       (push newvert faces)) )
     (if
      (funcall getempty i j (1+ k))
-     (push (copy-tree k+face) faces))
+     (let ((lightface (funcall getlight (+ i) (+ j) (+  1 k)))
+	   (newvert (copy-tree k+face)))
+       (lightvert newvert lightface)
+       (push newvert faces)) )
     (if
      (funcall getempty i j (1- k))
-     (push (copy-tree k-face) faces))
+     (let ((lightface (funcall getlight (+ i) (+ j) (+ -1 k)))
+	   (newvert (copy-tree k-face)))
+       (lightvert newvert lightface)
+       (push newvert faces)) )
     (dolist (face faces)
       (%damn-fuck face skin)
-      (increment-verts i j k face)
-      (fuck-verts -0.0 -0.0 -0.0 0.0 face))
+      (increment-verts i j k face))
     faces))
+
+(defun lightvert (vert light)
+  (let ((anum (expt 0.90 (- 15 light))))
+    (cunt-verts anum anum anum 1.0 vert)))
+
+;;0.9 for nether
+;;0.8 for overworld
