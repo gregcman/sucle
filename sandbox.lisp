@@ -36,6 +36,9 @@
 (defparameter dathread nil)
 
 (defparameter kill-button t)
+
+(defun hypot (list)
+  (sqrt (apply (function +) (mapcar (lambda (x) (* x x)) list))))
 (defun init ()
   "a mess of shit"
   (setq kill-button t)
@@ -67,6 +70,7 @@
      (declare (ignore value))
      (push key dirtychunks))
    chunkhash)
+  (setf dirtychunks (sort  dirtychunks (lambda (a b) (> (hypot a) (hypot b)))))
 
   (setf vaohash (make-hash-table :test #'equal))
   (setf phystimer (timer))
