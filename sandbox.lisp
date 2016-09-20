@@ -36,9 +36,6 @@
 (defparameter dathread nil)
 
 (defparameter kill-button t)
-
-(defun hypot (list)
-  (sqrt (apply (function +) (mapcar (lambda (x) (* x x)) list))))
 (defun init ()
   "a mess of shit"
   (setq kill-button t)
@@ -62,7 +59,7 @@
   
   (bind-shit "terrain.png")
 
-  (setf (simplecam-pos ourcam) (mat:onebyfour '(0 0 0 0)))
+  (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
   (setf dirtychunks nil)
   (maphash
@@ -70,7 +67,6 @@
      (declare (ignore value))
      (push key dirtychunks))
    chunkhash)
-  (setf dirtychunks (sort  dirtychunks (lambda (a b) (> (hypot a) (hypot b)))))
 
   (setf vaohash (make-hash-table :test #'equal))
   (setf phystimer (timer))

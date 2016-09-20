@@ -1568,9 +1568,9 @@
    'vector))
 
 (defparameter blockIndexInTexture
-  (coerce 
-   (let ((blist nil))
-     (dolist (ablock blocks)
-       (push (nth 29 ablock) blist))
-     (nreverse blist))
-   'vector))
+  (let ((thearray (make-array 256)))
+    (let ((counter 0))
+      (dolist (ablock blocks)
+	(setf (aref thearray counter) (nth 29 ablock))
+	(incf counter)))
+    thearray))

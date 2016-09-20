@@ -47,7 +47,7 @@
       (progn	  
 	(setf (row-major-aref cameraVelocity 1) 0)
 	(setf (row-major-aref (simplecam-pos camera) 1) 0)
-	(setf (simplecam-pos camera) (mat:onebyfour '(0 128 0 1))))))
+	(setf (simplecam-pos camera) (mat:onebyfour (list 0 128 0 1))))))
 
 (defun controls (camera)
   "mice look and keys move"

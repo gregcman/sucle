@@ -2,12 +2,13 @@
 
 (defun empty-chunk ()
   "makes an empty chunk"
-  (make-array '(16 16 16)))
+  (make-array '(16 16 16) :element-type '(unsigned-byte 8)))
 
 ;;chunkhash stores all of the chunks in a hasmap.
 ;;chunks accessed by '(x y z) in chunk coords
 (defparameter chunkhash (make-hash-table :test (function equal)))
 (defparameter lighthash (make-hash-table :test (function equal)))
+(defparameter skylighthash (make-hash-table :test (function equal)))
 
 ;;dirty chunks is a list of modified chunks 
 (defparameter dirtychunks nil)
@@ -70,6 +71,16 @@
 	      (chunk-block chunk xd yd zd)
 	      0))))))
 
+(defun skygetlight (i j k)
+  "gets a generic block in space"
+  (multiple-value-bind (x xd) (floor i 16)
+    (Multiple-value-bind (y yd) (floor j 16)
+      (multiple-value-bind (z zd) (floor k 16)
+	(let ((chunk (gethash (list x y z) skylighthash)))
+	  (if chunk
+	      (chunk-block chunk xd yd zd)
+	      0))))))
+
 (defun empty-chunk-at (key)
   "puts an empty chunk at the specified coords"
   (let ((newchunk (empty-chunk)))
@@ -89,7 +100,7 @@
 	      (setf chunk (empty-chunk-at pos)))
 	  (let ((old (chunk-block chunk xd yd zd)))
 	    (if (/= old blockid)
-		(setf (chunk-block chunk xd yd zd) blockid)
+		(setf (chunk-block chunk xd yd zd) (the (unsigned-byte 8) blockid))
 		nil)))))))
 
 (defun setblock-with-update (i j k blockid)
@@ -116,10 +127,15 @@ others know what happened"
     (if thechunk
 	(progn
 	  (let ((light (getlightlizz thechunk))
-		(blocks (getblockslizz thechunk)))
+		(blocks (getblockslizz thechunk))
+		(skylight (getskylightlizz thechunk)))
 	    (let ((counter 0))
 	      (dolist (n (sandbox::flat3-chunk light))
 		(setf (gethash (list x counter y) lighthash) n)
+		(incf counter)))
+	    (let ((counter 0))
+	      (dolist (n (sandbox::flat3-chunk skylight))
+		(setf (gethash (list x counter y) skylighthash) n)
 		(incf counter)))
 	    (let ((counter 0))
 	      (dolist (n (sandbox::flat3-chunk blocks))
@@ -127,8 +143,18 @@ others know what happened"
 		(pushnew (list x counter y) dirtychunks)
 		(incf counter))))))))
 
+(defun byte-read (path)
+  (with-open-file (stream path :element-type '(unsigned-byte 8))
+    (let* ((len (file-length stream))
+	   (data (make-array len :element-type '(unsigned-byte 8))))
+      (dotimes (n len)
+	(setf (aref data n) (read-byte stream)))
+      data)))
+
+(defparameter atest (byte-read #P "/home/imac/.minecraft/saves/fun world/region/r.-1.-1.mcr"))
+
 (defun helpchunk (x y)
-   (let ((thechunk  (cl-mc-shit:mcr-chunk cl-mc-shit::testchunk x y)))
+   (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
      (if thechunk
 	 (cl-mc-shit:chunk-data
 	       thechunk)
@@ -136,12 +162,20 @@ others know what happened"
 
 (defun expand-nibbles (vec)
   (let* ((len (length vec))
-	 (newvec (make-array (* 2 len))))
+	 (newvec (make-array (* 2 len) :element-type '(unsigned-byte 4))))
     (dotimes (x len)
       (multiple-value-bind (a b) (floor (aref vec x) 16)
 	(setf (aref newvec (* 2 x)) b)
 	(setf (aref newvec (1+ (* 2 x))) a)))
     newvec))
+
+(defun getskylightlizz (lizz)
+  (expand-nibbles
+   (gettag "SkyLight"
+	   (third
+	    (first
+	     (third
+	      lizz))))) )
 
 (defun getlightlizz (lizz)
   (expand-nibbles

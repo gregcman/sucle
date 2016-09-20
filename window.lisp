@@ -84,7 +84,7 @@
 	     (print condition)
 	     (get-mouse-out)
 	     (restart-case
-		 (let ((r (find-restart 'my-restart)))
+		 (let ((r (find-restart 'my-rxestart)))
 		   (invoke-restart r))
 	       (my-restart () (go huh))))))
        (funcall func))

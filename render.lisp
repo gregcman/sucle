@@ -57,21 +57,20 @@
 
 (defun squish (the-list type &key (biglength (length the-list)))
   "turns a list of identical vertices/indicis into a flat array for opengl"
-  (let* ((verts (make-array (* (length (car the-list)) biglength) :element-type type))
+  (let* ((siz (length (car the-list)))
+	 (verts (make-array (* siz biglength) :element-type type))
 	 (counter 0))
     (dolist (vert the-list)
-      (dolist (item vert)
-	(setf (aref verts counter) item)
+      (dotimes (item siz)
+	(setf (aref verts counter) (elt vert item))
 	(incf counter)))
     verts))
 
 (defun shape-vao (s)
   "converts a shape into a vao"
-  (let ((verts (squish (reverse (shape-vs s)) :float :biglength (shape-vertlength s)))
-	(indicies (squish (shape-is s) :unsigned-int)))
-    (create-vao
-     verts
-     indicies)))
+  (create-vao
+   (shape-vs s)
+   (shape-is s)))
 
 (defun to-gl-array (seq type
                     &key

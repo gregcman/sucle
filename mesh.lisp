@@ -5,10 +5,17 @@
 ;;increase the indices by the vertlength amount.
 
 (defstruct shape
-  is
-  vs
+  (is (make-array 0 :adjustable t :fill-pointer 0))
+  (vs (make-array 0 :adjustable t :fill-pointer 0))
   (vertlength 0)
   (indexlength 0))
+
+(defun destroy-shape (leshape)
+  (setf (fill-pointer (shape-is leshape)) 0)
+  (setf (fill-pointer (shape-vs leshape)) 0)
+  (setf (shape-vertlength leshape) 0)
+  (setf (shape-indexlength leshape) 0)
+  leshape)
 
 (defun tringulate (verts)
   "take some verts and make a polygon instead"
@@ -51,15 +58,13 @@
   (let* ((len (length verts))
 	 (offset (shape-vertlength s1)))
     (dotimes (n (- len 2))
-       (push
-       (list
-	offset
-	(+ offset 1 n)
-	(+ offset 2 n))
-       (shape-is s1)))
+      (vector-push-extend offset (shape-is s1))
+      (vector-push-extend (+ n 1 offset) (shape-is s1))
+      (vector-push-extend (+ n 2 offset) (shape-is s1)))
     (incf (shape-vertlength s1) len)
     (incf (shape-indexlength s1) (- len 2))
     (dolist (v verts)
-      (push v (shape-vs s1)))
+      (dotimes (n (length v))
+	(vector-push-extend (aref v n) (shape-vs s1))))
     s1))
 
