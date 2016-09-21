@@ -47,7 +47,7 @@
       (update-world-vao))
   (maphash
    (lambda (key vao)
-     (if (> 128 (distoplayer key (simplecam-pos camera)))
+     (if (> (+ (sqrt (* 3 16 16)) 128) (distoplayer key (simplecam-pos camera)))
 	 (progn
 	   (set-matrix
 	    "model"
