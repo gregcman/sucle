@@ -150,6 +150,7 @@ with positions, textures, and colors. no normals"
 	     (let ((fineshape
 		    (get-a-variable-block2-shape
 		     blockid
+		     (aref mc-blocks::blockIndexInTexture blockid)   
 		     (lambda (a b c)
 		       (getblock (+ a i) (+ b j) (+ c k)))
 		     (lambda (a b c)
@@ -210,26 +211,20 @@ with positions, textures, and colors. no normals"
       (push (list 'drawblockface n) tot))
     (nreverse tot)))
 
-(defun get-a-variable-block2-shape (blockid getempty betlight getskylightz)
-  "the default block shape. same texture every side."
-  (let* ((theskin (aref mc-blocks::blockIndexInTexture blockid))
-	 (the-skin (if (numberp theskin)
-		       (lambda (n) (declare (ignore n)) theskin)
-		       theskin)))   
-    (let* ((faces nil))
-
-      (actuallywow)
-      
-      (if (= 18 blockid)
-	  (let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
-	    (dolist (face faces)
-	      (cunt-verts
-	       (/ (elt colorizer 0) 256)
-	       (/ (elt colorizer 1) 256)
-	       (/ (elt colorizer 2) 256)
-	       (/ (elt colorizer 3) 256)
-	       face))))
-      faces)))
+(defun get-a-variable-block2-shape (blockid the-skin getempty betlight getskylightz)
+  "the default block shape. same texture every side." 
+  (let* ((faces nil))
+    (actuallywow) 
+    (if (= 18 blockid)
+	(let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
+	  (dolist (face faces)
+	    (cunt-verts
+	     (/ (elt colorizer 0) 256)
+	     (/ (elt colorizer 1) 256)
+	     (/ (elt colorizer 2) 256)
+	     (/ (elt colorizer 3) 256)
+	     face))))
+    faces))
 
 (defun lightfunc (light)
   (expt 0.8 (- 15 light)))

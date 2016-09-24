@@ -24,45 +24,43 @@
 					  (distoplayer a (simplecam-pos camera))
 					  (distoplayer b (simplecam-pos camera))))))
   (setf dirtychunks (remove nil dirtychunks))
-  (time
-   (let ((achunk (pop dirtychunks)))
-     (if achunk
-	 (progn
-	   (print achunk)
-	   (if mesher-thread
-	       (if (sb-thread:thread-alive-p mesher-thread)
-		   (push achunk dirtychunks)
-		   (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
-		     (if shape
-			 (setf (gethash coords vaohash) (shape-vao shape))
-			 (progn
-			   (print "wtf")
-			   (push coords dirtychunks)))
-		     (if (> (+ (sqrt (* 3 16 16)) 128) (distoplayer achunk (simplecam-pos camera)))
-			 (progn
-			   (setf mesher-thread
-				 (sb-thread:make-thread
-				  (lambda (achunk)
-				    (sb-thread:return-from-thread
-				     (values
-				      achunk
-				      (chunk-shape achunk))))
-				  :arguments (list achunk))))
-			 (push achunk dirtychunks))))
-	       (print "wtf"))))))
+  (let ((achunk (pop dirtychunks)))
+    (if achunk
+	(if nil
+	    (progn
+	      (setf (gethash achunk vaohash) (shape-vao (chunk-shape (first achunk)
+								     (second achunk)
+								     (third achunk)))))
+	    (progn
+	      (if mesher-thread
+		  (if (sb-thread:thread-alive-p mesher-thread)
+		      (push achunk dirtychunks)
+		      (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
+			(if shape
+			    (setf (gethash coords vaohash) (shape-vao shape))
+			    (progn
+			      (push coords dirtychunks)))
+			(if (> (+ (sqrt (* 3 16 16)) 128) (distoplayer achunk (simplecam-pos camera)))
+			    (progn
+			      (setf mesher-thread
+				    (sb-thread:make-thread
+				     (lambda (achunk)
+				       (sb-thread:return-from-thread
+					(values
+					 achunk
+					 (chunk-shape (first achunk)
+						      (second achunk)
+						      (third achunk)))))
+				     :arguments (list achunk))))
+			    (push achunk dirtychunks)))))))))
   
   (if (in:key-pressed-p #\g)
       (update-world-vao))
   (bind-shit "terrain.png")
   (maphash
    (lambda (key vao)
-     (if (> (+ (sqrt (* 3 16 16)) 128) (distoplayer key (simplecam-pos camera)))
-	 (progn
-	   (set-matrix
-	    "model"
-	    (mat:translation-matrix
-	     (* 16 (first key))(* 16 (second key)) (* 16 (third key))))
-	   (draw-vao vao))))
+     (declare (ignore key))
+     (draw-vao vao))
    vaohash)
   (gl:flush))
 

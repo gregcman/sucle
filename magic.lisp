@@ -10,7 +10,7 @@
 
 (defparameter texture-library (make-hash-table :test 'equal))
 (defparameter picture-library (make-hash-table :test 'equal))
-(defun load-png (name fi lename)
+(defun load-png (name filename)
   (setf (gethash name picture-library)
 	(flip-image (opticl:read-png-file filename))))
 
