@@ -21,10 +21,11 @@ float fogfunc(in float ledistance, out float daratio)
 void main()
 {
 
-	gl_Position = projection * view * model * vec4(position, 1.0f);
+	vec4 viewspace = view * model * vec4(position, 1.0f);
+	gl_Position = projection * viewspace;
 	TexCoord = texCoord;
 
-	fogfunc(gl_Position.z, fogratio);	
+	fogfunc(distance(vec3(viewspace.x, viewspace.y, viewspace.z), vec3(0, 0, 0)), fogratio);	
 	mycolor = color;
 	
 } 

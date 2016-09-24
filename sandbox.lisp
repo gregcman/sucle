@@ -113,7 +113,7 @@
   (render ourcam)
   (sdl:update-display))
 
-(defparameter ticks/sec 60)
+(defparameter ticks/sec 100)
 (defparameter tickscale (/ 20 ticks/sec))
 (defparameter phystimer nil)
 (defparameter physrate nil)

@@ -256,6 +256,10 @@ with positions, textures, and colors. no normals"
 (defun avg (&rest args)
   (/ (apply (function +) args) (length args)))
 
+;;buns r fun ahun
+(defun dayify (num)
+  (round (* daytime num)))
+
 (defun lightvert2 (face getlight a b unchange skylit)
   (dolist (vert face)
     (let ((foo (round (* 2 (elt vert a))))
@@ -268,10 +272,10 @@ with positions, textures, and colors. no normals"
 	(let ((foo (round (* 2 (elt vert a))))
 	      (bar (round (* 2 (elt vert b))))
 	      (qux (round (* 2 (elt vert unchange)))))
-	  (let* ((1dos (vec3getlight skylit (insert-at  qux (vector foo 0) unchange )))
-		 (1tres (vec3getlight skylit (insert-at qux (vector 0 bar) unchange )))
-		 (1quatro (vec3getlight skylit (insert-at qux (vector 0 0) unchange )))
-		 (1uno  (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))))
+	  (let* ((1dos (dayify (vec3getlight skylit (insert-at qux (vector foo 0) unchange ))))
+		 (1tres (dayify (vec3getlight skylit (insert-at qux (vector 0 bar) unchange ))))
+		 (1quatro (dayify (vec3getlight skylit (insert-at qux (vector 0 0) unchange ))))
+		 (1uno  (dayify (vec3getlight skylit (insert-at  qux (vector foo bar) unchange )))))
 	    (let ((anum (lightfunc (avg (max 1uno uno)
 					(max 1dos dos)
 					(max 1tres tres)

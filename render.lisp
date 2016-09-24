@@ -35,6 +35,12 @@
    (gl:get-uniform-location shaderProgram name)
    thenumber))
 
+(defun set-vec4 (name thevec4)
+  "sets a uniform integer"
+  (gl:uniformfv
+   (gl:get-uniform-location shaderProgram name)
+   thevec4))
+
 (defun load-and-make-shader (vpath fpath)
   "loads a shader from a filepath and puts it into a program"
   (make-shader-program-from-strings

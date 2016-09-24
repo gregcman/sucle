@@ -29,12 +29,14 @@
       
     (if (not onground)
 	(mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
-    (let ((airscaled (mat:onebyfour (list
-				     (row-major-aref cameraVelocity 0)
-				     0
-				     (row-major-aref cameraVelocity 2)
-				     0))))
-      (mat:scale! airscaled (* 0.6 0.91 0.5))
+    (let ((airscaled
+	   (mat:onebyfour
+	    (list
+	     (row-major-aref cameraVelocity 0)
+	     0
+	     (row-major-aref cameraVelocity 2)
+	     0))))
+      (mat:scale! airscaled (* 0.6 0.91 0.54))
       (setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
       (setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
     (setf (row-major-aref cameraVelocity 1)

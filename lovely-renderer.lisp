@@ -19,10 +19,13 @@
 	       (deg-rad (simplecam-fov camera))
 	       (/ out::pushed-width out::pushed-height) 0.01 128)) 
   (set-matrix "model" (mat:identity-matrix))
-  (setf dirtychunks (sort  dirtychunks
-			   (lambda (a b) (<
-					  (distoplayer a (simplecam-pos camera))
-					  (distoplayer b (simplecam-pos camera))))))
+  (setf dirtychunks
+	(sort
+	 dirtychunks
+	 (lambda (a b)
+	   (<
+	    (distoplayer a (simplecam-pos camera))
+	    (distoplayer b (simplecam-pos camera))))))
   (setf dirtychunks (remove nil dirtychunks))
   (let ((achunk (pop dirtychunks)))
     (if achunk
@@ -53,7 +56,8 @@
 						      (third achunk)))))
 				     :arguments (list achunk))))
 			    (push achunk dirtychunks)))))))))
-  
+
+  (settime)
   (if (in:key-pressed-p #\g)
       (update-world-vao))
   (bind-shit "terrain.png")
@@ -63,6 +67,26 @@
      (draw-vao vao))
    vaohash)
   (gl:flush))
+
+(defparameter daytime 1.0)
+
+(defun settime ()
+  (setnight daytime))
+
+(defun setnight (val)
+  (let ((a (lightstuff val)))
+    (gl:clear-color  
+     (* a 0.68)
+     (* a 0.8)
+     (* a 1.0) 1.0)
+    (set-vec4 "fogcolor"
+	      (vector
+	       (* a 0.68)
+	       (* a 0.8)
+	       (* a 1.0) 1.0))))
+
+(defun lightstuff (num)
+  (expt 0.8 (- 15 (* 15  num))))
 
 (defparameter mesher-thread nil)
 
@@ -90,7 +114,7 @@
   (maphash
    (lambda (k v)
      (declare (ignore v))
-     (pushnew (unchunkhashfunc k) dirtychunks))
+     (pushnew (unchunkhashfunc k) dirtychunks :test #'equal))
    chunkhash))
 
 (defmacro progno (&rest nope))
@@ -99,9 +123,6 @@
   "opengl initializing things"
   (setf mesher-thread (sb-thread:make-thread (lambda ())))
   (setf dirtychunks nil)
-  (if nil
-      (gl:clear-color 0 0 0 1)
-      (gl:clear-color 0.68 0.8 1.0 1.0))
   (gl:enable :depth-test)
   (gl:disable :blend)
   (gl:enable :cull-face)

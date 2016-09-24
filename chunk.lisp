@@ -108,7 +108,7 @@
 	(let ((chunk nil))
 	  (setf chunk (getchunkat skylighthash x y z))
 	  (if chunk
-	      (round (* (get-chunk-block chunk xd yd zd) 15/15))
+	      (round (get-chunk-block chunk xd yd zd))
 	      15))))))
 
 (defun empty-chunk-at (x y z)
