@@ -65,6 +65,8 @@
     (incf (shape-indexlength s1) (- len 2))
     (dolist (v verts)
       (dotimes (n (length v))
-	(vector-push-extend (aref v n) (shape-vs s1))))
+	(let ((indivdata (aref v n)))
+	  (dotimes (q (length indivdata))
+	    (vector-push-extend (aref indivdata q) (shape-vs s1))))))
     s1))
 

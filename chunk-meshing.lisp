@@ -1,117 +1,122 @@
 (in-package :sandbox)
 
-;;this file takes chunk data and turns
-;; it into a mesh. The mesh is passed
-;; to the renderer for rendering
-
-;;a list of faces and colors which are
-;;not abstracted away
-
-(progn
- (defun i-face ()
-   (list (vector -0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6)
-	 (vector -0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6)
-	 (vector -0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6)
-	 (vector -0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6)))
- (defun i+face ()
-   (list (vector 0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6)
-	 (vector 0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6)
-	 (vector 0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6)
-	 (vector 0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6)))
- (defun j-face ()
-   (list (vector -0.5 -0.5 -0.5  0.0 0.0  0.5 0.5 0.5 0.3)
-	 (vector 0.5 -0.5 -0.5  1.0 0.0 0.5 0.5 0.5 0.3)
-	 (vector 0.5 -0.5  0.5  1.0 1.0  0.5 0.5 0.5 0.3)
-	 (vector -0.5 -0.5  0.5  0.0 1.0  0.5 0.5 0.5 0.3)))
- (defun j+face ()
-   (list (vector -0.5 0.5 0.5 0.0 1.0  1.0 1.0 1.0 1.0)
-	 (vector 0.5 0.5 0.5 1.0 1.0  1.0 1.0 1.0 1.0)
-	 (vector 0.5 0.5 -0.5 1.0 0.0  1.0 1.0 1.0 1.0)
-	 (vector -0.5 0.5 -0.5 0.0 0.0  1.0 1.0 1.0 1.0)))
- (defun k-face ()
-   (list (vector -0.5 0.5 -0.5 0.0 1.0  0.8 0.8 0.8 0.8)
-	 (vector 0.5 0.5 -0.5 1.0 1.0  0.8 0.8 0.8 0.8)
-	 (vector 0.5 -0.5 -0.5 1.0 0.0  0.8 0.8 0.8 0.8)
-	 (vector -0.5 -0.5 -0.5 0.0 0.0  0.8 0.8 0.8 0.8)))
- (defun k+face ()
-   (list (vector -0.5 -0.5  0.5  0.0 0.0 0.8 0.8 0.8 0.8)
-	 (vector 0.5 -0.5  0.5  1.0 0.0  0.8 0.8 0.8 0.8)
-	 (vector 0.5  0.5  0.5  1.0 1.0  0.8 0.8 0.8 0.8)
-	 (vector -0.5  0.5  0.5  0.0 1.0 0.8 0.8 0.8 0.8))))
+;;i- i+ j- j+ k- k+
 
 (defparameter blockfaces
   (vector
    (lambda ()
-     (list (vector -0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6)
-	   (vector -0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6)
-	   (vector -0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6)
-	   (vector -0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6)))
+     (list
+      (vertex
+       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.6))
+      (vertex
+       (pos -0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6))
+      (vertex
+       (pos -0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6))
+      (vertex
+       (pos -0.5  0.5 -0.5) (uv 0.0 1.0) (opgray 0.6))))
    (lambda ()
-     (list (vector 0.5 -0.5  0.5  1.0 0.0  0.6 0.6 0.6 0.6)
-	   (vector 0.5 -0.5 -0.5  0.0 0.0  0.6 0.6 0.6 0.6)
-	   (vector 0.5  0.5 -0.5  0.0 1.0  0.6 0.6 0.6 0.6)
-	   (vector 0.5  0.5  0.5  1.0 1.0  0.6 0.6 0.6 0.6)))
+     (list
+      (vertex
+       (pos 0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.6))
+      (vertex
+       (pos 0.5  0.5 -0.5)  (uv 0.0 1.0) (opgray 0.6))
+      (vertex
+       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6))
+      (vertex
+       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6))))
    (lambda ()
-     (list (vector -0.5 -0.5 -0.5  0.0 0.0  0.5 0.5 0.5 0.3)
-	   (vector 0.5 -0.5 -0.5  1.0 0.0 0.5 0.5 0.5 0.3)
-	   (vector 0.5 -0.5  0.5  1.0 1.0  0.5 0.5 0.5 0.3)
-	   (vector -0.5 -0.5  0.5  0.0 1.0  0.5 0.5 0.5 0.3)))
+     (list
+      (vertex
+       (pos -0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.5))
+      (vertex
+       (pos 0.5 -0.5 -0.5)  (uv 1.0 0.0)  (opgray 0.5))
+      (vertex
+       (pos 0.5 -0.5  0.5)  (uv 1.0 1.0)  (opgray 0.5))
+      (vertex
+       (pos -0.5 -0.5  0.5)  (uv 0.0 1.0) (opgray 0.5) )))
    (lambda ()
-     (list (vector -0.5 0.5 0.5 0.0 1.0  1.0 1.0 1.0 1.0)
-	   (vector 0.5 0.5 0.5 1.0 1.0  1.0 1.0 1.0 1.0)
-	   (vector 0.5 0.5 -0.5 1.0 0.0  1.0 1.0 1.0 1.0)
-	   (vector -0.5 0.5 -0.5 0.0 0.0  1.0 1.0 1.0 1.0)))
+     (list
+      (vertex
+       (pos -0.5 0.5 -0.5) (uv 0.0 0.0) (opgray 1.0))
+      (vertex
+       (pos -0.5 0.5 0.5) (uv 0.0 1.0) (opgray 1.0))
+      (vertex
+       (pos 0.5 0.5 0.5) (uv 1.0 1.0) (opgray 1.0))
+      (vertex
+       (pos 0.5 0.5 -0.5) (uv 1.0 0.0) (opgray 1.0))))
    (lambda ()
-     (list (vector -0.5 0.5 -0.5 0.0 1.0  0.8 0.8 0.8 0.8)
-	   (vector 0.5 0.5 -0.5 1.0 1.0  0.8 0.8 0.8 0.8)
-	   (vector 0.5 -0.5 -0.5 1.0 0.0  0.8 0.8 0.8 0.8)
-	   (vector -0.5 -0.5 -0.5 0.0 0.0  0.8 0.8 0.8 0.8)))
+     (list
+      (vertex
+       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.8))
+      (vertex
+       (pos -0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 0.8))
+      (vertex
+       (pos 0.5 0.5 -0.5) (uv 1.0 1.0) (opgray 0.8))
+      (vertex
+       (pos 0.5 -0.5 -0.5) (uv 1.0 0.0) (opgray 0.8))))
    (lambda ()
-     (list (vector -0.5 -0.5  0.5  0.0 0.0 0.8 0.8 0.8 0.8)
-	   (vector 0.5 -0.5  0.5  1.0 0.0  0.8 0.8 0.8 0.8)
-	   (vector 0.5  0.5  0.5  1.0 1.0  0.8 0.8 0.8 0.8)
-	   (vector -0.5  0.5  0.5  0.0 1.0 0.8 0.8 0.8 0.8)))))
+     (list
+      (vertex
+       (pos -0.5 -0.5  0.5)  (uv 0.0 0.0)(opgray 0.8) )
+      (vertex
+       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.8))
+      (vertex
+       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.8))
+      (vertex
+       (pos -0.5  0.5  0.5)  (uv 0.0 1.0) (opgray 0.8))))))
+
+(defun opgray (val)
+  (rgba val val val 1.0))
+(defun vertex (&rest args)
+  (make-array (length args) :initial-contents args))
+(defun rgba (r g b a)
+  (vector r g b a))
+(defun pos (x y z)
+  (vector x y z))
+(defun uv (u v)
+  (vector u v))
 
 ;;current layout: 3 position floats, 2 texcoord floats, 4 color floats
 
 (defun increment-verts (x y z verts)
   "linear translation of vertices"
   (dolist (n verts)
-    (incf (aref n 0) x)
-    (incf (aref n 1) y)
-    (incf (aref n 2) z))
+    (let ((pos (elt n 0)))
+      (incf (aref pos 0) x)
+      (incf (aref pos 1) y)
+      (incf (aref pos 2) z)))
   verts)
 
 (defun fuck-verts (r g b a verts)
-  "linear translation of vertices"
   (dolist (n verts)
-    (incf (aref n 5) r)
-    (incf (aref n 6) g)
-    (incf (aref n 7) b)
-    (incf (aref n 8) a))
+    (let ((color (elt n 2)))
+      (incf (aref color 0) r)
+      (incf (aref color 1) g)
+      (incf (aref color 2) b)
+      (incf (aref color 3) a)))
   verts)
 
 (defun cunt-verts (r g b a verts)
-  "linear translation of vertices"
   (dolist (n verts)
-    (cunt-vert r g b a n))
+    (cunt-vert r g b a (elt n 2)))
   verts)
 
 (defun cunt-vert (r g b a n)
   "colorize a vertex"
-  (setf (aref n 5) (* (aref n 5) r))
-  (setf (aref n 6) (* (aref n 6) g))
-  (setf (aref n 7) (* (aref n 7) b))
-  (setf (aref n 8) (* (aref n 8) a))
+  (setf (aref n 0) (* (aref n 0) r))
+  (setf (aref n 1) (* (aref n 1) g))
+  (setf (aref n 2) (* (aref n 2) b))
+  (setf (aref n 3) (* (aref n 3) a))
   n)
 
 (defun %damn-fuck (verts num)
   "converts 0-1 texcoords to terrain.png coords"
   (let* ((xtrans (mod num 16))
 	 (ytrans (- 15 (/ (- num xtrans) 16))))
-    (dolist (v verts)
-      (setf (aref v 3) (+ (/ (aref v 3) 16) (/ xtrans 16)))
-      (setf (aref v 4) (+ (/ (aref v 4) 16) (/  ytrans 16))))
+    (dolist (vim verts)
+      (let ((v (elt vim 1)))
+	(setf (aref v 0) (+ (/ (aref v 0) 16) (/ xtrans 16)))
+	(setf (aref v 1) (+ (/ (aref v 1) 16) (/  ytrans 16)))))
     verts))
 
 (defparameter shapebuffer (make-shape))
@@ -165,15 +170,6 @@ with positions, textures, and colors. no normals"
 		:initial-value new-shape)))))))
     new-shape))
 
-(if (= 0 thetex)
-    (let ((colorizer (getapixel 0 255 (gethash "grasscolor.png" picture-library))))
-      (cunt-verts
-       (/ (elt colorizer 0) 256)
-       (/ (elt colorizer 1) 256)
-       (/ (elt colorizer 2) 256)
-       (/ (elt colorizer 3) 256)
-       newvert)))
-
 (defun meep (n)
   (let ((position nil)
 	(val nil))
@@ -215,9 +211,9 @@ with positions, textures, and colors. no normals"
   (let* ((faces (make-array 6 :initial-element nil)))
     (actuallywow)
 
-    (dotimes (n 6)
-      (let ((newvert (aref faces n)))
-	(%damn-fuck newvert (funcall the-skin n))))
+    (progn (dotimes (n 6)
+	     (let ((newvert (aref faces n)))
+	       (%damn-fuck newvert (funcall the-skin n)))))
     (progn
      (if (= 18 blockid)
 	 (let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
@@ -261,26 +257,28 @@ with positions, textures, and colors. no normals"
   (round (* daytime num)))
 
 (defun lightvert2 (face getlight a b unchange skylit)
-  (dolist (vert face)
-    (let ((foo (round (* 2 (elt vert a))))
-	  (bar (round (* 2 (elt vert b))))
-	  (qux (round (* 2 (elt vert unchange)))))
-      (let ((uno (vec3getlight getlight (insert-at  qux (vector foo bar) unchange )))
-	    (dos (vec3getlight getlight (insert-at  qux (vector foo 0) unchange )))
-	    (tres (vec3getlight getlight (insert-at qux (vector 0 bar) unchange )))
-	    (quatro (vec3getlight getlight (insert-at qux (vector 0 0) unchange ))))
-	(let ((foo (round (* 2 (elt vert a))))
-	      (bar (round (* 2 (elt vert b))))
-	      (qux (round (* 2 (elt vert unchange)))))
-	  (let* ((1dos (dayify (vec3getlight skylit (insert-at qux (vector foo 0) unchange ))))
-		 (1tres (dayify (vec3getlight skylit (insert-at qux (vector 0 bar) unchange ))))
-		 (1quatro (dayify (vec3getlight skylit (insert-at qux (vector 0 0) unchange ))))
-		 (1uno  (dayify (vec3getlight skylit (insert-at  qux (vector foo bar) unchange )))))
-	    (let ((anum (lightfunc (avg (max 1uno uno)
-					(max 1dos dos)
-					(max 1tres tres)
-					(max 1quatro quatro)))))
-	      (cunt-vert anum anum anum 1.0 vert))))))))
+  (dolist (v face)
+    (let ((vert (elt v 0)))
+      
+      (let ((foo (round (* 2 (elt vert a))))
+	    (bar (round (* 2 (elt vert b))))
+	    (qux (round (* 2 (elt vert unchange)))))
+	(let ((uno (vec3getlight getlight (insert-at  qux (vector foo bar) unchange )))
+	      (dos (vec3getlight getlight (insert-at  qux (vector foo 0) unchange )))
+	      (tres (vec3getlight getlight (insert-at qux (vector 0 bar) unchange )))
+	      (quatro (vec3getlight getlight (insert-at qux (vector 0 0) unchange ))))
+	  (let ((foo (round (* 2 (elt vert a))))
+		(bar (round (* 2 (elt vert b))))
+		(qux (round (* 2 (elt vert unchange)))))
+	    (let* ((1dos (dayify (vec3getlight skylit (insert-at qux (vector foo 0) unchange ))))
+		   (1tres (dayify (vec3getlight skylit (insert-at qux (vector 0 bar) unchange ))))
+		   (1quatro (dayify (vec3getlight skylit (insert-at qux (vector 0 0) unchange ))))
+		   (1uno  (dayify (vec3getlight skylit (insert-at  qux (vector foo bar) unchange )))))
+	      (let ((anum (lightfunc (avg (max 1uno uno)
+					  (max 1dos dos)
+					  (max 1tres tres)
+					  (max 1quatro quatro)))))
+		(cunt-vert anum anum anum 1.0 (elt v 2))))))))))
 
 ;;0.9 for nether
 ;;0.8 for overworld
