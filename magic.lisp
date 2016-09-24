@@ -10,7 +10,7 @@
 
 (defparameter texture-library (make-hash-table :test 'equal))
 (defparameter picture-library (make-hash-table :test 'equal))
-(defun load-png (name filename)
+(defun load-png (name fi lename)
   (setf (gethash name picture-library)
 	(flip-image (opticl:read-png-file filename))))
 
@@ -43,6 +43,16 @@
     (dotimes (x total-size)
       (setf (aref new-array x) (row-major-aref some-array x)))
     new-array))
+
+(defun getapixel (x y somepic)
+  (let* ((dims (array-dimensions somepic))
+	 (width (first dims))
+	 (depth (third dims)))
+    (let ((basenum (+ (*  depth width y) (* depth x))))
+      (vector (row-major-aref somepic (+ 0 basenum))
+	      (row-major-aref somepic (+ 1 basenum))
+	      (row-major-aref somepic (+ 2 basenum))
+	      (row-major-aref somepic (+ 3 basenum))))))
 
 (defun flip-image(darray)
   (let* ((dims (array-dimensions darray))
@@ -125,6 +135,14 @@
        "moon.png" "sun.png")
       ("title/"
        "black.png" "mclogo.png" "mojang.png"))))
+
+(defun byte-read (path)
+  (with-open-file (stream path :element-type '(unsigned-byte 8))
+    (let* ((len (file-length stream))
+	   (data (make-array len :element-type '(unsigned-byte 8))))
+      (dotimes (n len)
+	(setf (aref data n) (read-byte stream)))
+      data)))
 
 (defparameter texturesloaded? nil)
 

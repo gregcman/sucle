@@ -63,7 +63,14 @@
 
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
+  (setf dirtychunks nil)
+  (maphash
+   (lambda (key value)
+     (declare (ignore value))
+     (push key dirtychunks))
+   chunkhash)
 
+  (setf vaohash (make-hash-table :test #'equal))
   (setf phystimer (timer))
   (setf rendertimer (timer))
   (setf physthread (loud-thread #'physthread "physics"))

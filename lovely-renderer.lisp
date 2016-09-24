@@ -7,6 +7,7 @@
 (defun render (camera)
   "responsible for rendering the world"
   (gl:clear :color-buffer-bit :depth-buffer-bit)
+  (setf (simplecam-fov camera) 70)
   (set-matrix "view"
 	      (mat:easy-lookat
 	       (mat:add #2A((0 1.5 0 0))
@@ -23,28 +24,36 @@
 					  (distoplayer a (simplecam-pos camera))
 					  (distoplayer b (simplecam-pos camera))))))
   (setf dirtychunks (remove nil dirtychunks))
-  (let ((achunk (pop dirtychunks)))	
-    (if mesher-thread
-	(if (sb-thread:thread-alive-p mesher-thread)
-	    (if achunk
-		(push achunk dirtychunks))
-	    (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
-	      (if shape
-		  (setf (gethash coords vaohash) (shape-vao shape))
-		  (progn
-		    (push coords dirtychunks)))
-	      (progn
-		(setf mesher-thread
-		      (sb-thread:make-thread
-		       (lambda (achunk)
-			 (sb-thread:return-from-thread
-			  (values
-			   achunk
-			   (chunk-shape achunk))))
-		       :arguments (list achunk))))))))
+  (time
+   (let ((achunk (pop dirtychunks)))
+     (if achunk
+	 (progn
+	   (print achunk)
+	   (if mesher-thread
+	       (if (sb-thread:thread-alive-p mesher-thread)
+		   (push achunk dirtychunks)
+		   (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
+		     (if shape
+			 (setf (gethash coords vaohash) (shape-vao shape))
+			 (progn
+			   (print "wtf")
+			   (push coords dirtychunks)))
+		     (if (> (+ (sqrt (* 3 16 16)) 128) (distoplayer achunk (simplecam-pos camera)))
+			 (progn
+			   (setf mesher-thread
+				 (sb-thread:make-thread
+				  (lambda (achunk)
+				    (sb-thread:return-from-thread
+				     (values
+				      achunk
+				      (chunk-shape achunk))))
+				  :arguments (list achunk))))
+			 (push achunk dirtychunks))))
+	       (print "wtf"))))))
   
   (if (in:key-pressed-p #\g)
       (update-world-vao))
+  (bind-shit "terrain.png")
   (maphash
    (lambda (key vao)
      (if (> (+ (sqrt (* 3 16 16)) 128) (distoplayer key (simplecam-pos camera)))
@@ -82,7 +91,8 @@
   "updates all of the vaos in the chunkhash. takes a long time"
   (maphash
    (lambda (k v)
-     (pushnew k dirtychunks))
+     (declare (ignore v))
+     (pushnew (unchunkhashfunc k) dirtychunks))
    chunkhash))
 
 (defmacro progno (&rest nope))
@@ -90,6 +100,7 @@
 (defun glinnit ()
   "opengl initializing things"
   (setf mesher-thread (sb-thread:make-thread (lambda ())))
+  (setf dirtychunks nil)
   (if nil
       (gl:clear-color 0 0 0 1)
       (gl:clear-color 0.68 0.8 1.0 1.0))
@@ -99,6 +110,8 @@
   (gl:cull-face :back)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (gl:active-texture :texture0)
+
+  (setf vaohash (make-hash-table :test #'equal))
   
   (setq shaderProgram
 	(load-and-make-shader

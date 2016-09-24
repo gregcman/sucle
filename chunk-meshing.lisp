@@ -65,7 +65,7 @@
   verts)
 
 (defun cunt-vert (r g b a n)
-  "linear translation of vertice, ns the vert dumbass"
+  "colorize a vertex"
   (setf (aref n 5) (* (aref n 5) r))
   (setf (aref n 6) (* (aref n 6) g))
   (setf (aref n 7) (* (aref n 7) b))
@@ -97,14 +97,9 @@
 
 (defun chunk-shape (coords)
   "turn a chunk into a shape, complete
-with positions, textures, and colors. no normals tho or smooth lighting"
-  (if (gethash coords chunkhash)
-      (let* ((chunk (gethash coords chunkhash))
-	     (new-shape (destroy-shape shapebuffer))
-	     (dims (array-dimensions chunk))
-	     (il (first dims))
-	     (jl (second dims))
-	     (kl (third dims))
+with positions, textures, and colors. no normals"
+  (if (apply #'chunkexistsat coords)
+      (let* ((new-shape (destroy-shape shapebuffer))
 	     (io (first coords))
 	     (jo (second coords))
 	     (ko (third coords)))
@@ -114,34 +109,35 @@ with positions, textures, and colors. no normals tho or smooth lighting"
 		 (something2... x y z io jo ko))
 	       (getskylight (x y z)
 		 (something3... x y z io jo ko)))
-	  (time
-	   (dotimes (i il)
-	     (dotimes (j jl)
-	       (dotimes (k kl)
-		 (let ((blockid (getablock i j k)))
-		   (if (not (zerop blockid))
-		       (let ((the-skin (aref blockIndexInTexture blockid)))
-			 (if (numberp the-skin)
-			     
-			     (progn
-			       (let ((fineshape
-				      (get-a-default-block2-shape #'getablock #'getlight
+	  (dotimes (i 16)
+	    (dotimes (j 16)
+	      (dotimes (k 16)
+		(let ((blockid (getablock i j k)))
+		  (if (not (zerop blockid))
+		      (let ((the-skin (aref mc-blocks::blockIndexInTexture blockid)))
+			(if (numberp the-skin)
+			    
+			    (progn
+			      (let ((fineshape
+				     (get-a-variable-block2-shape blockid #'getablock #'getlight
 								  #'getskylight
-								  the-skin i j k)))
-				 (reduce
-				  #'add-verts
-				  fineshape
-				  :initial-value new-shape)))
-			     (progn
-			       (reduce
-				#'add-verts
-				(get-a-variable-block2-shape #'getablock #'getlight
-							     #'getskylight
-							     the-skin i j k)
-				:initial-value new-shape)))))))))))
+								  (lambda (x)
+								    (declare (ignore x))
+								    the-skin) i j k)))
+				(reduce
+				 #'add-verts
+				 fineshape
+				 :initial-value new-shape)))
+			    (progn
+			      (reduce
+			       #'add-verts
+			       (get-a-variable-block2-shape blockid #'getablock #'getlight
+							    #'getskylight
+							    the-skin i j k)
+			       :initial-value new-shape))))))))))
 	new-shape)))
 
-(defun get-a-variable-block2-shape (getempty getlight fuckme the-skin i j k)
+(defun get-a-variable-block2-shape (blockid getempty getlight fuckme the-skin i j k)
   "the default block shape. same texture every side."
   (let ((betlight
 	 (lambda (a b c)
@@ -160,13 +156,22 @@ with positions, textures, and colors. no normals tho or smooth lighting"
        (zerop (funcall getempty (1- i) j k))
        (let ((newvert (i-face)))
 	 (lightvert2 newvert betlight 1 2 0 getskylightz)
-	  (%damn-fuck newvert (funcall the-skin 2))
+	 (%damn-fuck newvert (funcall the-skin 2))
 	 (push newvert faces)))
       (if
        (zerop (funcall getempty i (1+ j) k))
        (let ((newvert (j+face)))
 	 (lightvert2 newvert betlight 0 2 1 getskylightz)
-	  (%damn-fuck newvert (funcall the-skin 1))
+	 (let ((thetex (funcall the-skin 1)))
+	   (%damn-fuck newvert thetex)
+	   (if (= 0 thetex)
+	       (let ((colorizer (getapixel 0 255 (gethash "grasscolor.png" picture-library))))
+		 (cunt-verts
+		  (/ (elt colorizer 0) 256)
+		  (/ (elt colorizer 1) 256)
+		  (/ (elt colorizer 2) 256)
+		  (/ (elt colorizer 3) 256)
+		  newvert))))
 	 (push newvert faces)) )
       (if
        (zerop  (funcall getempty i (1- j) k))
@@ -186,51 +191,16 @@ with positions, textures, and colors. no normals tho or smooth lighting"
 	 (lightvert2 newvert betlight 0 1 2 getskylightz)
 	 (%damn-fuck newvert (funcall the-skin 4))
 	 (push newvert faces)))
+      (if (= 18 blockid)
+	  (let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
+	    (dolist (face faces)
+	      (cunt-verts
+	       (/ (elt colorizer 0) 256)
+	       (/ (elt colorizer 1) 256)
+	       (/ (elt colorizer 2) 256)
+	       (/ (elt colorizer 3) 256)
+	       face))))
       (dolist (face faces)
-	(increment-verts i j k face))
-      faces)))
-
-(defun get-a-default-block2-shape (getempty getlight fuckme skin i j k)
-  "the default block shape. same texture every side."
-  (let ((betlight
-	 (lambda (a b c)
-	   (funcall getlight (+ a i) (+ b j) (+ c k))))
-	(getskylightz
-	 (lambda (a b c)
-	   (funcall fuckme (+ a i) (+ b j) (+ c k)))))
-    (let* ((faces nil))
-      (if
-       (zerop (funcall getempty (1+ i) j k))
-       (let ((newvert (i+face)))
-	 (lightvert2 newvert betlight 1 2 0 getskylightz)
-	 (push newvert faces)))
-      (if
-       (zerop (funcall getempty (1- i) j k))
-       (let ((newvert (i-face)))
-	 (lightvert2 newvert betlight 1 2 0 getskylightz)
-	 (push newvert faces)))
-      (if
-       (zerop (funcall getempty i (1+ j) k))
-       (let ((newvert (j+face)))
-	 (lightvert2 newvert betlight 0 2 1 getskylightz)
-	 (push newvert faces)) )
-      (if
-       (zerop  (funcall getempty i (1- j) k))
-       (let ((newvert (j-face)))
-	 (lightvert2 newvert betlight 0 2 1 getskylightz)
-	 (push newvert faces)) )
-      (if
-       (zerop  (funcall getempty i j (1+ k)))
-       (let ((newvert (k+face)))
-	 (lightvert2 newvert betlight 0 1 2 getskylightz)
-	 (push newvert faces)))
-      (if
-       (zerop  (funcall getempty i j (1- k)))
-        (let ((newvert (k-face)))
-	 (lightvert2 newvert betlight 0 1 2 getskylightz)
-	 (push newvert faces)))
-      (dolist (face faces)
-	(%damn-fuck face skin)
 	(increment-verts i j k face))
       faces)))
 
@@ -272,7 +242,10 @@ with positions, textures, and colors. no normals tho or smooth lighting"
 			   (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))
 			   0)))
 					;	(print 3434)
-	    (let ((anum (lightfunc (max (avg uno dos tres quatro) (avg 1uno 1dos 1tres 1quatro)))))
+	    (let ((anum (lightfunc (avg (max 1uno uno)
+					(max 1dos dos)
+					(max 1tres tres)
+					(max 1quatro quatro)))))
 	      (cunt-vert anum anum anum 1.0 vert))))))))
 
 ;;0.9 for nether
