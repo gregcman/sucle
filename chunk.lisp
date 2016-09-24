@@ -40,7 +40,8 @@
 	(empty-chunk))))
 
 (defun clearchunk (achunk)
-  (nsubst-if-not 0 #'zerop achunk))
+  (nsubstitute-if-not 0 #'zerop achunk)
+  achunk)
 
 (defun plus2^19 (n)
   (declare (type fixnum n))
@@ -114,7 +115,7 @@
   (let ((oldchunk (getchunkat chunkhash x y z)))
     (if oldchunk
 	(clearchunk oldchunk)
-	(setchunkat x y z (getachunk)))))
+	(setchunkat x y z (clearchunk (getachunk))))))
 
 (defun destroy-chunk-at (x y z)
   (let ((oldchunk (getchunkat chunkhash x y z)))

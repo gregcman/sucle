@@ -150,6 +150,7 @@ with positions, textures, and colors. no normals"
 	     (let ((fineshape
 		    (get-a-variable-block2-shape
 		     blockid
+		     (aref mc-blocks::blockIndexInTexture blockid)   
 		     (lambda (a b c)
 		       (getblock (+ a i) (+ b j) (+ c k)))
 		     (lambda (a b c)
@@ -202,34 +203,42 @@ with positions, textures, and colors. no normals"
 	  (zerop blockidnexttome)
 	  (let ((newvert (funcall (elt blockfaces ,(fourth vals)))))
 	    (lightvert2 newvert betlight ,@b getskylightz)
-	    (%damn-fuck newvert (funcall the-skin ,side))
-	    (push newvert faces)))))))
+	    (setf (aref faces ,side) newvert)))))))
 (defmacro actuallywow ()
   (let ((tot (list 'progn)))
     (dotimes (n 6)
       (push (list 'drawblockface n) tot))
     (nreverse tot)))
 
-(defun get-a-variable-block2-shape (blockid getempty betlight getskylightz)
-  "the default block shape. same texture every side."
-  (let* ((theskin (aref mc-blocks::blockIndexInTexture blockid))
-	 (the-skin (if (numberp theskin)
-		       (lambda (n) (declare (ignore n)) theskin)
-		       theskin)))   
-    (let* ((faces nil))
+(defun get-a-variable-block2-shape (blockid the-skin getempty betlight getskylightz)
+  "the default block shape. same texture every side." 
+  (let* ((faces (make-array 6 :initial-element nil)))
+    (actuallywow)
 
-      (actuallywow)
-      
-      (if (= 18 blockid)
-	  (let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
-	    (dolist (face faces)
-	      (cunt-verts
-	       (/ (elt colorizer 0) 256)
-	       (/ (elt colorizer 1) 256)
-	       (/ (elt colorizer 2) 256)
-	       (/ (elt colorizer 3) 256)
-	       face))))
-      faces)))
+    (dotimes (n 6)
+      (let ((newvert (aref faces n)))
+	(%damn-fuck newvert (funcall the-skin n))))
+    (progn
+     (if (= 18 blockid)
+	 (let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
+	   (dotimes (vert 6)
+	     (let ((face (elt faces vert)))
+	       (cunt-verts
+		(/ (elt colorizer 0) 256)
+		(/ (elt colorizer 1) 256)
+		(/ (elt colorizer 2) 256)
+		(/ (elt colorizer 3) 256)
+		face)))))
+     (if (= 2 blockid)
+	 (let ((colorizer (getapixel 0 255 (gethash "grasscolor.png" picture-library))))
+	   (let ((face (elt faces 1)))
+	     (cunt-verts
+	      (/ (elt colorizer 0) 256)
+	      (/ (elt colorizer 1) 256)
+	      (/ (elt colorizer 2) 256)
+	      (/ (elt colorizer 3) 256)
+	      face)))))
+    (coerce (delete nil faces) 'list)))
 
 (defun lightfunc (light)
   (expt 0.8 (- 15 light)))
