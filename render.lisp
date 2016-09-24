@@ -41,6 +41,12 @@
    (gl:get-uniform-location shaderProgram name)
    thevec4))
 
+(defun set-float (name thefloat)
+  "sets a uniform integer"
+  (gl:uniformf
+   (gl:get-uniform-location shaderProgram name)
+   thefloat))
+
 (defun load-and-make-shader (vpath fpath)
   "loads a shader from a filepath and puts it into a program"
   (make-shader-program-from-strings
@@ -132,20 +138,29 @@
 		    glindices) 
      ;;position attribute
 
-    (gl:vertex-attrib-pointer
-     0 3 :float :false (* 9 (sizeof :float)) 0)
-    (gl:enable-vertex-attrib-array 0)
+    (let ((totsize (* 17 (sizeof :float))))
+      (gl:vertex-attrib-pointer
+       0 3 :float :false totsize 0)
+      (gl:enable-vertex-attrib-array 0)
 
-     ;;texture attribute
+      ;;texture attribute
 
 
-    (gl:vertex-attrib-pointer
-     2 2 :float :false (* 9 (sizeof :float)) (* 3 (sizeof :float)))
-    (gl:enable-vertex-attrib-array 2)
+      (gl:vertex-attrib-pointer
+       2 2 :float :false totsize (* 3 (sizeof :float)))
+      (gl:enable-vertex-attrib-array 2)
 
-    (gl:vertex-attrib-pointer
-     4 4 :float :false (* 9 (sizeof :float)) (* 5 (sizeof :float)))
-     (gl:enable-vertex-attrib-array 4)
+      (gl:vertex-attrib-pointer
+       4 4 :float :false totsize (* 5 (sizeof :float)))
+      (gl:enable-vertex-attrib-array 4)
+
+      (gl:vertex-attrib-pointer
+       8 4 :float :false totsize (* 9 (sizeof :float)))
+      (gl:enable-vertex-attrib-array 8)
+
+      (gl:vertex-attrib-pointer
+       12 4 :float :false totsize (* 13 (sizeof :float)))
+      (gl:enable-vertex-attrib-array 12))
     
     (gl:free-gl-array glverts)
     (gl:free-gl-array glindices)
@@ -195,6 +210,8 @@
     (gl:bind-attrib-location shaderprogram 0 "position")
     (gl:bind-attrib-location shaderprogram 2 "texCoord")
     (gl:bind-attrib-location shaderprogram 4 "color")
+    (gl:bind-attrib-location shaderprogram 8 "blockLight")
+    (gl:bind-attrib-location shaderprogram 12 "skyLight")
     (gl:shader-source vertexShader vertex-shader-string)
     (gl:compile-shader vertexShader)
     (let ((success (gl:get-shader-info-log vertexShader)))

@@ -57,6 +57,7 @@
 				     :arguments (list achunk))))
 			    (push achunk dirtychunks)))))))))
 
+  (setf daytime (/ (+ 1 (sin (/ (get-internal-run-time) (* 20 60 1000)))) 2))
   (settime)
   (if (in:key-pressed-p #\g)
       (update-world-vao))
@@ -71,6 +72,7 @@
 (defparameter daytime 1.0)
 
 (defun settime ()
+  (set-float "timeday" daytime)
   (setnight daytime))
 
 (defun setnight (val)

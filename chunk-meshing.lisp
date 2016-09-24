@@ -7,64 +7,68 @@
    (lambda ()
      (list
       (vertex
-       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.6))
+       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.6) (blocklight) (skylight))
       (vertex
-       (pos -0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6))
+       (pos -0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6) (blocklight) (skylight))
       (vertex
-       (pos -0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6))
+       (pos -0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6) (blocklight) (skylight))
       (vertex
-       (pos -0.5  0.5 -0.5) (uv 0.0 1.0) (opgray 0.6))))
+       (pos -0.5  0.5 -0.5) (uv 0.0 1.0) (opgray 0.6) (blocklight) (skylight))))
+   (lambda () 
+     (list
+      (vertex
+       (pos 0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.6) (blocklight) (skylight))
+      (vertex
+       (pos 0.5  0.5 -0.5)  (uv 0.0 1.0) (opgray 0.6) (blocklight) (skylight))
+      (vertex
+       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6) (blocklight) (skylight))
+      (vertex
+       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6) (blocklight) (skylight))))
    (lambda ()
      (list
       (vertex
-       (pos 0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.6))
+       (pos -0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.5) (blocklight) (skylight))
       (vertex
-       (pos 0.5  0.5 -0.5)  (uv 0.0 1.0) (opgray 0.6))
+       (pos 0.5 -0.5 -0.5)  (uv 1.0 0.0)  (opgray 0.5) (blocklight) (skylight))
       (vertex
-       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6))
+       (pos 0.5 -0.5  0.5)  (uv 1.0 1.0)  (opgray 0.5) (blocklight) (skylight))
       (vertex
-       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6))))
+       (pos -0.5 -0.5  0.5)  (uv 0.0 1.0) (opgray 0.5) (blocklight) (skylight))))
    (lambda ()
      (list
       (vertex
-       (pos -0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.5))
+       (pos -0.5 0.5 -0.5) (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
       (vertex
-       (pos 0.5 -0.5 -0.5)  (uv 1.0 0.0)  (opgray 0.5))
+       (pos -0.5 0.5 0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))
       (vertex
-       (pos 0.5 -0.5  0.5)  (uv 1.0 1.0)  (opgray 0.5))
+       (pos 0.5 0.5 0.5) (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
       (vertex
-       (pos -0.5 -0.5  0.5)  (uv 0.0 1.0) (opgray 0.5) )))
+       (pos 0.5 0.5 -0.5) (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))))
    (lambda ()
      (list
       (vertex
-       (pos -0.5 0.5 -0.5) (uv 0.0 0.0) (opgray 1.0))
+       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.8) (blocklight) (skylight))
       (vertex
-       (pos -0.5 0.5 0.5) (uv 0.0 1.0) (opgray 1.0))
+       (pos -0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 0.8)(blocklight) (skylight))
       (vertex
-       (pos 0.5 0.5 0.5) (uv 1.0 1.0) (opgray 1.0))
+       (pos 0.5 0.5 -0.5) (uv 1.0 1.0) (opgray 0.8) (blocklight) (skylight))
       (vertex
-       (pos 0.5 0.5 -0.5) (uv 1.0 0.0) (opgray 1.0))))
+       (pos 0.5 -0.5 -0.5) (uv 1.0 0.0) (opgray 0.8) (blocklight) (skylight))))
    (lambda ()
      (list
       (vertex
-       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.8))
+       (pos -0.5 -0.5  0.5)  (uv 0.0 0.0)(opgray 0.8) (blocklight) (skylight))
       (vertex
-       (pos -0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 0.8))
+       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.8) (blocklight) (skylight))
       (vertex
-       (pos 0.5 0.5 -0.5) (uv 1.0 1.0) (opgray 0.8))
+       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.8)(blocklight) (skylight))
       (vertex
-       (pos 0.5 -0.5 -0.5) (uv 1.0 0.0) (opgray 0.8))))
-   (lambda ()
-     (list
-      (vertex
-       (pos -0.5 -0.5  0.5)  (uv 0.0 0.0)(opgray 0.8) )
-      (vertex
-       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.8))
-      (vertex
-       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.8))
-      (vertex
-       (pos -0.5  0.5  0.5)  (uv 0.0 1.0) (opgray 0.8))))))
+       (pos -0.5  0.5  0.5)  (uv 0.0 1.0) (opgray 0.8) (blocklight) (skylight))))))
 
+(defun skylight ()
+  (vector 0.0 0.0 0.0 0.0))
+(defun blocklight ()
+  (vector 0.0 0.0 0.0 0.0))
 (defun opgray (val)
   (rgba val val val 1.0))
 (defun vertex (&rest args)
@@ -200,6 +204,7 @@ with positions, textures, and colors. no normals"
 	  (let ((newvert (funcall (elt blockfaces ,(fourth vals)))))
 	    (lightvert2 newvert betlight ,@b getskylightz)
 	    (setf (aref faces ,side) newvert)))))))
+
 (defmacro actuallywow ()
   (let ((tot (list 'progn)))
     (dotimes (n 6)
@@ -215,6 +220,16 @@ with positions, textures, and colors. no normals"
 	     (let ((newvert (aref faces n)))
 	       (%damn-fuck newvert (funcall the-skin n)))))
     (progn
+      (if (= 31 blockid)
+	  (let ((colorizer (getapixel 0 255 (gethash "grasscolor.png" picture-library))))
+	    (dotimes (n 6)
+		(let ((face (elt faces n)))
+		  (cunt-verts
+		   (/ (elt colorizer 0) 256)
+		   (/ (elt colorizer 1) 256)
+		   (/ (elt colorizer 2) 256)
+		   (/ (elt colorizer 3) 256)
+		   face)))))
      (if (= 18 blockid)
 	 (let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
 	   (dotimes (vert 6)
@@ -244,10 +259,12 @@ with positions, textures, and colors. no normals"
     (cunt-verts anum anum anum 1.0 vert)))
 
 (defun vec3getlight (lelight vec3)
-  (funcall lelight
-	   (elt vec3 0)
-	   (elt vec3 1)
-	   (elt vec3 2)))
+  (coerce
+   (funcall lelight
+	    (elt vec3 0)
+	    (elt vec3 1)
+	    (elt vec3 2))
+   'float))
 
 (defun avg (&rest args)
   (/ (apply (function +) args) (length args)))
@@ -258,8 +275,7 @@ with positions, textures, and colors. no normals"
 
 (defun lightvert2 (face getlight a b unchange skylit)
   (dolist (v face)
-    (let ((vert (elt v 0)))
-      
+    (let ((vert (elt v 0)))    
       (let ((foo (round (* 2 (elt vert a))))
 	    (bar (round (* 2 (elt vert b))))
 	    (qux (round (* 2 (elt vert unchange)))))
@@ -270,15 +286,18 @@ with positions, textures, and colors. no normals"
 	  (let ((foo (round (* 2 (elt vert a))))
 		(bar (round (* 2 (elt vert b))))
 		(qux (round (* 2 (elt vert unchange)))))
-	    (let* ((1dos (dayify (vec3getlight skylit (insert-at qux (vector foo 0) unchange ))))
-		   (1tres (dayify (vec3getlight skylit (insert-at qux (vector 0 bar) unchange ))))
-		   (1quatro (dayify (vec3getlight skylit (insert-at qux (vector 0 0) unchange ))))
-		   (1uno  (dayify (vec3getlight skylit (insert-at  qux (vector foo bar) unchange )))))
-	      (let ((anum (lightfunc (avg (max 1uno uno)
-					  (max 1dos dos)
-					  (max 1tres tres)
-					  (max 1quatro quatro)))))
-		(cunt-vert anum anum anum 1.0 (elt v 2))))))))))
+	    (let* ((1dos (vec3getlight skylit (insert-at qux (vector foo 0) unchange )))
+		   (1tres (vec3getlight skylit (insert-at qux (vector 0 bar) unchange )))
+		   (1quatro (vec3getlight skylit (insert-at qux (vector 0 0) unchange )))
+		   (1uno (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))))
+	      (setf (elt v 3) (vector uno dos tres quatro))
+	      (setf (elt v 4) (vector 1uno 1dos 1tres 1quatro))
+	      (progno
+	       (let ((anum (lightfunc (avg (max 1uno uno)
+					   (max 1dos dos)
+					   (max 1tres tres)
+					   (max 1quatro quatro)))))
+		 (cunt-vert anum anum anum 1.0 (elt v 2)))))))))))
 
 ;;0.9 for nether
 ;;0.8 for overworld
