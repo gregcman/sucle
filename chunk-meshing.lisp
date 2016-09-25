@@ -157,7 +157,8 @@ with positions, textures, and colors. no normals"
        (let ((blockid (getblock i j k)))
 	 (if (not (zerop blockid))
 	     (let ((fineshape
-		    (get-a-variable-block2-shape
+		    (blockshape
+		     io jo ko
 		     blockid
 		     (lambda (a b c)
 		       (getblock (+ a i) (+ b j) (+ c k)))
@@ -213,8 +214,8 @@ with positions, textures, and colors. no normals"
       (push (list 'drawblockface n) tot))
     (nreverse tot)))
 
-(defun get-a-variable-block2-shape (blockid getempty betlight getskylightz)
-  "the default block shape. same texture every side." 
+(defun blockshape (i j k blockid getempty betlight getskylightz)
+  (declare (ignore i j k))
   (let* ((faces (make-array 6 :initial-element nil)))
     (actuallywow)
     (if (= blockid 2)
@@ -228,7 +229,7 @@ with positions, textures, and colors. no normals"
 	      (%damn-fuck newvert the-skin)))))
     (progn
       (if (= 31 blockid)
-	  (let ((colorizer (getapixel 0 255 (gethash "grasscolor.png" picture-library))))
+	  (let ((colorizer (getapixel 0 0 (gethash "grasscolor.png" picture-library))))
 	    (dotimes (n 6)
 		(let ((face (elt faces n)))
 		  (cunt-verts
@@ -238,7 +239,7 @@ with positions, textures, and colors. no normals"
 		   (/ (elt colorizer 3) 256)
 		   face)))))
      (if (= 18 blockid)
-	 (let ((colorizer (getapixel 0 255 (gethash "foliagecolor.png" picture-library))))
+	 (let ((colorizer (getapixel 0 0 (gethash "foliagecolor.png" picture-library))))
 	   (dotimes (vert 6)
 	     (let ((face (elt faces vert)))
 	       (cunt-verts
@@ -248,7 +249,7 @@ with positions, textures, and colors. no normals"
 		(/ (elt colorizer 3) 256)
 		face)))))
      (if (= 2 blockid)
-	 (let ((colorizer (getapixel 0 255 (gethash "grasscolor.png" picture-library))))
+	 (let ((colorizer (getapixel 0 0 (gethash "grasscolor.png" picture-library))))
 	   (let ((face (elt faces 1)))
 	     (cunt-verts
 	      (/ (elt colorizer 0) 256)

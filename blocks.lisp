@@ -990,7 +990,7 @@
      "minX" 0.30000001192092896
      )
     (list
-     "blockName" "mushroom" 
+     "blockName" "mushroomBrown" 
      "blockID" 39
      "blockIndexInTexture" 29
      "isOpaqueCube" nil
@@ -1016,7 +1016,7 @@
      "minX" 0.30000001192092896
      )
     (list
-     "blockName" "mushroom" 
+     "blockName" "mushroomRed" 
      "blockID" 40
      "blockIndexInTexture" 28
      "isOpaqueCube" nil
@@ -2623,8 +2623,6 @@
       (0 2)
       (1 0)
       (t 3))))
-
-
 
 (buildblocks)
     
