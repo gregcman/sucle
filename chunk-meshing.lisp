@@ -2,6 +2,7 @@
 
 ;;i- i+ j- j+ k- k+
 
+(defmacro progno (&rest args) (declare (ignore args)))
 (defparameter blockfaces
   (vector
    (lambda ()
@@ -166,7 +167,7 @@ with positions, textures, and colors. no normals"
 		       (getlight (+ a i) (+ b j) (+ c k)))
 		     (lambda (a b c)
 		       (skygetlight (+ a i) (+ b j) (+ c k))))))
-	       (dolist (face fineshape)
+	       (dolist (face (coerce (delete nil fineshape) 'list))
 		 (increment-verts i j k face))
 	       (reduce
 		#'add-verts
@@ -174,6 +175,33 @@ with positions, textures, and colors. no normals"
 		:initial-value new-shape)))))))
     new-shape))
 
+(defun blockshape (i j k blockid getempty betlight getskylightz)
+  (let ((faces
+	 (case (aref mc-blocks::getrendertype blockid)
+	   (0 (renderstandardblock blockid getempty betlight getskylightz))
+	   (1 (renderblockreed blockid i j k betlight getskylightz))
+	   (t (make-array 6 :initial-element nil)))))
+  
+    (if (= blockid 2)
+	(let ((ourfunc (aref mc-blocks::getblocktexture blockid)))
+	  (dotimes (n 6)
+	    (let ((newvert (aref faces n)))
+	      (%damn-fuck newvert (funcall ourfunc n)))))
+	(let ((the-skin (aref mc-blocks::blockIndexInTexture blockid)))
+	  (dotimes (n (length faces))
+	    (let ((newvert (aref faces n)))
+	      (%damn-fuck newvert the-skin)))))
+    (let ((colorizer (aref mc-blocks::colormultiplier blockid)))
+      (if (functionp colorizer)
+	  (if (= 2 blockid)
+	      (let ((face (elt faces 1)))
+		(colorize face (funcall colorizer)))
+	      (dotimes (n (length faces))
+		(let ((face (elt faces n)))
+		  (colorize face (funcall colorizer)))))))
+    faces))
+
+(eval-when (:load-toplevel :compile-toplevel :execute)
 (defun meep (n)
   (let ((position nil)
 	(val nil))
@@ -192,7 +220,7 @@ with positions, textures, and colors. no normals"
 	 (position (first vals)))
     (setf (elt posses  position) (second vals))
     (setf wowee (concatenate 'list (remove position wowee) (vector position)))
-    (list* n posses wowee (elt pair n) vals)))
+    (list* n posses wowee (elt pair n) vals))))
 
 (defmacro drawblockface (side)
   (let ((vals (moop side)))
@@ -214,50 +242,98 @@ with positions, textures, and colors. no normals"
       (push (list 'drawblockface n) tot))
     (nreverse tot)))
 
-(defun blockshape (i j k blockid getempty betlight getskylightz)
-  (declare (ignore i j k))
+(defun renderstandardblock (blockid getempty betlight getskylightz)
   (let* ((faces (make-array 6 :initial-element nil)))
     (actuallywow)
-    (if (= blockid 2)
-	(let ((ourfunc (aref mc-blocks::getblocktexture blockid)))
-	  (dotimes (n 6)
-	    (let ((newvert (aref faces n)))
-	      (%damn-fuck newvert (funcall ourfunc n)))))
-	(let ((the-skin (aref mc-blocks::blockIndexInTexture blockid)))
-	  (dotimes (n 6)
-	    (let ((newvert (aref faces n)))
-	      (%damn-fuck newvert the-skin)))))
-    (progn
-      (if (= 31 blockid)
-	  (let ((colorizer (getapixel 0 0 (gethash "grasscolor.png" picture-library))))
-	    (dotimes (n 6)
-		(let ((face (elt faces n)))
-		  (cunt-verts
-		   (/ (elt colorizer 0) 256)
-		   (/ (elt colorizer 1) 256)
-		   (/ (elt colorizer 2) 256)
-		   (/ (elt colorizer 3) 256)
-		   face)))))
-     (if (= 18 blockid)
-	 (let ((colorizer (getapixel 0 0 (gethash "foliagecolor.png" picture-library))))
-	   (dotimes (vert 6)
-	     (let ((face (elt faces vert)))
-	       (cunt-verts
-		(/ (elt colorizer 0) 256)
-		(/ (elt colorizer 1) 256)
-		(/ (elt colorizer 2) 256)
-		(/ (elt colorizer 3) 256)
-		face)))))
-     (if (= 2 blockid)
-	 (let ((colorizer (getapixel 0 0 (gethash "grasscolor.png" picture-library))))
-	   (let ((face (elt faces 1)))
-	     (cunt-verts
-	      (/ (elt colorizer 0) 256)
-	      (/ (elt colorizer 1) 256)
-	      (/ (elt colorizer 2) 256)
-	      (/ (elt colorizer 3) 256)
-	      face)))))
-    (coerce (delete nil faces) 'list)))
+    faces))
+
+(defparameter xfaces
+  (vector
+   (lambda ()
+     (list
+      (vertex
+       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos  0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos  0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos -0.5  0.5 -0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))))
+   (lambda () 
+     (list
+      (vertex
+       (pos -0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos -0.5  0.5 -0.5)  (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))))
+   (lambda ()
+     (list
+      (vertex
+       (pos 0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos 0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos -0.5 0.5 0.5) (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos -0.5 -0.5 0.5) (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))))
+   (lambda ()
+     (list
+      (vertex
+       (pos 0.5 -0.5  -0.5)  (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos -0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos -0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
+      (vertex
+       (pos 0.5  0.5  -0.5)  (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))))))
+
+(defun renderBlockReed (blockid i j k betlight getskylightz)
+  (let* ((faces (make-array 4 :initial-element nil)))
+    (let ((lighthere (coerce (funcall betlight 0 0 0) 'float))
+	  (skylighthere (coerce (funcall getskylightz 0 0 0) 'float)))
+      (dotimes (n 4)
+	(let ((newface (funcall (elt xfaces n))))
+	  (setf (elt faces n) newface)
+	  (dolist (v newface)
+	    (setf (elt v 3) (allvec4 lighthere))
+	    (setf (elt v 4) (allvec4 skylighthere))))))
+    faces))
+
+(defun allvec4 (num)
+  (vector
+   num
+   num
+   num
+   num))
+
+(defun vec4colorize (face colorizer)
+  (cunt-verts
+   (elt colorizer 0)
+   (elt colorizer 1)
+   (elt colorizer 2)
+   (elt colorizer 3)
+   face))
+
+(defun colorize (face colorizer)
+  (cunt-verts
+   (/ (elt colorizer 0) 256)
+   (/ (elt colorizer 1) 256)
+   (/ (elt colorizer 2) 256)
+   (/ (elt colorizer 3) 256)
+   face))
+
+(defun renderblockbyrendertype ())
+
+(defun lightmultiplier (light)
+  (let ((ans (lightfunc light)))
+    (vector
+     ans
+     ans
+     ans
+     1.0)))
 
 (defun lightfunc (light)
   (expt 0.8 (- 15 light)))

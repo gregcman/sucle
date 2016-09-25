@@ -1,5 +1,6 @@
 (in-package :mc-blocks)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter raw
   `((list
      "blockName" "stone" 
@@ -2497,13 +2498,19 @@
      "minY" 0.0
      "minX" 0.0
      )))
-
+(defparameter allblocks (make-hash-table :test (function equal)))
+(defun aconverter (meh)
+  (let ((wow (copy-tree meh)))
+    (setf (first wow) (intern (string-upcase (third meh))))
+    (push 'defblock wow)
+    wow)) 
+)
 (defmacro defblockthemall ()
   (list* 'progn (mapcar #'aconverter raw)))
 
 (defblockthemall)
 
-(defparameter allblocks (make-hash-table :test (function equal)))
+
 
 (defmacro defblock (name &rest args)
   `(setf (gethash (quote ,name) allblocks)
@@ -2523,13 +2530,6 @@
 (defun hashinfo (leblock)
   (maphash (lambda (k v) (print (list* k v)))
 	   leblock))
-
-(defun aconverter (meh)
-  (let ((wow (copy-tree meh)))
-    (setf (first wow) (intern (string-upcase (third meh))))
-    (push 'defblock wow)
-    (print wow)
-    wow)) 
 
 (defun bitarray (size)
   (make-array size :element-type (quote (unsigned-byte 1))))
@@ -2612,6 +2612,8 @@
   (defblockprop isCollidable "isCollidable" t))
 
 (defparameter getBlocktexture (make-array totalblockspace))
+(defparameter colormultiplier (make-array totalblockspace))
+
 
 (defmacro deffunc (array nombre func)
   `(let ((blockid (gethash "blockID" (gethash ,nombre allblocks))))
@@ -2623,6 +2625,13 @@
       (0 2)
       (1 0)
       (t 3))))
+
+(deffunc colormultiplier 'tallgrass
+  (lambda () (sandbox::getapixel 0 0 (gethash "grasscolor.png" sandbox::picture-library))))
+(deffunc colormultiplier 'grass
+  (lambda () (sandbox::getapixel 0 0 (gethash "grasscolor.png" sandbox::picture-library))))
+(deffunc colormultiplier 'leaves
+  (lambda () (sandbox::getapixel 0 0 (gethash "foliagecolor.png" sandbox::picture-library))))
 
 (buildblocks)
     
