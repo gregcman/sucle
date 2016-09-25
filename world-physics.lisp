@@ -192,7 +192,7 @@
 		(blocky (round (1- (ceiling (+ y (elt vec3player 1))))))
 		(blockz (round (1- (+ z (elt vec3player 2))))))
 	    (let ((blockid (mat-pos (vector blockx blocky blockz))))
-	      (if (not (zerop blockid))
+	      (if (eq t (aref mc-blocks::iscollidable blockid))
 		  (push (vector blockx blocky blockz) places)))))))
     places))
 

@@ -57,7 +57,9 @@
 				     :arguments (list achunk))))
 			    (push achunk dirtychunks)))))))))
 
-  (setf daytime (/ (+ 1 (sin (/ (get-internal-run-time) (* 20 60 1000)))) 2))
+  (if nil
+      (setf daytime (/ (+ 1 (cos (/ (get-internal-run-time) (* 20 100)))) 2))
+      (setf daytime 1))
   (settime)
   (if (in:key-pressed-p #\g)
       (update-world-vao))

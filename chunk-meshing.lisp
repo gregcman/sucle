@@ -159,7 +159,6 @@ with positions, textures, and colors. no normals"
 	     (let ((fineshape
 		    (get-a-variable-block2-shape
 		     blockid
-		     (aref mc-blocks::blockIndexInTexture blockid)   
 		     (lambda (a b c)
 		       (getblock (+ a i) (+ b j) (+ c k)))
 		     (lambda (a b c)
@@ -200,7 +199,10 @@ with positions, textures, and colors. no normals"
 	  (b (third vals)))
       `(let ((blockidnexttome (funcall getempty ,@a)))
 	 (if
-	  (zerop blockidnexttome)
+	  (or
+	   (zerop blockidnexttome)
+	   (and (not (aref mc-blocks::opaquecubelooukup blockidnexttome))
+		(not (= blockid blockidnexttome))))
 	  (let ((newvert (funcall (elt blockfaces ,(fourth vals)))))
 	    (lightvert2 newvert betlight ,@b getskylightz)
 	    (setf (aref faces ,side) newvert)))))))
@@ -211,14 +213,19 @@ with positions, textures, and colors. no normals"
       (push (list 'drawblockface n) tot))
     (nreverse tot)))
 
-(defun get-a-variable-block2-shape (blockid the-skin getempty betlight getskylightz)
+(defun get-a-variable-block2-shape (blockid getempty betlight getskylightz)
   "the default block shape. same texture every side." 
   (let* ((faces (make-array 6 :initial-element nil)))
     (actuallywow)
-
-    (progn (dotimes (n 6)
-	     (let ((newvert (aref faces n)))
-	       (%damn-fuck newvert (funcall the-skin n)))))
+    (if (= blockid 2)
+	(let ((ourfunc (aref mc-blocks::getblocktexture blockid)))
+	  (dotimes (n 6)
+	    (let ((newvert (aref faces n)))
+	      (%damn-fuck newvert (funcall ourfunc n)))))
+	(let ((the-skin (aref mc-blocks::blockIndexInTexture blockid)))
+	  (dotimes (n 6)
+	    (let ((newvert (aref faces n)))
+	      (%damn-fuck newvert the-skin)))))
     (progn
       (if (= 31 blockid)
 	  (let ((colorizer (getapixel 0 255 (gethash "grasscolor.png" picture-library))))
