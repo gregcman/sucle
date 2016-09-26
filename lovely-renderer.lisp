@@ -3,11 +3,77 @@
 ;;non-generic rendering
 
 ;;vaohash holds all the vaos which correlate to each chunk
-(defparameter vaohash nil)
-(defun render (camera)
+(defparameter vaohash (make-hash-table :test #'equal))
+(defparameter shaderhash (make-hash-table :test #'equal))
+(defmacro toggle (a)
+  `(setf ,a (not ,a)))
+(defparameter drawmode nil)
+
+(defun leresize (option)
+  (out:push-dimensions option)
+  (gl:viewport 0 0 out:width out:height))
+
+(defun render ()
   "responsible for rendering the world"
-  (gl:clear :color-buffer-bit :depth-buffer-bit)
-  (setf (simplecam-fov camera) 70)
+  (let ((camera (getworld "player")))
+    (gl:clear :color-buffer-bit :depth-buffer-bit)
+    (setf (simplecam-fov camera) 70) 
+    (setupmatrices camera)
+    (sortdirtychunks camera)
+    (designatemeshing)
+    (settime)
+    (if (in:key-pressed-p #\v)
+	(progn (leresize t)))
+    (if (in:key-pressed-p #\g)
+	(update-world-vao))
+    (if (in:key-pressed-p #\y)
+	(loadblockshader))
+    (if (in:key-pressed-p #\q)
+	(progn
+	  (toggle drawmode)
+	  (if drawmode
+	      (gl:polygon-mode :front-and-back :line)
+	      (gl:polygon-mode :front-and-back :fill))))
+    (draw-chunk-meshes)
+    (gl:flush)))
+
+(defun draw-chunk-meshes ()
+  (gl:enable :depth-test)
+  (gl:disable :blend)
+  (gl:enable :cull-face)
+  (gl:cull-face :back)
+  (gl:blend-func :src-alpha :one-minus-src-alpha)
+  (gl:active-texture :texture0)
+  (bind-shit "terrain.png")
+  (use-program "blockshader")
+  (set-matrix "model" (mat:identity-matrix))
+  (maphash
+   (lambda (key vao)
+     (declare (ignore key))
+     (draw-vao vao))
+   vaohash))
+
+(defun designatemeshing ()
+  (if (string= mesherwhere? "worker")
+      (if (mesherthreadbusy)
+	  (progn)
+	  (progn
+	    (if mesher-thread
+		(getmeshersfinishedshit))
+	    (let ((achunk (car dirtychunks)))
+	      (if achunk
+		  (progn
+		    (giveworktomesherthread achunk)
+		    (setf dirtychunks
+			  (delete achunk dirtychunks :test #'equal)))))))
+      (let ((achunk (pop dirtychunks)))
+	(if achunk
+	    (setf (gethash achunk vaohash)
+		  (shape-vao (chunk-shape (first achunk)
+					  (second achunk)
+					  (third achunk))))))))
+
+(defun setupmatrices (camera)
   (set-matrix "view"
 	      (mat:easy-lookat
 	       (mat:add #2A((0 1.5 0 0))
@@ -17,61 +83,45 @@
   (set-matrix "projection"
 	      (mat:projection-matrix
 	       (deg-rad (simplecam-fov camera))
-	       (/ out::pushed-width out::pushed-height) 0.01 128)) 
-  (set-matrix "model" (mat:identity-matrix))
-  (setf dirtychunks
-	(sort
-	 dirtychunks
-	 (lambda (a b)
-	   (<
-	    (distoplayer a (simplecam-pos camera))
-	    (distoplayer b (simplecam-pos camera))))))
-  (setf dirtychunks (remove nil dirtychunks))
-  (let ((achunk (pop dirtychunks)))
-    (if achunk
-	(if nil
-	    (progn
-	      (setf (gethash achunk vaohash) (shape-vao (chunk-shape (first achunk)
-								     (second achunk)
-								     (third achunk)))))
-	    (progn
-	      (if mesher-thread
-		  (if (sb-thread:thread-alive-p mesher-thread)
-		      (push achunk dirtychunks)
-		      (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
-			(if shape
-			    (setf (gethash coords vaohash) (shape-vao shape))
-			    (progn
-			      (push coords dirtychunks)))
-			(if (> (+ (sqrt (* 3 16 16)) 128) (distoplayer achunk (simplecam-pos camera)))
-			    (progn
-			      (setf mesher-thread
-				    (sb-thread:make-thread
-				     (lambda (achunk)
-				       (sb-thread:return-from-thread
-					(values
-					 achunk
-					 (chunk-shape (first achunk)
-						      (second achunk)
-						      (third achunk)))))
-				     :arguments (list achunk))))
-			    (push achunk dirtychunks)))))))))
+	       (/ out::pushed-width out::pushed-height) 0.01 128)) )
 
-  (if nil
-      (setf daytime (/ (+ 1 (cos (/ (get-internal-run-time) (* 20 100)))) 2))
-      (setf daytime 1))
-  (settime)
-  (if (in:key-pressed-p #\g)
-      (update-world-vao))
-  (bind-shit "terrain.png")
-  (maphash
-   (lambda (key vao)
-     (declare (ignore key))
-     (draw-vao vao))
-   vaohash)
-  (gl:flush))
+(defun sortdirtychunks (camera)
+  (progn
+    (setf dirtychunks
+	  (remove nil
+		  (sort
+		   dirtychunks
+		   (lambda (a b)
+		     (<
+		      (distoplayer a (simplecam-pos camera))
+		      (distoplayer b (simplecam-pos camera)))))))))
 
-(defparameter daytime 1.0)
+(defparameter mesherwhere? (if t "worker" "main"))
+
+(defun getmeshersfinishedshit ()
+  (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
+    (if coords
+	(if shape
+	    (setf (gethash coords vaohash) (shape-vao shape))
+	    (progn
+	      (pushnew coords dirtychunks :test #'equal)))))
+  (setf mesher-thread nil))
+
+(defun mesherthreadbusy ()
+  (not (or (eq nil mesher-thread)
+	   (not (sb-thread:thread-alive-p mesher-thread)))))
+
+(defun giveworktomesherThread (thechunk)
+  (setf mesher-thread
+	(sb-thread:make-thread
+	 (lambda (achunk)
+	   (sb-thread:return-from-thread
+	    (values
+	     achunk
+	     (chunk-shape (first achunk)
+			  (second achunk)
+			  (third achunk)))))
+	 :arguments (list thechunk))))
 
 (defun settime ()
   (set-float "timeday" daytime)
@@ -123,20 +173,48 @@
 
 (defmacro progno (&rest nope))
 
-(defun glinnit ()
-  "opengl initializing things"
-  (setf mesher-thread (sb-thread:make-thread (lambda ())))
-  (setf dirtychunks nil)
-  (gl:enable :depth-test)
-  (gl:disable :blend)
-  (gl:enable :cull-face)
-  (gl:cull-face :back)
-  (gl:blend-func :src-alpha :one-minus-src-alpha)
-  (gl:active-texture :texture0)
+(defun use-program (name)
+  (let ((ourprog (gethash name shaderhash)))
+    (setq shaderProgram ourprog)
+    (gl:use-program ourprog)))
 
-  (setf vaohash (make-hash-table :test #'equal))
-  
-  (setq shaderProgram
+(defun load-a-shader (name vs frag attribs)
+  (setf (gethash name shaderhash)
 	(load-and-make-shader
-	 "transforms.vs" "basictexcoord.frag"))
-  (gl:use-program shaderProgram))
+	 vs
+	 frag
+	 attribs)))
+
+(defun glinnit ()
+  "initializing things"
+  (loadletextures)
+  (load-into-texture-library "items.png")
+  (load-into-texture-library "grasscolor.png")
+  (load-into-texture-library "foliagecolor.png")
+  (load-into-texture-library "terrain.png")
+  (bind-shit "terrain.png")
+  (setf dirtychunks nil)
+  (setf mesher-thread nil)
+  (clrhash vaohash)
+  (clrhash shaderhash)
+  (loadblockshader)
+  (use-program "blockshader"))
+
+(defun load-into-texture-library (name &optional (othername name))
+  (let ((thepic (gethash name picture-library)))
+    (if thepic
+	(let ((dims (array-dimensions thepic)))
+	    (load-shit
+	     (fatten thepic)
+	     othername (first dims) (second dims))))))
+
+(defun loadblockshader ()
+  (load-a-shader
+   "blockshader"
+   "transforms.vs"
+   "basictexcoord.frag"
+   '(("position" . 0)
+     ("texCoord" . 2)
+     ("color" . 4)
+     ("blockLight" . 8)
+     ("skyLight" . 9))))

@@ -43,26 +43,10 @@
   (out:push-dimensions)
   (in::initialize)
   (glinnit)
-  (in:p-1 #\q (let ((variabl nil))
-		(lambda ()
-		  (setf variabl (not variabl))
-		  (if variabl
-		      (gl:polygon-mode :front-and-back :line)
-		      (gl:polygon-mode :front-and-back :fill)))))
-  (in:p+1 #\ (lambda () (setq kill-button nil)))
-  (in:p+1 #\v (lambda () (leresize t)))
-  (in:p+1 #\r (function window:toggle-mouse-capture))
-  (loadletextures)
-
-  (load-into-texture-library "items.png")
-  (load-into-texture-library "grasscolor.png")
-  (load-into-texture-library "foliagecolor.png")
-  (load-into-texture-library "terrain.png")
+  (physinnit)
   
-  (bind-shit "terrain.png")
-
-  (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
-  (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
+  (in:p+1 #\ (lambda () (setq kill-button nil)))
+  (in:p+1 #\r (function window:toggle-mouse-capture))
 
   (setf phystimer (timer))
   (setf rendertimer (timer))
@@ -70,18 +54,6 @@
   (unwind-protect
        (injection)
     (sb-thread:terminate-thread physthread)))
-
-(defun load-into-texture-library (name &optional (othername name))
-  (let ((thepic (gethash name picture-library)))
-    (if thepic
-	(let ((dims (array-dimensions thepic)))
-	    (load-shit
-	     (fatten thepic)
-	     othername (first dims) (second dims))))))
-
-(defun leresize (option)
-  (out:push-dimensions option)
-  (gl:viewport 0 0 out:width out:height))
 
 (defparameter rendertimer nil)
 (defparameter renderrate nil)
@@ -106,11 +78,9 @@
 		in::down-keys '(#\:)
 		in::released-keys)))
 
-(defparameter ourcam (make-simplecam))
-
 (defun draw ()
   (caption-info)
-  (render ourcam)
+  (render)
   (sdl:update-display))
 
 (defparameter ticks/sec 60)
@@ -123,8 +93,8 @@
 		 (/ 1000.0 ticks/sec)
 		 (lambda ()
 		   (if (in:ismousecaptured)
-		       (controls ourcam))
-		   (physics ourcam)))))
+		       (controls))
+		   (physics)))))
     (if arate
 	(setf physrate arate)))
   (if (and

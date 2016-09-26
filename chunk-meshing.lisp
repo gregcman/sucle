@@ -67,9 +67,9 @@
        (pos -0.5  0.5  0.5)  (uv 0.0 1.0) (opgray 0.8) (blocklight) (skylight))))))
 
 (defun skylight ()
-  (vector 0.0 0.0 0.0 0.0))
+  (vector 0.0))
 (defun blocklight ()
-  (vector 0.0 0.0 0.0 0.0))
+  (vector 0.0))
 (defun opgray (val)
   (rgba val val val 1.0))
 (defun vertex (&rest args)
@@ -298,8 +298,8 @@ with positions, textures, and colors. no normals"
 	(let ((newface (funcall (elt xfaces n))))
 	  (setf (elt faces n) newface)
 	  (dolist (v newface)
-	    (setf (elt v 3) (allvec4 lighthere))
-	    (setf (elt v 4) (allvec4 skylighthere))))))
+	    (setf (elt v 3) (vector (lightfunc lighthere)))
+	    (setf (elt v 4) (vector (lightfunc skylighthere)))))))
     faces))
 
 (defun allvec4 (num)
@@ -374,8 +374,8 @@ with positions, textures, and colors. no normals"
 		   (1tres (vec3getlight skylit (insert-at qux (vector 0 bar) unchange )))
 		   (1quatro (vec3getlight skylit (insert-at qux (vector 0 0) unchange )))
 		   (1uno (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))))
-	      (setf (elt v 3) (vector uno dos tres quatro))
-	      (setf (elt v 4) (vector 1uno 1dos 1tres 1quatro))
+	      (setf (elt v 3) (vector (lightfunc (avg uno dos tres quatro))))
+	      (setf (elt v 4) (vector (lightfunc (avg 1uno 1dos 1tres 1quatro))))
 	      (progno
 	       (let ((anum (lightfunc (avg (max 1uno uno)
 					   (max 1dos dos)

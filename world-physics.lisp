@@ -3,46 +3,62 @@
 (defparameter onground nil)
 (defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
 (defparameter wow nil)
+(defparameter worldhash (make-hash-table :test #'equal))
 
-(defun physics (camera)
+(defun getworld (name)
+  (gethash name worldhash))
+
+(defun setworld (name newval)
+  (setf (gethash name worldhash) newval))
+
+(defparameter daytime 1.0)
+(defparameter ourcam (make-simplecam))
+
+(defun physinnit ()
+  (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
+  (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
+  (setworld "player" ourcam))
+
+(defun physics ()
   "a messy function for the bare bones physics"
-  (setf wow camera)
-  (let ((wowzer nil)
-	(collisiondata nil)
-	(velclamp nil))
-    (multiple-value-bind (a b c)
-	(aabbcc::finish-clamps #'myafunc
-			       (mat-vec (simplecam-pos camera))
-			       (mat-vec cameraVelocity))
-      (setf wowzer a)
-      (setf collisiondata b)
-      (setf velclamp c))
-    (setf onground (if (numberp (elt collisiondata 2))
-		       (= 0 (elt collisiondata 2))
-		       (eq :contact (elt collisiondata 2))))
+  (let ((camera (getworld "player")))
+    (setf wow camera)
+    (let ((wowzer nil)
+	  (collisiondata nil)
+	  (velclamp nil))
+      (multiple-value-bind (a b c)
+	  (aabbcc::finish-clamps #'myafunc
+				 (mat-vec (simplecam-pos camera))
+				 (mat-vec cameraVelocity))
+	(setf wowzer a)
+	(setf collisiondata b)
+	(setf velclamp c))
+      (setf onground (if (numberp (elt collisiondata 2))
+			 (= 0 (elt collisiondata 2))
+			 (eq :contact (elt collisiondata 2))))
 
-    (setf (simplecam-pos camera)
-	  (vec-mat
-	   wowzer))
-    (setf cameraVelocity
-	  (mat-clamper cameraVelocity velclamp))
+      (setf (simplecam-pos camera)
+	    (vec-mat
+	     wowzer))
+      (setf cameraVelocity
+	    (mat-clamper cameraVelocity velclamp))
       
-    (if (not onground)
-	(mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
-    (let ((airscaled
-	   (mat:onebyfour
-	    (list
-	     (row-major-aref cameraVelocity 0)
-	     0
-	     (row-major-aref cameraVelocity 2)
-	     0))))
-      (mat:scale! airscaled (* 0.6 0.91 0.54))
-      (setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
-      (setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
-    (setf (row-major-aref cameraVelocity 1)
-	  (* (expt 0.98 tickscale)
-	     (row-major-aref cameraVelocity 1)))
-    (outofbounds camera)))
+      (if (not onground)
+	  (mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
+      (let ((airscaled
+	     (mat:onebyfour
+	      (list
+	       (row-major-aref cameraVelocity 0)
+	       0
+	       (row-major-aref cameraVelocity 2)
+	       0))))
+	(mat:scale! airscaled (* 0.6 0.91 0.54))
+	(setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
+	(setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
+      (setf (row-major-aref cameraVelocity 1)
+	    (* (expt 0.98 tickscale)
+	       (row-major-aref cameraVelocity 1)))
+      (outofbounds camera))))
 
 (defun outofbounds (camera)
   (if (> 0 (row-major-aref (simplecam-pos camera) 1))
@@ -51,23 +67,27 @@
 	(setf (row-major-aref (simplecam-pos camera) 1) 0)
 	(setf (simplecam-pos camera) (mat:onebyfour (list 0 128 0 1))))))
 
-(defun controls (camera)
-  "mice look and keys move"
-  (mouse-looking camera)
-  (mat:add!
-   cameraVelocity
-   (keymovement camera))
+(defun controls ()
+  (let ((camera (getworld "player")))
+    (mouse-looking camera)
+    (mat:add!
+     cameraVelocity
+     (keymovement camera))
 
-  (in:p+1 #\h (lambda () (someseq
-			  (floor (row-major-aref (simplecam-pos camera) 0) 16)
-			  (floor (row-major-aref (simplecam-pos camera) 2) 16))))
+    (if nil
+	(setf daytime (/ (+ 1 (cos (/ (get-internal-run-time) (* 20 100)))) 2))
+	(setf daytime 1))
 
-  (in:p+1 3 (lambda () (aplatform
-			(mat-world-pos (simplecam-pos camera))
-			(random 97))))
-  (in:p+1 2 (lambda ()
-	      (notaplatform (mat-world-pos (simplecam-pos camera)))
-	      (notaplatform (vecadd (mat-world-pos (simplecam-pos camera)) (vector 0 1 0))))))
+    (in:p+1 #\h (lambda () (someseq
+			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
+			    (floor (row-major-aref (simplecam-pos camera) 2) 16))))
+
+    (in:p+1 3 (lambda () (aplatform
+			  (mat-world-pos (simplecam-pos camera))
+			  2)))
+    (in:p+1 2 (lambda ()
+		(notaplatform (mat-world-pos (simplecam-pos camera)))
+		(notaplatform (vecadd (mat-world-pos (simplecam-pos camera)) (vector 0 1 0)))))))
 
 (defun mat-world-pos (mat)
   (vector
@@ -200,7 +220,7 @@
   (let ((ourblocks (get-blocks-around-player vec3player vel)))
     (let ((ourcontacts (blocktocontact ourblocks vec3player vel)))
       (let ((totcollisoins (aabbcc::collapsecollisions ourcontacts)))
-	totcollisoins))))
+        totcollisoins))))
 
 (defun insert-at (num vec place)
   (let* ((start (subseq vec 0 place))
