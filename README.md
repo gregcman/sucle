@@ -6,3 +6,7 @@ collection of stuff to do matrix maths
 
 - https://github.com/terminal625/cl-mc-shit
 collection of stuff to load minecraft data files 
+
+
+- https://github.com/terminal625/aabbcc
+really nasty bounding box physics 
