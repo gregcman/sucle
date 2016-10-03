@@ -4,6 +4,7 @@
 (defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
 (defparameter wow nil)
 (defparameter worldhash (make-hash-table :test #'equal))
+(defparameter isneaking nil)
 
 (defun getworld (name)
   (gethash name worldhash))
@@ -17,7 +18,9 @@
 (defun physinnit ()
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
-  (setworld "player" ourcam))
+  (setworld "player" ourcam)
+  (setf isprinting nil)
+  (setf wprev most-negative-fixnum))
 
 (defun physics ()
   "a messy function for the bare bones physics"
@@ -42,6 +45,7 @@
 	     wowzer))
       (setf cameraVelocity
 	    (mat-clamper cameraVelocity velclamp))
+
       
       (if (not onground)
 	  (mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
@@ -52,7 +56,13 @@
 	       0
 	       (row-major-aref cameraVelocity 2)
 	       0))))
-	(mat:scale! airscaled (* 0.6 0.91 0.54))
+	(mat:scale! airscaled (* 0.9))
+	(if onground (mat:scale! airscaled (* 0.6 0.91)))
+	(if nil
+	    (let ((speed (hypot (mat-lis airscaled))))
+	      (print speed)
+	      (if (> 0.05 speed)
+		  (setf isprinting nil))))
 	(setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
 	(setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
       (setf (row-major-aref cameraVelocity 1)
@@ -67,14 +77,42 @@
 	(setf (row-major-aref (simplecam-pos camera) 1) 0)
 	(setf (simplecam-pos camera) (mat:onebyfour (list 0 128 0 1))))))
 
+(defparameter lastw nil)
+(defparameter wprev most-negative-fixnum)
+(defparameter wpressprev nil)
+(defparameter isprinting nil)
+
+(defmacro toggle (var)
+  `(setf ,var (not ,var)))
+
 (defun controls ()
   (let ((camera (getworld "player")))
     (mouse-looking camera)
     (mat:add!
      cameraVelocity
      (keymovement camera))
-
-    (if nil
+    (progn
+     (if (in::akeydown "w")
+	 ;;if it was pressed last round
+	 (progn
+	   (if (not wpressprev)
+	       (progn
+		 (if (> 150 (- (get-internal-run-time) wprev))
+		     (setf isprinting t))))
+	   (setf wpressprev t))
+	 (progn
+	   (setf isprinting nil)
+	   (if wpressprev
+	       (progn
+		 (setf wprev (get-internal-run-time))
+		 (setf wpressprev nil))))))
+    
+    (if (in::akeydown "lshift")
+	(progn
+	  (setf isprinting nil)
+	  (setf isneaking t))
+	(setf isneaking nil))
+    (if t
 	(setf daytime (/ (+ 1 (cos (/ (get-internal-run-time) (* 20 100)))) 2))
 	(setf daytime 1))
 
@@ -117,7 +155,7 @@
 (defun good-func (some-number)
   "maps keys to vectors"
   (lambda (x)
-    (if (in:key-p (first x))
+    (if (in::akeydown (first x))
 	(mat:add! some-number
 		  (mat:onebyfour (second x))))))
 
@@ -130,11 +168,17 @@
 	 (lemod (good-func delta)))
     (mapcar
      lemod
-     '((#\d ( 1  0  0  0))
-       (#\e (-1  0  0  0))
-       (#\s ( 0  0  1  0))
-       (#\f ( 0  0 -1  0))))
-    (mat:scale! (mat:normalize! delta) (* 0.7 (expt tickscale 2)))
+     '(("s" ( 1  0  0  0))
+       ("w" (-1  0  0  0))
+       ("a" ( 0  0  1  0))
+       ("d" ( 0  0 -1  0))))
+    (mat:scale! (mat:normalize! delta) (* 0.4 (expt tickscale 2)))
+    (if isneaking
+	(mat:scale! delta 0.2))
+    (if isprinting
+	(mat:scale! delta 1.3))
+    (if (not onground)
+	(mat:scale! delta 0.2))
     delta))
 
 (defun key-jumps ()
@@ -144,7 +188,7 @@
     (if onground
 	(mapcar
 	 lemod
-	 `((#\Space (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
+	 `(("space" (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
     delta))
 
 (defun keymovement (camera)

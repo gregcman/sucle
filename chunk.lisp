@@ -186,7 +186,7 @@
 	(push new-chunk ourans)))
     (nreverse ourans)))
 
-(defparameter atest (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.0.mcr"))
+(defparameter atest (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.-1.1.mcr"))
 
 (defun helpchunk (x y)
    (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))

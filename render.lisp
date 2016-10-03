@@ -137,14 +137,11 @@
     (gl:bind-buffer :element-array-buffer (gl:gen-vertex-array))
     (gl:buffer-data :element-array-buffer :static-draw
 		    glindices) 
-     ;;position attribute
 
     (let ((totsize (* 11 (sizeof :float))))
       (gl:vertex-attrib-pointer
        0 3 :float :false totsize 0)
       (gl:enable-vertex-attrib-array 0)
-
-      ;;texture attribute
 
       (gl:vertex-attrib-pointer
        2 2 :float :false totsize (* 3 (sizeof :float)))

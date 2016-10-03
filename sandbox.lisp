@@ -46,7 +46,7 @@
   (physinnit)
   
   (in:p+1 #\ (lambda () (setq kill-button nil)))
-  (in:p+1 #\r (function window:toggle-mouse-capture))
+  (in:p+1 #\e (function window:toggle-mouse-capture))
 
   (setf phystimer (timer))
   (setf rendertimer (timer))

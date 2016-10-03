@@ -13,11 +13,18 @@
   (out:push-dimensions option)
   (gl:viewport 0 0 out:width out:height))
 
+(defun ease (x target fraction)
+  (+ x (* fraction (- target x))))
+
 (defun render ()
   "responsible for rendering the world"
   (let ((camera (getworld "player")))
     (gl:clear :color-buffer-bit :depth-buffer-bit)
-    (setf (simplecam-fov camera) 70) 
+    (if isprinting
+	(setf (simplecam-fov camera)
+	      (ease (simplecam-fov camera) 90 0.2))
+	(setf (simplecam-fov camera)
+	      (ease (simplecam-fov camera) 70 0.2))) 
     (setupmatrices camera)
     (sortdirtychunks camera)
     (designatemeshing)
@@ -76,7 +83,10 @@
 (defun setupmatrices (camera)
   (set-matrix "view"
 	      (mat:easy-lookat
-	       (mat:add #2A((0 1.5 0 0))
+	       (mat:add (mat:onebyfour
+			 (list 0
+			       (if isneaking (- 1.5 1/8) 1.5)
+			       0 0))
 			(simplecam-pos camera))
 	       (simplecam-pitch camera)
 	       (simplecam-yaw camera)))

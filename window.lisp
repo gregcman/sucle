@@ -290,6 +290,11 @@
 (defvar caption "default")
 (defvar little-caption "default little caption")
 
+(defun akeydown (name)
+  (sdl:key-down-p
+   (intern (concatenate 'string "SDL-KEY-" (string-upcase name))
+	   "KEYWORD")))
+
 (defun push-dimensions (&optional (resizable nil))
   (setq window
 	(sdl:window width height
