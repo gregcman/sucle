@@ -40,7 +40,7 @@
   "a mess of shit"
   (setq kill-button t)
   (setq out:width (if nil 512 854) out:height (if nil 512 480))
-  (out:push-dimensions)
+  (out:push-dimensions t)
   (in::initialize)
   (glinnit)
   (physinnit)
