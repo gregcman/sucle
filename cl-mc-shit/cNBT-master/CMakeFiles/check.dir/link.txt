@@ -1,0 +1,1 @@
+/usr/bin/cc  -Wall -W -Wextra -fstrict-aliasing -Wstrict-aliasing=3 -pedantic -std=c99 -Wunsafe-loop-optimizations -funsafe-loop-optimizations -DDEBUG -g   CMakeFiles/check.dir/check.c.o  -o bin/check -rdynamic libnbt.so -lz -Wl,-rpath,/home/imac/Downloads/cNBT-master 

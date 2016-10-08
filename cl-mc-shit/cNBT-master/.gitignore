@@ -1,0 +1,10 @@
+*.o
+*.a
+*.plist
+tags
+check
+nbtreader
+regioninfo
+testdata/dump.bin
+testdata/dump2.bin
+build/

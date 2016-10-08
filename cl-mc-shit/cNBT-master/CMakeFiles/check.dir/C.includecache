@@ -1,0 +1,44 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/imac/Downloads/cNBT-master/buffer.h
+stddef.h
+-
+
+/home/imac/Downloads/cNBT-master/check.c
+nbt.h
+/home/imac/Downloads/cNBT-master/nbt.h
+errno.h
+-
+stdbool.h
+-
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+
+/home/imac/Downloads/cNBT-master/list.h
+stddef.h
+-
+
+/home/imac/Downloads/cNBT-master/nbt.h
+stdbool.h
+-
+stddef.h
+-
+stdint.h
+-
+stdio.h
+-
+buffer.h
+/home/imac/Downloads/cNBT-master/buffer.h
+list.h
+/home/imac/Downloads/cNBT-master/list.h
+

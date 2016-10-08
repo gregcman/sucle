@@ -1,0 +1,1 @@
+/usr/bin/cc  -fPIC -Wall -W -Wextra -fstrict-aliasing -Wstrict-aliasing=3 -pedantic -std=c99 -Wunsafe-loop-optimizations -funsafe-loop-optimizations -DDEBUG -g  -shared -Wl,-soname,libnbt.so -o libnbt.so CMakeFiles/nbt.dir/buffer.c.o CMakeFiles/nbt.dir/nbt_loading.c.o CMakeFiles/nbt.dir/nbt_parsing.c.o CMakeFiles/nbt.dir/nbt_treeops.c.o CMakeFiles/nbt.dir/nbt_util.c.o 
