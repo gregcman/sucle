@@ -2629,7 +2629,7 @@
 (deffunc colormultiplier 'tallgrass
   (lambda () (sandbox::getapixel 0 0 (gethash "grasscolor.png" sandbox::picture-library))))
 (deffunc colormultiplier 'grass
-  (lambda () (sandbox::getapixel 0 0 (gethash "grasscolor.png" sandbox::picture-library))))
+  (lambda () (sandbox::getapixel 255 255 (gethash "grasscolor.png" sandbox::picture-library))))
 (deffunc colormultiplier 'leaves
   (lambda () (sandbox::getapixel 0 0 (gethash "foliagecolor.png" sandbox::picture-library))))
 
