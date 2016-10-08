@@ -10,6 +10,7 @@
                #:cl-utilities
 	       
 	           #:opticl
+#:window
 #:cl-mc-shit
 #:the-matrix-is-everywhere
 #:aabbcc)
@@ -17,7 +18,6 @@
   :serial t
   :components  
   ((:file "package")
-   (:file "window")
    (:file "magic")
    (:file "mesh")
    (:file "render")
