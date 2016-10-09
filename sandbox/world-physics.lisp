@@ -11,7 +11,7 @@
 (defun setworld (name newval)
   (setf (gethash name worldhash) newval))
 
-(defparameter daytime 1.0)
+(defparameter daytime 0.0)
 (defparameter ourcam (make-simplecam))
 
 (defun physinnit ()
@@ -26,6 +26,7 @@
 ;;0.6 * 0.91 is walking friction
 (defun physics ()
   "a messy function for the bare bones physics"
+  (setf daytime (/ (1+  (cos (/ (get-internal-real-time) 2000))) 2))
   (let ((camera (getworld "player")))
     (let ((wowzer nil)
 	  (collisiondata nil)
@@ -118,17 +119,21 @@
 			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
 			    (floor (row-major-aref (simplecam-pos camera) 2) 16))))
 
-    (in:p0 3 (lambda () (aplatform
+    (in:p0 #\z (lambda () (aplatform
 			  (mat-world-pos (simplecam-pos camera))
 			  2)))
-    (in:p0 2 (lambda ()
+    (in:p0 #\x (lambda ()
 		(notaplatform (mat-world-pos (simplecam-pos camera)))
-		(notaplatform (vecadd (mat-world-pos (simplecam-pos camera)) (vector 0 1 0)))))))
+		(notaplatform (vecadd (mat-world-pos (simplecam-pos camera)) (vector 0 1 0)))))
+    (in:p0 #\c (lambda ()
+	       (oneplatform
+		(mat-world-pos (simplecam-pos camera))
+		91)))))
 
 (defun mat-world-pos (mat)
   (vector
    (round (row-major-aref mat 0))
-   (round (row-major-aref mat 1))
+   (floor (row-major-aref mat 1))
    (round (row-major-aref mat 2))))
 
 (defun mouse-looking (camera)
@@ -244,6 +249,12 @@
       (dotimes (b 3)
 	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid)))))
 
+(defun oneplatform (pos blockid)
+  (let ((i (elt pos 0))
+	(j (elt pos 1))
+	(k (elt pos 2)))
+    (setblock-with-update (+ i) (- j 1) (+ k) blockid)))
+
 (defun notaplatform (pos)
   (let ((i (elt pos 0))
 	(j (elt pos 1))
@@ -304,7 +315,9 @@
     (if thechunk
 	(let ((light (getlightlizz thechunk))
 	      (blocks (getblockslizz thechunk))
-	      (skylight (getskylightlizz thechunk)))
+	      (skylight (getskylightlizz thechunk))
+	      (meta (getmetadatalizz thechunk))
+	      (leheight (getheightlizz thechunk)))
 	  (let ((xscaled (ash x 4))
 		(yscaled (ash y 4)))
 	    (sandbox::flat3-chunk
@@ -317,6 +330,16 @@
 	     (lambda (x y z b)
 	       (skysetlight x y z b))
 	     xscaled 0 yscaled)
+	    (sandbox::flat3-chunk
+	     meta
+	     (lambda (x y z b)
+	       (setmeta x y z b))
+	     xscaled 0 yscaled)
+	    (sandbox::flat2-chunk
+	     leheight
+	     (lambda (x y b)
+	       (setheight x y b))
+	     xscaled yscaled)
 	    (sandbox::flat3-chunk
 	     blocks
 	     (lambda (x y z b)
@@ -331,6 +354,12 @@
 	  (funcall setfunc (+ xoffset i) (+ yoffset (* 16 wow) j) (+ zoffset k)
 		   (elt data (+ (* i 16 128) (+ j (* 16 wow)) (* k 128)))))))))
 
+(defun flat2-chunk (data setfunc xoffset yoffset)
+  (dotimes (j 16)
+    (dotimes (i 16)
+      (funcall setfunc (+ xoffset i) (+ yoffset j)
+	       (elt data (+ i (+ (* 16 j))))))))
+
 
 (defparameter atest (if nil
 			cl-mc-shit::testchunk
@@ -340,7 +369,7 @@
    (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
      (if thechunk
 	 (cl-mc-shit:chunk-data
-	       thechunk)
+	  thechunk)
 	 nil)))
 
 (defun expand-nibbles (vec)
@@ -352,57 +381,89 @@
 	(setf (aref newvec (1+ (* 2 x))) a)))
     newvec))
 
-(defun getskylightlizz (lizz)
-  (expand-nibbles
-   (gettag "SkyLight"
-	   (third
-	    (first
-	     (third
-	      lizz))))) )
-
-(defun getlightlizz (lizz)
-  (expand-nibbles
-   (gettag "BlockLight"
-	   (third
-	    (first
-	     (third
-	      lizz))))) )
+(defun nbt-open (lizz)
+  (third
+   (first
+    (third
+     lizz))))
 
 (defun gettag (lestring lizz)
   (dolist (tag lizz)
     (if (equal lestring (second tag))
 	(return-from gettag (third tag)))))
 
+(defun getmetadatalizz (lizz)
+  (expand-nibbles
+   (gettag "Data"
+	   (nbt-open lizz))))
+
+(defun getskylightlizz (lizz)
+  (expand-nibbles
+   (gettag "SkyLight"
+	   (nbt-open lizz))))
+
+(defun getlightlizz (lizz)
+  (expand-nibbles
+   (gettag "BlockLight"
+	   (nbt-open lizz))) )
+
 (defun getblockslizz (lizz)
   (gettag
    "Blocks"
-   (third
-    (first
-     (third
-      lizz)))))
+   (nbt-open lizz)))
 
+(defun getheightlizz (lizz)
+  (gettag
+   "HeightMap"
+   (nbt-open lizz)))
+
+(defun genhash ()
+  (make-hash-table :test (function eql)))
 
 ;;chunkhash stores all of the chunks in a hasmap.
 ;;chunks accessed by '(x y z) in chunk coords
-(defparameter chunkhash (make-hash-table :test (function eql)))
-(defparameter lighthash (make-hash-table :test (function eql)))
-(defparameter skylighthash (make-hash-table :test (function eql)))
+(defparameter chunkhash (genhash))
+(defparameter lighthash (genhash))
+(defparameter skylighthash (genhash))
+(defparameter metahash (genhash))
+
+(defparameter heighthash (genhash))
+
 ;;dirty chunks is a list of modified chunks 
 (defparameter dirtychunks nil)
 
 (defun clearworld ()
-  (send-to-free-mem chunkhash)
-  (send-to-free-mem lighthash)
-  (send-to-free-mem skylighthash)
+  (vox::send-to-free-mem chunkhash)
+  (vox::send-to-free-mem lighthash)
+  (vox::send-to-free-mem skylighthash)
+  (vox::send-to-free-mem metahash)
+  (pix::send-to-free-mem heighthash)
   (setf dirtychunks nil))
 
 (setf (fdefinition 'getblock) (vox::func-get chunkhash 0))
-(setf (fdefinition 'getlight) (vox::func-get lighthash 15))
+(setf (fdefinition 'setblock) (vox::func-set chunkhash 0))
+(defun (setf getblock) (new x y z)
+    (setblock x y z new))
+
+(setf (fdefinition 'getlight) (vox::func-get lighthash 0))
+(setf (fdefinition 'setlight) (vox::func-set lighthash 0))
+(defun (setf getlight) (new x y z)
+    (setlight x y z new))
+
 (setf (fdefinition 'skygetlight) (vox::func-get skylighthash 15))
-(setf (fdefinition 'setblock) (vox::func-set chunkhash))
-(setf (fdefinition 'setblock) (vox::func-set chunkhash))
-(setf (fdefinition 'setlight) (vox::func-set lighthash))
-(setf (fdefinition 'skysetlight) (vox::func-set skylighthash))
+(setf (fdefinition 'skysetlight) (vox::func-set skylighthash 15))
+(defun (setf skygetlight) (new x y z)
+    (skysetlight x y z new))
+
+(setf (fdefinition 'getmeta) (vox::func-get metahash 0))
+(setf (fdefinition 'setmeta) (vox::func-set metahash 0))
+(defun (setf getmeta) (new x y z)
+    (setmeta x y z new))
+
+(setf (fdefinition 'getheight) (pix::func-get heighthash 0))
+(setf (fdefinition 'setheight) (pix::func-set heighthash 0))
+(defun (setf getheight) (new x y)
+    (setheight x y new))
 
 (defun block-dirtify (i j k)
   (pushnew (list (ash i -4) (ash j -4) (ash k -4)) dirtychunks :test 'equal))
@@ -410,6 +471,205 @@
 (defun dirtify (x y z)
   (pushnew (list x y z) dirtychunks :test 'equal))
 
+(defun update-height (x y)
+  (block wow
+    (dorange (z 0 255)
+	     (let ((val (- 255 z)))
+	       (let ((the-block (getblock x val y)))
+		 (let ((ans 
+			 (eq t 
+			      (aref mc-blocks::opaquecubelooukup the-block))))
+		   (if ans
+		       (return-from wow
+			 (setf (getheight x y) val)))))))
+    (setheight x y 0)))
+
+(defun isOpaque (id)
+  (eq t (aref mc-blocks::opaquecubelooukup id)))
+
+(defun lightnode (ans)
+  (if ans
+      (progn
+	(let* ((ourpos (pop ans))
+	       (i (first ourpos))
+	       (j (second ourpos))
+	       (k (third ourpos)))
+	  (let ((courant (apply #'getlight ourpos)))
+	    (unless (zerop courant)
+	      (let ((current (1- courant)))
+		(flet ((settest (x y z)
+			 (unless (isOpaque (getblock x y z))
+			   (setf (getlight x y z) current)
+			   (pushnew (list x y z) ans :test #'equal))))
+		  (let ((i- (getlight (- i 1) (+ j 0) (+ k 0)))
+			(i+ (getlight (+ i 1) (+ j 0) (+ k 0)))
+			(j- (getlight (+ i 0) (- j 1) (+ k 0)))
+			(j+ (getlight (+ i 0) (+ j 1) (+ k 0)))
+			(k- (getlight (+ i 0) (+ j 0) (- k 1)))
+			(k+ (getlight (+ i 0) (+ j 0) (+ k 1))))
+		    (if (< i- current)
+			(settest (- i 1) (+ j 0) (+ k 0)))
+		    (if (< i+ current)
+			(settest (+ i 1) (+ j 0) (+ k 0)))
+		    (if (< j- current)
+			(settest (+ i 0) (- j 1) (+ k 0)))
+		    (if (< j+ current)
+			(settest (+ i 0) (+ j 1) (+ k 0)))
+		    (if (< k- current)
+			(settest (+ i 0) (+ j 0) (- k 1)))
+		    (if (< k+ current)
+			(settest (+ i 0) (+ j 0) (+ k 1)))))))))
+	(lightnode ans))))
+
+;;first we remove all the possible lights that could be affected by
+;;the light we want to remove, then the surrounding lights fill in the
+;;holes.
+(defun delightnode (ans other)
+  (if ans
+      (progn
+	(let* ((ourpos (pop ans))
+	       (i (first ourpos))
+	       (j (second ourpos))
+	       (k (third ourpos)))
+	  (let ((current (getlight i j k)))
+	    (setf (getlight i j k) 0)
+	    (flet ((settest (x y z)
+		     (unless (isopaque (getblock x y z))
+		       (pushnew (list x y z) ans :test #'equal)))
+		   (lightprop (x y z)
+		     (pushnew (list x y z) other :test #'equal)))
+	      (let ((i- (getlight (- i 1) (+ j 0) (+ k 0)))
+		    (i+ (getlight (+ i 1) (+ j 0) (+ k 0)))
+		    (j- (getlight (+ i 0) (- j 1) (+ k 0)))
+		    (j+ (getlight (+ i 0) (+ j 1) (+ k 0)))
+		    (k- (getlight (+ i 0) (+ j 0) (- k 1)))
+		    (k+ (getlight (+ i 0) (+ j 0) (+ k 1))))
+		(unless (zerop i-)
+		  (if (< i- current)
+		      (settest (+ i -1) (+ j 0) (+ k 0))   
+		      (lightprop (+ i -1) (+ j 0) (+ k 0))))
+		(unless (zerop i+)
+		  (if (< i+ current)
+		      (settest (+ i 1) (+ j 0) (+ k 0))   
+		      (lightprop (+ i 1) (+ j 0) (+ k 0))))
+		(unless (zerop j-)
+		  (if (< j- current)
+		      (settest (+ i 0) (+ j -1) (+ k 0))   
+		      (lightprop (+ i 0) (+ j -1) (+ k 0))))
+		(unless (zerop j+)
+		  (if (< j+ current)
+		      (settest (+ i 0) (+ j 1) (+ k 0))   
+		      (lightprop (+ i 0) (+ j 1) (+ k 0))))
+		(unless (zerop k-)
+		  (if (< k- current)
+		      (settest (+ i 0) (+ j 0) (+ k -1))   
+		      (lightprop (+ i 0) (+ j 0) (+ k -1))))
+		(unless (zerop k+)
+		  (if (< k+ current)
+		      (settest (+ i 0) (+ j 0) (+ k 1))   
+		      (lightprop (+ i 0) (+ j 0) (+ k 1))))))))
+	(delightnode ans other))
+      (if other
+	  (lightnode other))))
+
+(defun skylightnode (ans)
+  (if ans
+      (progn
+	(let* ((ourpos (pop ans))
+	       (i (first ourpos))
+	       (j (second ourpos))
+	       (k (third ourpos)))
+	  (let* ((current (apply #'skygetlight ourpos))
+		 (1-current (1- current)))
+	    (flet ((settest (x y z)
+		     (unless (isOpaque (getblock x y z))
+		       (setf (skygetlight x y z) (1- current))
+		       (pushnew (list x y z) ans :test #'equal)))
+		   (wowtest (x y z)
+		     (unless (or (isOpaque (getblock x y z))
+				 (> 0 y))
+		       (setf (skygetlight x y z) 15)
+		       (pushnew (list x y z) ans :test #'equal))))
+	      (let ((i- (skygetlight (- i 1) (+ j 0) (+ k 0)))
+		    (i+ (skygetlight (+ i 1) (+ j 0) (+ k 0)))
+		    (j- (skygetlight (+ i 0) (- j 1) (+ k 0)))
+		    (j+ (skygetlight (+ i 0) (+ j 1) (+ k 0)))
+		    (k- (skygetlight (+ i 0) (+ j 0) (- k 1)))
+		    (k+ (skygetlight (+ i 0) (+ j 0) (+ k 1))))
+		(if (< i- 1-current)
+		    (settest (- i 1) (+ j 0) (+ k 0)))
+		(if (< i+ 1-current)
+		    (settest (+ i 1) (+ j 0) (+ k 0)))
+		(if (= 15 current)
+		    (wowtest (+ i 0) (- j 1) (+ k 0))
+		    (if (< j- 1-current)
+			(settest (+ i 0) (- j 1) (+ k 0))))
+		(if (< j+ 1-current)
+		    (settest (+ i 0) (+ j 1) (+ k 0)))
+		(if (< k- 1-current)
+		    (settest (+ i 0) (+ j 0) (- k 1)))
+		(if (< k+ 1-current)
+		    (settest (+ i 0) (+ j 0) (+ k 1)))))))
+	(skylightnode ans))))
+
+;;first we remove all the possible lights that could be affected by
+;;the light we want to remove, then the surrounding lights fill in the
+;;holes.
+(defun skydelightnode (ans other)
+  (if ans
+      (progn
+	(let* ((ourpos (pop ans))
+	       (i (first ourpos))
+	       (j (second ourpos))
+	       (k (third ourpos)))
+	  (let ((current (skygetlight i j k)))
+	    (setf (skygetlight i j k) 0)
+	    (flet ((settest (x y z)
+		     (unless (or (isopaque (getblock x y z))
+				 (< y 0))
+		       (pushnew (list x y z) ans :test #'equal)))
+		   (lightprop (x y z)
+		     (pushnew (list x y z) other :test #'equal)))
+	      (let ((i- (skygetlight (- i 1) (+ j 0) (+ k 0)))
+		    (i+ (skygetlight (+ i 1) (+ j 0) (+ k 0)))
+		    (j- (skygetlight (+ i 0) (- j 1) (+ k 0)))
+		    (j+ (skygetlight (+ i 0) (+ j 1) (+ k 0)))
+		    (k- (skygetlight (+ i 0) (+ j 0) (- k 1)))
+		    (k+ (skygetlight (+ i 0) (+ j 0) (+ k 1))))
+		(unless (zerop i-)
+		  (if (< i- current)
+		      (settest (+ i -1) (+ j 0) (+ k 0))   
+		      (lightprop (+ i -1) (+ j 0) (+ k 0))))
+		(unless (zerop i+)
+		  (if (< i+ current)
+		      (settest (+ i 1) (+ j 0) (+ k 0))   
+		      (lightprop (+ i 1) (+ j 0) (+ k 0))))
+		(unless (zerop j-)
+		  (if (< j- current)
+		      (settest (+ i 0) (+ j -1) (+ k 0))   
+		      (lightprop (+ i 0) (+ j -1) (+ k 0))))
+		(if (= 15 current)
+		    (settest (+ i 0) (+ j -1) (+ k 0)))
+		(unless (zerop j+)
+		  (if (< j+ current)
+		      (settest (+ i 0) (+ j 1) (+ k 0))   
+		      (lightprop (+ i 0) (+ j 1) (+ k 0))))
+		(unless (zerop k-)
+		  (if (< k- current)
+		      (settest (+ i 0) (+ j 0) (+ k -1))   
+		      (lightprop (+ i 0) (+ j 0) (+ k -1))))
+		(unless (zerop k+)
+		  (if (< k+ current)
+		      (settest (+ i 0) (+ j 0) (+ k 1))   
+		      (lightprop (+ i 0) (+ j 0) (+ k 1))))))))
+	(skydelightnode ans other))
+      (if other
+	  (skylightnode other))))
+
 (defun setblock-with-update (i j k blockid)
+  (delightnode (list (list i j k)) nil)
+  (setlight i j k (aref mc-blocks::lightvalue blockid))
+  (skydelightnode (list (list i j k)) nil)
+  (lightnode (list (list i j k)))
   (if (setblock i j k blockid)
       (block-dirtify i j k)))

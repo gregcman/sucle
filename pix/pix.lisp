@@ -1,31 +1,27 @@
-(in-package :vox)
+(in-package :pix)
 
-(declaim (inline plus2^19 minus2^19))
-(let ((anum (ash 1 19)))
-  (defun plus2^19 (n)
+(declaim (inline plus2^30 minus2^30))
+(let ((anum (ash 1 30)))
+  (defun plus2^30 (n)
     (declare (type fixnum n))
     (the fixnum (+ n anum)))
 
-  (defun minus2^19 (n)
+  (defun minus2^30 (n)
     (declare (type fixnum n))
     (- n anum)))
 
-(defun chunkhashfunc (x y z)
-  (declare (type fixnum x y z))
-  (+ (the fixnum (plus2^19 z))
+(defun chunkhashfunc (x y)
+  (declare (type fixnum x y))
+  (+ (the fixnum (plus2^30 y))
      (the fixnum
-	  (ash (+ (the fixnum (plus2^19 y))
-		  (the fixnum
-		       (ash (the fixnum
-				 (plus2^19 x)) 20))) 20))))
+	  (ash (the fixnum
+		    (plus2^30 x)) 31))))
 
 (defun unhashfunc (ah)
   (declare (type fixnum ah))
-  (let* ((z (logand ah (1- (ash 1 20))))
-	 (xy (ash ah -20))
-	 (y (logand xy (1- (ash 1 20))))
-	 (x (ash xy -20)))
-    (values (minus2^19 x) (minus2^19 y) (minus2^19 z))))
+  (let* ((y (logand ah (1- (ash 1 31))))
+	 (x (ash ah -31)))
+    (values (minus2^30 x) (minus2^30 y))))
 
 (defun unchunkhashfunc (ah)
   (declare (type fixnum ah))
@@ -46,7 +42,7 @@
 
 (defun empty-chunk ()
   "makes an empty chunk"
-  (make-array (* 16 16 16) :element-type '(unsigned-byte 8)))
+  (make-array (* 16 16) :element-type '(unsigned-byte 8)))
 
 (defun getachunk ()
   (let ((somechunk (pop freechunkmempool)))
@@ -60,37 +56,37 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun empty-chunk-at (x y z thehash defaultval)
-  (let ((oldchunk (getchunkat thehash x y z)))
+(defun empty-chunk-at (x y thehash defaultval)
+  (let ((oldchunk (getchunkat thehash x y)))
     (if oldchunk
 	(clearchunk oldchunk defaultval)
-	(setchunkat x y z (clearchunk (getachunk) defaultval) thehash))))
+	(setchunkat x y (clearchunk (getachunk) defaultval) thehash))))
 
-(defun destroy-chunk-at (x y z thehash)
-  (let ((oldchunk (getchunkat thehash x y z)))
+(defun destroy-chunk-at (x y thehash)
+  (let ((oldchunk (getchunkat thehash x y)))
     (if oldchunk
 	(progn
-	  (remhash (chunkhashfunc x y z) thehash)
+	  (remhash (chunkhashfunc x y) thehash)
 	  (free-chunk oldchunk)))))
 
-(defun getchunkat (hash x y z)
-  (gethash (chunkhashfunc x y z) hash))
+(defun getchunkat (hash x y)
+  (gethash (chunkhashfunc x y) hash))
 
-(defun setchunkat (x y z newchunk thehash)
+(defun setchunkat (x y newchunk thehash)
   (setf
-   (gethash (chunkhashfunc x y z) thehash)
+   (gethash (chunkhashfunc x y) thehash)
    newchunk)
   newchunk)
 
-(defun chunkexistsat (x y z hash)
-  (getchunkat hash x y z))
+(defun chunkexistsat (x y hash)
+  (getchunkat hash x y))
 
-(defun get-chunk-block (chunk i j k)
-  (aref chunk (+  i (* 16 (+ (* 16 j) k)))))
+(defun get-chunk-block (chunk i j)
+  (aref chunk (+  i (* 16 j))))
 
-(defun set-chunk-block (chunk i j k new)
+(defun set-chunk-block (chunk i j new)
   (setf
-   (aref chunk (+  i (* 16 (+ (* 16 j) k))))
+   (aref chunk (+  i (* 16 j)))
    new))
 
 ;;the get and set functions get their own definitions because they need to be fast.
@@ -98,33 +94,31 @@
 (defun func-get (thathash defaultval)
   (declare (type hash-table thathash))
   (declare (type fixnum defaultval))
-  (lambda (i j k)
+  (lambda (i j)
     (multiple-value-bind (x xd) (floor i 16)
       (Multiple-value-bind (y yd) (floor j 16)
-	(multiple-value-bind (z zd) (floor k 16)
-	  (let ((chunk (getchunkat thathash x y z)))
-	    (if chunk
-		(get-chunk-block chunk xd yd zd)
-		defaultval)))))))
+	(let ((chunk (getchunkat thathash x y)))
+	  (if chunk
+	      (get-chunk-block chunk xd yd)
+	      defaultval))))))
 
 (defun func-set (thathash defaultval)
   (declare (type hash-table thathash))
-  (lambda (i j k blockid)
+  (lambda (i j blockid)
     (multiple-value-bind (x xd) (floor i 16)
       (multiple-value-bind (y yd) (floor j 16)
-	(multiple-value-bind (z zd) (floor k 16)
-	  (let* ((chunk (getchunkat thathash x y z)))
-	    (if (not chunk)
-		(setf chunk (empty-chunk-at x y z thathash defaultval)))
-	    (let ((old (get-chunk-block chunk xd yd zd)))
-	      (if (/= old blockid)
-		  (set-chunk-block chunk xd yd zd blockid)
-		  nil))))))))
+	(let* ((chunk (getchunkat thathash x y)))
+	  (if (not chunk)
+	      (setf chunk (empty-chunk-at x y thathash defaultval)))
+	  (let ((old (get-chunk-block chunk xd yd)))
+	    (if (/= old blockid)
+		(set-chunk-block chunk xd yd blockid)
+		nil)))))))
 
 ;;create a hashmap which holds arrays
 ;;type is the type of the array
 ;;the array is flat, but it is an illusion that it has
-;;the dimensions of 16 x 16 x 16
+;;the dimensions of 16 x 16
 
 (defun nope (an-object a-property)
   (remhash a-property an-object))

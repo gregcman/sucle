@@ -26,7 +26,7 @@ float fogfunc(in float ledistance, out float daratio)
 void main()
 {
 	float wow = max(blockLight,timeday*skyLight);	
-
+	
 	vec4 viewspace = view * model * vec4(position, 1.0f);
 	gl_Position = projection * viewspace;
 	TexCoord = texCoord;

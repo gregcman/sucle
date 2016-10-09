@@ -76,7 +76,8 @@
    (concatenate 'string
 		in::pressed-keys '(#\:)
 		in::down-keys '(#\:)
-		in::released-keys)))
+		in::released-keys
+		(write-to-string (mat-lis (simplecam-pos  ourcam))))))
 
 (defun draw ()
   (caption-info)

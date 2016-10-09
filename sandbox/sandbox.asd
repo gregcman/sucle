@@ -14,7 +14,8 @@
 		 #:cl-mc-shit
 		 #:the-matrix-is-everywhere
 		 #:aabbcc
-		 #:vox)
+		 #:vox
+		 #:pix)
 
     :serial t
     :components  
