@@ -1,28 +1,36 @@
 (in-package :vox)
 
-;;chunkhash stores all of the chunks in a hasmap.
-;;chunks accessed by '(x y z) in chunk coords
-(defparameter chunkhash (make-hash-table :test (function eql)))
-(defparameter lighthash (make-hash-table :test (function eql)))
-(defparameter skylighthash (make-hash-table :test (function eql)))
-;;dirty chunks is a list of modified chunks 
-(defparameter dirtychunks nil)
+(defun plus2^19 (n)
+  (declare (type fixnum n))
+  (+ n (ash 1 19)))
 
-(defun clearworld ()
-  (send-to-free-mem chunkhash)
-  (clrhash chunkhash)
-  (send-to-free-mem lighthash)
-  (clrhash lighthash)
-  (send-to-free-mem skylighthash)
-  (clrhash skylighthash)
-  (setf dirtychunks nil))
+(defun minus2^19 (n)
+  (declare (type fixnum n))
+  (- n (ash 1 19)))
+
+(defun chunkhashfunc (x y z)
+  (declare (type fixnum x y z))
+  (+ (plus2^19 z) (ash (+ (plus2^19 y) (ash (plus2^19 x) 20)) 20)))
+
+(defun unhashfunc (ah)
+  (declare (type fixnum ah))
+  (let* ((z (logand ah (1- (ash 1 20))))
+	 (xy (ash ah -20))
+	 (y (logand xy (1- (ash 1 20))))
+	 (x (ash xy -20)))
+    (values (minus2^19 x) (minus2^19 y) (minus2^19 z))))
+
+(defun unchunkhashfunc (ah)
+  (declare (type fixnum ah))
+  (multiple-value-list (unhashfunc ah)))
 
 (defun send-to-free-mem (hash)
   (maphash
    (lambda (k v)
      (declare (ignore k))
      (free-chunk v))
-   hash))
+   hash)
+  (clrhash hash))
 
 (defparameter freechunkmempool nil)
 
@@ -43,37 +51,32 @@
   (nsubstitute-if-not 0 #'zerop achunk)
   achunk)
 
-(defun plus2^19 (n)
-  (declare (type fixnum n))
-  (+ n (ash 1 19)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun minus2^19 (n)
-  (declare (type fixnum n))
-  (- n (ash 1 19)))
+(defun empty-chunk-at (x y z thehash)
+  (let ((oldchunk (getchunkat thehash x y z)))
+    (if oldchunk
+	(clearchunk oldchunk)
+	(setchunkat x y z (clearchunk (getachunk)) thehash))))
 
-(defun chunkhashfunc (x y z)
-  (declare (type fixnum x y z))
-  (+ (plus2^19 z) (ash (+ (plus2^19 y) (ash (plus2^19 x) 20)) 20)))
-
-(defun unchunkhashfunc (ah)
-  (declare (type fixnum ah))
-  (let* ((z (logand ah (1- (ash 1 20))))
-	 (xy (ash ah -20))
-	 (y (logand xy (1- (ash 1 20))))
-	 (x (ash xy -20)))
-    (list (minus2^19 x) (minus2^19 y) (minus2^19 z))))
+(defun destroy-chunk-at (x y z thehash)
+  (let ((oldchunk (getchunkat thehash x y z)))
+    (if oldchunk
+	(progn
+	  (remhash (chunkhashfunc x y z) thehash)
+	  (free-chunk oldchunk)))))
 
 (defun getchunkat (hash x y z)
   (gethash (chunkhashfunc x y z) hash))
 
-(defun setchunkat (x y z newchunk)
+(defun setchunkat (x y z newchunk thehash)
   (setf
-   (gethash (chunkhashfunc x y z) chunkhash)
+   (gethash (chunkhashfunc x y z) thehash)
    newchunk)
   newchunk)
 
-(defun chunkexistsat (x y z)
-  (getchunkat chunkhash x y z))
+(defun chunkexistsat (x y z hash)
+  (getchunkat hash x y z))
 
 (defun get-chunk-block (chunk i j k)
   (aref chunk (+  i (* 16 (+ (* 16 j) k)))))
@@ -83,69 +86,73 @@
    (aref chunk (+  i (* 16 (+ (* 16 j) k))))
    new))
 
-(defun getblock (i j k)
-  (multiple-value-bind (x xd) (floor i 16)
-    (Multiple-value-bind (y yd) (floor j 16)
-      (multiple-value-bind (z zd) (floor k 16)
-	(let ((chunk (getchunkat chunkhash x y z)))
-	  (if chunk
-	      (get-chunk-block chunk xd yd zd)
-	      0))))))
+;;the get and set functions get their own definitions because they need to be fast.
 
-(defun getlight (i j k)
-  (multiple-value-bind (x xd) (floor i 16)
-    (Multiple-value-bind (y yd) (floor j 16)
-      (multiple-value-bind (z zd) (floor k 16)
-	(let ((chunk (getchunkat lighthash x y z)))
-	  (if chunk
-	      (get-chunk-block chunk xd yd zd)
-	      15))))))
+(defun func-get (thathash defaultval)
+  (declare (type hash-table thathash))
+  (declare (type fixnum defaultval))
+  (lambda (i j k)
+    (multiple-value-bind (x xd) (floor i 16)
+      (Multiple-value-bind (y yd) (floor j 16)
+	(multiple-value-bind (z zd) (floor k 16)
+	  (let ((chunk (getchunkat thathash x y z)))
+	    (if chunk
+		(get-chunk-block chunk xd yd zd)
+		defaultval)))))))
 
-(defun skygetlight (i j k)
-  (multiple-value-bind (x xd) (floor i 16)
-    (Multiple-value-bind (y yd) (floor j 16)
-      (multiple-value-bind (z zd) (floor k 16)
-	(let ((chunk nil))
-	  (setf chunk (getchunkat skylighthash x y z))
-	  (if chunk
-	      (round (get-chunk-block chunk xd yd zd))
-	      15))))))
+(defun func-set (thathash)
+  (declare (type hash-table thathash))
+  (lambda (i j k blockid)
+    (multiple-value-bind (x xd) (floor i 16)
+      (multiple-value-bind (y yd) (floor j 16)
+	(multiple-value-bind (z zd) (floor k 16)
+	  (let* ((chunk (getchunkat thathash x y z)))
+	    (if (not chunk)
+		(setf chunk (empty-chunk-at x y z thathash)))
+	    (let ((old (get-chunk-block chunk xd yd zd)))
+	      (if (/= old blockid)
+		  (set-chunk-block chunk xd yd zd blockid)
+		  nil))))))))
 
-(defun empty-chunk-at (x y z)
-  (let ((oldchunk (getchunkat chunkhash x y z)))
-    (if oldchunk
-	(clearchunk oldchunk)
-	(setchunkat x y z (clearchunk (getachunk))))))
+;;create a hashmap which holds arrays
+;;type is the type of the array
+;;the array is flat, but it is an illusion that it has
+;;the dimensions of 16 x 16 x 16
 
-(defun destroy-chunk-at (x y z)
-  (let ((oldchunk (getchunkat chunkhash x y z)))
-    (if oldchunk
-	(progn
-	  (remhash (chunkhashfunc x y z) chunkhash)
-	  (free-chunk oldchunk)))))
+(defun nope (an-object a-property)
+  (remhash a-property an-object))
 
-(defun setblock (i j k blockid)
-  (multiple-value-bind (x xd) (floor i 16)
-    (multiple-value-bind (y yd) (floor j 16)
-      (multiple-value-bind (z zd) (floor k 16)
-	(let* ((chunk (getchunkat chunkhash x y z)))
-	  (if (not chunk)
-	      (setf chunk (empty-chunk-at x y z)))
-	  (let ((old (get-chunk-block chunk xd yd zd)))
-	    (if (/= old blockid)
-		(set-chunk-block chunk xd yd zd (the (unsigned-byte 8) blockid))
-		nil)))))))
+(defun what (an-object a-property)
+  (gethash a-property an-object))
 
-(defun block-dirtify (i j k)
-  (pushnew (list (ash i -4) (ash j -4) (ash k -4)) dirtychunks :test 'equal))
+(defun (setf what) (new an-object a-property)
+  (setf (gethash a-property an-object) new))
 
-(defun dirtify (x y z)
-  (pushnew (list x y z) dirtychunks :test 'equal))
+(defun shit ()
+  (make-hash-table :test (function eq)))
 
-(defun blockcoordtochunk (x y z)
-  (declare (type fixnum x y z))
-  (chunkhashfunc (ash x -4) (ash y -4) (ash z -4)))
+(defun spill (shit)
+  (let ((props nil))
+    (maphash
+     (lambda (k v) (push (cons k v) props))
+     shit)
+    props))
 
-(defun setblock-with-update (i j k blockid)
-  (if (setblock i j k blockid)
-      (block-dirtify i j k)))
+(defmacro dorange ((var start length) &rest body)
+  (let ((temp (gensym))
+	(temp2 (gensym))
+	(tempstart (gensym))
+	(templength (gensym)))
+    `(block nil
+       (let* ((,templength ,length)
+	      (,tempstart ,start)
+	      (,var ,tempstart))
+	 (declare (type signed-byte ,var))
+	 (tagbody
+	    (go ,temp2)
+	    ,temp
+	    (tagbody ,@body)
+	    (psetq ,var (1+ ,var))
+	    ,temp2
+	    (unless (>= ,var (+ ,tempstart ,templength)) (go ,temp))
+	    (return-from nil (progn nil)))))))

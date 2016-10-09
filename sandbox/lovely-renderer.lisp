@@ -44,6 +44,21 @@
     (draw-chunk-meshes)
     (gl:flush)))
 
+(defun setupmatrices (camera)
+  (set-matrix "view"
+	      (mat:easy-lookat
+	       (mat:add (mat:onebyfour
+			 (list 0
+			       (if isneaking (- 1.5 1/8) 1.5)
+			       0 0))
+			(simplecam-pos camera))
+	       (simplecam-pitch camera)
+	       (simplecam-yaw camera)))
+  (set-matrix "projection"
+	      (mat:projection-matrix
+	       (deg-rad (simplecam-fov camera))
+	       (/ out::pushed-width out::pushed-height) 0.01 128)) )
+
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)
   (gl:disable :blend)
@@ -51,7 +66,10 @@
   (gl:cull-face :back)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (gl:active-texture :texture0)
-  (bind-shit "terrain.png")
+  (bind-shit (case 0
+	       (0 "terrain.png")
+	       (1 "pack.png")
+	       (2 "default.png")))
   (use-program "blockshader")
   (set-matrix "model" (mat:identity-matrix))
   (maphash
@@ -67,33 +85,18 @@
 	  (progn
 	    (if mesher-thread
 		(getmeshersfinishedshit))
-	    (let ((achunk (car vox::dirtychunks)))
+	    (let ((achunk (car dirtychunks)))
 	      (if achunk
 		  (progn
 		    (giveworktomesherthread achunk)
-		    (setf vox::dirtychunks
-			  (delete achunk vox::dirtychunks :test #'equal)))))))
-      (let ((achunk (pop vox::dirtychunks)))
+		    (setf dirtychunks
+			  (delete achunk dirtychunks :test #'equal)))))))
+      (let ((achunk (pop dirtychunks)))
 	(if achunk
 	    (setf (gethash achunk vaohash)
 		  (shape-vao (chunk-shape (first achunk)
 					  (second achunk)
 					  (third achunk))))))))
-
-(defun setupmatrices (camera)
-  (set-matrix "view"
-	      (mat:easy-lookat
-	       (mat:add (mat:onebyfour
-			 (list 0
-			       (if isneaking (- 1.5 1/8) 1.5)
-			       0 0))
-			(simplecam-pos camera))
-	       (simplecam-pitch camera)
-	       (simplecam-yaw camera)))
-  (set-matrix "projection"
-	      (mat:projection-matrix
-	       (deg-rad (simplecam-fov camera))
-	       (/ out::pushed-width out::pushed-height) 0.01 128)) )
 
 (defun sortdirtychunks (camera)
   (progn
@@ -114,7 +117,7 @@
 	(if shape
 	    (setf (gethash coords vaohash) (shape-vao shape))
 	    (progn
-	      (pushnew coords vox::dirtychunks :test #'equal)))))
+	      (pushnew coords dirtychunks :test #'equal)))))
   (setf mesher-thread nil))
 
 (defun mesherthreadbusy ()
@@ -178,8 +181,8 @@
   (maphash
    (lambda (k v)
      (declare (ignore v))
-     (pushnew (vox::unchunkhashfunc k) vox::dirtychunks :test #'equal))
-   vox::chunkhash))
+     (pushnew (vox::unchunkhashfunc k) dirtychunks :test #'equal))
+   chunkhash))
 
 (defmacro progno (&rest nope))
 
@@ -202,6 +205,8 @@
   (load-into-texture-library "grasscolor.png")
   (load-into-texture-library "foliagecolor.png")
   (load-into-texture-library "terrain.png")
+  (load-into-texture-library "default.png")
+  (load-into-texture-library "pack.png")
   (bind-shit "terrain.png")
   (setf dirtychunks nil)
   (setf mesher-thread nil)
@@ -546,13 +551,13 @@
    (lambda () 
      (list
       (vertex
-       (pos 0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.6) (blocklight) (skylight))
+       (pos 0.5 -0.5 -0.5)  (uv 1.0 0.0) (opgray 0.6) (blocklight) (skylight))
       (vertex
-       (pos 0.5  0.5 -0.5)  (uv 0.0 1.0) (opgray 0.6) (blocklight) (skylight))
+       (pos 0.5  0.5 -0.5)  (uv 1.0 1.0) (opgray 0.6) (blocklight) (skylight))
       (vertex
-       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6) (blocklight) (skylight))
+       (pos 0.5  0.5  0.5)  (uv 0.0 1.0) (opgray 0.6) (blocklight) (skylight))
       (vertex
-       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6) (blocklight) (skylight))))
+       (pos 0.5 -0.5  0.5)  (uv 0.0 0.0) (opgray 0.6) (blocklight) (skylight))))
    (lambda ()
      (list
       (vertex
@@ -568,21 +573,21 @@
       (vertex
        (pos -0.5 0.5 -0.5) (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
       (vertex
-       (pos -0.5 0.5 0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))
+       (pos -0.5 0.5 0.5) (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))
       (vertex
        (pos 0.5 0.5 0.5) (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
       (vertex
-       (pos 0.5 0.5 -0.5) (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))))
+       (pos 0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))))
    (lambda ()
      (list
       (vertex
-       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.8) (blocklight) (skylight))
+       (pos -0.5 -0.5 -0.5) (uv 1.0 0.0) (opgray 0.8) (blocklight) (skylight))
       (vertex
-       (pos -0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 0.8)(blocklight) (skylight))
+       (pos -0.5 0.5 -0.5) (uv 1.0 1.0) (opgray 0.8)(blocklight) (skylight))
       (vertex
-       (pos 0.5 0.5 -0.5) (uv 1.0 1.0) (opgray 0.8) (blocklight) (skylight))
+       (pos 0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 0.8) (blocklight) (skylight))
       (vertex
-       (pos 0.5 -0.5 -0.5) (uv 1.0 0.0) (opgray 0.8) (blocklight) (skylight))))
+       (pos 0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.8) (blocklight) (skylight))))
    (lambda ()
      (list
       (vertex
@@ -676,8 +681,8 @@
 
 
 (defun chunk-shape (io jo ko)
-  "turn a chunk into a shape, complete
-with positions, textures, and colors. no normals"
+  (declare (optimize (speed 3)))
+  
   (let* ((new-shape (destroy-shape shapebuffer)))
     (dorange
      (i (* io 16) 16)
@@ -685,18 +690,18 @@ with positions, textures, and colors. no normals"
       (j (* jo 16) 16)
       (dorange
        (k (* ko 16) 16)
-       (let ((blockid (vox::getblock i j k)))
+       (let ((blockid (getblock i j k)))
 	 (if (not (zerop blockid))
 	     (let ((fineshape
 		    (blockshape
 		     io jo ko
 		     blockid
 		     (lambda (a b c)
-		       (vox::getblock (+ a i) (+ b j) (+ c k)))
+		       (getblock (+ a i) (+ b j) (+ c k)))
 		     (lambda (a b c)
-		       (vox::getlight (+ a i) (+ b j) (+ c k)))
+		       (getlight (+ a i) (+ b j) (+ c k)))
 		     (lambda (a b c)
-		       (vox::skygetlight (+ a i) (+ b j) (+ c k))) )))
+		       (skygetlight (+ a i) (+ b j) (+ c k))) )))
 	       (dolist (face (coerce (delete nil fineshape) 'list))
 		 (increment-verts i j k face))
 	       (reduce

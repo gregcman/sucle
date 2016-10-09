@@ -16,8 +16,8 @@ void main()
 
     color = texture(ourTexture, TexCoord) * mycolor;
    color= mix(vec4(fogcolor.xyz, color.a), color, fogratio);
-	if(color.a < 0.1)
-			discard;
+	//if(color.a < 0.1)
+	//		discard;
 	
 	
 }

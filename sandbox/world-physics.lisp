@@ -24,11 +24,59 @@
 ;;gravity is (* -0.08 (expt tickscale 2)) 0 0
 ;;falling friction is 0.98
 ;;0.6 * 0.91 is walking friction
-
 (defun physics ()
+  "a messy function for the bare bones physics"
   (let ((camera (getworld "player")))
-    (mat:scale! cameraVelocity 0.9)
-    (mat:add! (simplecam-pos camera) cameraVelocity)))
+    (let ((wowzer nil)
+	  (collisiondata nil)
+	  (velclamp nil))
+      (multiple-value-bind (a b c)
+	  (aabbcc::finish-clamps #'myafunc
+				 (mat-vec (simplecam-pos camera))
+				 (mat-vec cameraVelocity))
+	(setf wowzer a)
+	(setf collisiondata b)
+	(setf velclamp c))
+      (setf onground (if (numberp (elt collisiondata 2))
+			 (= 0 (elt collisiondata 2))
+			 (eq :contact (elt collisiondata 2))))
+
+      (setf (simplecam-pos camera)
+	    (vec-mat
+	     wowzer))
+      (setf cameraVelocity
+	    (mat-clamper cameraVelocity velclamp))
+
+      
+      (if (not onground)
+	  (mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
+      (let ((airscaled
+	     (mat:onebyfour
+	      (list
+	       (row-major-aref cameraVelocity 0)
+	       0
+	       (row-major-aref cameraVelocity 2)
+	       0))))
+	(mat:scale! airscaled (* 0.9))
+	(if onground (mat:scale! airscaled (* 0.6 0.91)))
+	(if nil
+	    (let ((speed (hypot (mat-lis airscaled))))
+	      (print speed)
+	      (if (> 0.05 speed)
+		  (setf isprinting nil))))
+	(setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
+	(setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
+      (setf (row-major-aref cameraVelocity 1)
+	    (* (expt 0.98 tickscale)
+	       (row-major-aref cameraVelocity 1)))
+      (outofbounds camera))))
+
+(defun outofbounds (camera)
+  (if (> 0 (row-major-aref (simplecam-pos camera) 1))
+      (progn	  
+	(setf (row-major-aref cameraVelocity 1) 0)
+	(setf (row-major-aref (simplecam-pos camera) 1) 0)
+	(setf (simplecam-pos camera) (mat:onebyfour (list 0 128 0 1))))))
 
 (defparameter lastw nil)
 (defparameter wprev most-negative-fixnum)
@@ -65,9 +113,6 @@
 	  (setf isprinting nil)
 	  (setf isneaking t))
 	(setf isneaking nil))
-    (if t
-	(setf daytime (/ (+ 1 (cos (/ (get-internal-run-time) (* 20 100)))) 2))
-	(setf daytime 1))
 
     (in:p+1 #\h (lambda () (someseq
 			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
@@ -126,25 +171,22 @@
        ("a" ( 0  0  1  0))
        ("d" ( 0  0 -1  0))))
     (mat:scale! (mat:normalize! delta) (* 0.4 (expt tickscale 2)))
-    (progno
-     (if isneaking
-	 (mat:scale! delta 0.2))
-     (if isprinting
-	 (mat:scale! delta 1.3))
-     (if (not onground)
-	 (mat:scale! delta 0.2)))
+    (if isneaking
+	(mat:scale! delta 0.2))
+    (if isprinting
+	(mat:scale! delta 1.3))
+    (if (not onground)
+	(mat:scale! delta 0.2))
     delta))
 
 (defun key-jumps ()
   "keys for jumping"
   (let* ((delta (empty-vec4))
 	 (lemod (good-func delta)))
-    (if (or t
-	    onground)
+    (if	onground
 	(mapcar
 	 lemod
-	 `(("space" (0 ,(* 0.42 (expt tickscale 3)) 0 0))
-	   ("lshift" (0 ,(* -0.42 (expt tickscale 3)) 0 0)))))
+	 `(("space" (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
     delta))
 
 (defun keymovement (camera)
@@ -153,13 +195,54 @@
 	     (mat:rotation-matrix 0 1 0
 				  (simplecam-yaw camera))))
 
+(defun blocktocontact (blocklist vec3player vel)
+  (mapcar
+   (lambda (theplace)
+     (aabbcc::%aabb-intersect
+      (aabbcc::player-aabb)
+      vec3player
+      (aabbcc::block-aabb)
+      theplace
+      vel))
+   blocklist))
+
+(defun get-blocks-around-player (vec3player vel)
+  (declare (ignore vel))
+  (let ((places nil))
+    (dotimes (x 3)
+      (dotimes (y 4)
+	(dotimes (z 3)
+	  (let ((blockx (round (- (+ x (elt vec3player 0)) 1)))
+		(blocky (round (- (ceiling (+ y (elt vec3player 1))) 1)))
+		(blockz (round (- (+ z (elt vec3player 2)) 1))))
+	    (let ((blockid (mat-pos (vector blockx blocky blockz))))
+	      (if (eq t (aref mc-blocks::iscollidable blockid))
+		  (push (vector blockx blocky blockz) places)))))))
+    places))
+
+(defun myafunc (vec3player vel)
+  (let ((ourblocks (get-blocks-around-player vec3player vel)))
+    (let ((ourcontacts (blocktocontact ourblocks vec3player vel)))
+      (let ((totcollisoins (aabbcc::collapsecollisions ourcontacts)))
+        totcollisoins))))
+
+(defun insert-at (num vec place)
+  (let* ((start (subseq vec 0 place))
+	 (end (subseq vec place (length vec))))
+    (concatenate 'vector start (vector num) end)))
+
+(defun delete-at (vec place)
+  (let* ((start (subseq vec 0 place))
+	 (end (subseq vec (1+ place) (length vec))))
+    (concatenate 'vector start end)))
+
 (defun aplatform (pos blockid)
   (let ((i (elt pos 0))
 	(j (elt pos 1))
 	(k (elt pos 2)))
     (dotimes (a 3)
       (dotimes (b 3)
-	(vox::setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid)))))
+	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid)))))
 
 (defun notaplatform (pos)
   (let ((i (elt pos 0))
@@ -167,7 +250,7 @@
 	(k (elt pos 2)))
     (dotimes (a 3)
       (dotimes (b 3)
-	(vox::setblock-with-update (+ a i -1) (+ j) (+ b k -1) 0)))))
+	(setblock-with-update (+ a i -1) (+ j) (+ b k -1) 0)))))
 
 (defun vec-mat (vec)
   (let ((newmat (mat:onebyfour '(0 0 0 0))))
@@ -186,7 +269,7 @@
    (row-major-aref mat 2)))
 
 (defun mat-pos (mat)
-  (vox::getblock
+  (getblock
    (round (row-major-aref mat 0))
    (round (row-major-aref mat 1))
    (round (row-major-aref mat 2))))
@@ -222,40 +305,36 @@
 	(let ((light (getlightlizz thechunk))
 	      (blocks (getblockslizz thechunk))
 	      (skylight (getskylightlizz thechunk)))
-	  (let ((counter 0))
-	    (dolist (n (sandbox::flat3-chunk light))
-	      (vox::destroy-chunk-at x counter y)
-	      (setf (gethash (vox::chunkhashfunc x counter y) vox::lighthash) n)
-	      (incf counter)))
-	  (let ((counter 0))
-	    (dolist (n (sandbox::flat3-chunk skylight))
-	      (vox::destroy-chunk-at x counter y)
-	      (vox::setf (gethash (vox::chunkhashfunc x counter y) vox::skylighthash) n)
-	      (incf counter)))
-	  (let ((counter 0))
-	    (dolist (n (sandbox::flat3-chunk blocks))
-	      (vox::destroy-chunk-at x counter y)
-	      (setf (gethash (vox::chunkhashfunc x counter y) vox::chunkhash) n)
-	      (vox::dirtify x counter y)
-	      (incf counter)))))))
+	  (let ((xscaled (ash x 4))
+		(yscaled (ash y 4)))
+	    (sandbox::flat3-chunk
+	     light
+	     (lambda (x y z b)
+	       (setlight x y z b))
+	     xscaled 0 yscaled)
+	    (sandbox::flat3-chunk
+	     skylight
+	     (lambda (x y z b)
+	       (skysetlight x y z b))
+	     xscaled 0 yscaled)
+	    (sandbox::flat3-chunk
+	     blocks
+	     (lambda (x y z b)
+	       (setblock x y z b))
+	     xscaled 0 yscaled))))))
 
-(defun flat3-chunk (data)
-  "takes flat chunk data and packs it into a chunk" 
-  (let ((ourans nil))
-    (dotimes (wow 8)
-      (let ((new-chunk (vox::getachunk)))
-	(dotimes (j 16)
-	  (dotimes (i 16)
-	    (dotimes (k 16)
-	      (vox::set-chunk-block new-chunk i j k
-			       (elt data (+ (* i 16 128) (+ j (* 16 wow)) (* k 128)))))))
-	(push new-chunk ourans)))
-    (nreverse ourans)))
+(defun flat3-chunk (data setfunc xoffset yoffset zoffset)
+  (dotimes (wow 8)
+    (dotimes (j 16)
+      (dotimes (i 16)
+	(dotimes (k 16)
+	  (funcall setfunc (+ xoffset i) (+ yoffset (* 16 wow) j) (+ zoffset k)
+		   (elt data (+ (* i 16 128) (+ j (* 16 wow)) (* k 128)))))))))
 
 
-(defparameter atest (if t
+(defparameter atest (if nil
 			cl-mc-shit::testchunk
-			(byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.0.mcr")))
+			(byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr")))
 
 (defun helpchunk (x y)
    (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
@@ -266,7 +345,7 @@
 
 (defun expand-nibbles (vec)
   (let* ((len (length vec))
-	 (newvec (make-array (* 2 len) :element-type '(unsigned-byte 4))))
+	 (newvec (make-array (* 2 len) :element-type '(unsigned-byte 8))))
     (dotimes (x len)
       (multiple-value-bind (a b) (floor (aref vec x) 16)
 	(setf (aref newvec (* 2 x)) b)
@@ -301,3 +380,36 @@
     (first
      (third
       lizz)))))
+
+
+;;chunkhash stores all of the chunks in a hasmap.
+;;chunks accessed by '(x y z) in chunk coords
+(defparameter chunkhash (make-hash-table :test (function eql)))
+(defparameter lighthash (make-hash-table :test (function eql)))
+(defparameter skylighthash (make-hash-table :test (function eql)))
+;;dirty chunks is a list of modified chunks 
+(defparameter dirtychunks nil)
+
+(defun clearworld ()
+  (send-to-free-mem chunkhash)
+  (send-to-free-mem lighthash)
+  (send-to-free-mem skylighthash)
+  (setf dirtychunks nil))
+
+(setf (fdefinition 'getblock) (vox::func-get chunkhash 0))
+(setf (fdefinition 'getlight) (vox::func-get lighthash 15))
+(setf (fdefinition 'skygetlight) (vox::func-get skylighthash 15))
+(setf (fdefinition 'setblock) (vox::func-set chunkhash))
+(setf (fdefinition 'setblock) (vox::func-set chunkhash))
+(setf (fdefinition 'setlight) (vox::func-set lighthash))
+(setf (fdefinition 'skysetlight) (vox::func-set skylighthash))
+
+(defun block-dirtify (i j k)
+  (pushnew (list (ash i -4) (ash j -4) (ash k -4)) dirtychunks :test 'equal))
+
+(defun dirtify (x y z)
+  (pushnew (list x y z) dirtychunks :test 'equal))
+
+(defun setblock-with-update (i j k blockid)
+  (if (setblock i j k blockid)
+      (block-dirtify i j k)))

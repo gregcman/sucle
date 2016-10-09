@@ -1,5 +1,5 @@
 (asdf:defsystem #:vox
-  :description "three dimensional voxel data"
+  :description "pretty big three dimensional voxel data, only valid up to +/- 2^23 or something"
   :version "0.0.0"
   :author "morpheus"
   :maintainer "tain mainer"
