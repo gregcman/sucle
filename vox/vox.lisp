@@ -1,16 +1,23 @@
 (in-package :vox)
 
-(defun plus2^19 (n)
-  (declare (type fixnum n))
-  (+ n (ash 1 19)))
+(declaim (inline plus2^19 minus2^19))
+(let ((anum (ash 1 19)))
+  (defun plus2^19 (n)
+    (declare (type fixnum n))
+    (the fixnum (+ n anum)))
 
-(defun minus2^19 (n)
-  (declare (type fixnum n))
-  (- n (ash 1 19)))
+  (defun minus2^19 (n)
+    (declare (type fixnum n))
+    (- n anum)))
 
 (defun chunkhashfunc (x y z)
   (declare (type fixnum x y z))
-  (+ (plus2^19 z) (ash (+ (plus2^19 y) (ash (plus2^19 x) 20)) 20)))
+  (+ (the fixnum (plus2^19 z))
+     (the fixnum
+	  (ash (+ (the fixnum (plus2^19 y))
+		  (the fixnum
+		       (ash (the fixnum
+				 (plus2^19 x)) 20))) 20))))
 
 (defun unhashfunc (ah)
   (declare (type fixnum ah))

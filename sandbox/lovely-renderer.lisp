@@ -146,11 +146,11 @@
      (* a 0.68)
      (* a 0.8)
      (* a 1.0) 1.0)
-    (set-vec4 "fogcolor"
+    (set-vec3 "fogcolor"
 	      (vector
 	       (* a 0.68)
 	       (* a 0.8)
-	       (* a 1.0) 1.0))))
+	       (* a 1.0)))))
 
 (defun lightstuff (num)
   (expt 0.8 (- 15 (* 15  num))))
@@ -271,6 +271,12 @@
   (gl:uniformfv
    (gl:get-uniform-location shaderProgram name)
    thevec4))
+
+(defun set-vec3 (name thevec3)
+  "sets a uniform integer"
+  (gl:uniformfv
+   (gl:get-uniform-location shaderProgram name)
+   thevec3))
 
 (defun set-float (name thefloat)
   "sets a uniform integer"

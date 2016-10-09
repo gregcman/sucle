@@ -9,16 +9,16 @@ in float fogratio;
 
 uniform sampler2D ourTexture;
 
-uniform vec4 fogcolor;
+uniform vec3 fogcolor;
 
 void main()
 {
 
-    color = texture(ourTexture, TexCoord) * mycolor;
-   color= mix(vec4(fogcolor.xyz, color.a), color, fogratio);
-	//if(color.a < 0.1)
-	//		discard;
-	
+ 
+	color= texture(ourTexture, TexCoord) * mycolor;
+	if(color.a < 0.1)
+			discard;
+	color= vec4(mix(fogcolor, color.rgb, fogratio), color.a);
 	
 }
 

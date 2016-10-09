@@ -300,8 +300,7 @@
 	(sdl:window width height
 		    :opengl t
 		    :opengl-attributes
-		    '((:sdl-gl-depth-size 16)
-		      (:sdl-gl-doublebuffer 1))
+		    '((:sdl-gl-depth-size 1))
 		    :resizable resizable))
   (setq pushed-width width
 	pushed-height height))

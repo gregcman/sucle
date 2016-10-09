@@ -32,6 +32,6 @@ void main()
 	TexCoord = texCoord;
 
 	fogfunc(distance(viewspace.xyz, vec3(0)), fogratio);	
-	mycolor = vec4(wow,wow,wow,1.0)*color;
+	mycolor = vec4(vec3(wow)*color.rgb, color.a);
 	
 } 
