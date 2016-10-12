@@ -14,9 +14,9 @@
    :name name))
 
 (defun timer ()
-  (let ((prevtime (get-internal-real-time)))
+  (let ((prevtime (fine-time)))
     (lambda (time afunc)
-      (let* ((now (get-internal-real-time))
+      (let* ((now (fine-time))
 	     (diff (- now prevtime)))
 	(if (> diff time)
 	    (progn
@@ -59,30 +59,24 @@
 (defparameter renderrate nil)
 (defun injection ()
   (let ((arate (funcall rendertimer
-		 (/ 1000.0 100)
-		 (lambda ()
-		   (funcall window:base-needs)
-		   (draw)))))
+			(if nil
+			    0
+			    (/ 1000000.0 59.88))
+			(lambda ()
+			  (render)))))
     (if arate
-	(setf renderrate arate)))
+	(progn
+	  (setf renderrate arate)
+	  (window:set-caption (write-to-string (/ renderrate 1000.0))))))
+    (funcall window:base-needs)
+  (let ((camera (getworld "player")))
+    (if (in:ismousecaptured)
+	(mouse-looking camera)))
   (if 
    (and
     kill-button
     (not window:status))
    (injection)))
-
-(defun caption-info ()
-  (window:set-caption
-   (concatenate 'string
-		in::pressed-keys '(#\:)
-		in::down-keys '(#\:)
-		in::released-keys
-		(write-to-string (mat-lis (simplecam-pos  ourcam))))))
-
-(defun draw ()
-  (caption-info)
-  (render)
-  (sdl:update-display))
 
 (defparameter ticks/sec 60)
 (defparameter tickscale (/ 20 ticks/sec))
@@ -91,7 +85,7 @@
 (defparameter physthread nil)
 (defun physthread ()
   (let ((arate (funcall phystimer
-		 (/ 1000.0 ticks/sec)
+		 (/ 1000000.0 ticks/sec)
 		 (lambda ()
 		   (if (in:ismousecaptured)
 		       (controls))
@@ -102,3 +96,7 @@
        kill-button
        (not window:status))
       (physthread)))
+
+(defun fine-time ()
+  (multiple-value-bind (s m) (sb-ext:get-time-of-day)
+    (+ (* (expt 10 6) s) m)))

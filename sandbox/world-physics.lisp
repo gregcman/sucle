@@ -11,8 +11,14 @@
 (defun setworld (name newval)
   (setf (gethash name worldhash) newval))
 
-(defparameter daytime 0.0)
+(defparameter daytime 1.0)
 (defparameter ourcam (make-simplecam))
+
+(defun ease (x target fraction)
+  (+ x (* fraction (- target x))))
+;;70 is normal
+;;110 is quake pro
+(defparameter defaultfov 70)
 
 (defun physinnit ()
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
@@ -26,8 +32,19 @@
 ;;0.6 * 0.91 is walking friction
 (defun physics ()
   "a messy function for the bare bones physics"
-  (setf daytime (/ (1+  (cos (/ (get-internal-real-time) 2000))) 2))
+  (setf daytime (case 10
+		  (0 27.5069)
+		  (2 9)
+		  (9 0)
+		  (3 0)
+		  (1 (/ (+ 0  (cos (/ (get-internal-real-time) 2000))) 0.5))
+		  (10 1.0)))
   (let ((camera (getworld "player")))
+    (if isprinting
+      (setf (simplecam-fov camera)
+	    (ease (simplecam-fov camera) (* 1.15 defaultfov) 0.2))
+      (setf (simplecam-fov camera)
+	    (ease (simplecam-fov camera) defaultfov 0.2)))
     (let ((wowzer nil)
 	  (collisiondata nil)
 	  (velclamp nil))
@@ -89,7 +106,6 @@
 
 (defun controls ()
   (let ((camera (getworld "player")))
-    (mouse-looking camera)
     (mat:add!
      cameraVelocity
      (keymovement camera))
@@ -115,7 +131,7 @@
 	  (setf isneaking t))
 	(setf isneaking nil))
 
-    (in:p+1 #\h (lambda () (someseq
+    (in:key-pressed-hook #\h (lambda () (someseq
 			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
 			    (floor (row-major-aref (simplecam-pos camera) 2) 16))))
 
@@ -138,8 +154,8 @@
 
 (defun mouse-looking (camera)
   (let* ((change (in:delta))
-	 (x (* 1/360 (aref change 0)))
-	 (y (* 1/360 (aref change 1))))
+	 (x (* 1.25 1/360 (aref change 0)))
+	 (y (* 1.25 1/360 (aref change 1))))
     (setf
      (simplecam-yaw camera)
      (mod (+ (simplecam-yaw camera) x) (* 2 pi)))

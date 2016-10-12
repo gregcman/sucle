@@ -9,43 +9,69 @@
   `(setf ,a (not ,a)))
 (defparameter drawmode nil)
 
-(defun leresize (option)
-  (out:push-dimensions option)
-  (gl:viewport 0 0 out:width out:height))
-
-(defun ease (x target fraction)
-  (+ x (* fraction (- target x))))
-
 (defun render ()
   "responsible for rendering the world"
   (let ((camera (getworld "player")))
-    (gl:clear :color-buffer-bit :depth-buffer-bit)
-    (if isprinting
-	(setf (simplecam-fov camera)
-	      (ease (simplecam-fov camera) 90 0.2))
-	(setf (simplecam-fov camera)
-	      (ease (simplecam-fov camera) 70 0.2))) 
-    (setupmatrices camera)
-    (sortdirtychunks camera)
-    (designatemeshing)
-    (settime)
-    (if (in:key-pressed-p #\v)
-	(progn (leresize t)))
-    (if (in:key-pressed-p #\g)
+    (use-program "blockshader")
+    (gl:clear :depth-buffer-bit :color-buffer-bit)
+    (if (in:akeydown "g")
 	(update-world-vao))
-    (if (in:key-pressed-p #\y)
+    (if (in:akeydown "y")
 	(loadblockshader))
-    (if (in:key-pressed-p #\q)
+    (if (in:akeydown "o")
+	(setf worldlist (genworldcallist)))
+    (if (in:akeydown "q")
 	(progn
 	  (toggle drawmode)
 	  (if drawmode
 	      (gl:polygon-mode :front-and-back :line)
 	      (gl:polygon-mode :front-and-back :fill))))
+    (setupmatrices camera)
+    (sortdirtychunks camera)
+    (designatemeshing)
+    (settime)
+    
     (draw-chunk-meshes)
-    (gl:flush)))
+
+    (use-program "simpleshader")
+    (setupmatrices camera)
+    (gl:matrix-mode :modelview)
+    (gl:load-identity)
+    (gl:disable :cull-face)
+    (bind-shit "clouds.png")
+    (gl:color 1 1 1 1)
+    (let* ((pos (simplecam-pos camera))
+	   (xpos (x pos))
+	   (zpos (z pos))
+	   (texx (/ xpos (* 128 16 2)))
+	   (texy (/ zpos (* 128 16 2)))
+	   (lilsize (/ 1 16)))
+      (gl:with-pushed-matrix
+	(gl:with-primitive :quads
+	  (gl:vertex-attrib 2 (+ texx) (+ texy))
+	  (gl:vertex (+ xpos -128) cloudheight (+ zpos -128))
+	  (gl:vertex-attrib 2 (+ lilsize texx) (+ texy))
+	  (gl:vertex (+ xpos 128) cloudheight (+ zpos -128))
+	  (gl:vertex-attrib 2 (+ lilsize texx) (+ lilsize texy))
+	  (gl:vertex (+ xpos 128) cloudheight (+ zpos 128))
+	  (gl:vertex-attrib 2 (+ texx) (+ lilsize texy))
+	  (gl:vertex (+ xpos -128) cloudheight (+ zpos 128)))))
+    (gl:flush)
+    (sdl:update-display)))
+
+(defun x (vec)
+  (row-major-aref vec 0))
+(defun y (vec)
+  (row-major-aref vec 1))
+(defun z (vec)
+  (row-major-aref vec 2))
+(defun w (vec)
+  (row-major-aref vec 3))
+
+(defparameter cloudheight 100)
 
 (defun setupmatrices (camera)
-  (set-matrix "view"
+  (set-matrix "modelview"
 	      (mat:easy-lookat
 	       (mat:add (mat:onebyfour
 			 (list 0
@@ -59,24 +85,32 @@
 	       (deg-rad (simplecam-fov camera))
 	       (/ out::pushed-width out::pushed-height) 0.01 128)) )
 
+(defun genworldcallist ()
+  (let ((ourlist (gl:gen-lists 1)))
+    (gl:new-list ourlist :compile)
+    (maphash
+     (lambda (key vao)
+       (declare (ignore key))
+       (if t
+	   (gl:call-list vao)
+	   (draw-vao vao)))
+     vaohash)
+    (gl:end-list)
+    ourlist))
+
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)
-  (gl:disable :blend)
+
   (gl:enable :cull-face)
   (gl:cull-face :back)
-  (gl:blend-func :src-alpha :one-minus-src-alpha)
-  (gl:active-texture :texture0)
   (bind-shit (case 0
 	       (0 "terrain.png")
 	       (1 "pack.png")
 	       (2 "default.png")))
-  (use-program "blockshader")
-  (set-matrix "model" (mat:identity-matrix))
-  (maphash
-   (lambda (key vao)
-     (declare (ignore key))
-     (draw-vao vao))
-   vaohash))
+  (if worldlist
+      (gl:call-list worldlist)))
+
+(defparameter worldlist nil)
 
 (defun designatemeshing ()
   (if (string= mesherwhere? "worker")
@@ -94,9 +128,9 @@
       (let ((achunk (pop dirtychunks)))
 	(if achunk
 	    (setf (gethash achunk vaohash)
-		  (shape-vao (chunk-shape (first achunk)
-					  (second achunk)
-					  (third achunk))))))))
+		  (shape-list (chunk-shape (first achunk)
+					   (second achunk)
+					   (third achunk))))))))
 
 (defun sortdirtychunks (camera)
   (progn
@@ -115,7 +149,7 @@
   (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
     (if coords
 	(if shape
-	    (setf (gethash coords vaohash) (shape-vao shape))
+	    (setf (gethash coords vaohash) (shape-list shape))
 	    (progn
 	      (pushnew coords dirtychunks :test #'equal)))))
   (setf mesher-thread nil))
@@ -140,20 +174,26 @@
   (set-float "timeday" daytime)
   (setnight daytime))
 
+(defun clamp (x min max)
+  (max (min x max) min))
+
 (defun setnight (val)
-  (let ((a (lightstuff val)))
-    (gl:clear-color  
-     (* a 0.68)
-     (* a 0.8)
-     (* a 1.0) 1.0)
-    (set-vec3 "fogcolor"
-	      (vector
-	       (* a 0.68)
-	       (* a 0.8)
-	       (* a 1.0)))))
+  (flet ((foofunc (x)
+	   (clamp x 0.0 1.0)))
+    (let ((a (lightstuff val)))
+      (gl:clear-color  
+       (foofunc (* a 0.68))
+       (foofunc (* a 0.8))
+       (foofunc (* a 1.0)) 1.0)
+      (set-vec3 "fogcolor"
+		(vector
+		 (foofunc (* a 0.68))
+		 (foofunc (* a 0.8))
+		 (foofunc (* a 1.0))
+		 1.0)))))
 
 (defun lightstuff (num)
-  (expt 0.8 (- 15 (* 15  num))))
+  (lightfunc (* 15 num)))
 
 (defparameter mesher-thread nil)
 
@@ -207,13 +247,29 @@
   (load-into-texture-library "terrain.png")
   (load-into-texture-library "default.png")
   (load-into-texture-library "pack.png")
+  (load-into-texture-library "clouds.png")
   (bind-shit "terrain.png")
   (setf dirtychunks nil)
+  (setf worldlist nil)
   (setf mesher-thread nil)
   (clrhash vaohash)
   (clrhash shaderhash)
-  (loadblockshader)
-  (use-program "blockshader"))
+  (load-a-shader
+   "blockshader"
+   "blockshader/transforms.vs"
+   "blockshader/basictexcoord.frag"
+   '(("position" . 0)
+     ("texCoord" . 2)
+     ("color" . 3)
+     ("blockLight" . 8)
+     ("skyLight" . 12)))
+  (load-a-shader
+   "simpleshader"
+   "simpleshader/transforms.vs"
+   "simpleshader/basictexcoord.frag"
+   '(("position" . 0)
+     ("texCoord" . 2)
+     ("color" . 3))))
 
 (defun load-into-texture-library (name &optional (othername name))
   (let ((thepic (gethash name picture-library)))
@@ -222,17 +278,6 @@
 	    (load-shit
 	     (fatten thepic)
 	     othername (first dims) (second dims))))))
-
-(defun loadblockshader ()
-  (load-a-shader
-   "blockshader"
-   "transforms.vs"
-   "basictexcoord.frag"
-   '(("position" . 0)
-     ("texCoord" . 2)
-     ("color" . 4)
-     ("blockLight" . 8)
-     ("skyLight" . 9))))
 
 (defun sizeof (type-keyword)
   "gets the size of a foreign c type"
@@ -375,26 +420,31 @@
     (gl:buffer-data :element-array-buffer :static-draw
 		    glindices) 
 
-    (let ((totsize (* 11 (sizeof :float))))
+    (let ((totsize (* 17 (sizeof :float))))
+      ;;position
       (gl:vertex-attrib-pointer
        0 3 :float :false totsize 0)
       (gl:enable-vertex-attrib-array 0)
 
+      ;;texcoord
       (gl:vertex-attrib-pointer
        2 2 :float :false totsize (* 3 (sizeof :float)))
       (gl:enable-vertex-attrib-array 2)
 
+      ;;color
       (gl:vertex-attrib-pointer
-       4 4 :float :false totsize (* 5 (sizeof :float)))
-      (gl:enable-vertex-attrib-array 4)
+       3 4 :float :false totsize (* 5 (sizeof :float)))
+      (gl:enable-vertex-attrib-array 3)
 
+      ;;blocklight
       (gl:vertex-attrib-pointer
-       8 1 :float :false totsize (* 9 (sizeof :float)))
+       8 4 :float :false totsize (* 9 (sizeof :float)))
       (gl:enable-vertex-attrib-array 8)
 
+      ;;skylight
       (gl:vertex-attrib-pointer
-       9 1 :float :false totsize (* 10 (sizeof :float)))
-      (gl:enable-vertex-attrib-array 9))
+       12 4 :float :false totsize (* 13 (sizeof :float)))
+      (gl:enable-vertex-attrib-array 12))
     
     (gl:free-gl-array glverts)
     (gl:free-gl-array glindices)
@@ -406,24 +456,61 @@
      :verts glverts
      :indices glindices)))
 
-(defun draw-vao (some-vao)
-  "draws a vao struct"
-  (gl:bind-vertex-array (vao-id some-vao))
-  (gl:draw-elements
-   :triangles
-   (gl:make-null-gl-array :unsigned-int)
-   :count (vao-length some-vao))
-  (gl:bind-vertex-array 0))
+(defun shape-list (the-shape)
+  (let ((ourlist (gl:gen-lists 1))
+	(verts (shape-vs the-shape))
+	(vertsize 17))
+    (gl:new-list ourlist :compile)
+    (macrolet ((wow (num start)
+		 `(gl:vertex-attrib ,num
+				    (elt verts (+ base ,start 0))
+				    (elt verts (+ base ,start 1))
+				    (elt verts (+ base ,start 2))
+				    (elt verts (+ base ,start 3))))
+	       (wow2 (num start)
+		 `(gl:vertex-attrib ,num
+				    (elt verts (+ base ,start 0))
+				    (elt verts (+ base ,start 1))))
+	       (wow3 (num start)
+		 `(gl:vertex-attrib ,num
+				    (elt verts (+ base ,start 0))
+				    (elt verts (+ base ,start 1))
+				    (elt verts (+ base ,start 2)))))
+      (gl:with-primitives :quads
+	(dotimes (x (shape-vertlength the-shape))
+	  (let ((base (* x vertsize)))
+	    (wow2 2 3)
+	    (wow 3 5)
+	    (wow 8 9)
+	    (wow 12 13)
+	    (wow3 0 0)))))
+    (gl:end-list)
+    ourlist))
+
+(let ((nullarray (gl:make-null-gl-array :unsigned-int)))
+  (defun draw-vao (some-vao)
+    "draws a vao struct"
+    (gl:bind-vertex-array (vao-id some-vao))
+    (if nil
+	(gl:draw-arrays
+	 :quads
+	 0
+	 (vao-length some-vao))
+	(gl:draw-elements 
+	 :triangles
+	 nullarray
+	 :count (vao-length some-vao)))))
 
 (defun create-texture-wot (tex-data width height)
   "creates an opengl texture from data"
   (let ((the-shit (car (gl:gen-textures 1))))
     (gl:bind-texture :texture-2d the-shit)
-    (gl:tex-parameter :texture-2d :texture-min-filter :nearest)
+    (gl:tex-parameter :texture-2d :texture-min-filter :nearest-mipmap-linear)
     (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
-    (gl:tex-parameter :texture-2d :texture-wrap-s :clamp-to-edge)
-    (gl:tex-parameter :texture-2d :texture-wrap-t :clamp-to-edge)
+    (gl:tex-parameter :texture-2d :texture-wrap-s :repeat)
+    (gl:tex-parameter :texture-2d :texture-wrap-t :repeat)
     (gl:tex-parameter :texture-2d :texture-border-color '(0 0 0 0))
+    (gl:tex-parameter :texture-2d :generate-mipmap :true)
     (gl:tex-image-2d
      :texture-2d 0
      :rgba width height 0 :rgba :unsigned-byte tex-data)
@@ -839,8 +926,8 @@
 	(let ((newface (funcall (elt xfaces n))))
 	  (setf (elt faces n) newface)
 	  (dolist (v newface)
-	    (setf (elt v 3) (vector (lightfunc lighthere)))
-	    (setf (elt v 4) (vector (lightfunc skylighthere)))))))
+	    (setf (elt v 3) (allvec4 (lightfunc lighthere)))
+	    (setf (elt v 4) (allvec4 (lightfunc skylighthere)))))))
     faces))
 
 (defun allvec4 (num)
@@ -877,7 +964,7 @@
      1.0)))
 
 (defun lightfunc (light)
-  (expt 0.8 (- 15 light)))
+  (/ (- (expt 0.8 (- 15 light)) (expt 0.8 15)) (- 1 (expt 0.8 15))))
 
 (defun lightvert (vert light)
   (let ((anum (lightfunc light)))
@@ -925,8 +1012,8 @@
 		   (1tres (vec3getlight skylit (insert-at qux (vector 0 bar) unchange )))
 		   (1quatro (vec3getlight skylit (insert-at qux (vector 0 0) unchange )))
 		   (1uno (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))))
-	      (setf (elt v 3) (vector (lightfunc (avg uno dos tres quatro))))
-	      (setf (elt v 4) (vector (lightfunc (avg 1uno 1dos 1tres 1quatro))))
+	      (setf (elt v 3) (apply #'vector (mapcar #'lightfunc (list uno dos tres quatro))))
+	      (setf (elt v 4) (apply #'vector (mapcar #'lightfunc (list 1uno 1dos 1tres 1quatro))))
 	      (progno
 	       (let ((anum (lightfunc (avg (max 1uno uno)
 					   (max 1dos dos)

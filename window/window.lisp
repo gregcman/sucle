@@ -54,7 +54,9 @@
 	    (:video-resize-event
 	     (:w w :h h)
 	     (setq out:width w)
-	     (setq out:height h)))
+	     (setq out:height h)
+	     (out:push-dimensions)
+	     (gl:viewport 0 0 out:width out:height)))
 	  (in::update)
 	  (more-window-shit)))
   (setq wrapper
@@ -69,7 +71,6 @@
 	    (setf
 	     cl-opengl-bindings:*gl-get-proc-address*
 	     #'sdl-cffi::sdl-gl-get-proc-address)
-	    
 	    (setf sdl::*sdl-event* sdl-event)
 	    (unwind-protect
 		 (wowwow func)
@@ -295,13 +296,16 @@
    (intern (concatenate 'string "SDL-KEY-" (string-upcase name))
 	   "KEYWORD")))
 
+(defmacro progno (&body fuck) (declare (ignore fuck)))
+
 (defun push-dimensions (&optional (resizable nil))
   (setq window
 	(sdl:window width height
 		    :opengl t
 		    :opengl-attributes
-		    '((:sdl-gl-depth-size 16)
-		      (:sdl-gl-doublebuffer 1))
+		    `((:sdl-gl-depth-size 16)
+		      (:sdl-gl-doublebuffer 1)
+		      (:sdl-gl-swap-control 0))
 		    :resizable resizable))
   (setq pushed-width width
 	pushed-height height))

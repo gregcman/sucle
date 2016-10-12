@@ -29,6 +29,7 @@
    #:p+1
    #:p0
    #:p-1
+   #:akeydown
 
    ;;output is below
    #:height #:width #:caption
