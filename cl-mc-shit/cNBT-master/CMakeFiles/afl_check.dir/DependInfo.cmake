@@ -4,17 +4,18 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_C
-  "/home/imac/Downloads/cNBT-master/afl_check.c" "/home/imac/Downloads/cNBT-master/CMakeFiles/afl_check.dir/afl_check.c.o"
+  "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/afl_check.c" "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/CMakeFiles/afl_check.dir/afl_check.c.o"
   )
-set(CMAKE_C_COMPILER_ID "GNU")
+set(CMAKE_C_COMPILER_ID "Clang")
 
 # The include file search paths:
 set(CMAKE_C_TARGET_INCLUDE_PATH
+  "/usr/local/Cellar/zlib/1.2.8/include"
   )
 
 # Targets to which this target links.
 set(CMAKE_TARGET_LINKED_INFO_FILES
-  "/home/imac/Downloads/cNBT-master/CMakeFiles/nbt.dir/DependInfo.cmake"
+  "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/CMakeFiles/nbt.dir/DependInfo.cmake"
   )
 
 # Fortran module output directory.

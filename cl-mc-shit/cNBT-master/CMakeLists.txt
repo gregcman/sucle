@@ -13,8 +13,14 @@ IF (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_C_FLAGS_RELEASE "-march=native -O3 -s -DNDEBUG")
 ENDIF()
 
+find_package(ZLIB REQUIRED)
+if (ZLIB_FOUND)
+    include_directories(${ZLIB_INCLUDE_DIRS})
+endif()
+
 # Output paths
 set(EXECUTABLE_OUTPUT_PATH bin)
+set(CMAKE_MACOSX_RPATH 1)
 
 find_program(BASH_PROGRAM bash)
 
@@ -25,6 +31,8 @@ ADD_LIBRARY(nbt SHARED
   nbt_treeops.c
   nbt_util.c
 )
+
+TARGET_LINK_LIBRARIES(nbt ${ZLIB_LIBRARIES})
 
 ADD_EXECUTABLE(check check.c)
 ADD_EXECUTABLE(afl_check afl_check.c)

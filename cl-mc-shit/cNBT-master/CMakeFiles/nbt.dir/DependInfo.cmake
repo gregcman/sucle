@@ -4,16 +4,17 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_C
-  "/home/imac/Downloads/cNBT-master/buffer.c" "/home/imac/Downloads/cNBT-master/CMakeFiles/nbt.dir/buffer.c.o"
-  "/home/imac/Downloads/cNBT-master/nbt_loading.c" "/home/imac/Downloads/cNBT-master/CMakeFiles/nbt.dir/nbt_loading.c.o"
-  "/home/imac/Downloads/cNBT-master/nbt_parsing.c" "/home/imac/Downloads/cNBT-master/CMakeFiles/nbt.dir/nbt_parsing.c.o"
-  "/home/imac/Downloads/cNBT-master/nbt_treeops.c" "/home/imac/Downloads/cNBT-master/CMakeFiles/nbt.dir/nbt_treeops.c.o"
-  "/home/imac/Downloads/cNBT-master/nbt_util.c" "/home/imac/Downloads/cNBT-master/CMakeFiles/nbt.dir/nbt_util.c.o"
+  "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.c" "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/CMakeFiles/nbt.dir/buffer.c.o"
+  "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_loading.c" "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/CMakeFiles/nbt.dir/nbt_loading.c.o"
+  "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_parsing.c" "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/CMakeFiles/nbt.dir/nbt_parsing.c.o"
+  "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_treeops.c" "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/CMakeFiles/nbt.dir/nbt_treeops.c.o"
+  "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_util.c" "/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/CMakeFiles/nbt.dir/nbt_util.c.o"
   )
-set(CMAKE_C_COMPILER_ID "GNU")
+set(CMAKE_C_COMPILER_ID "Clang")
 
 # The include file search paths:
 set(CMAKE_C_TARGET_INCLUDE_PATH
+  "/usr/local/Cellar/zlib/1.2.8/include"
   )
 
 # Targets to which this target links.

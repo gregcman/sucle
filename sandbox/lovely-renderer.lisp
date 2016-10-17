@@ -263,13 +263,13 @@
      ("color" . 3)
      ("blockLight" . 8)
      ("skyLight" . 12)))
-  (load-a-shader
-   "simpleshader"
-   "simpleshader/transforms.vs"
-   "simpleshader/basictexcoord.frag"
-   '(("position" . 0)
-     ("texCoord" . 2)
-     ("color" . 3))))
+  (progno (load-a-shader
+	  "simpleshader"
+	  "simpleshader/transforms.vs"
+	  "simpleshader/basictexcoord.frag"
+	  '(("position" . 0)
+	    ("texCoord" . 2)
+	    ("color" . 3)))))
 
 (defun load-into-texture-library (name &optional (othername name))
   (let ((thepic (gethash name picture-library)))

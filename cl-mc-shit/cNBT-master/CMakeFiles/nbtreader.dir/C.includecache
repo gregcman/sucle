@@ -6,17 +6,17 @@
 
 #IncludeRegexTransform: 
 
-/home/imac/Downloads/cNBT-master/buffer.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.h
 stddef.h
 -
 
-/home/imac/Downloads/cNBT-master/list.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/list.h
 stddef.h
 -
 
-/home/imac/Downloads/cNBT-master/main.c
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/main.c
 nbt.h
-/home/imac/Downloads/cNBT-master/nbt.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt.h
 assert.h
 -
 errno.h
@@ -30,7 +30,7 @@ string.h
 getopt.h
 -
 
-/home/imac/Downloads/cNBT-master/nbt.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt.h
 stdbool.h
 -
 stddef.h
@@ -40,7 +40,7 @@ stdint.h
 stdio.h
 -
 buffer.h
-/home/imac/Downloads/cNBT-master/buffer.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.h
 list.h
-/home/imac/Downloads/cNBT-master/list.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/list.h
 

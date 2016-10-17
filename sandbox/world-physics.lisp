@@ -377,9 +377,10 @@
 	       (elt data (+ i (+ (* 16 j))))))))
 
 
-(defparameter atest (if nil
-			cl-mc-shit::testchunk
-			(byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr")))
+(progno
+  (defparameter atest (if nil
+			  cl-mc-shit::testchunk
+			  (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))))
 
 (defun helpchunk (x y)
    (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))

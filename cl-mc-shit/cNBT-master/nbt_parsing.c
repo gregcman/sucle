@@ -470,7 +470,7 @@ static void dump_int_array(const struct nbt_int_array ia, struct buffer* b)
 }
 
 nbt_list* thefuck(const struct list_head *pos){
-struct nbt_list* entry = list_entry(pos, conststruct nbt_list, entry);
+struct nbt_list* entry = list_entry(pos, const struct nbt_list, entry);
 return entry;
 }
 

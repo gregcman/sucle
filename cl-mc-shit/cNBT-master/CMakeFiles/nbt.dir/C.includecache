@@ -6,9 +6,9 @@
 
 #IncludeRegexTransform: 
 
-/home/imac/Downloads/cNBT-master/buffer.c
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.c
 buffer.h
-/home/imac/Downloads/cNBT-master/buffer.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.h
 assert.h
 -
 stdlib.h
@@ -18,15 +18,15 @@ stddef.h
 string.h
 -
 
-/home/imac/Downloads/cNBT-master/buffer.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.h
 stddef.h
 -
 
-/home/imac/Downloads/cNBT-master/list.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/list.h
 stddef.h
 -
 
-/home/imac/Downloads/cNBT-master/nbt.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt.h
 stdbool.h
 -
 stddef.h
@@ -36,17 +36,17 @@ stdint.h
 stdio.h
 -
 buffer.h
-/home/imac/Downloads/cNBT-master/buffer.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.h
 list.h
-/home/imac/Downloads/cNBT-master/list.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/list.h
 
-/home/imac/Downloads/cNBT-master/nbt_loading.c
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_loading.c
 nbt.h
-/home/imac/Downloads/cNBT-master/nbt.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt.h
 buffer.h
-/home/imac/Downloads/cNBT-master/buffer.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.h
 list.h
-/home/imac/Downloads/cNBT-master/list.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/list.h
 assert.h
 -
 errno.h
@@ -58,13 +58,13 @@ stdlib.h
 zlib.h
 -
 
-/home/imac/Downloads/cNBT-master/nbt_parsing.c
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_parsing.c
 nbt.h
-/home/imac/Downloads/cNBT-master/nbt.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt.h
 buffer.h
-/home/imac/Downloads/cNBT-master/buffer.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/buffer.h
 list.h
-/home/imac/Downloads/cNBT-master/list.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/list.h
 assert.h
 -
 errno.h
@@ -80,9 +80,9 @@ stdlib.h
 string.h
 -
 
-/home/imac/Downloads/cNBT-master/nbt_treeops.c
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_treeops.c
 nbt.h
-/home/imac/Downloads/cNBT-master/nbt.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt.h
 assert.h
 -
 errno.h
@@ -92,9 +92,29 @@ stdlib.h
 string.h
 -
 
-/home/imac/Downloads/cNBT-master/nbt_util.c
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt_util.c
 nbt.h
-/home/imac/Downloads/cNBT-master/nbt.h
+/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master/nbt.h
 string.h
 -
+
+/usr/local/Cellar/zlib/1.2.8/include/zconf.h
+windows.h
+-
+limits.h
+-
+sys/types.h
+-
+stdarg.h
+-
+stddef.h
+-
+unistd.h
+-
+unixio.h
+-
+
+/usr/local/Cellar/zlib/1.2.8/include/zlib.h
+zconf.h
+/usr/local/Cellar/zlib/1.2.8/include/zconf.h
 

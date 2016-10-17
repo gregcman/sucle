@@ -5,7 +5,7 @@ file(REMOVE_RECURSE
   "CMakeFiles/nbt.dir/nbt_treeops.c.o"
   "CMakeFiles/nbt.dir/nbt_util.c.o"
   "libnbt.pdb"
-  "libnbt.so"
+  "libnbt.dylib"
 )
 
 # Per-language clean rules from dependency scanning.
