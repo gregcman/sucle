@@ -2,80 +2,78 @@
 
 ;;only one window is allowed in sdl. But why would anyone want
 ;;more than tha?
-(defparameter window nil)
-
-(defmacro generate-case-events (event-name status &body events)
-  `(loop until (= 0 (sdl-cffi::SDL-Poll-Event ,event-name)) do
-	(case (sdl::event-type ,event-name)
-	  (:QUIT-EVENT (progn (setf ,status t)))
-	  ,@(mapcar (lambda (event)  
-		      (sdl::expand-event
-		       event-name
-		       (car event)
-		       (gethash (car event) sdl::*events*)
-		       (cadr event)
-		       (cddr event)))
-		    events)))) 
-
+(defparameter window nil) 
 (defparameter status nil)
 (defparameter wrapper nil)
 (defparameter base-needs nil)
 
-(defparameter mousecapturestate nil)
-(defun arise
-    (&key
-       ((:event-obj sdl-event) (sdl::new-event)))
+(glfw:def-key-callback key-callback (window key scancode action mod-keys)
+  (case action
+    (:press
+     (key-down (pairlis
+		      '(:state :scancode :key :mod :unicode)
+		      (list nil scancode key nil nil))))
+    (:release
+     (key-up (pairlis
+	      '(:state :scancode :key :mod :unicode)
+	      (list nil scancode key nil nil))))))
+
+(glfw:def-mouse-button-callback mouse-callback (window button action mod-keys)
+  (case action
+    (:press
+     (in::buttonshit button action nil nil))
+    (:release
+     (in::buttonshit button action nil nil))))
+
+(glfw:def-window-size-callback update-viewport (window w h)
+  (declare (ignore window))
+  (set-viewport w h))
+
+(defun set-viewport (width height)
+  (gl:viewport 0 0 width height)
+  (gl:matrix-mode :projection)
+  (gl:load-identity)
+  (gl:ortho -50 50 -50 50 -1 1)
+  (gl:matrix-mode :modelview)
+  (gl:load-identity))
+
+(defun get-gl-constant (keyword)
+  "gets a gl-constant"
+  (cffi:foreign-enum-value '%gl:enum keyword))
+
+(defun arise ()
   (setq status nil)
   (setq window nil)
   (setq mousecapturestate nil)
-  (lambda () status)
+  (sb-int:set-floating-point-modes :traps nil)
   (setq base-needs
 	(lambda ()
-	  (generate-case-events sdl-event status
-	    ;;we map the sdl ascii characters to lisp characters
-	    (:key-up-event
-	     (:state state :scancode scancode
-		     :key key :mod mod :unicode unicode)
-	     (key-up (pairlis
-		      '(:state :scancode :key :mod :unicode)
-		      (list state scancode key mod unicode))))
-	    (:key-down-event
-	     (:state state :scancode scancode
-		     :key key :mod mod :unicode unicode)	
-	     (key-down (pairlis
-			'(:state :scancode :key :mod :unicode)
-			(list state scancode key mod unicode))))   
-	    (:mouse-button-up-event
-	     (:button button :state state :x x :y y)
-	     (in::buttonshit button state x y))
-	    (:mouse-button-down-event
-	     (:button button :state state :x x :y y)
-	     (in::buttonshit button state x y))
-	    (:video-resize-event
-	     (:w w :h h)
-	     (setq out:width w)
-	     (setq out:height h)
-	     (out:push-dimensions)
-	     (gl:viewport 0 0 out:width out:height)))
+	  (setq status (glfw:window-should-close-p))
+	  (glfw:poll-events)
 	  (in::update)
 	  (more-window-shit)))
   (setq wrapper
-	(lambda (func)				
-	  #+darwin (lispbuilder-sdl-cocoahelper::cocoahelper-init)
-	  ;;cocoa for macosx
-	  ;;Turning off floating point errors for
-	  ;;copatibility or some shit
-	  #+sbcl(sb-int:set-floating-point-modes :traps '())
-	  (sdl:with-init ()  
-	    (out::init)
-	    (setf
-	     cl-opengl-bindings:*gl-get-proc-address*
-	     #'sdl-cffi::sdl-gl-get-proc-address)
-	    (setf sdl::*sdl-event* sdl-event)
-	    (unwind-protect
-		 (wowwow func)
-	      (out::dead)
-	      (sdl:free-event sdl-event))))))
+	(lambda (func)
+	  ;; Graphics calls on OS X must occur in the main thread
+	  (trivial-main-thread:with-body-in-main-thread ()
+	    (glfw:with-init-window (:title "proto" :width 16 :height 16
+					   :opengl-profile :opengl-any-profile
+					;;   :opengl-forward-compat (get-gl-constant :true)
+					;;   :context-version-minor 2
+					;;   :context-version-major 3
+					   )
+	      (out::init)
+	      (setf %gl:*gl-get-proc-address* #'glfw:get-proc-address)
+	      (glfw:set-mouse-button-callback 'mouse-callback)
+	      (glfw:set-key-callback 'key-callback)
+	      (glfw:set-window-size-callback 'update-viewport)
+	      (unwind-protect
+		   (if nil
+		       (funcall func)
+		       (wowwow func))
+		(out::dead)))))))
+
+(defparameter mousecapturestate nil)
 
 (defun wowwow (func)
   (tagbody
@@ -85,7 +83,7 @@
 	     (print condition)
 	     (get-mouse-out)
 	     (restart-case
-		 (let ((r (find-restart 'my-rxestart)))
+		 (let ((r (find-restart 'my-restart)))
 		   (invoke-restart r))
 	       (my-restart () (go huh))))))
        (funcall func))
@@ -97,8 +95,7 @@
 	   (wowwow func)))))
 
 (defun get-mouse-out ()
-  (sdl:show-cursor t)
-  (sdl:sdl-wm-grab-input :sdl-grab-off))
+ (glfw:set-input-mode :cursor :normal))
 
 (defun more-window-shit ()
   (if (in:ismousecaptured)
@@ -114,14 +111,12 @@
 (defun toggle-mouse-capture ()
   (if (not (ismousecaptured))
       (progn
-	(sdl:show-cursor nil)
-	(sdl:sdl-wm-grab-input :sdl-grab-on))
+	(glfw:set-input-mode :cursor :disabled))
       (progn
-	(sdl:show-cursor t)
-	(sdl:sdl-wm-grab-input :sdl-grab-off))))
+	(glfw:set-input-mode :cursor :normal))))
 
 (defun ismousecaptured ()
-  (if  (eq :sdl-grab-on (sdl:sdl-wm-grab-input :sdl-grab-query))
+  (if  (eq :disabled (glfw:get-input-mode :cursor))
        t
        nil))
 
@@ -131,19 +126,17 @@
 
 ;; helper function for the pressed key list
 (defun key-down (info-list)
-  (let* ((unicode (cdr (assoc :unicode info-list)))
-	 (sdl-key-code (cdr (assoc :key info-list)))
-	 (character (code-char unicode)))
+  (let* ((sdl-key-code (cdr (assoc :key info-list))))
     (setf  (gethash sdl-key-code sdl-ascii)
-	   (adjoin character (gethash sdl-key-code sdl-ascii)))
-    (setf in::down-keys (adjoin character in::down-keys))))
+	   (adjoin sdl-key-code (gethash sdl-key-code sdl-ascii)))
+    (setf in::down-keys (adjoin sdl-key-code in::down-keys))))
 
 ;; yet another helper function for the key list
 (defun key-up (info-list) 
   (let* ((sdl-key-code (cdr (assoc :key info-list)))
 	 (dem-keys (gethash sdl-key-code sdl-ascii)))
     (setf in::down-keys
-	  (set-difference in::down-keys dem-keys :test #'char=))))
+	  (set-difference in::down-keys dem-keys :test #'eq))))
 
 ;; a package which handles the keyboard and mouse
 ;; mostly just wrappers around SDL
@@ -170,7 +163,6 @@
 (defvar mouse-button-pressing-hook-hash nil)
 
 (defun initialize ()
-  (sdl:enable-unicode)
   (setq down-keys-prev nil)
   (setf down-keys nil)
   (setq pressed-keys nil)
@@ -180,8 +172,7 @@
   (setq mouse-pressed-buttons nil)
   (setq mouse-released-buttons nil)
 
-  (clear-functions)
-  )
+  (clear-functions))
 
 (defun clear-functions ()
   
@@ -193,14 +184,22 @@
   (setq mouse-button-pressing-hook-hash (make-hash-table)))
 
 ;; getting the mouse x position
-(defun x () (sdl:mouse-x))
+(defun x () (elt (glfw:get-cursor-position) 0))
 
 ;; getting the mouse y position
-(defun y () (sdl:mouse-y))
+(defun y () (elt (glfw:get-cursor-position) 1))
 
+(defparameter prev (vector 0 0))
 ;; returns a 2d vector corresponding to the change in 
 ;; mouse position
-(defun delta () (sdl:mouse-relative-position))
+(defun delta ()
+  (let ((newx (x))
+	(newy (y)))
+    (prog1
+	(vector
+	 (- newx (elt prev 0))
+	 (- newy (elt prev 1)))
+      (setf prev (vector newx newy)))))
 
 (defun mouse-button-p (button) (member button mouse-down-buttons))
 (defun mouse-button-pressing-hook (button func)
@@ -244,11 +243,11 @@
       (key-released-hook id func)))
 
 (defun buttonshit (button state x y)
-  (if (zerop state)
+  (if (eq :pressed state)
       (setf mouse-down-buttons (remove button mouse-down-buttons))
       (setf mouse-down-buttons (adjoin button mouse-down-buttons)))
-  (if (or (= button 5) (= button 4))
-      (if (zerop state)
+  (if (or (eq button 5) (eq button 4))
+      (if (eq :pressed state)
 	  (execute (gethash button mouse-button-released-hook-hash))
 	  (execute (gethash button mouse-button-pressed-hook-hash)))))
 
@@ -292,21 +291,12 @@
 (defvar little-caption "default little caption")
 
 (defun akeydown (name)
-  (sdl:key-down-p
-   (intern (concatenate 'string "SDL-KEY-" (string-upcase name))
-	   "KEYWORD")))
+  (eq :pressed (glfw:get-key (intern (string-upcase name) "KEYWORD"))))
 
 (defmacro progno (&body fuck) (declare (ignore fuck)))
 
 (defun push-dimensions (&optional (resizable nil))
-  (setq window
-	(sdl:window width height
-		    :opengl t
-		    :opengl-attributes
-		    `((:sdl-gl-depth-size 16)
-		      (:sdl-gl-doublebuffer 1)
-		      (:sdl-gl-swap-control 0))
-		    :resizable resizable))
+  (glfw:set-window-size width height)
   (setq pushed-width width
 	pushed-height height))
 
@@ -315,7 +305,7 @@
 (defun dead ())
 
 (defun push-titles ()
-  (sdl:set-caption caption little-caption))
+  (glfw:set-window-title caption))
 
 (defun set-caption (newcap)
   (setq caption newcap)
@@ -324,3 +314,6 @@
 (defun set-mirco-caption (n)
   (setq little-caption n)
   (push-titles))
+
+(defun update-display ()
+  (glfw:swap-buffers))

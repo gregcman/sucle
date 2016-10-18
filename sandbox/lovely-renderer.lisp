@@ -14,13 +14,11 @@
   (let ((camera (getworld "player")))
     (use-program "blockshader")
     (gl:clear :depth-buffer-bit :color-buffer-bit)
-    (if (in:akeydown "g")
+    (if (in:key-p :g)
 	(update-world-vao))
-    (if (in:akeydown "y")
-	(loadblockshader))
-    (if (in:akeydown "o")
+    (if (in:key-p :o)
 	(setf worldlist (genworldcallist)))
-    (if (in:akeydown "q")
+    (if (in:key-p :q)
 	(progn
 	  (toggle drawmode)
 	  (if drawmode
@@ -56,8 +54,7 @@
 	  (gl:vertex (+ xpos 128) cloudheight (+ zpos 128))
 	  (gl:vertex-attrib 2 (+ texx) (+ lilsize texy))
 	  (gl:vertex (+ xpos -128) cloudheight (+ zpos 128)))))
-    (gl:flush)
-    (sdl:update-display)))
+    (window:update-display)))
 
 (defun x (vec)
   (row-major-aref vec 0))
@@ -263,7 +260,7 @@
      ("color" . 3)
      ("blockLight" . 8)
      ("skyLight" . 12)))
-  (progno (load-a-shader
+  (progn (load-a-shader
 	  "simpleshader"
 	  "simpleshader/transforms.vs"
 	  "simpleshader/basictexcoord.frag"

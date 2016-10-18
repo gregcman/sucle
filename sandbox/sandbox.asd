@@ -6,7 +6,6 @@
     :licence "fuck that shit"
 
     :depends-on (#:cl-opengl
-		 #:lispbuilder-sdl
 		 #:cl-utilities  
 		 #:opticl
 		 

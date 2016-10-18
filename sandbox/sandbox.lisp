@@ -45,8 +45,8 @@
   (glinnit)
   (physinnit)
   
-  (in:p+1 #\ (lambda () (setq kill-button nil)))
-  (in:p+1 #\e (function window:toggle-mouse-capture))
+  (in:p+1 :ESCAPE (lambda () (setq kill-button nil)))
+  (in:p+1 :E (function window:toggle-mouse-capture))
 
   (setf phystimer (timer))
   (setf rendertimer (timer))
@@ -68,10 +68,11 @@
 	(progn
 	  (setf renderrate arate)
 	  (window:set-caption (write-to-string (/ renderrate 1000.0))))))
-    (funcall window:base-needs)
-  (let ((camera (getworld "player")))
-    (if (in:ismousecaptured)
-	(mouse-looking camera)))
+  (funcall window:base-needs)
+  (progn
+   (let ((camera (getworld "player")))
+     (if (in:ismousecaptured)
+	 (mouse-looking camera))))
   (if 
    (and
     kill-button

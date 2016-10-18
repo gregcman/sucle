@@ -35,4 +35,6 @@
    #:height #:width #:caption
    #:little-caption #:push-dimensions #:set-caption
    #:set-micro-caption #:push-titles
-   #:pushed-width #:pushed-height))
+   #:pushed-width #:pushed-height
+
+   #:update-display))

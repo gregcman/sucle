@@ -1,11 +1,11 @@
-#version 130
-in vec4 position;
-in vec2 texCoord;
-in vec4 color;
+#version 120
+attribute vec4 position;
+attribute vec2 texCoord;
+attribute vec4 color;
 
-out lowp vec2 TexCoord;
-out lowp vec4 mycolor;
-out float fogratio;
+varying vec2 TexCoord;
+varying vec4 mycolor;
+varying float fogratio;
   
 uniform mat4 modelview;
 uniform mat4 projection;

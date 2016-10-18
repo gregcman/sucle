@@ -21,6 +21,7 @@
 (defparameter defaultfov 70)
 
 (defun physinnit ()
+  (sb-int:set-floating-point-modes :traps nil)
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
   (setworld "player" ourcam)
@@ -110,7 +111,7 @@
      cameraVelocity
      (keymovement camera))
     (progn
-     (if (in::akeydown "w")
+      (if (in:key-p :w)
 	 ;;if it was pressed last round
 	 (progn
 	   (if (not wpressprev)
@@ -125,7 +126,7 @@
 		 (setf wprev (get-internal-run-time))
 		 (setf wpressprev nil))))))
     
-    (if (in::akeydown "lshift")
+    (if (in:key-p :left-shift)
 	(progn
 	  (setf isprinting nil)
 	  (setf isneaking t))
@@ -135,16 +136,18 @@
 			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
 			    (floor (row-major-aref (simplecam-pos camera) 2) 16))))
 
-    (in:p0 #\z (lambda () (aplatform
-			  (mat-world-pos (simplecam-pos camera))
-			  2)))
-    (in:p0 #\x (lambda ()
-		(notaplatform (mat-world-pos (simplecam-pos camera)))
-		(notaplatform (vecadd (mat-world-pos (simplecam-pos camera)) (vector 0 1 0)))))
-    (in:p0 #\c (lambda ()
-	       (oneplatform
-		(mat-world-pos (simplecam-pos camera))
-		91)))))
+    (if (in:key-pressed-p :z)
+	(aplatform
+	 (mat-world-pos (simplecam-pos camera))
+	 2))
+    (if (in:key-pressed-p :x)
+	(progn
+	  (notaplatform (mat-world-pos (simplecam-pos camera)))
+	  (notaplatform (vecadd (mat-world-pos (simplecam-pos camera)) (vector 0 1 0)))))
+    (if (in:key-pressed-p :c) 
+	(oneplatform
+	 (mat-world-pos (simplecam-pos camera))
+	 91))))
 
 (defun mat-world-pos (mat)
   (vector
@@ -187,10 +190,10 @@
 	 (lemod (good-func delta)))
     (mapcar
      lemod
-     '(("s" ( 1  0  0  0))
-       ("w" (-1  0  0  0))
-       ("a" ( 0  0  1  0))
-       ("d" ( 0  0 -1  0))))
+     '((:s ( 1  0  0  0))
+       (:w (-1  0  0  0))
+       (:a ( 0  0  1  0))
+       (:d ( 0  0 -1  0))))
     (mat:scale! (mat:normalize! delta) (* 0.4 (expt tickscale 2)))
     (if isneaking
 	(mat:scale! delta 0.2))
@@ -207,7 +210,7 @@
     (if	onground
 	(mapcar
 	 lemod
-	 `(("space" (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
+	 `((:space (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
     delta))
 
 (defun keymovement (camera)

@@ -1,15 +1,13 @@
-#version 130
-in lowp vec2 TexCoord;
-in lowp vec4 mycolor;
-
-out lowp vec4 color;
+#version 120
+varying vec2 TexCoord;
+varying vec4 mycolor;
 
 uniform sampler2D ourTexture;
 
 void main()
 {
-	vec4 imagecolor = texture(ourTexture, TexCoord);
+	vec4 imagecolor = texture2D(ourTexture, TexCoord);
 	if(imagecolor.a < 0.1){discard;}
-	color= imagecolor * mycolor;
+	gl_FragColor= imagecolor * mycolor;
 }
 
