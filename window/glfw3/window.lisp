@@ -16,14 +16,16 @@
     (:release
      (key-up (pairlis
 	      '(:state :scancode :key :mod :unicode)
-	      (list nil scancode key nil nil))))))
+	      (list nil scancode key nil nil)))))
+  (in::update))
 
 (glfw:def-mouse-button-callback mouse-callback (window button action mod-keys)
   (case action
     (:press
      (in::buttonshit button action nil nil))
     (:release
-     (in::buttonshit button action nil nil))))
+     (in::buttonshit button action nil nil)))
+  (in::update))
 
 (glfw:def-window-size-callback update-viewport (window w h)
   (declare (ignore window))
@@ -50,7 +52,6 @@
 	(lambda ()
 	  (setq status (glfw:window-should-close-p))
 	  (glfw:poll-events)
-	  (in::update)
 	  (more-window-shit)))
   (setq wrapper
 	(lambda (func)
@@ -291,7 +292,7 @@
 (defvar little-caption "default little caption")
 
 (defun akeydown (name)
-  (eq :pressed (glfw:get-key (intern (string-upcase name) "KEYWORD"))))
+  (member name down-keys))
 
 (defmacro progno (&body fuck) (declare (ignore fuck)))
 

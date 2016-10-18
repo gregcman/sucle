@@ -37,7 +37,6 @@
     (gl:load-identity)
     (gl:disable :cull-face)
     (bind-shit "clouds.png")
-    (gl:color 1 1 1 1)
     (let* ((pos (simplecam-pos camera))
 	   (xpos (x pos))
 	   (zpos (z pos))
@@ -46,6 +45,7 @@
 	   (lilsize (/ 1 16)))
       (gl:with-pushed-matrix
 	(gl:with-primitive :quads
+	  (gl:vertex-attrib 3 1 1 1 1)
 	  (gl:vertex-attrib 2 (+ texx) (+ texy))
 	  (gl:vertex (+ xpos -128) cloudheight (+ zpos -128))
 	  (gl:vertex-attrib 2 (+ lilsize texx) (+ texy))
