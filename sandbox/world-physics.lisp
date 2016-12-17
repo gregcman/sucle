@@ -385,6 +385,8 @@
 			  cl-mc-shit::testchunk
 			  (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))))
 
+(defparameter atest cl-mc-shit::testchunk)
+
 (defun helpchunk (x y)
    (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
      (if thechunk
