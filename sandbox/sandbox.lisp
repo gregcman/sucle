@@ -1,19 +1,20 @@
 (in-package #:sandbox)
 
-(defmacro progno (&rest nope))
+;;spawn two threads
+;;physics thread
+;;rendering thread
 
 (defun loud-thread (func name)
   "makes a thread that reads and writes to stdio"
-  (sb-thread:make-thread ;; thread function
-   #'(lambda (standard-output standard-input)
-       ;; thread-local dynamic binding of special variable
+  (sb-thread:make-thread 
+   #'(lambda (standard-output standard-input)    
        (let ((*standard-output* standard-output) (*standard-input* standard-input))
 	 (funcall func)))
-   ;; thread function argument, provided by the current thread
    :arguments (list *standard-output* *standard-input*)
    :name name))
 
 (defun timer ()
+  "control the fps execution"
   (let ((prevtime (fine-time)))
     (lambda (time afunc)
       (let* ((now (fine-time))
@@ -37,7 +38,6 @@
 
 (defparameter kill-button t)
 (defun init ()
-  "a mess of shit"
   (setq kill-button t)
   (setq out:width (if nil 512 854) out:height (if nil 512 480))
   (out:push-dimensions nil)
@@ -46,7 +46,9 @@
   (physinnit)
   
   (in:p+1 :ESCAPE (lambda () (setq kill-button nil)))
+  ;;escape to quit
   (in:p+1 :E (function window:toggle-mouse-capture))
+  ;;e to escape mouse
 
   (setf phystimer (timer))
   (setf rendertimer (timer))
@@ -70,9 +72,8 @@
 	  (window:set-caption (write-to-string (/ renderrate 1000.0))))))
   (funcall window:base-needs)
   (progn
-   (let ((camera (getworld "player")))
-     (if (in:ismousecaptured)
-	 (mouse-looking camera))))
+    (if (in:ismousecaptured)
+	(look-around)))
   (if 
    (and
     kill-button
@@ -86,11 +87,11 @@
 (defparameter physthread nil)
 (defun physthread ()
   (let ((arate (funcall phystimer
-		 (/ 1000000.0 ticks/sec)
-		 (lambda ()
-		   (if (in:ismousecaptured)
-		       (controls))
-		   (physics)))))
+			(/ 1000000.0 ticks/sec)
+			(lambda ()
+			  (if (in:ismousecaptured)
+			      (controls))
+			  (physics)))))
     (if arate
 	(setf physrate arate)))
   (if (and

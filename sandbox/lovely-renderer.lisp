@@ -5,13 +5,19 @@
 ;;vaohash holds all the vaos which correlate to each chunk
 (defparameter vaohash (make-hash-table :test #'equal))
 (defparameter shaderhash (make-hash-table :test #'equal))
-(defmacro toggle (a)
-  `(setf ,a (not ,a)))
 (defparameter drawmode nil)
+
+(defstruct simplecam
+  (pos (mat:onebyfour '(0.0 0.0 0.0 1)))
+  (up (mat:onebyfour '(0.0 1.0 0.0 0)))
+  (yaw 0)
+  (pitch 0)
+  (fov 100))
+(defparameter ourcam (make-simplecam))
 
 (defun render ()
   "responsible for rendering the world"
-  (let ((camera (getworld "player")))
+  (let ((camera ourcam))
     (use-program "blockshader")
     (gl:clear :depth-buffer-bit :color-buffer-bit)
     (if (in:key-p :g)
@@ -286,13 +292,6 @@
 (defun deg-rad (deg)
   "converts degrees to radians"
   (* deg pi 1/180))
-
-(defstruct simplecam
-  (pos (mat:onebyfour '(0.0 0.0 0.0 1)))
-  (up (mat:onebyfour '(0.0 1.0 0.0 0)))
-  (yaw 0)
-  (pitch 0)
-  (fov 100))
 
 (defparameter shaderProgram nil)
 

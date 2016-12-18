@@ -1,18 +1,18 @@
 (in-package :sandbox)
 
+;;fuck me
+;;this file contains::
+;;loading nbt into the world
+;;vector operations
+;;player controls
+;;player movement among blocks
+;;this is not pretty
+;;why did i name everything so retardedly?
+
 (defparameter onground nil)
 (defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
-(defparameter worldhash (make-hash-table :test #'equal))
 (defparameter isneaking nil)
-
-(defun getworld (name)
-  (gethash name worldhash))
-
-(defun setworld (name newval)
-  (setf (gethash name worldhash) newval))
-
 (defparameter daytime 1.0)
-(defparameter ourcam (make-simplecam))
 
 (defun ease (x target fraction)
   (+ x (* fraction (- target x))))
@@ -24,94 +24,12 @@
   (sb-int:set-floating-point-modes :traps nil)
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
-  (setworld "player" ourcam)
   (setf isprinting nil)
   (setf wprev most-negative-fixnum))
 
 ;;gravity is (* -0.08 (expt tickscale 2)) 0 0
 ;;falling friction is 0.98
 ;;0.6 * 0.91 is walking friction
-
-
-(defun blocktocontact (blocklist px py pz vx vy vz)
-  (mapcar
-   (lambda (theplace)
-     (multiple-value-bind (a b c d)
-	 (multiple-value-bind (minimum type)
-	     (aabbcc::aabb-collide
-	      player-aabb
-	      px py pz
-	      block-aabb
-	      theplace
-	      vx vy vz)
-	   (multiple-value-bind (xc yc zc) (aabbcc::type-translator type vx vy vz)
-	     (values minimum xc yc zc)))
-       (list a b c d)))
-   blocklist))
-
-(defun block-touches (blocklist px py pz)
-  (let ((x+ nil)
-	(x- nil)
-	(y+ nil)
-	(y- nil)
-	(z+ nil)
-	(z- nil))
-    (dolist (theplace blocklist)
-      (multiple-value-bind (bx sx by sy bz sz) ;;b = big =positive s = small = negative
-	  (aabbcc::aabb-contact px py pz
-				player-aabb
-				(elt theplace 0)
-				(elt theplace 1)
-				(elt theplace 2)
-				block-aabb)
-	(if bx (setq x+ t))
-	(if sx (setq x- t))
-	(if by (setq y+ t))
-	(if sy (setq y- t))
-	(if bz (setq z+ t))
-	(if sz (setq z- t))))
-    (values x+ x- y+ y- z+ z-)))
-
-(defun get-blocks-around-player (px py pz)
-  (let ((places nil))
-    (dotimes (x 3)
-      (dotimes (y 4)
-	(dotimes (z 3)
-	  (let ((blockx (round (- (+ x px) 1)))
-		(blocky (round (- (ceiling (+ y py)) 1)))
-		(blockz (round (- (+ z pz) 1))))
-	    (let ((blockid (mat-pos (vector blockx blocky blockz))))
-	      (if (eq t (aref mc-blocks::iscollidable blockid))
-		  (push (vector blockx blocky blockz) places)))))))
-    places))
-
-(defun myafunc (px py pz vx vy vz)
-  (let ((ourblocks (get-blocks-around-player px py pz)))
-    (let ((ourcontacts (blocktocontact ourblocks px py pz vx vy vz)))
-      (aabbcc::collapsecollisions ourcontacts))))
-
-
-(defun block-aabb ()
-  (aabbcc::make-aabb
-   :minx -0.5
-   :miny -0.5
-   :minz -0.5
-   :maxx 0.5
-   :maxy 0.5
-   :maxz 0.5))
-
-(defun player-aabb ()
-  (aabbcc::make-aabb
-   :minx -0.3
-   :miny 0
-   :minz -0.3
-   :maxx 0.3
-   :maxy 1.62
-   :maxz 0.3))
-
-
-(defparameter block-aabb (block-aabb))
-(defparameter player-aabb (player-aabb))
 
 (defun physics ()
   "a messy function for the bare bones physics"
@@ -122,7 +40,7 @@
   		  (3 0)
 		  (1 (/ (+ 0  (cos (/ (get-internal-real-time) 2000))) 0.5))
 		  (10 1.0)))
-  (let ((camera (getworld "player")))
+  (let ((camera ourcam))
     (if isprinting
       (setf (simplecam-fov camera)
 	    (ease (simplecam-fov camera) (* 1.15 defaultfov) 0.2))
@@ -130,13 +48,6 @@
 	    (ease (simplecam-fov camera) defaultfov 0.2)))
 
 
-
-    ;;;;very nasty collision bounds code
-
-    ;;finish-clamps seems to returning multiple things
-    ;;a - wowzer is the final position
-    ;;b - collisiondata is the final contact data at the finish
-    ;;c is how the velocity was curbed along the path
     (let ((pos (mat-vec (simplecam-pos camera)))
 	  (vel (mat-vec cameraVelocity)))
       (multiple-value-bind (px py pz ccx ccy ccz)
@@ -196,6 +107,9 @@
 	     (row-major-aref cameraVelocity 1)))
     (outofbounds camera)))
 
+(defun look-around ()
+  (mouse-looking ourcam))
+
 (defun outofbounds (camera)
   (if (> 0 (row-major-aref (simplecam-pos camera) 1))
       (progn	  
@@ -203,57 +117,8 @@
 	(setf (row-major-aref (simplecam-pos camera) 1) 0)
 	(setf (simplecam-pos camera) (mat:onebyfour (list 0 128 0 1))))))
 
-(defparameter lastw nil)
-(defparameter wprev most-negative-fixnum)
-(defparameter wpressprev nil)
-(defparameter isprinting nil)
-
 (defmacro toggle (var)
   `(setf ,var (not ,var)))
-
-(defun controls ()
-  (let ((camera (getworld "player")))
-    (mat:add!
-     cameraVelocity
-     (keymovement camera))
-    (progn
-      (if (in:key-p :w)
-	 ;;if it was pressed last round
-	 (progn
-	   (if (not wpressprev)
-	       (progn
-		 (if (> 150 (- (get-internal-run-time) wprev))
-		     (setf isprinting t))))
-	   (setf wpressprev t))
-	 (progn
-	   (setf isprinting nil)
-	   (if wpressprev
-	       (progn
-		 (setf wprev (get-internal-run-time))
-		 (setf wpressprev nil))))))
-    
-    (if (in:key-p :left-shift)
-	(progn
-	  (setf isprinting nil)
-	  (setf isneaking t))
-	(setf isneaking nil))
-
-    (in:key-pressed-hook #\h (lambda () (someseq
-			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
-			    (floor (row-major-aref (simplecam-pos camera) 2) 16))))
-
-    (if (in:key-pressed-p :z)
-	(aplatform
-	 (mat-world-pos (simplecam-pos camera))
-	 2))
-    (if (in:key-pressed-p :x)
-	(progn
-	  (notaplatform (mat-world-pos (simplecam-pos camera)))
-	  (notaplatform (vecadd (mat-world-pos (simplecam-pos camera)) (vector 0 1 0)))))
-    (if (in:key-pressed-p :c) 
-	(oneplatform
-	 (mat-world-pos (simplecam-pos camera))
-	 91))))
 
 (defun mat-world-pos (mat)
   (vector
@@ -261,101 +126,11 @@
    (floor (row-major-aref mat 1))
    (round (row-major-aref mat 2))))
 
-(defun mouse-looking (camera)
-  (let* ((change (in:delta))
-	 (x (* 1.25 1/360 (aref change 0)))
-	 (y (* 1.25 1/360 (aref change 1))))
-    (setf
-     (simplecam-yaw camera)
-     (mod (+ (simplecam-yaw camera) x) (* 2 pi)))
-    (setf (simplecam-pitch camera)
-	  (anothershit
-	   (+ (simplecam-pitch camera) y) (/ pi 2)))))
-
-(defun anothershit (x whatthefuck)
-  "used to clamp the pitch"
-  (if (> x whatthefuck)
-      whatthefuck
-      (if (< x (- whatthefuck))
-	  (- whatthefuck)
-	  x)))
-
-(defun good-func (some-number)
-  "maps keys to vectors"
-  (lambda (x)
-    (if (in::akeydown (first x))
-	(mat:add! some-number
-		  (mat:onebyfour (second x))))))
 
 (defun empty-vec4 ()
   (mat:onebyfour '(0 0 0 0)))
 
-(defun key-legs ()
-  "keys for walking"
-  (let* ((delta (empty-vec4))
-	 (lemod (good-func delta)))
-    (mapcar
-     lemod
-     '((:s ( 1  0  0  0))
-       (:w (-1  0  0  0))
-       (:a ( 0  0  1  0))
-       (:d ( 0  0 -1  0))))
-    (mat:scale! (mat:normalize! delta) (* 0.4 (expt tickscale 2)))
-    (if isneaking
-	(mat:scale! delta 0.2))
-    (if isprinting
-	(mat:scale! delta 1.3))
-    (if (not onground)
-	(mat:scale! delta 0.2))
-    delta))
-
-(defun key-jumps ()
-  "keys for jumping"
-  (let* ((delta (empty-vec4))
-	 (lemod (good-func delta)))
-    (if onground
-	(mapcar
-	 lemod
-	 `((:space (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
-    delta))
-
-(defun keymovement (camera)
-  "total keymovement"
-  (mat:mmul! (mat:add (key-legs) (key-jumps))
-	     (mat:rotation-matrix 0 1 0
-				  (simplecam-yaw camera))))
-
-(defun insert-at (num vec place)
-  (let* ((start (subseq vec 0 place))
-	 (end (subseq vec place (length vec))))
-    (concatenate 'vector start (vector num) end)))
-
-(defun delete-at (vec place)
-  (let* ((start (subseq vec 0 place))
-	 (end (subseq vec (1+ place) (length vec))))
-    (concatenate 'vector start end)))
-
-(defun aplatform (pos blockid)
-  (let ((i (elt pos 0))
-	(j (elt pos 1))
-	(k (elt pos 2)))
-    (dotimes (a 3)
-      (dotimes (b 3)
-	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid)))))
-
-(defun oneplatform (pos blockid)
-  (let ((i (elt pos 0))
-	(j (elt pos 1))
-	(k (elt pos 2)))
-    (setblock-with-update (+ i) (- j 1) (+ k) blockid)))
-
-(defun notaplatform (pos)
-  (let ((i (elt pos 0))
-	(j (elt pos 1))
-	(k (elt pos 2)))
-    (dotimes (a 3)
-      (dotimes (b 3)
-	(setblock-with-update (+ a i -1) (+ j) (+ b k -1) 0)))))
+;;;Why are theses functions here?
 
 (defun vec-mat (vec)
   (let ((newmat (mat:onebyfour '(0 0 0 0))))
@@ -577,187 +352,7 @@
 			 (setf (getheight x y) val)))))))
     (setheight x y 0)))
 
-(defun isOpaque (id)
-  (eq t (aref mc-blocks::opaquecubelooukup id)))
 
-(defun lightnode (ans)
-  (if ans
-      (progn
-	(let* ((ourpos (pop ans))
-	       (i (first ourpos))
-	       (j (second ourpos))
-	       (k (third ourpos)))
-	  (let ((courant (apply #'getlight ourpos)))
-	    (unless (zerop courant)
-	      (let ((current (1- courant)))
-		(flet ((settest (x y z)
-			 (unless (isOpaque (getblock x y z))
-			   (setf (getlight x y z) current)
-			   (pushnew (list x y z) ans :test #'equal))))
-		  (let ((i- (getlight (- i 1) (+ j 0) (+ k 0)))
-			(i+ (getlight (+ i 1) (+ j 0) (+ k 0)))
-			(j- (getlight (+ i 0) (- j 1) (+ k 0)))
-			(j+ (getlight (+ i 0) (+ j 1) (+ k 0)))
-			(k- (getlight (+ i 0) (+ j 0) (- k 1)))
-			(k+ (getlight (+ i 0) (+ j 0) (+ k 1))))
-		    (if (< i- current)
-			(settest (- i 1) (+ j 0) (+ k 0)))
-		    (if (< i+ current)
-			(settest (+ i 1) (+ j 0) (+ k 0)))
-		    (if (< j- current)
-			(settest (+ i 0) (- j 1) (+ k 0)))
-		    (if (< j+ current)
-			(settest (+ i 0) (+ j 1) (+ k 0)))
-		    (if (< k- current)
-			(settest (+ i 0) (+ j 0) (- k 1)))
-		    (if (< k+ current)
-			(settest (+ i 0) (+ j 0) (+ k 1)))))))))
-	(lightnode ans))))
-
-;;first we remove all the possible lights that could be affected by
-;;the light we want to remove, then the surrounding lights fill in the
-;;holes.
-(defun delightnode (ans other)
-  (if ans
-      (progn
-	(let* ((ourpos (pop ans))
-	       (i (first ourpos))
-	       (j (second ourpos))
-	       (k (third ourpos)))
-	  (let ((current (getlight i j k)))
-	    (setf (getlight i j k) 0)
-	    (flet ((settest (x y z)
-		     (unless (isopaque (getblock x y z))
-		       (pushnew (list x y z) ans :test #'equal)))
-		   (lightprop (x y z)
-		     (pushnew (list x y z) other :test #'equal)))
-	      (let ((i- (getlight (- i 1) (+ j 0) (+ k 0)))
-		    (i+ (getlight (+ i 1) (+ j 0) (+ k 0)))
-		    (j- (getlight (+ i 0) (- j 1) (+ k 0)))
-		    (j+ (getlight (+ i 0) (+ j 1) (+ k 0)))
-		    (k- (getlight (+ i 0) (+ j 0) (- k 1)))
-		    (k+ (getlight (+ i 0) (+ j 0) (+ k 1))))
-		(unless (zerop i-)
-		  (if (< i- current)
-		      (settest (+ i -1) (+ j 0) (+ k 0))   
-		      (lightprop (+ i -1) (+ j 0) (+ k 0))))
-		(unless (zerop i+)
-		  (if (< i+ current)
-		      (settest (+ i 1) (+ j 0) (+ k 0))   
-		      (lightprop (+ i 1) (+ j 0) (+ k 0))))
-		(unless (zerop j-)
-		  (if (< j- current)
-		      (settest (+ i 0) (+ j -1) (+ k 0))   
-		      (lightprop (+ i 0) (+ j -1) (+ k 0))))
-		(unless (zerop j+)
-		  (if (< j+ current)
-		      (settest (+ i 0) (+ j 1) (+ k 0))   
-		      (lightprop (+ i 0) (+ j 1) (+ k 0))))
-		(unless (zerop k-)
-		  (if (< k- current)
-		      (settest (+ i 0) (+ j 0) (+ k -1))   
-		      (lightprop (+ i 0) (+ j 0) (+ k -1))))
-		(unless (zerop k+)
-		  (if (< k+ current)
-		      (settest (+ i 0) (+ j 0) (+ k 1))   
-		      (lightprop (+ i 0) (+ j 0) (+ k 1))))))))
-	(delightnode ans other))
-      (if other
-	  (lightnode other))))
-
-(defun skylightnode (ans)
-  (if ans
-      (progn
-	(let* ((ourpos (pop ans))
-	       (i (first ourpos))
-	       (j (second ourpos))
-	       (k (third ourpos)))
-	  (let* ((current (apply #'skygetlight ourpos))
-		 (1-current (1- current)))
-	    (flet ((settest (x y z)
-		     (unless (isOpaque (getblock x y z))
-		       (setf (skygetlight x y z) (1- current))
-		       (pushnew (list x y z) ans :test #'equal)))
-		   (wowtest (x y z)
-		     (unless (or (isOpaque (getblock x y z))
-				 (> 0 y))
-		       (setf (skygetlight x y z) 15)
-		       (pushnew (list x y z) ans :test #'equal))))
-	      (let ((i- (skygetlight (- i 1) (+ j 0) (+ k 0)))
-		    (i+ (skygetlight (+ i 1) (+ j 0) (+ k 0)))
-		    (j- (skygetlight (+ i 0) (- j 1) (+ k 0)))
-		    (j+ (skygetlight (+ i 0) (+ j 1) (+ k 0)))
-		    (k- (skygetlight (+ i 0) (+ j 0) (- k 1)))
-		    (k+ (skygetlight (+ i 0) (+ j 0) (+ k 1))))
-		(if (< i- 1-current)
-		    (settest (- i 1) (+ j 0) (+ k 0)))
-		(if (< i+ 1-current)
-		    (settest (+ i 1) (+ j 0) (+ k 0)))
-		(if (= 15 current)
-		    (wowtest (+ i 0) (- j 1) (+ k 0))
-		    (if (< j- 1-current)
-			(settest (+ i 0) (- j 1) (+ k 0))))
-		(if (< j+ 1-current)
-		    (settest (+ i 0) (+ j 1) (+ k 0)))
-		(if (< k- 1-current)
-		    (settest (+ i 0) (+ j 0) (- k 1)))
-		(if (< k+ 1-current)
-		    (settest (+ i 0) (+ j 0) (+ k 1)))))))
-	(skylightnode ans))))
-
-;;first we remove all the possible lights that could be affected by
-;;the light we want to remove, then the surrounding lights fill in the
-;;holes.
-(defun skydelightnode (ans other)
-  (if ans
-      (progn
-	(let* ((ourpos (pop ans))
-	       (i (first ourpos))
-	       (j (second ourpos))
-	       (k (third ourpos)))
-	  (let ((current (skygetlight i j k)))
-	    (setf (skygetlight i j k) 0)
-	    (flet ((settest (x y z)
-		     (unless (or (isopaque (getblock x y z))
-				 (< y 0))
-		       (pushnew (list x y z) ans :test #'equal)))
-		   (lightprop (x y z)
-		     (pushnew (list x y z) other :test #'equal)))
-	      (let ((i- (skygetlight (- i 1) (+ j 0) (+ k 0)))
-		    (i+ (skygetlight (+ i 1) (+ j 0) (+ k 0)))
-		    (j- (skygetlight (+ i 0) (- j 1) (+ k 0)))
-		    (j+ (skygetlight (+ i 0) (+ j 1) (+ k 0)))
-		    (k- (skygetlight (+ i 0) (+ j 0) (- k 1)))
-		    (k+ (skygetlight (+ i 0) (+ j 0) (+ k 1))))
-		(unless (zerop i-)
-		  (if (< i- current)
-		      (settest (+ i -1) (+ j 0) (+ k 0))   
-		      (lightprop (+ i -1) (+ j 0) (+ k 0))))
-		(unless (zerop i+)
-		  (if (< i+ current)
-		      (settest (+ i 1) (+ j 0) (+ k 0))   
-		      (lightprop (+ i 1) (+ j 0) (+ k 0))))
-		(unless (zerop j-)
-		  (if (< j- current)
-		      (settest (+ i 0) (+ j -1) (+ k 0))   
-		      (lightprop (+ i 0) (+ j -1) (+ k 0))))
-		(if (= 15 current)
-		    (settest (+ i 0) (+ j -1) (+ k 0)))
-		(unless (zerop j+)
-		  (if (< j+ current)
-		      (settest (+ i 0) (+ j 1) (+ k 0))   
-		      (lightprop (+ i 0) (+ j 1) (+ k 0))))
-		(unless (zerop k-)
-		  (if (< k- current)
-		      (settest (+ i 0) (+ j 0) (+ k -1))   
-		      (lightprop (+ i 0) (+ j 0) (+ k -1))))
-		(unless (zerop k+)
-		  (if (< k+ current)
-		      (settest (+ i 0) (+ j 0) (+ k 1))   
-		      (lightprop (+ i 0) (+ j 0) (+ k 1))))))))
-	(skydelightnode ans other))
-      (if other
-	  (skylightnode other))))
 
 (defun setblock-with-update (i j k blockid)
   (delightnode (list (list i j k)) nil)

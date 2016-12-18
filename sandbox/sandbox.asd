@@ -18,9 +18,15 @@
 
     :serial t
     :components  
-    ((:file "package")
+    ((:file "big-mac")
+     (:file "package")
      (:file "magic")
      (:file "blocks")
      (:file "lovely-renderer")
+     (:file "player-collision")
+     (:file "player-controls")
+     (:file "block-light")
+     (:file "retarded-vectors")
+     (:file "load-world")
      (:file "world-physics")
      (:file "sandbox")))
