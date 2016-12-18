@@ -37,16 +37,42 @@
   (mapcar
    (lambda (theplace)
      (multiple-value-bind (a b c d)
-	 (aabbcc::aabb-collide
-	  player-aabb
-	  px py pz
-	  block-aabb
-	  theplace
-	  vx vy vz)
+	 (multiple-value-bind (minimum type)
+	     (aabbcc::aabb-collide
+	      player-aabb
+	      px py pz
+	      block-aabb
+	      theplace
+	      vx vy vz)
+	   (multiple-value-bind (xc yc zc) (aabbcc::type-translator type vx vy vz)
+	     (values minimum xc yc zc)))
        (list a b c d)))
    blocklist))
 
-(defun get-blocks-around-player (px py pz vx vy vz)
+(defun block-touches (blocklist px py pz)
+  (let ((x+ nil)
+	(x- nil)
+	(y+ nil)
+	(y- nil)
+	(z+ nil)
+	(z- nil))
+    (dolist (theplace blocklist)
+      (multiple-value-bind (bx sx by sy bz sz) ;;b = big =positive s = small = negative
+	  (aabbcc::aabb-contact px py pz
+				player-aabb
+				(elt theplace 0)
+				(elt theplace 1)
+				(elt theplace 2)
+				block-aabb)
+	(if bx (setq x+ t))
+	(if sx (setq x- t))
+	(if by (setq y+ t))
+	(if sy (setq y- t))
+	(if bz (setq z+ t))
+	(if sz (setq z- t))))
+    (values x+ x- y+ y- z+ z-)))
+
+(defun get-blocks-around-player (px py pz)
   (let ((places nil))
     (dotimes (x 3)
       (dotimes (y 4)
@@ -60,7 +86,7 @@
     places))
 
 (defun myafunc (px py pz vx vy vz)
-  (let ((ourblocks (get-blocks-around-player px py pz vx vy vz)))
+  (let ((ourblocks (get-blocks-around-player px py pz)))
     (let ((ourcontacts (blocktocontact ourblocks px py pz vx vy vz)))
       (aabbcc::collapsecollisions ourcontacts))))
 
@@ -113,13 +139,7 @@
     ;;c is how the velocity was curbed along the path
     (let ((pos (mat-vec (simplecam-pos camera)))
 	  (vel (mat-vec cameraVelocity)))
-      (print (list   (elt pos 0)
-		     (elt pos 1)
-		     (elt pos 2)
-		     (elt vel 0)
-		     (elt vel 1)
-		     (elt vel 2) ))
-      (multiple-value-bind (px py pz ccx ccy ccz cx cy cz)
+      (multiple-value-bind (px py pz ccx ccy ccz)
 	  (aabbcc::step-motion #'myafunc
 			       (elt pos 0)
 			       (elt pos 1)
@@ -140,10 +160,17 @@
 						  (elt foo 1)
 						  (elt foo 2)
 						  ccx ccy ccz)
-		   (vector a b c)))))))
-    (print (get-internal-real-time))
-    (print onground)
-
+		   (vector a b c))))))
+      (let ((pos (mat-vec (simplecam-pos camera))))
+	(let ((blocks-around (get-blocks-around-player (elt pos 0)
+						       (elt pos 1)
+						       (elt pos 2))))
+	  (multiple-value-bind (x+ x- y+ y- z+ z-)
+	      (block-touches blocks-around
+			     (elt pos 0)
+			     (elt pos 1)
+			     (elt pos 2))
+	    (setf onground y-)))))
 
     
     (if (not onground)
@@ -286,7 +313,7 @@
   "keys for jumping"
   (let* ((delta (empty-vec4))
 	 (lemod (good-func delta)))
-    (if	onground
+    (if onground
 	(mapcar
 	 lemod
 	 `((:space (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
