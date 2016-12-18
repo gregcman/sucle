@@ -2,327 +2,247 @@
 
 (in-package #:aabbcc)
 
-;;; "aabbcc" goes here. Hacks and glory await!
+;;;below is code that I thought super hard about
+;;;I hope it gives u a hard on
+
+(defun step-motion (get-collision-data px py pz vx vy vz &optional xclamp yclamp zclamp (depth 0))
+  (multiple-value-bind (ratio xc yc zc)
+      (funcall get-collision-data px py pz vx vy vz)
+    (multiple-value-bind (newvx newvy newvz)
+	(clamp-vec vx vy vz xc yc zc)
+      (if (or (> depth 5)
+	      (and (zerop vx)
+		   (zerop vy)
+		   (zerop vz)))
+	  (values px py pz xclamp yclamp zclamp xc yc zc)
+	  (let ((whats-left (- 1 ratio)))
+	    (step-motion
+	     get-collision-data
+	     (+ px (* ratio newvx))
+	     (+ py (* ratio newvy))
+	     (+ pz (* ratio newvz))
+	     (* newvx whats-left)
+	     (* newvy whats-left)
+	     (* newvz whats-left)
+	     (or xclamp xc)
+	     (or yclamp yc)
+	     (or zclamp zc)
+	     (1+ depth)))))))
+
+(defun clamp-vec (vx vy vz xclamp yclamp zclamp)
+  (values
+   (if xclamp 0 vx)
+   (if yclamp 0 vy)
+   (if zclamp 0 vz)))
 
 (defun collapsecollisions (places)
-  (let ((collisions (make-array 6 :initial-contents '(1 1 1 1 1 1))))
-    (dolist (boxdata places)
-      (dotimes (val 6)
-	(let ((info (elt boxdata val)))
-	  (if (numberp info)
-	      (let ((nowval (elt collisions val)))
-		(if (numberp nowval)
-		    (if (< info nowval)
-			(setf (elt collisions val) info)))))
-	  (if (eq :contact info)
-	      (setf (aref collisions val) :contact)))))
-    collisions))
+  (let ((min-dist 1)
+	(xclamp nil)
+	(yclamp nil)
+	(zclamp nil))
+    (dolist (x places)
+      (if (= (car x) min-dist)
+	  (progn
+	    (setf xclamp (or xclamp (second x)))
+	    (setf yclamp (or yclamp (third x)))
+	    (setf zclamp (or zclamp (fourth x))))
+	  (if (< (car x) min-dist)
+	      (progn
+		(setf min-dist (car x))
+		(setf xclamp (second x))
+		(setf yclamp (third x))
+		(setf zclamp (fourth x))))))
+    (values min-dist xclamp yclamp zclamp)))
 
-(defun clamp-vec (vec collisiondata)
-  (let ((newvec (make-array 3 :initial-contents vec)))
-    ;;clamp to contacts
-    (dotimes (n 6)
-      (let* ((place (bleck n))
-	     (colval (elt collisiondata n)))
-	(if (eq colval :contact)
-	    (let ((wowz (if (oddp n) 1 -1)))
-	      (if (< 0 (* (elt newvec place) wowz))
-		  (setf (aref newvec place) 0))))))
-    newvec))
-
-(defun smallscalevec (collisiondata)
-  (let ((smallest 2))
-    ;;get the smallest distance
-    (dotimes (n 6)
-      (let* ((colval (elt collisiondata n)))
-	(if (numberp colval)
-	    (if (> smallest colval)
-		(setf smallest colval)))))
-    smallest))
+(defun aabb-collide (aabb1 px py pz aabb2 pos2 vx vy vz)
+  (%%collide (+ px (aabb-minx aabb1)) (+ py (aabb-miny aabb1)) (+ pz (aabb-minz aabb1))
+	     (+ px (aabb-maxx aabb1)) (+ py (aabb-maxy aabb1)) (+ pz (aabb-maxz aabb1))	    
+	     vx vy vz
+	     (+ (elt pos2 0) (aabb-minx aabb2))
+	     (+ (elt pos2 1) (aabb-miny aabb2))
+	     (+ (elt pos2 2) (aabb-minz aabb2))
+	     (+ (elt pos2 0) (aabb-maxx aabb2))
+	     (+ (elt pos2 1) (aabb-maxy aabb2))
+	     (+ (elt pos2 2) (aabb-maxz aabb2))))
 
 (defstruct aabb
-  (minx -0.5)
-  (miny -0.5)
-  (minz -0.5)
-  (maxx 0.5)
-  (maxy 0.5)
-  (maxz 0.5))
-
-(defun block-aabb ()
-  (make-aabb))
-
-(defun player-aabb ()
-  (make-aabb
-   :minx -0.3
-   :miny 0
-   :minz -0.3
-   :maxx 0.3
-   :maxy 1.62
-   :maxz 0.3))
-
-(defstruct rectangle
   minx
   miny
+  minz
   maxx
   maxy
-  z)
+  maxz)
 
-(defun rect-intersect (a b)
-  (if (and (< (rectangle-minx a) (rectangle-maxx b))
-	   (< (rectangle-minx b) (rectangle-maxx a))
-	   (< (rectangle-miny a) (rectangle-maxy b))
-	   (< (rectangle-miny b) (rectangle-maxy a)))
-      t
-      nil))
+(defmacro checkface ((op facea faceb) diff (d1 d2) (mx0 my0 mx1 my1 nx0 ny0 nx1 ny1))
+    `(if (,op ,facea ,faceb)
+	 (let* ((delta (- ,faceb ,facea))
+		(ddx (/ (* delta ,d1) ,diff))
+		(ddy (/ (* delta ,d2) ,diff))
+		(state (r-intersect (+ ddx ,mx0) (+ ddy ,my0)
+				    (+ ddx ,mx1) (+ ddy ,my1)
+				    ,nx0 ,ny0
+				    ,nx1 ,ny1)))
+	   (if state
+	       (if (case state
+		     ((t) t)
+		     (br (and (minusp ,d2) (plusp ,d1)))
+		     (ur (and (plusp ,d2) (plusp ,d1)))
+		     (ul (and (plusp ,d2) (minusp ,d1)))
+		     (bl (and (minusp ,d2) (minusp ,d1)))
+		     (b (minusp ,d2))
+		     (r (plusp ,d1))
+		     (u (plusp ,d2))
+		     (l (minusp ,d1)))
+		   (/ delta ,diff))))))
 
-(defun translate-rect (rect vec2)
-  (incf (rectangle-minx rect) (elt vec2 0))
-  (incf (rectangle-maxx rect) (elt vec2 0))
-  (incf (rectangle-miny rect) (elt vec2 1))
-  (incf (rectangle-maxy rect) (elt vec2 1))
-  rect)
+(defun corner-case (ddx ddy ddz)
+  (let ((dx (abs ddx))
+	(dy (abs ddy))
+	(dz (abs ddz)))
+    (if (= dx dy)
+	(if (= dx dz)
+	    (values t t t) ;;all equal sitting on corner
+	    (values t t nil));;dx dy equal dz wins
+	(if (= dx dz)
+	    (values t nil t);; dx dz equal dy wins
+	    (if (= dy dz)
+		(values nil t t);; dy dz equal dx wins
+		(if (> dx dy)
+		    (if (> dy dz)
+			(values nil nil t);;dx is largest dz is smallest, so bye dz
+			(values nil t nil);;dy is smallest
+			)
+		    (if (> dx dz)
+			(values nil nil t);;dz smallest
+			(values t nil nil);;dx beaten twice
+			)))))))
 
-(defun my-helper-func (x)
-  (if (evenp x)
-      (1+ x)
-      (1- x)))
+(defun %%collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
+  (multiple-value-bind (x y z)
+      (%collide ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
+    (let ((minimum 1))
+      (if (numberp x)
+	  (setq minimum (min minimum x))
+	  (setq x -69))
+      (if (numberp y)
+	  (setq minimum (min minimum y))
+	  (setq y -42))
+      (if (numberp z)
+	  (setq minimum (min minimum z))
+	  (setq z -64))
+      ;;set the values to magic numnbers to be compared
+      (let ((xt (= minimum x))
+	    (yt (= minimum y))
+	    (zt (= minimum z)))
+	(if xt
+	    (if yt
+		(if zt
+		    (multiple-value-bind (afoo bfoo cfoo)
+			(corner-case dx dy dz)
+		      (values minimum afoo bfoo cfoo)) ;;corner xyz
+		    (if (= dx dy)
+			(values minimum t t nil)
+			(if (> dx dy)
+			    (values minimum nil t nil)
+			    (values minimum t nil nil))) ;;edge xy
+		    )
+		(if zt
+		    (if (= dx dz)
+			(values minimum t nil t)
+			(if (> dx dz)
+			    (values minimum nil nil t)
+			    (values minimum t nil nil))) ;;edge xz
+		    (values minimum t nil nil) ;;face x
+		    ))
+	    (if yt
+		(if zt
+		    (if (= dy dz)
+			(values minimum nil t t)
+			(if (> dy dz)
+			    (values minimum nil nil t)
+			    (values minimum nil t nil)))
+		    (values minimum nil t nil) ;;face y
+		    )
+		(if zt
+		    (values minimum nil nil t) ;;face z
+		    (values minimum nil nil nil) ;;no collision
+		    )))))))
 
-(defun bleck (x)
-  (floor (/ x 2)))
+(defun testit (&rest args)
+  (multiple-value-bind (a b c d)
+      (apply #'%%collide args)
+    (print (list a b c d))))
 
-(defun some-rect (vec4 num)
-  (make-rectangle
-   :minx (elt vec4 0)
-   :maxx (elt vec4 1)
-   :miny (elt vec4 2)
-   :maxy (elt vec4 3)
-   :z num))
+(defun testit2 (&rest args)
+  (multiple-value-bind (a b c d)
+      (apply #'%%%collide args)
+    (print (list a b c d))))
 
-(defun aabb-to-rects (abba pos)
-  (let ((rectlist
-	 (vector
-	  (+ (elt pos 0) (aabb-minx abba))
-	  (+ (elt pos 0) (aabb-maxx abba))
-	  (+ (elt pos 1) (aabb-miny abba))
-	  (+ (elt pos 1) (aabb-maxy abba))
-	  (+ (elt pos 2) (aabb-minz abba))
-	  (+ (elt pos 2) (aabb-maxz abba))))
-	(shitlist nil))
-    (dotimes (x 6)      
-      (let* ((alist (vector 0 1 2 3 4 5))
-	     (another (remove (my-helper-func x)
-			      (remove x alist)))
-	     (arect (some-rect
-		     (let ((sometin (make-array 4)))
-		       (dotimes (n 4)
-			 (setf (aref sometin n) (aref rectlist (aref another n))))
-		       sometin)
-		     (aref rectlist x))))
-	(push 
-	 (list arect (- (mod x 2) 0.5) x)
-	 shitlist)))
-    (reverse shitlist)))
+(defun %%%collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
+  (%%collide ax0 ay0 az0
+	     (+ ax1 ax0) (+ ay1 ay0) (+ az1 az0)
+	     dx dy dz
+	     bx0 by0 bz0
+	     (+ bx1 bx0) (+ by1 by0) (+ bz1 bz0)))
+(defun test-cases ()
+  (print "unit cubes along the z axis")
+  (testit2 0 0 0 1 1 1
+	  0 0 0
+	  1 0 0 1 1 1)
+  (print "corner touching cubes")
+  (testit2 0 0 0 1 1 1
+	  0 0 0
+	  1 1 1 1 1 1)
+  (print "corner business")
+  (testit2 0 0 0 1 1 1
+	  5 5 5
+	  1.5 1.5 1.5 1 1 1)
+  (print "a test")
+  (testit2 0 0 0 1 1 1
+	  2 3 10
+	  1 2 5 1 1 1))
 
-(defun %aabb-intersect (aabb1 pos1 aabb2 pos2 vec3)
-  (let ((onerects  (aabb-to-rects aabb1 pos1))
-	(tworects  (aabb-to-rects aabb2 pos2))
-	(somelist nil))
-    (dotimes (x 6)
-      (let* ((dat1 (elt onerects x))
-	     (dat2 (elt tworects (my-helper-func x)))
-	     (therect
-	      (%rect-intersect
-	       (first dat1)
-	       (first dat2)
-	       (wtf x vec3)
-	       (second dat1)
-	       (second dat2))))
-	(push therect somelist)))
-    (reverse somelist)))
+(defun %collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
+  ;;if the velocity is zero, there is no point to test it
+  ;;if it is nonzero, we check the direction
+  ;; if the direction is positive but surface 2 is in the
+  ;;negative direction relative to surface 1 we discard
+  (values
+   (unless (zerop dx)
+     (if (plusp dx)
+	 (checkface (<= ax1 bx0) dx (dy dz) (ay0 az0 ay1 az1 by0 bz0 by1 bz1))
+	 (checkface (>= ax0 bx1) dx (dy dz) (ay0 az0 ay1 az1 by0 bz0 by1 bz1))))
+   (unless (zerop dy)
+     (if (plusp dy)
+	 (checkface (<= ay1 by0) dy (dx dz) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1))
+	 (checkface (>= ay0 by1) dy (dx dz) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1))))
+   (unless (zerop dz)
+     (if (plusp dz)
+	 (checkface (<= az1 bz0) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1))
+	 (checkface (>= az0 bz1) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1))))))
 
-(defun arect (x y x1 y1)
-  (make-rectangle :minx x :miny y :maxx x1 :maxy y1))
-
-(defun arect2 (x y x1 y1 z)
-  (make-rectangle :minx x :miny y :maxx x1 :maxy y1 :z z))
-
-(defun tests ()
-  (print (%rect-intersect
-	  (arect2 0 0 1 1 -1)
-	  (arect2 0 0 1 1 1)
-	  (vector 0 0 5) 1 -1))
-  (print (%rect-intersect
-	  (arect2 0 0 1 1 -1)
-	  (arect2 0 1 1 2 1)
-	  (vector 0 0 5) 1 -1))
-  (print (%rect-intersect
-	  (arect2 0 0 1 1 -1)
-	  (arect2 0 0 1 1 1)
-	  (vector 0 0 5) 1 -1))
-  (print (%rect-intersect
-	 (arect2 0 0 1 1 -1)
-	 (arect2 0 0 1 1 1)
-	 (vector 0 0 5) 1 -1)))
-
-(defun %rect-intersect (a b vec3 adir bdir)
-  (let* ((aiz (rectangle-z a))
-	 (biz (rectangle-z b))
-	 (diff (- biz aiz)))
-    (let ((zdelt (elt vec3 2)))
-      (if (zerop zdelt)
-	  ;;the rectangles do not move in the z direction
-	  (if (zerop diff)
-	      ;;the rectangles are on the same plane
-	      (if (rect-intersect
-		   (translate-rect a vec3)
-		   b)
-		  ;;contact established after moving,
-		  ;;sliding contact but no collision
-		  :contact
-		  ;;nocontact after moving
-		  :non)
-	      ;;the rectangles are not on the same plane
-	      ;;and neither move so its no
-	      :no)
-	  ;;the rectangles move in the z direction
-	  (if (or
-	       (and
-		(<= diff 0)
-		(< adir 0)
-		(< 0 bdir)
-		(< zdelt 0))
-	       (and
-		(<= 0 diff)
-		(< 0 adir)
-		(< bdir 0)
-		(< 0 zdelt)))
-	      ;;the rectangles do intersect becuase
-	      ;;the directions line up correctly
-	      (let* ((ratio (/ diff zdelt))
-		     (transx (* ratio (elt vec3 0)))
-		     (transy (* ratio (elt vec3 1)))
-		     (moveda (translate-rect
-			      a
-			      (vector transx transy))))
-		(if (rect-intersect
-		     moveda
-		     b)
-		    (if (zerop ratio)
-			;;the rectangles were on the same plane
-			;;to begin with, if they intersect its
-			;;definitely a contact
-			:contact
-			;;the rectangles were not on the same
-			;;plane and they definitely intersect
-			ratio)
-		    (if (not (edgy-rect-intersect moveda b))
-			;;not even the corners or the
-			;;edges are touching in this case.
-			;;absolutely nothing.
-			:nope
-			;;this is the part that gets hairy,
-			;;as it involves the direction of movement
-			;;to decide whether its contact or not
-			(nasty-intersection a b vec3))))
-	      ;;the rectangles do not intersect by the
-	      ;;nature of the directions they are facing
-	      (progn
-		:ehh))))))
-
-;;if there is a length an edge touches, if the rectangle is moving
-;;towards the other rectangle then contact depends on whether speed in the
-;;direction perpendicular to the edge is greater or equal to
-;;the speed into the page
-(defun nasty-intersection (a b vec3))
-
-(defun edgy-rect-intersect (a b)
-  (if (and (<= (rectangle-minx a) (rectangle-maxx b))
-	   (<= (rectangle-minx b) (rectangle-maxx a))
-	   (<= (rectangle-miny a) (rectangle-maxy b))
-	   (<= (rectangle-miny b) (rectangle-maxy a)))
-      t
-      nil))
-
-(defun wtf (x vec3)
-  (let* ((ouch (floor (/ x 2)))
-	 (eek (elt vec3 ouch))
-	 (umm (delete-at vec3 ouch))
-	 (dayum (concatenate 'vector umm (vector eek))))
-    dayum))
-
-(defun unwtf (x vec3)
-  (let* ((ouch (floor (/ x 2)))
-	 (myval (elt vec3 2)))
-    (subseq
-     (insert-at myval vec3 ouch)
-     0
-     3)))
-;;wtf tests (dotimes (x 6) (print (unwtf x (print (wtf x (vector :wot :teh :fack))))))
-
-(defun insert-at (num vec place)
-  (let* ((start (subseq vec 0 place))
-	 (end (subseq vec place (length vec))))
-    (concatenate 'vector start (vector num) end)))
-
-(defun delete-at (vec place)
-  (let* ((start (subseq vec 0 place))
-	 (end (subseq vec (1+ place) (length vec))))
-    (concatenate 'vector start end)))
-
-(defun vecscale (vec3 scale)
-  (vector
-   (* scale (elt vec3 0))
-   (* scale (elt vec3 1))
-   (* scale (elt vec3 2))))
-
-(defun vecsubtract (vec3 vec32)
-  (vector
-   (- (elt vec3 0) (elt vec32 0))
-   (- (elt vec3 1) (elt vec32 1))
-   (- (elt vec3 2) (elt vec32 2))))
-
-(defun vecadd (vec3 vec32)
-  (vector
-   (+ (elt vec3 0) (elt vec32 0))
-   (+ (elt vec3 1) (elt vec32 1))
-   (+ (elt vec3 2) (elt vec32 2))))
-
-(defun veczerop (vec)
-  (dotimes (n (length vec))
-    (if (zerop (elt vec n))
-	nil
-	(return-from veczerop nil)))
-  t)
-
-(defun finish-clamps (aabbgetfunc vec3position vec3velocity &optional
-						  (depth 0) (collisionacc (vector 0 0 0 0 0 0)))
-  (let* ((collisiondata (funcall aabbgetfunc vec3position vec3velocity))
-	 (next (clamp-vec vec3velocity collisiondata))
-	 (scalez (smallscalevec collisiondata)))  
-    (let ((coldone t))
-      (dotimes (x 6)
-	(if (not (if (numberp (elt collisiondata x))
-		     (or (= 1 (elt collisiondata x))
-			 (zerop (elt collisiondata x)))
-		     (eq :contact (elt collisiondata x))))
-	    (setf coldone nil)))
-      (dotimes (n 6)
-	(if (eq :contact (elt collisiondata n))
-	    (setf (aref collisionacc n) :contact)))
-      (if (and
-	   ( > depth 0)
-	   (veczerop vec3velocity)
-	   coldone)
-	  (progn	   
-	    (values
-	     vec3position
-	     collisiondata
-	     collisionacc))
-	  (finish-clamps
-	   aabbgetfunc
-	   (vecadd
-	    vec3position
-	    (vecscale next scalez))
-	   (vecscale next (- 1 scalez))
-	   (incf depth)
-	   collisionacc)))))
+(defun r-intersect (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)
+  "0 means the edges touch. positive number means there is space between
+negative means it is past. the symbols u r l and b represent the top,
+right, left, and bottom of the first rectangle."
+  (let ((dbottom (- ay0 by1))
+	(dright (- bx0 ax1))
+	(dup (- by0 ay1))
+	(dleft (- ax0 bx1)))
+    (let ((db (zerop dbottom))
+	  (dr (zerop dright))
+	  (du (zerop dup))
+	  (dl (zerop dleft)))
+      (if (or db dr du dl)
+	  (cond ((and du dr) 'ur)
+		((and du dl) 'ul)
+		((and db dl) 'bl)
+		((and db dr) 'br)
+		(db 'b)
+		(dr 'r)
+		(du 'u)
+		(dl 'l))
+	  (not (or (plusp dbottom)
+		   (plusp dright)
+		   (plusp dup)
+		   (plusp dleft)))))))

@@ -31,13 +31,69 @@
 ;;gravity is (* -0.08 (expt tickscale 2)) 0 0
 ;;falling friction is 0.98
 ;;0.6 * 0.91 is walking friction
+
+
+(defun blocktocontact (blocklist px py pz vx vy vz)
+  (mapcar
+   (lambda (theplace)
+     (multiple-value-bind (a b c d)
+	 (aabbcc::aabb-collide
+	  player-aabb
+	  px py pz
+	  block-aabb
+	  theplace
+	  vx vy vz)
+       (list a b c d)))
+   blocklist))
+
+(defun get-blocks-around-player (px py pz vx vy vz)
+  (let ((places nil))
+    (dotimes (x 3)
+      (dotimes (y 4)
+	(dotimes (z 3)
+	  (let ((blockx (round (- (+ x px) 1)))
+		(blocky (round (- (ceiling (+ y py)) 1)))
+		(blockz (round (- (+ z pz) 1))))
+	    (let ((blockid (mat-pos (vector blockx blocky blockz))))
+	      (if (eq t (aref mc-blocks::iscollidable blockid))
+		  (push (vector blockx blocky blockz) places)))))))
+    places))
+
+(defun myafunc (px py pz vx vy vz)
+  (let ((ourblocks (get-blocks-around-player px py pz vx vy vz)))
+    (let ((ourcontacts (blocktocontact ourblocks px py pz vx vy vz)))
+      (aabbcc::collapsecollisions ourcontacts))))
+
+
+(defun block-aabb ()
+  (aabbcc::make-aabb
+   :minx -0.5
+   :miny -0.5
+   :minz -0.5
+   :maxx 0.5
+   :maxy 0.5
+   :maxz 0.5))
+
+(defun player-aabb ()
+  (aabbcc::make-aabb
+   :minx -0.3
+   :miny 0
+   :minz -0.3
+   :maxx 0.3
+   :maxy 1.62
+   :maxz 0.3))
+
+
+(defparameter block-aabb (block-aabb))
+(defparameter player-aabb (player-aabb))
+
 (defun physics ()
   "a messy function for the bare bones physics"
   (setf daytime (case 10
 		  (0 27.5069)
 		  (2 9)
 		  (9 0)
-		  (3 0)
+  		  (3 0)
 		  (1 (/ (+ 0  (cos (/ (get-internal-real-time) 2000))) 0.5))
 		  (10 1.0)))
   (let ((camera (getworld "player")))
@@ -46,49 +102,72 @@
 	    (ease (simplecam-fov camera) (* 1.15 defaultfov) 0.2))
       (setf (simplecam-fov camera)
 	    (ease (simplecam-fov camera) defaultfov 0.2)))
-    (let ((wowzer nil)
-	  (collisiondata nil)
-	  (velclamp nil))
-      (multiple-value-bind (a b c)
-	  (aabbcc::finish-clamps #'myafunc
-				 (mat-vec (simplecam-pos camera))
-				 (mat-vec cameraVelocity))
-	(setf wowzer a)
-	(setf collisiondata b)
-	(setf velclamp c))
-      (setf onground (if (numberp (elt collisiondata 2))
-			 (= 0 (elt collisiondata 2))
-			 (eq :contact (elt collisiondata 2))))
 
-      (setf (simplecam-pos camera)
-	    (vec-mat
-	     wowzer))
-      (setf cameraVelocity
-	    (mat-clamper cameraVelocity velclamp))
 
-      
-      (if (not onground)
-	  (mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
-      (let ((airscaled
-	     (mat:onebyfour
-	      (list
-	       (row-major-aref cameraVelocity 0)
-	       0
-	       (row-major-aref cameraVelocity 2)
-	       0))))
-	(mat:scale! airscaled (* 0.9))
-	(if onground (mat:scale! airscaled (* 0.6 0.91)))
-	(if nil
-	    (let ((speed (hypot (mat-lis airscaled))))
-	      (print speed)
-	      (if (> 0.05 speed)
-		  (setf isprinting nil))))
-	(setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
-	(setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
-      (setf (row-major-aref cameraVelocity 1)
-	    (* (expt 0.98 tickscale)
-	       (row-major-aref cameraVelocity 1)))
-      (outofbounds camera))))
+
+    ;;;;very nasty collision bounds code
+
+    ;;finish-clamps seems to returning multiple things
+    ;;a - wowzer is the final position
+    ;;b - collisiondata is the final contact data at the finish
+    ;;c is how the velocity was curbed along the path
+    (let ((pos (mat-vec (simplecam-pos camera)))
+	  (vel (mat-vec cameraVelocity)))
+      (print (list   (elt pos 0)
+		     (elt pos 1)
+		     (elt pos 2)
+		     (elt vel 0)
+		     (elt vel 1)
+		     (elt vel 2) ))
+      (multiple-value-bind (px py pz ccx ccy ccz cx cy cz)
+	  (aabbcc::step-motion #'myafunc
+			       (elt pos 0)
+			       (elt pos 1)
+			       (elt pos 2)
+			       (elt vel 0)
+			       (elt vel 1)
+			       (elt vel 2))
+      ;;;;;WOWWOOWOWOWOWOW
+	(if (and (>= 0 (elt vel 1)) ccy)
+	    (setf onground t)
+	    (setf onground nil))
+	(setf (simplecam-pos camera) (vec-mat (vector px py pz)))
+	(let ((foo (mat-vec cameravelocity)))
+	  (setf cameraVelocity
+		(vec-mat
+		 (multiple-value-bind
+		       (a b c) (aabbcc::clamp-vec (elt foo 0)
+						  (elt foo 1)
+						  (elt foo 2)
+						  ccx ccy ccz)
+		   (vector a b c)))))))
+    (print (get-internal-real-time))
+    (print onground)
+
+
+    
+    (if (not onground)
+	(mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
+    (let ((airscaled
+	   (mat:onebyfour
+	    (list
+	     (row-major-aref cameraVelocity 0)
+	     0
+	     (row-major-aref cameraVelocity 2)
+	     0))))
+      (mat:scale! airscaled (* 0.9))
+      (if onground (mat:scale! airscaled (* 0.6 0.91)))
+      (if nil
+	  (let ((speed (hypot (mat-lis airscaled))))
+	    (print speed)
+	    (if (> 0.05 speed)
+		(setf isprinting nil))))
+      (setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
+      (setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
+    (setf (row-major-aref cameraVelocity 1)
+	  (* (expt 0.98 tickscale)
+	     (row-major-aref cameraVelocity 1)))
+    (outofbounds camera)))
 
 (defun outofbounds (camera)
   (if (> 0 (row-major-aref (simplecam-pos camera) 1))
@@ -219,37 +298,6 @@
 	     (mat:rotation-matrix 0 1 0
 				  (simplecam-yaw camera))))
 
-(defun blocktocontact (blocklist vec3player vel)
-  (mapcar
-   (lambda (theplace)
-     (aabbcc::%aabb-intersect
-      (aabbcc::player-aabb)
-      vec3player
-      (aabbcc::block-aabb)
-      theplace
-      vel))
-   blocklist))
-
-(defun get-blocks-around-player (vec3player vel)
-  (declare (ignore vel))
-  (let ((places nil))
-    (dotimes (x 3)
-      (dotimes (y 4)
-	(dotimes (z 3)
-	  (let ((blockx (round (- (+ x (elt vec3player 0)) 1)))
-		(blocky (round (- (ceiling (+ y (elt vec3player 1))) 1)))
-		(blockz (round (- (+ z (elt vec3player 2)) 1))))
-	    (let ((blockid (mat-pos (vector blockx blocky blockz))))
-	      (if (eq t (aref mc-blocks::iscollidable blockid))
-		  (push (vector blockx blocky blockz) places)))))))
-    places))
-
-(defun myafunc (vec3player vel)
-  (let ((ourblocks (get-blocks-around-player vec3player vel)))
-    (let ((ourcontacts (blocktocontact ourblocks vec3player vel)))
-      (let ((totcollisoins (aabbcc::collapsecollisions ourcontacts)))
-        totcollisoins))))
-
 (defun insert-at (num vec place)
   (let* ((start (subseq vec 0 place))
 	 (end (subseq vec place (length vec))))
@@ -287,10 +335,6 @@
     (dotimes (x (length vec))
       (setf (row-major-aref newmat x) (elt vec x)))
     newmat))
-
-(defun mat-clamper (mat coldata)
-  (vec-mat
-   (aabbcc::clamp-vec (mat-vec mat) coldata)))
 
 (defun mat-vec (mat)
   (vector

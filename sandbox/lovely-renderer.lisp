@@ -961,7 +961,7 @@
      1.0)))
 
 (defun lightfunc (light)
-  (/ (- (expt 0.8 (- 15 light)) (expt 0.8 15)) (- 1 (expt 0.8 15))))
+  (expt 0.9 (- 15 light)))
 
 (defun lightvert (vert light)
   (let ((anum (lightfunc light)))
