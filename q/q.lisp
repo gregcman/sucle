@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :q)
 
 ;;a basic fifo queue first in first out
 (defstruct queue

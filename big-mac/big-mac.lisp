@@ -1,4 +1,4 @@
-(in-package :cl-user)
+(in-package :big-mac)
 
 (defmacro toggle (var)
   `(setf ,var (not ,var)))

@@ -3,8 +3,8 @@
 (defun isOpaque (id)
   (eq t (aref mc-blocks::opaquecubelooukup id)))
 
-(defun light-node (x y z &optional (bfs (make-uniq-q)))
-  (uniq-push (vox::chunkhashfunc x y z) bfs)  
+(defun light-node (x y z &optional (bfs (q::make-uniq-q)))
+  (q::uniq-push (vox::chunkhashfunc x y z) bfs)  
   (%light-node bfs))
 
 (defmacro xyz (mx my mz &body body)
@@ -17,7 +17,7 @@
 (defun %light-node (bfs)
   (tagbody
    rep
-     (multiple-value-bind (place exists?) (uniq-pop bfs)
+     (multiple-value-bind (place exists?) (q::uniq-pop bfs)
        (if exists?
 	   (multiple-value-bind (i j k) (vox::unhashfunc place)
 	     (let* ((light-level (getlight i j k))
@@ -27,7 +27,8 @@
 			       (if (< (getlight x y z) lower-level)
 				   (unless (isOpaque (getblock x y z))
 				     (setlight x y z lower-level)
-				     (uniq-push (vox::chunkhashfunc x y z) bfs))))))
+				     (q::uniq-push 
+					(vox::chunkhashfunc x y z) bfs))))))
 		 (%0check -1 0 0)
 		 (%0check 1 0 0)
 		 (%0check 0 -1 0)
@@ -37,9 +38,9 @@
 	     (go rep))))))
 
 (defun de-light-node (x y z)
-  (let ((bfs (make-uniq-q))
-	(lighting-bfs (make-uniq-q)))
-    (kv-uniq-push (vox::chunkhashfunc x y z) (getlight x y z) bfs)
+  (let ((bfs (q::make-uniq-q))
+	(lighting-bfs (q::make-uniq-q)))
+    (q::kv-uniq-push (vox::chunkhashfunc x y z) (getlight x y z) bfs)
     (setf (getlight x y z) 0)
     (%de-light-node bfs lighting-bfs)
     (%light-node lighting-bfs)))
@@ -49,7 +50,7 @@
 (defun %de-light-node (bfs lighting-bfs)
   (tagbody
    rep
-     (multiple-value-bind (place light-value exists?) (kv-uniq-pop bfs)
+     (multiple-value-bind (place light-value exists?) (q::kv-uniq-pop bfs)
        (if exists?
 	   (multiple-value-bind (i j k) (vox::unhashfunc place)
 	     (macrolet ((check (mx my mz)
@@ -59,10 +60,10 @@
 				 (if (< adj-light-level light-value)
 				      (progn
 					(setlight x y z 0)
-					(kv-uniq-push (vox::chunkhashfunc x y z)
+					(q::kv-uniq-push (vox::chunkhashfunc x y z)
 						      adj-light-level bfs))
 				      (if (>= adj-light-level light-value)
-					  (uniq-push (vox::chunkhashfunc x y z)
+					  (q::uniq-push (vox::chunkhashfunc x y z)
 						     lighting-bfs))))))))
 	       
 	       (check -1 0 0)
@@ -74,15 +75,15 @@
 	     (go rep)))))
   lighting-bfs)
 
-(defun sky-light-node (x y z &optional (bfs (make-uniq-q)))
-  (uniq-push (vox::chunkhashfunc x y z) bfs)  
+(defun sky-light-node (x y z &optional (bfs (q::make-uniq-q)))
+  (q::uniq-push (vox::chunkhashfunc x y z) bfs)  
   (%sky-light-node bfs))
 
 ;;flood fill propagation with moving downwards
 (defun %sky-light-node (bfs)
   (tagbody
    rep
-     (multiple-value-bind (place exists?) (uniq-pop bfs)
+     (multiple-value-bind (place exists?) (q::uniq-pop bfs)
        (if exists?
 	   (multiple-value-bind (i j k) (vox::unhashfunc place)
 	     (let* ((light-level (skygetlight i j k))
@@ -92,14 +93,14 @@
 			       (if (< (skygetlight x y z) lower-level)
 				   (unless (isOpaque (getblock x y z))
 				     (skysetlight x y z lower-level)
-				     (uniq-push (vox::chunkhashfunc x y z) bfs)))))
+				     (q::uniq-push (vox::chunkhashfunc x y z) bfs)))))
 			  (downcheck (mx my mz)
 			    `(xyz ,mx ,my ,mz
 			       (if (< (skygetlight x y z) lower-level)
 				   (unless (or (> 0 y)
 					       (isOpaque (getblock x y z)))
 				     (skysetlight x y z 15)
-				     (uniq-push (vox::chunkhashfunc x y z) bfs))))))
+				     (q::uniq-push (vox::chunkhashfunc x y z) bfs))))))
 		 (%0check -1 0 0)
 		 (%0check 1 0 0)
 		 (if (= 15 light-level)
@@ -111,9 +112,9 @@
 	     (go rep))))))
 
 (defun sky-de-light-node (x y z)
-  (let ((bfs (make-uniq-q))
-	(lighting-bfs (make-uniq-q)))
-    (kv-uniq-push (vox::chunkhashfunc x y z) (skygetlight x y z) bfs)
+  (let ((bfs (q::make-uniq-q))
+	(lighting-bfs (q::make-uniq-q)))
+    (q::kv-uniq-push (vox::chunkhashfunc x y z) (skygetlight x y z) bfs)
     (setf (skygetlight x y z) 0)
     (%sky-de-light-node bfs lighting-bfs)
     (%sky-light-node lighting-bfs)))
@@ -123,7 +124,7 @@
 (defun %sky-de-light-node (bfs lighting-bfs)
   (tagbody
    rep
-     (multiple-value-bind (place light-value exists?) (kv-uniq-pop bfs)
+     (multiple-value-bind (place light-value exists?) (q::kv-uniq-pop bfs)
        (if exists?
 	   (multiple-value-bind (i j k) (vox::unhashfunc place)
 	     (macrolet ((check (mx my mz)
@@ -133,10 +134,10 @@
 				 (if (< adj-light-level light-value)
 				      (progn
 					(skysetlight x y z 0)
-					(kv-uniq-push (vox::chunkhashfunc x y z)
+					(q::kv-uniq-push (vox::chunkhashfunc x y z)
 						      adj-light-level bfs))
 				      (if (>= adj-light-level light-value)
-					  (uniq-push (vox::chunkhashfunc x y z)
+					  (q::uniq-push (vox::chunkhashfunc x y z)
 						     lighting-bfs))))))))
 	       
 	       (check -1 0 0)
@@ -147,7 +148,7 @@
 				 (< y 0))
 		       (let ((adj-light-level (skygetlight x y z)))
 			 (skysetlight x y z 0)
-			 (kv-uniq-push (vox::chunkhashfunc x y z) adj-light-level bfs))))
+			 (q::kv-uniq-push (vox::chunkhashfunc x y z) adj-light-level bfs))))
 		   (check 0 -1 0))
 	       (check 0 1 0)
 	       (check 0 0 -1)
@@ -157,8 +158,8 @@
 
 (defun test-light ()
   (clearworld)
-  (dorange (x -32 32)
-	   (dorange (y 0 24)
-		    (dorange (z -32 32)
+  (!%::dorange (x -32 32)
+	   (!%::dorange (y 0 24)
+		    (!%::dorange (z -32 32)
 			     (setblock x y z 3))))
   (update-world-vao))

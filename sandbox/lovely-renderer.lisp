@@ -751,11 +751,11 @@
   (declare (optimize (speed 3)))
   
   (let* ((new-shape (destroy-shape shapebuffer)))
-    (dorange
+    (!%::dorange
      (i (* io 16) 16)
-     (dorange
+     (!%::dorange
       (j (* jo 16) 16)
-      (dorange
+      (!%::dorange
        (k (* ko 16) 16)
        (let ((blockid (getblock i j k)))
 	 (if (not (zerop blockid))

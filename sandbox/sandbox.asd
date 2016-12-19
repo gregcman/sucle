@@ -9,6 +9,8 @@
 		 #:cl-utilities  
 		 #:opticl
 		 
+		 #:big-mac
+		 #:q
 		 #:window
 		 #:cl-mc-shit
 		 #:the-matrix-is-everywhere
@@ -19,8 +21,6 @@
     :serial t
     :components  
     ((:file "package")
-     (:file "q") ;;queues and unique queues
-     (:file "big-mac");;convenience macros
      (:file "magic") ;;file io type stuff
      (:file "blocks") ;;list of minecraft block values
      (:file "world") ;;get blocks, contain blocks, set blocks...
