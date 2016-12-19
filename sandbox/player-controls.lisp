@@ -1,5 +1,18 @@
 (in-package :sandbox)
 
+;;in this file
+;;sprinting
+;;sneaking
+;;walking
+;;collision with blocks
+;;jumping
+;;strafing
+;;gravity
+;;looking around
+;;naturally this will be quite messy, as there are many facets
+;;to player movement. before, the light code and importing and world
+;; "world hash?!" were lumped with this for some reason-----
+
 (defparameter lastw nil)
 (defparameter wprev most-negative-fixnum)
 (defparameter wpressprev nil)
@@ -37,14 +50,16 @@
 			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
 			    (floor (row-major-aref (simplecam-pos camera) 2) 16))))
 
-    (if (in:key-pressed-p :z)
-	(aplatform
+    (if (in:key-p :z)
+	(%aplatform
 	 (mat-world-pos (simplecam-pos camera))
-	 2))
+	 3))
     (if (in:key-pressed-p :x)
 	(progn
 	  (notaplatform (mat-world-pos (simplecam-pos camera)))
-	  (notaplatform (incf (elt (mat-world-pos (simplecam-pos camera)) 1) 1))))
+	  (let ((wot (mat-world-pos (simplecam-pos camera))))
+	    (incf (elt wot 1) 1)
+	    (notaplatform wot))))
     (if (in:key-pressed-p :c) 
 	(oneplatform
 	 (mat-world-pos (simplecam-pos camera))
@@ -53,7 +68,7 @@
 (defun mat-world-pos (mat)
   (vector
    (round (row-major-aref mat 0))
-   (floor (row-major-aref mat 1))
+   (ceiling (row-major-aref mat 1))
    (round (row-major-aref mat 2))))
 
 (defun mouse-looking (camera)
@@ -128,6 +143,12 @@
       (dotimes (b 3)
 	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid)))))
 
+(defun %aplatform (pos blockid)
+  (let ((i (elt pos 0))
+	(j (elt pos 1))
+	(k (elt pos 2)))
+    (setblock-with-update (+ i) (- j 1) (+ k) blockid)))
+
 (defun oneplatform (pos blockid)
   (let ((i (elt pos 0))
 	(j (elt pos 1))
@@ -154,7 +175,6 @@
 
 (defparameter onground nil)
 (defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
-(defparameter daytime 1.0)
 
 (defun ease (x target fraction)
   (+ x (* fraction (- target x))))
@@ -175,7 +195,7 @@
 
 (defun physics ()
   "a messy function for the bare bones physics"
-  (setf daytime (case 10
+  (setf daytime (case 1
 		  (0 27.5069)
 		  (2 9)
 		  (9 0)

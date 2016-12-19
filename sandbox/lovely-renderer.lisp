@@ -22,11 +22,9 @@
     (gl:clear :depth-buffer-bit :color-buffer-bit)
     (if (in:key-p :g)
 	(update-world-vao))
-    (if (in:key-p :o)
-	(setf worldlist (genworldcallist)))
     (if (in:key-p :q)
 	(progn
-	  (toggle drawmode)
+	  (setf drawmode (not drawmode))
 	  (if drawmode
 	      (gl:polygon-mode :front-and-back :line)
 	      (gl:polygon-mode :front-and-back :fill))))
@@ -152,7 +150,9 @@
   (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
     (if coords
 	(if shape
-	    (setf (gethash coords vaohash) (shape-list shape))
+	    (progn
+	      (setf (gethash coords vaohash) (shape-list shape))
+	      (setf worldlist (genworldcallist)))
 	    (progn
 	      (pushnew coords dirtychunks :test #'equal)))))
   (setf mesher-thread nil))
@@ -224,10 +224,9 @@
   (maphash
    (lambda (k v)
      (declare (ignore v))
-     (pushnew (vox::unchunkhashfunc k) dirtychunks :test #'equal))
+     (multiple-value-bind (x y z) (vox::unhashfunc k)
+	 (pushnew (list x y z) dirtychunks :test #'equal)))
    chunkhash))
-
-(defmacro progno (&rest nope))
 
 (defun use-program (name)
   (let ((ourprog (gethash name shaderhash)))
@@ -748,27 +747,6 @@
 
 (defparameter shapebuffer (make-shape))
 
-(defmacro dorange ((var start length) &rest body)
-  (let ((temp (gensym))
-	(temp2 (gensym))
-	(tempstart (gensym))
-	(templength (gensym)))
-    `(block nil
-       (let* ((,templength ,length)
-	      (,tempstart ,start)
-	      (,var ,tempstart))
-	 (declare (type signed-byte ,var))
-	 (tagbody
-	    (go ,temp2)
-	    ,temp
-	    (tagbody ,@body)
-	    (psetq ,var (1+ ,var))
-	    ,temp2
-	    (unless (>= ,var (+ ,tempstart ,templength)) (go ,temp))
-	    (return-from nil (progn nil)))))))
-
-
-
 (defun chunk-shape (io jo ko)
   (declare (optimize (speed 3)))
   
@@ -960,7 +938,7 @@
      1.0)))
 
 (defun lightfunc (light)
-  (expt 0.9 (- 15 light)))
+  (expt 0.8 (- 15 light)))
 
 (defun lightvert (vert light)
   (let ((anum (lightfunc light)))

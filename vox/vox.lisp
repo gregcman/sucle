@@ -29,10 +29,6 @@
 	 (x (ash xy -20)))
     (values (minus2^19 x) (minus2^19 y) (minus2^19 z))))
 
-(defun unchunkhashfunc (ah)
-  (declare (type fixnum ah))
-  (multiple-value-list (unhashfunc ah)))
-
 (defun send-to-free-mem (hash)
   (maphash
    (lambda (k v)
@@ -95,7 +91,7 @@
    (aref chunk (+  i (* 16 (+ (* 16 j) k))))
    new))
 
-;;the get and set functions get their own definitions because they need to be fast.
+;;premature optimization is the root of all evil
 
 (defun func-get (thathash defaultval)
   (declare (type hash-table thathash))

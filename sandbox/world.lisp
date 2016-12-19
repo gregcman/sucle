@@ -12,6 +12,8 @@
 
 (defparameter heighthash (genhash))
 
+(defparameter daytime 1.0)
+
 ;;dirty chunks is a list of modified chunks 
 (defparameter dirtychunks nil)
 
@@ -68,12 +70,17 @@
     (setheight x y 0)))
 
 (defun setblock-with-update (i j k blockid)
-  (delightnode (list (list i j k)) nil)
-  (setlight i j k (aref mc-blocks::lightvalue blockid))
-  (skydelightnode (list (list i j k)) nil)
-  (lightnode (list (list i j k)))
-  (if (setblock i j k blockid)
-      (block-dirtify i j k)))
+  (let ((new-light-value (aref mc-blocks::lightvalue blockid))
+	(old-light-value (getlight i j k)))
+    (when (setblock i j k blockid)
+      (if (< new-light-value old-light-value)
+	  (progn
+	    (de-light-node i j k)))
+      (setlight i j k new-light-value)
+      (sky-de-light-node i j k)
+      (unless (zerop new-light-value)
+	(light-node i j k))
+      (block-dirtify i j k))))
 
 (defun round-pos (x y z)
   (getblock

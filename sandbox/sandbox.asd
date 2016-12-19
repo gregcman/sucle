@@ -19,6 +19,7 @@
     :serial t
     :components  
     ((:file "package")
+     (:file "q") ;;queues and unique queues
      (:file "big-mac");;convenience macros
      (:file "magic") ;;file io type stuff
      (:file "blocks") ;;list of minecraft block values
