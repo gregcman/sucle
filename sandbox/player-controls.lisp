@@ -382,3 +382,9 @@ collect all the nearest collisions with the player"
 	      (if (eq t (aref mc-blocks::iscollidable blockid))
 		  (push (vector blockx blocky blockz) places)))))))
     places))
+
+(defun round-pos (x y z)
+  (getblock
+   (round x)
+   (round y)
+   (round z)))

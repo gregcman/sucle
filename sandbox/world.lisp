@@ -77,9 +77,3 @@
        (unless (zerop new-light-value)
 	 (light-node i j k))
        (block-dirtify i j k)))))
-
-(defun round-pos (x y z)
-  (getblock
-   (round x)
-   (round y)
-   (round z)))

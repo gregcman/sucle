@@ -1,6 +1,12 @@
 (in-package :sandbox)
 
-;;non-generic rendering
+;;why in the world is everything lumped in here?
+;;meshing
+;;vaos
+;;gpu data
+;;vbos and vaos
+;;meshing data
+;;main controls
 
 ;;vaohash holds all the vaos which correlate to each chunk
 (defparameter vaohash (make-hash-table :test #'equal))
