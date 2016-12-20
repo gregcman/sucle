@@ -61,6 +61,12 @@
 	    (ldb (byte 4 20) pos)
 	    (ldb (byte 4 40) pos))))
 
+(let ((num (ash 1 15)))
+  (defun chunk-16 (x y z)
+    (dpb (+ z num) (byte 16 44)
+	 (dpb (+ y num) (byte 16 24)
+	      (ash (+ x num) 4)))))
+
 (defun send-to-free-mem (hash)
   (maphash
    (lambda (k v)
@@ -100,15 +106,15 @@
   (let ((oldchunk (getchunkat thehash x y z)))
     (if oldchunk
 	(progn
-	  (remhash (chunkhashfunc x y z) thehash)
+	  (remhash (chunk-16 x y z) thehash)
 	  (free-chunk oldchunk)))))
 
 (defun getchunkat (hash x y z)
-  (gethash (chunkhashfunc x y z) hash))
+  (gethash (chunk-16 x y z) hash))
 
 (defun setchunkat (x y z newchunk thehash)
   (setf
-   (gethash (chunkhashfunc x y z) thehash)
+   (gethash (chunk-16 x y z) thehash)
    newchunk)
   newchunk)
 

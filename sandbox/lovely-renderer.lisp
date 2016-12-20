@@ -113,26 +113,12 @@
 (defparameter worldlist nil)
 
 (defun designatemeshing ()
-  (if (string= mesherwhere? "worker")
-      (if (mesherthreadbusy)
-	  (progn)
-	  (progn
-	    (if mesher-thread
-		(getmeshersfinishedshit))
-	    (let ((achunk (car dirtychunks)))
-	      (if achunk
-		  (progn
-		    (giveworktomesherthread achunk)
-		    (setf dirtychunks
-			  (delete achunk dirtychunks :test #'equal)))))))
-      (let ((achunk (pop dirtychunks)))
-	(if achunk
-	    (setf (gethash achunk vaohash)
-		  (shape-list (chunk-shape (first achunk)
-					   (second achunk)
-					   (third achunk))))))))
-
-(defparameter mesherwhere? (if t "worker" "main"))
+  (unless (mesherthreadbusy)
+    (if mesher-thread
+	(getmeshersfinishedshit))
+    (let ((achunk (dirty-pop)))
+      (when achunk
+	(giveworktomesherthread achunk)))))
 
 (defun getmeshersfinishedshit ()
   (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
@@ -141,8 +127,7 @@
 	    (progn
 	      (setf (gethash coords vaohash) (shape-list shape))
 	      (setf worldlist (genworldcallist)))
-	    (progn
-	      (pushnew coords dirtychunks :test #'equal)))))
+	    (dirty-push coords))))
   (setf mesher-thread nil))
 
 (defun mesherthreadbusy ()
@@ -154,11 +139,10 @@
 	(sb-thread:make-thread
 	 (lambda (achunk)
 	   (sb-thread:return-from-thread
-	    (values
-	     achunk
-	     (chunk-shape (first achunk)
-			  (second achunk)
-			  (third achunk)))))
+	    (multiple-value-bind (x y z) (vox::unhashfunc achunk)
+	      (values
+	       achunk
+	       (chunk-shape x y z)))))
 	 :arguments (list thechunk))))
 
 (defun settime ()
@@ -213,7 +197,7 @@
    (lambda (k v)
      (declare (ignore v))
      (multiple-value-bind (x y z) (vox::unhashfunc k)
-	 (pushnew (list x y z) dirtychunks :test #'equal)))
+       (dirty-push (list x y z))))
    chunkhash))
 
 (defun use-program (name)
@@ -737,11 +721,11 @@
   
   (let* ((new-shape (destroy-shape shapebuffer)))
     (!%::dorange
-     (i (* io 16) 16)
+     (i io 16)
      (!%::dorange
-      (j (* jo 16) 16)
+      (j jo 16)
       (!%::dorange
-       (k (* ko 16) 16)
+       (k ko 16)
        (let ((blockid (getblock i j k)))
 	 (if (not (zerop blockid))
 	     (let ((fineshape

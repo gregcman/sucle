@@ -22,7 +22,8 @@
 (defun dirty-pop ()
   (pop dirtychunks))
 (defun dirty-push (item)
-  (pushnew item dirtychunks :test 'equal))
+  (multiple-value-bind (x y z) (apply #'values item)
+    (pushnew (vox::chunkhashfunc x y z) dirtychunks :test 'equal)))
 
 ;;initialize the world
 (defun world-init ()
@@ -64,7 +65,9 @@
     (setheight x y new))
 
 (defun block-dirtify (i j k)
-  (dirty-push  (list (ash i -4) (ash j -4) (ash k -4))))
+  (dirty-push  (list (ash (ash i -4) 4)
+		     (ash (ash j -4) 4)
+		     (ash (ash k -4) 4))))
 
 (defun dirtify (x y z)
   (dirty-push (list x y z)))
