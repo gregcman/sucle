@@ -3,7 +3,7 @@
 (defun genhash ()
   (make-hash-table :test (function eql)))
 
-;;chunkhash stores all of the chunks in a hasmap.
+;;chunkhash stores all of the chunks in a hashmap.
 ;;chunks accessed by '(x y z) in chunk coords
 (defparameter chunkhash (genhash))
 (defparameter lighthash (genhash))
@@ -18,12 +18,11 @@
 ;;we do not want anyone to see a raw list!
 (defparameter dirtychunks nil)
 (defun clean-dirty ()
-  (setf dirtychunks nil))
+  (setf dirtychunks (q::make-uniq-q)))
 (defun dirty-pop ()
-  (pop dirtychunks))
+  (q::uniq-pop dirtychunks))
 (defun dirty-push (item)
-  (multiple-value-bind (x y z) (apply #'values item)
-    (pushnew (vox::chunkhashfunc x y z) dirtychunks :test 'equal)))
+  (q::uniq-push item dirtychunks))
 
 ;;initialize the world
 (defun world-init ()
@@ -39,38 +38,18 @@
 
 ;;look at all the repetition here!! its clear a macro is in order
 ;;vox needs to be cleaned up
-(setf (fdefinition 'getblock) (vox::func-get chunkhash 0))
-(setf (fdefinition 'setblock) (vox::func-set chunkhash 0))
-(defun (setf getblock) (new x y z)
-    (setblock x y z new))
-
-(setf (fdefinition 'getlight) (vox::func-get lighthash 0))
-(setf (fdefinition 'setlight) (vox::func-set lighthash 0))
-(defun (setf getlight) (new x y z)
-    (setlight x y z new))
-
-(setf (fdefinition 'skygetlight) (vox::func-get skylighthash 15))
-(setf (fdefinition 'skysetlight) (vox::func-set skylighthash 15))
-(defun (setf skygetlight) (new x y z)
-    (skysetlight x y z new))
-
-(setf (fdefinition 'getmeta) (vox::func-get metahash 0))
-(setf (fdefinition 'setmeta) (vox::func-set metahash 0))
-(defun (setf getmeta) (new x y z)
-    (setmeta x y z new))
+(vox::prep-hash setblock getblock chunkhash 0)
+(vox::prep-hash setlight getlight lighthash 0)
+(vox::prep-hash skysetblock skygetlight skylighthash 15)
+(vox::prep-hash setmeta getmeta metahash 0)
 
 (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
 (setf (fdefinition 'setheight) (pix::func-set heighthash 0))
 (defun (setf getheight) (new x y)
-    (setheight x y new))
+  (setheight x y new))
 
 (defun block-dirtify (i j k)
-  (dirty-push  (list (ash (ash i -4) 4)
-		     (ash (ash j -4) 4)
-		     (ash (ash k -4) 4))))
-
-(defun dirtify (x y z)
-  (dirty-push (list x y z)))
+  (dirty-push (vox::chop (vox::chunkhashfunc i j k))))
 
 (defun update-height (x y)
   (block wow
@@ -86,17 +65,18 @@
     (setheight x y 0)))
 
 (defun setblock-with-update (i j k blockid)
-  (let ((new-light-value (aref mc-blocks::lightvalue blockid))
-	(old-light-value (getlight i j k)))
-    (when (setblock i j k blockid)
-      (if (< new-light-value old-light-value)
-	  (progn
-	    (de-light-node i j k)))
-      (setlight i j k new-light-value)
-      (sky-de-light-node i j k)
-      (unless (zerop new-light-value)
-	(light-node i j k))
-      (block-dirtify i j k))))
+  (if (/= blockid (getblock i j k))
+   (let ((new-light-value (aref mc-blocks::lightvalue blockid))
+	 (old-light-value (getlight i j k)))
+     (when (setblock i j k blockid)
+       (if (< new-light-value old-light-value)
+	   (progn
+	     (de-light-node i j k)))
+       (setlight i j k new-light-value)
+       (sky-de-light-node i j k)
+       (unless (zerop new-light-value)
+	 (light-node i j k))
+       (block-dirtify i j k)))))
 
 (defun round-pos (x y z)
   (getblock

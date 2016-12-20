@@ -61,11 +61,13 @@
 	    (ldb (byte 4 20) pos)
 	    (ldb (byte 4 40) pos))))
 
+;;create a position along a 16 16 16 grid -- as if the block hash was chopped
 (let ((num (ash 1 15)))
   (defun chunk-16 (x y z)
     (dpb (+ z num) (byte 16 44)
 	 (dpb (+ y num) (byte 16 24)
 	      (ash (+ x num) 4)))))
+
 
 (defun send-to-free-mem (hash)
   (maphash
@@ -81,78 +83,36 @@
   (push lechunk freechunkmempool))
 
 (defun empty-chunk ()
-  "makes an empty chunk"
   (make-array (* 16 16 16) :element-type '(unsigned-byte 8)))
 
 (defun getachunk ()
-  (let ((somechunk (pop freechunkmempool)))
-    (if somechunk
-	somechunk
-	(empty-chunk))))
+  (or (pop freechunkmempool)
+      (empty-chunk)))
 
 (defun clearchunk (achunk value)
-  (nsubstitute-if value (lambda (x) t) achunk)
+  (dotimes (x (array-total-size achunk))
+    (setf (row-major-aref achunk x) value))
   achunk)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmacro get-chunk-block (chunk i j k)
+  `(aref ,chunk
+	 (dpb ,j (byte 4 8)
+	      (dpb ,k (byte 4 4) ,i))))
 
-(defun empty-chunk-at (x y z thehash defaultval)
-  (let ((oldchunk (getchunkat thehash x y z)))
-    (if oldchunk
-	(clearchunk oldchunk defaultval)
-	(setchunkat x y z (clearchunk (getachunk) defaultval) thehash))))
-
-(defun destroy-chunk-at (x y z thehash)
-  (let ((oldchunk (getchunkat thehash x y z)))
-    (if oldchunk
-	(progn
-	  (remhash (chunk-16 x y z) thehash)
-	  (free-chunk oldchunk)))))
-
-(defun getchunkat (hash x y z)
-  (gethash (chunk-16 x y z) hash))
-
-(defun setchunkat (x y z newchunk thehash)
-  (setf
-   (gethash (chunk-16 x y z) thehash)
-   newchunk)
-  newchunk)
-
-(defun chunkexistsat (x y z hash)
-  (getchunkat hash x y z))
-
-(defun get-chunk-block (chunk i j k)
-  (aref chunk (+  i (* 16 (+ (* 16 j) k)))))
-
-(defun set-chunk-block (chunk i j k new)
-  (setf
-   (aref chunk (+  i (* 16 (+ (* 16 j) k))))
-   new))
-
-;;premature optimization is the root of all evil
-
-(defun func-get (thathash defaultval)
-  (declare (type hash-table thathash))
-  (declare (type fixnum defaultval))
-  (lambda (i j k)
-    (multiple-value-bind (x xd) (floor i 16)
-      (Multiple-value-bind (y yd) (floor j 16)
-	(multiple-value-bind (z zd) (floor k 16)
-	  (let ((chunk (getchunkat thathash x y z)))
-	    (if chunk
-		(get-chunk-block chunk xd yd zd)
-		defaultval)))))))
-
-(defun func-set (thathash defaultval)
-  (declare (type hash-table thathash))
-  (lambda (i j k blockid)
-    (multiple-value-bind (x xd) (floor i 16)
-      (multiple-value-bind (y yd) (floor j 16)
-	(multiple-value-bind (z zd) (floor k 16)
-	  (let* ((chunk (getchunkat thathash x y z)))
-	    (if (not chunk)
-		(setf chunk (empty-chunk-at x y z thathash defaultval)))
-	    (let ((old (get-chunk-block chunk xd yd zd)))
-	      (if (/= old blockid)
-		  (set-chunk-block chunk xd yd zd blockid)
-		  nil))))))))
+(defmacro prep-hash (setter-name getter-name thathash defaultval)
+  `(progn
+     (defun ,getter-name (i j k)
+	 (multiple-value-bind (chunk-code xd yd zd) (chop (chunkhashfunc i j k))
+	   (let ((chunk (gethash chunk-code ,thathash)))
+	     (if chunk
+		 (values (get-chunk-block chunk xd yd zd) t)
+		 (values ,defaultval nil)))))
+     (defun ,setter-name (i j k blockid)
+       (multiple-value-bind (chunk-code xd yd zd) (chop (chunkhashfunc i j k))
+	 (let ((chunk (or (gethash chunk-code ,thathash)
+			  (setf
+			   (gethash chunk-code ,thathash)
+			   (clearchunk (getachunk) ,defaultval)))))
+	   (setf (get-chunk-block chunk xd yd zd) blockid))))
+     (defun (setf ,getter-name) (new i j k)
+       (,setter-name i j k new))))

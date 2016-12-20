@@ -196,8 +196,7 @@
   (maphash
    (lambda (k v)
      (declare (ignore v))
-     (multiple-value-bind (x y z) (vox::unhashfunc k)
-       (dirty-push (list x y z))))
+     (dirty-push k))
    chunkhash))
 
 (defun use-program (name)
