@@ -183,6 +183,7 @@
 (defparameter defaultfov 70)
 
 (defun physinnit ()
+  (world-init)
   (sb-int:set-floating-point-modes :traps nil)
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
@@ -195,7 +196,7 @@
 
 (defun physics ()
   "a messy function for the bare bones physics"
-  (setf daytime (case 1
+  (setf daytime (case 10
 		  (0 27.5069)
 		  (2 9)
 		  (9 0)

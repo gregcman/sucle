@@ -14,8 +14,19 @@
 
 (defparameter daytime 1.0)
 
-;;dirty chunks is a list of modified chunks 
+;;dirty chunks is a list of modified chunks
+;;we do not want anyone to see a raw list!
 (defparameter dirtychunks nil)
+(defun clean-dirty ()
+  (setf dirtychunks nil))
+(defun dirty-pop ()
+  (pop dirtychunks))
+(defun dirty-push (item)
+  (pushnew item dirtychunks :test 'equal))
+
+;;initialize the world
+(defun world-init ()
+  (clean-dirty))
 
 (defun clearworld ()
   (vox::send-to-free-mem chunkhash)
@@ -23,8 +34,10 @@
   (vox::send-to-free-mem skylighthash)
   (vox::send-to-free-mem metahash)
   (pix::send-to-free-mem heighthash)
-  (setf dirtychunks nil))
+  (clean-dirty))
 
+;;look at all the repetition here!! its clear a macro is in order
+;;vox needs to be cleaned up
 (setf (fdefinition 'getblock) (vox::func-get chunkhash 0))
 (setf (fdefinition 'setblock) (vox::func-set chunkhash 0))
 (defun (setf getblock) (new x y z)
@@ -51,10 +64,10 @@
     (setheight x y new))
 
 (defun block-dirtify (i j k)
-  (pushnew (list (ash i -4) (ash j -4) (ash k -4)) dirtychunks :test 'equal))
+  (dirty-push  (list (ash i -4) (ash j -4) (ash k -4))))
 
 (defun dirtify (x y z)
-  (pushnew (list x y z) dirtychunks :test 'equal))
+  (dirty-push (list x y z)))
 
 (defun update-height (x y)
   (block wow

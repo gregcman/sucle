@@ -29,7 +29,6 @@
 	      (gl:polygon-mode :front-and-back :line)
 	      (gl:polygon-mode :front-and-back :fill))))
     (setupmatrices camera)
-    (sortdirtychunks camera)
     (designatemeshing)
     (settime)
     
@@ -132,17 +131,6 @@
 		  (shape-list (chunk-shape (first achunk)
 					   (second achunk)
 					   (third achunk))))))))
-
-(defun sortdirtychunks (camera)
-  (progn
-    (setf dirtychunks
-	  (remove nil
-		  (sort
-		   dirtychunks
-		   (lambda (a b)
-		     (<
-		      (distoplayer a (simplecam-pos camera))
-		      (distoplayer b (simplecam-pos camera)))))))))
 
 (defparameter mesherwhere? (if t "worker" "main"))
 
@@ -251,7 +239,6 @@
   (load-into-texture-library "pack.png")
   (load-into-texture-library "clouds.png")
   (bind-shit "terrain.png")
-  (setf dirtychunks nil)
   (setf worldlist nil)
   (setf mesher-thread nil)
   (clrhash vaohash)
@@ -622,8 +609,6 @@
 (in-package :sandbox)
 
 ;;i- i+ j- j+ k- k+
-
-(defmacro progno (&rest args) (declare (ignore args)))
 (defparameter blockfaces
   (vector
    (lambda ()
@@ -988,7 +973,7 @@
 		   (1uno (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))))
 	      (setf (elt v 3) (apply #'vector (mapcar #'lightfunc (list uno dos tres quatro))))
 	      (setf (elt v 4) (apply #'vector (mapcar #'lightfunc (list 1uno 1dos 1tres 1quatro))))
-	      (progno
+	      (!%::progno
 	       (let ((anum (lightfunc (avg (max 1uno uno)
 					   (max 1dos dos)
 					   (max 1tres tres)

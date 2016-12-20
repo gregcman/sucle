@@ -1,33 +1,65 @@
 (in-package :vox)
 
-;;what in the world was I thinking when I wrote this?
+;;define two functions which combine numbers into a bigger number.
+;;instead of hashing structs, use this to hash just one number made of other numbers
+(defun create-packed-num (hash-name unhash-name size-lists)
+  (let ((place 0)
+	(yes-fnc nil)
+	(un-fnc (list 'values))
+	(gensym-list nil))
+    (dolist (pair size-lists)
+      (let ((bit-size (car pair))
+	    (offset (second pair)))
+	(let ((sym (gensym)))
+	  (push sym gensym-list)
+	  (if (zerop place)
+	      (if (zerop offset)
+		  (push sym yes-fnc)
+		  (setf yes-fnc `(+ ,sym ,offset)))
+	      (if (zerop offset)
+		  (setf yes-fnc `(dpb ,sym (byte ,bit-size ,place) ,yes-fnc))
+		  (setf yes-fnc `(dpb (+ ,sym ,offset) (byte ,bit-size ,place) ,yes-fnc)))))
+	
+	(if (zerop offset)
+	    (push `(ldb (byte ,bit-size ,place) ah) un-fnc)
+	    (push `(- (ldb (byte ,bit-size ,place) ah) ,offset) un-fnc))	
+	(incf place bit-size)))
+    (eval
+     `(progn
+	(defun ,hash-name ,(nreverse gensym-list) ,yes-fnc)
+	(defun ,unhash-name (ah) ,(nreverse un-fnc))))))
 
-(declaim (inline plus2^19 minus2^19))
-(let ((anum (ash 1 19)))
-  (defun plus2^19 (n)
-    (declare (type fixnum n))
-    (the fixnum (+ n anum)))
+;;chunks are aligned to 16 16 16 which means that by chopping off
+;;the last 4 bits of each constituent number we get the code for the chunk!
+;;and this is done in one mask!
+(defun bit-chopper (spec chops)
+  (let ((place 0)
+	(mask 0))
+    (dolist (pair spec)
+      (let ((bits (car pair))
+	    (chop (car chops)))
+	(setf chops (cdr chops))
+        (setf mask (dpb (1- (ash 1 chop)) (byte chop place) mask))
+	(incf place bits)))
+    mask))
 
-  (defun minus2^19 (n)
-    (declare (type fixnum n))
-    (- n anum)))
+(defun print-bits (n size)
+  (let ((string (concatenate 'string "~" (write-to-string size) ",'0B")))
+    (format t string (ldb (byte size 0) n))))
 
-(defun chunkhashfunc (x y z)
-  (declare (type fixnum x y z))
-  (+ (the fixnum (plus2^19 z))
-     (the fixnum
-	  (ash (+ (the fixnum (plus2^19 y))
-		  (the fixnum
-		       (ash (the fixnum
-				 (plus2^19 x)) 20))) 20))))
+;;spec is the way numbers are fit into an integer. In this can it is a fixnum on 64 bit machines.
+;;20 bits go to x, 20 bits go to y, 20 bits go to z, 2 bits are left over = 62 bits
+(defparameter spec `((20 ,(ash 1 19)) (20 ,(ash 1 19)) (20 ,(ash 1 19))))
+(CREATE-PACKED-NUM 'chunkhashfunc 'unhashfunc spec)
 
-(defun unhashfunc (ah)
-  (declare (type fixnum ah))
-  (let* ((z (logand ah (1- (ash 1 20))))
-	 (xy (ash ah -20))
-	 (y (logand xy (1- (ash 1 20))))
-	 (x (ash xy -20)))
-    (values (minus2^19 x) (minus2^19 y) (minus2^19 z))))
+;;chop returns the values: the code of the containing chunk, and the
+;;offsets which refer to the specific block
+(let ((mask (bit-chopper spec (list 4 4 4))))
+  (defun chop (pos)
+    (values (logandc1 mask pos)
+	    (ldb (byte 4 0) pos)
+	    (ldb (byte 4 20) pos)
+	    (ldb (byte 4 40) pos))))
 
 (defun send-to-free-mem (hash)
   (maphash

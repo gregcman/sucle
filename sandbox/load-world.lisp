@@ -51,7 +51,7 @@
 	       (elt data (+ i (+ (* 16 j))))))))
 
 
-(progno
+(!%::progno
   (defparameter atest (if nil
 			  cl-mc-shit::testchunk
 			  (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))))

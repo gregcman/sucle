@@ -161,5 +161,6 @@
   (!%::dorange (x -32 32)
 	   (!%::dorange (y 0 24)
 		    (!%::dorange (z -32 32)
-			     (setblock x y z 3))))
+				 (setblock x y z 3)
+				 (skysetlight x y z 0))))
   (update-world-vao))
