@@ -1,19 +1,16 @@
 (in-package :sandbox)
 
-(defun genhash ()
-  (make-hash-table :test (function eql)))
-
 ;;chunkhash stores all of the chunks in a hashmap.
 ;;chunks accessed by '(x y z) in chunk coords
-(defparameter chunkhash (genhash))
-(defparameter lighthash (genhash))
-(defparameter skylighthash (genhash))
-(defparameter metahash (genhash))
+(defparameter chunkhash (vox::genhash))
+(defparameter lighthash (vox::genhash))
+(defparameter skylighthash (vox::genhash))
+(defparameter metahash (vox::genhash))
 
-(defparameter heighthash (genhash))
+(defparameter heighthash (make-hash-table))
 
 (defparameter daytime 1.0)
-
+(vox::define-fixnum-ops (0 25 4) (26 25 4) (52 9 4))
 ;;dirty chunks is a list of modified chunks
 ;;we do not want anyone to see a raw list!
 (defparameter dirtychunks nil)
@@ -24,25 +21,46 @@
 (defun dirty-push (item)
   (q::uniq-push item dirtychunks))
 
+(defun send-to-free-mem (hash pool)
+  (maphash
+   (lambda (k v)
+     (declare (ignore k))
+     (vox::give-to pool v))
+   hash)
+  (clrhash hash))
+
+(defparameter freechunkmempool8
+  (vox::make-provider
+   :create-func #'(lambda (&optional (x 0)) (vox::%new-chunk (unsigned-byte 8) x 4 4 4))
+   :cleanup-func #'vox::clearchunk
+   :size-cap 128))
+
+(defparameter freechunkmempool4
+  (vox::make-provider
+   :create-func #'(lambda (&optional (x 0)) (vox::%new-chunk (unsigned-byte 4) x 4 4 4))
+   :cleanup-func #'vox::clearchunk
+   :size-cap 512))
+
 ;;initialize the world
 (defun world-init ()
   (clean-dirty))
 
 (defun clearworld ()
-  (vox::send-to-free-mem chunkhash)
-  (vox::send-to-free-mem lighthash)
-  (vox::send-to-free-mem skylighthash)
-  (vox::send-to-free-mem metahash)
-  (pix::send-to-free-mem heighthash)
+  (send-to-free-mem chunkhash freechunkmempool8)
+  (send-to-free-mem lighthash freechunkmempool4)
+  (send-to-free-mem skylighthash freechunkmempool4)
+  (send-to-free-mem metahash freechunkmempool4)
+  (if nil
+      (send-to-free-mem heighthash))
   (clean-dirty))
 
 ;;look at all the repetition here!! its clear a macro is in order
 ;;vox needs to be cleaned up
 (progn
-  (vox::prep-hash setblock getblock chunkhash 0)
-  (vox::prep-hash setlight getlight lighthash 0)
-  (vox::prep-hash skysetlight skygetlight skylighthash 15)
-  (vox::prep-hash setmeta getmeta metahash 0))
+  (vox::prep-hash 8 setblock getblock chunkhash 0 (vox::get-from freechunkmempool8 0))
+  (vox::prep-hash 4 setlight getlight lighthash 0 (vox::get-from freechunkmempool4 0))
+  (vox::prep-hash 4 skysetlight skygetlight skylighthash 15 (vox::get-from freechunkmempool4 15))
+  (vox::prep-hash 4 setmeta getmeta metahash 0 (vox::get-from freechunkmempool4 0)))
 
 (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
 (setf (fdefinition 'setheight) (pix::func-set heighthash 0))
