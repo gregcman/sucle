@@ -38,10 +38,11 @@
 
 ;;look at all the repetition here!! its clear a macro is in order
 ;;vox needs to be cleaned up
-(vox::prep-hash setblock getblock chunkhash 0)
-(vox::prep-hash setlight getlight lighthash 0)
-(vox::prep-hash skysetlight skygetlight skylighthash 15)
-(vox::prep-hash setmeta getmeta metahash 0)
+(progn
+  (vox::prep-hash setblock getblock chunkhash 0)
+  (vox::prep-hash setlight getlight lighthash 0)
+  (vox::prep-hash skysetlight skygetlight skylighthash 15)
+  (vox::prep-hash setmeta getmeta metahash 0))
 
 (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
 (setf (fdefinition 'setheight) (pix::func-set heighthash 0))
