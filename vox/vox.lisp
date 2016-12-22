@@ -1,5 +1,80 @@
 (in-package :vox)
 
+
+;;1. start with a bunch of constant specifications
+;;2. generate multiple functions according to the specifications
+;;3. specifications are in a hash table which hash names bound to constants
+;;4. function generating functions are toplevel so they can be tested
+(defun gen-spec (body)
+  (let ((hash-table (make-hash-table :test 'eq)))
+    (dolist (pair body)
+      (setf (gethash (car pair) hash-table) (second pair)))
+    hash-table))
+
+(defun add-spec (spec body)
+  (dolist (pair body)
+    (setf (gethash (car pair) spec) (second pair))))
+
+(defun spec-assoc (hash)
+  (let ((acc nil))
+    (maphash
+     (lambda (k v)
+       (push (cons k v) acc))
+     hash)
+    acc))
+
+;;replace all symbols which start with p!x.. with
+;;the value from the hash table with keyx..
+(defun is-param (symbol)
+  (let ((string (symbol-name symbol)))
+    (if (> (length string) 2)
+	(if (string= "P!" (subseq string 0 2))
+	    (intern (subseq string 2) (symbol-package symbol))))))
+
+;;rp = replace params
+(defun rp (spec code)
+  (labels ((rec (piece)
+	     (if (atom piece)
+		 (if (symbolp piece)
+		     (let ((val (is-param piece)))
+		       (if val
+			   (gethash val spec)
+			   piece))
+		     piece)
+		 (cons (rec (car piece))
+		       (rec (cdr piece))))))
+    (rec code)))
+
+(defun legal-p (symbol)
+  (if (member symbol '(&optional &rest &body &key &optional t))
+      nil
+      symbol))
+(defun get-actual-args (headless-lambda)
+  (let ((argument-list (car headless-lambda))
+	(actual-args nil))
+    (dolist (arg argument-list actual-args)
+      (if (atom arg)
+	  (if (legal-p arg)
+	      (push arg actual-args))
+	  (push (car arg) actual-args)))))
+
+
+;;inline the headless lambda, give it a name, give it speed and recklessness
+(defun make-fast (nombre headless-lambda)
+  `(progn
+     (declaim (inline ,nombre))
+     (defun ,nombre ,(car headless-lambda)
+       (declare (optimize (speed 3) (safety 0)))
+       ,@(cdr headless-lambda))))
+
+(defun fixnums! (headless-lambda)
+  `(,(car headless-lambda)
+     (declare (type fixnum ,@(get-actual-args headless-lambda)))
+     ,@(cdr headless-lambda)))
+
+(defun fastnum (name headless-lambda)
+  (make-fast name (fixnums! headless-lambda)))
+
 ;;instead of using a struct or a vector to represent a point,
 ;;a single fixnum can be used.
 ;;a fixnum is 62 bits on a 64 bit machine [lets not worry about the 32 bit]
@@ -25,72 +100,126 @@
 ;;(defparameter spec `((20 ,(ash 1 19)) (20 ,(ash 1 19)) (20 ,(ash 1 19))))
 ;;(eval (CREATE-PACKED-NUM 'chunkhashfunc 'unhashfunc spec))
 
-(defmacro define-fixnum-ops ((num0-start num0-size chopx)
-			     (num1-start num1-size chopy) 
-			     (num2-start num2-size chopz))
-  `(symbol-macrolet ((num0 (byte ,num0-size ,num0-start))
-		     (num1 (byte ,num1-size ,num1-start))
-		     (num2 (byte ,num2-size ,num2-start)))
-     (defun unhashfunc (ah)
-       (DECLARE (OPTIMIZE (SPEED 3) (SAFETY 0))
-		(TYPE FIXNUM AH))
-       (values (- (ldb num0 ah) (ash 1 (1- ,num0-size)))
-	       (- (LDB num2 AH) (ash 1 (1- ,num2-size)))
-	       (- (ldb num1 ah) (ash 1 (1- ,num1-size)))))
+(defun gen-remove-overflow ()
+  `((pos) (logand pos p!overflow-mask)))
 
-     (defun chunkhashfunc (x y z)
-       (DECLARE (OPTIMIZE (SPEED 3) (SAFETY 0))
-		(TYPE FIXNUM x y z))
-       (THE FIXNUM
-	    (DPB (+ y (ash 1 (1- ,num2-size))) num2
-		 (DPB (+ z (ash 1 (1- ,num1-size))) num1
-		      (ldb num0 (+ x (ash 1 (1- ,num0-size))))))))
+(defun gen-chopper ()
+  `((pos) (logand p!truncate-mask pos)))
 
-     (DEFUN %UNHASHFUNC (AH)
-       (DECLARE (OPTIMIZE (SPEED 3) (SAFETY 0))
-		(TYPE FIXNUM AH))
-       (VALUES (LDB num0 AH)
-	       (LDB num2 AH)
-	       (LDB num1 AH)))
+(defun gen-anti-chopper ()
+  `((pos) (logand p!anti-truncate-mask pos)))
 
-     (DEFUN %CHUNKHASHFUNC (x y z)
-       (DECLARE (OPTIMIZE (SPEED 3) (SAFETY 0))
-		(TYPE FIXNUM x y z))
-       (THE FIXNUM
-	    (DPB y num2
-		 (DPB z num1
-		      (ldb num0 x)))))
+(defun gen-packer ()
+  `((x y z)
+    (THE FIXNUM
+	 (logior (the fixnum (ash (mod z (ash p!offset2 1)) p!num2-start))
+		 (the fixnum (ash (mod y (ash p!offset1 1)) p!num1-start))
+		 (the fixnum (ash (mod x (ash p!offset0 1)) p!num0-start))))))
 
-     ;;chop the last 4 bits off of each number to obtain the chunk code
-     (defmacro truncate-mask ()
-       (lognot (+ (ash (1- (ash 1 ,chopy)) ,num0-start)
-		  (ash (1- (ash 1 ,chopx)) ,num1-start)
-		  (ash (1- (ash 1 ,chopz)) ,num2-start))))
-     (defun chop (pos)
-       (declare (optimize (speed 3) (safety 0))
-		(type fixnum pos))
-       (logand (truncate-mask) pos))
+(defun gen-unpacker(spec)
+  `((fixnum)
+    (values (signed-unsiged
+	     ,(if (zerop (rp spec 'p!num0-start))
+		  `(logand fixnum (1- (ash 1 p!num0-size)))  
+		  `(ldb (byte p!num0-size p!num0-start) fixnum)) p!offset0)
+	    (signed-unsiged
+	     (LDB (byte p!num1-size p!num1-start) fixnum) p!offset1)
+	    (signed-unsiged
+	     (ash fixnum (- p!num2-start)) p!offset2))))
 
-     (defmacro overflow-mask ()
-       (lognot (logior (ash 1 (+ ,num0-start ,num0-size))
-		       (ash 1 (+ ,num1-start ,num1-size))
-		       (ash 1 (+ ,num2-start ,num2-size)))))
-     (defun add (pos delta)
-       (declare (optimize (speed 3) (safety 0))
-		(type fixnum pos delta))
-       (logand (the fixnum (+ pos delta)) (overflow-mask)))
+(defun gen-mask-overflow ()
+  `(lognot (logior (ash 1 (+ p!num0-start p!num0-size))
+		   (ash 1 (+ p!num1-start p!num1-size))
+		   (ash 1 (+ p!num2-start p!num2-size)))))
 
-     ;;bind-vars with the offset
-     (defmacro with-offset (pos (xv yv zv) &body body)
-       `(let ((,xv (ldb (byte ,,chopx ,,num0-start) ,pos))
-	      (,yv (ldb (byte ,,chopy ,,num2-start) ,pos))
-	      (,zv (ldb (byte ,,chopz ,,num1-start) ,pos)))
-	  ,@body))))
+(defun gen-mask-truncate ()
+  `(lognot (+ (ash (1- (ash 1 p!chopy)) p!num0-start)
+	      (ash (1- (ash 1 p!chopx)) p!num1-start)
+	      (ash (1- (ash 1 p!chopz)) p!num2-start))))
+
+(defun gen-mask-anti-truncate ()
+  `(+ (ash (1- (ash 1 p!chopy)) p!num0-start)
+      (ash (1- (ash 1 p!chopx)) p!num1-start)
+      (ash (1- (ash 1 p!chopz)) p!num2-start)))
+
+
+;;there is a pattern here and it is ugly
+
+(declaim (inline signed-unsiged))
+(defmacro signed-unsiged (x n)
+  (let ((n (eval n)))
+    `(- (mod (the fixnum (+ ,x ,(/ n 2))) ,n) ,(/ n 2))))
+
+(defun fuckme (x)
+  (declare (optimize (speed 3) (safety 0))
+	   (type fixnum x))
+  (signed-unsiged x (ash 1 9)))
+
+(defparameter foobar nil)
+
+(defmacro define-fixnum-ops (num0-start num0-size chopx
+			     num1-start num1-size chopy 
+			     num2-start num2-size chopz)
+  (let ((spec (gen-spec `((num0-start ,num0-start)
+			  (num1-start ,num1-start)
+			  (num2-start ,num2-start)
+			  (num0-size ,num0-size)
+			  (num1-size ,num1-size)
+			  (num2-size ,num2-size)
+			  (chopx ,chopx)
+			  (chopy ,chopy)
+			  (chopz ,chopz)
+			  (offset0 ,(ash 1 (1- num0-size)))
+			  (offset1 ,(ash 1 (1- num1-size)))
+			  (offset2 ,(ash 1 (1- num2-size)))))))
+    (add-spec spec `((overflow-mask ,(rp spec (gen-mask-overflow)))
+		     (truncate-mask ,(rp spec (gen-mask-truncate)))
+		     (anti-truncate-mask ,(rp spec (gen-mask-anti-truncate)))))
+    (setf foobar spec)
+    `(progn
+       ,(rp spec (fastnum 'unhashfunc (gen-unpacker spec)))
+       ,(rp spec (fastnum 'chunkhashfunc (gen-packer)))
+       ,(rp spec (fastnum 'chop (gen-chopper)))
+       ,(rp spec (fastnum 'anti-chop (gen-anti-chopper)))
+       ,(rp spec (fastnum 'rem-flow (gen-remove-overflow)))
+
+       (defun add (a b)
+	 (declare (optimize (speed 3) (safety 0))
+		  (type fixnum a b))
+	 (rem-flow (+ a b)))
+
+       ;;bind-vars with the offset
+
+       (defmacro with-offset (pos (xv yv zv) &body body)
+	 `(let ((,xv (ldb (byte ,,chopx ,,num0-start) ,pos))
+		(,yv (ldb (byte ,,chopy ,,num1-start) ,pos))
+		(,zv (ldb (byte ,,chopz ,,num2-start) ,pos)))
+	    ,@body)))))
+
+(defun %ref (i j k)
+  (declare (optimize (speed 3) (safety 0))
+	   (type fixnum i j k))
+  (the (unsigned-byte 12)
+       (logior (the fixnum (ash (mod k 16) 8))
+	       (the fixnum (ash (mod j 16) 4))
+	       (the fixnum (mod i 16)))))
+
+(declaim (inline %%ref))
+(defun %%ref (code)
+  (declare (optimize (speed 3) (safety 0))
+	   (type fixnum code))
+  (let ((c (anti-chop code)))
+    (the (unsigned-byte 12)
+	 (ash (logior (the fixnum (ash c 44))
+		      (the fixnum (ash c 22))
+		      c) -44))))
 
 ;;print the twos complement binary representation of a number, padded to n 
 (defun print-bits (n size)
   (let ((string (concatenate 'string "~" (write-to-string size) ",'0B")))
-    (format t string (ldb (byte size 0) n))))
+    (let ((num (ldb (byte size 0) n)))      
+      (format t string num)
+      num)))
 
 ;;next up is memory pooling
 ;;the pool is a data structure which holds things that can be reused
@@ -126,16 +255,6 @@
     (setf (row-major-aref achunk x) value))
   achunk)
 
-(defun %ref (i j k)
-  (declare (optimize (speed 3) (safety 0))
-	   (type fixnum i j k))
-  (the (unsigned-byte 12)
-       (dpb j (byte 4 8)
-	       (dpb k (byte 4 4) i))))
-
-(defmacro get-chunk-block (chunk i j k)
-  `(aref ,chunk (%ref ,i ,j ,k)))
-
 (defmacro %new-chunk (type defaultval chopx chopy chopz)
   `(make-array (ash 1 (+ ,chopx ,chopy ,chopz))
 	       :element-type ',type
@@ -153,27 +272,24 @@
      (defun ,getter-name (i j k)
        (declare (optimize (speed 3) (safety 0))
 		(type fixnum i j k))
-       (let ((block-code (chunkhashfunc i j k)))
+       (let ((block-code (chunkhashfunc i k j)))
 	 (let ((chunk-code (chop block-code)))
 	   (let ((chunk (gethash chunk-code ,thathash)))
 	     (declare (type (or (simple-array (unsigned-byte ,bits) (4096))
 				null) chunk))
 	     (if chunk
-		 (with-offset block-code (xd yd zd)
-		   (values (get-chunk-block chunk xd yd zd) t))
+		 (values (aref chunk (%%ref block-code)) t)
 		 (values ,defaultval nil))))))
      (defun ,setter-name (i j k blockid)
        (declare (optimize (speed 3) (safety 0))
 		(type fixnum i j k))
-       (let ((block-code (chunkhashfunc i j k)))
+       (let ((block-code (chunkhashfunc i k j)))
 	 (let ((chunk-code (chop block-code)))
 	   (let ((chunk (or (gethash chunk-code ,thathash)
 			    (setf
 			     (gethash chunk-code ,thathash)
 			     ,creator))))
 	     (declare (type (simple-array (unsigned-byte ,bits) (4096)) chunk))
-	     (with-offset block-code (xd yd zd) 
-	       (setf (get-chunk-block chunk xd yd zd) blockid))))))
+	     (setf (aref chunk (%%ref block-code)) blockid)))))
      (defun (setf ,getter-name) (new i j k)
        (,setter-name i j k new))))
-

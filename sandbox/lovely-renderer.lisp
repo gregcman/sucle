@@ -148,7 +148,7 @@
 	    (multiple-value-bind (x y z) (vox::unhashfunc achunk)
 	      (values
 	       achunk
-	       (chunk-shape x y z)))))
+	       (chunk-shape x z y)))))
 	 :arguments (list thechunk))))
 
 (defun settime ()

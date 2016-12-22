@@ -10,7 +10,9 @@
 (defparameter heighthash (make-hash-table))
 
 (defparameter daytime 1.0)
-(vox::define-fixnum-ops (0 25 4) (26 25 4) (52 9 4))
+(vox::define-fixnum-ops 0 25 4
+			26 25 4
+			52 9 4)
 ;;dirty chunks is a list of modified chunks
 ;;we do not want anyone to see a raw list!
 (defparameter dirtychunks nil)
@@ -68,7 +70,7 @@
   (setheight x y new))
 
 (defun block-dirtify (i j k)
-  (dirty-push (vox::chop (vox::chunkhashfunc i j k))))
+  (dirty-push (vox::chop (vox::chunkhashfunc i k j))))
 
 (defun update-height (x y)
   (block wow
