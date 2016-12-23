@@ -154,13 +154,6 @@
 		       num1-start num1-size chopy 
 		       num2-start num2-size chopz))))
 
-;;print the twos complement binary representation of a number, padded to n 
-(defun print-bits (n size)
-  (let ((string (concatenate 'string "~" (write-to-string size) ",'0B")))
-    (let ((num (ldb (byte size 0) n)))      
-      (format t string num)
-      num)))
-
 ;;the type of hash table that lets fixnums be equated [default is eql]
 ;;combine the number of bits per individual item, the get/set names,
 ;;the hash which hashes the fixnums, the default value, and the method

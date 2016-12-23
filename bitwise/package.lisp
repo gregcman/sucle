@@ -1,4 +1,4 @@
-(defpackage #:q
+(defpackage #:bitwise
   (:use #:cl)
-  (:nicknames #:q)
-  (:export))
+  (:nicknames #:bit)
+  (:export :print-bits))

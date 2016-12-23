@@ -1,4 +1,4 @@
-(asdf:defsystem #:q
+(asdf:defsystem #:queue
   :description "some simple queues"
   :author "Gregorio Manabat"
   :maintainer "Gregorio Manabat"
@@ -8,4 +8,4 @@
   :serial t
   :components  
   ((:file "package")
-   (:file "q")))
+   (:file "queue")))

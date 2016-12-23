@@ -24,7 +24,7 @@
   (maphash
    (lambda (k v)
      (declare (ignore k))
-     (vox::give-to pool v))
+     (recycle:give-to pool v))
    hash)
   (clrhash hash))
 
