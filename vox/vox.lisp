@@ -1,8 +1,17 @@
+;;;;create a data structure to store chunks which in turn store voxels
+;;;;or some sort of three dimensional data
+;;;;Currently implemented by a hash table filled with arrays.
 (in-package :vox)
 ;;inline the headless lambda, give it a name, give it speed and recklessness
 (defun make-fast (nombre headless-lambda)
   `(progn
      (declaim (inline ,nombre))
+     (defun ,nombre ,(car headless-lambda)
+       (declare (optimize (speed 3) (safety 0)))
+       ,@(cdr headless-lambda))))
+
+(defun not-too-fast (nombre headless-lambda)
+  `(progn
      (defun ,nombre ,(car headless-lambda)
        (declare (optimize (speed 3) (safety 0)))
        ,@(cdr headless-lambda))))
@@ -64,11 +73,11 @@
     (values (signed-unsiged
 	     ,(if (zerop (coge:rp spec 'p!num0-start))
 		  `(logand fixnum (1- (ash 1 p!num0-size)))  
-		  `(ldb (byte p!num0-size p!num0-start) fixnum)) p!offset0)
+		  `(ldb (byte p!num0-size p!num0-start) fixnum)) (ash p!offset0 1))
 	    (signed-unsiged
-	     (LDB (byte p!num1-size p!num1-start) fixnum) p!offset1)
+	     (LDB (byte p!num1-size p!num1-start) fixnum) (ash p!offset1 1))
 	    (signed-unsiged
-	     (ash fixnum (- p!num2-start)) p!offset2))))
+	     (ash fixnum (- p!num2-start)) (ash p!offset2 1)))))
 
 (defun gen-mask-overflow ()
   `(lognot (logior (ash 1 (+ p!num0-start p!num0-size))
@@ -92,6 +101,24 @@
 	    (,zv (ldb (byte p!chopz p!num2-start) ,pos)))
 	,@body)))
 
+(defun gen-%%ref (spec)
+  (let ((size-0 (coge:rp spec 'p!chopx))
+	(size-1 (coge:rp spec 'p!chopy))
+	(size-2 (coge:rp spec 'p!chopz))
+	(start-1 (coge:rp spec 'p!num1-start))
+	(start-2 (coge:rp spec 'p!num2-start)))
+    (let ((first-shift (- start-2 size-0 size-1))
+	  (second-shift (- start-2 start-1 size-1)))
+      `((code)
+	(let ((c (p!anti-chop code)))
+	  (the (unsigned-byte ,(+ size-0 size-1 size-2))
+	       (ash (logior (the fixnum (ash c ,first-shift))
+			    (the fixnum (ash c ,second-shift))
+			    c) ,(- first-shift))))))))
+
+(defun gen-add ()
+  `((a b) (p!rem-flow (+ a b))))
+
 (defun derived-parts (spec)
   (coge:add-spec
    spec
@@ -104,49 +131,28 @@
      (truncate-mask . ,(coge:rp spec (gen-mask-truncate)))
      (anti-truncate-mask . ,(coge:rp spec (gen-mask-anti-truncate))))))
 
-
-;;there is a pattern here and it is ugly
-
 (coge:defspec fixnum-op-spec (num0-start num0-size chopx
-			      num1-start num1-size chopy 
-			      num2-start num2-size chopz))
+					 num1-start num1-size chopy 
+					 num2-start num2-size chopz))
 
 (defun define-fixnum-ops (spec)
-  `(progn
-     ,(coge:rp spec (fastnum 'unhashfunc (gen-unpacker spec)))
-     ,(coge:rp spec (fastnum 'chunkhashfunc (gen-packer)))
-     ,(coge:rp spec (fastnum 'chop (gen-chopper)))
-     ,(coge:rp spec (fastnum 'anti-chop (gen-anti-chopper)))
-     ,(coge:rp spec (fastnum 'rem-flow (gen-remove-overflow)))
+  (coge:add-spec spec '((rem-flow . rem-flow)
+			(anti-chop . anti-chop)))
+  (coge:rp spec
+	   `(progn
+	      ,(fastnum 'unhashfunc (gen-unpacker spec))
+	      ,(fastnum 'chunkhashfunc (gen-packer))
+	      ,(fastnum 'chop (gen-chopper))
+	      ,(fastnum 'anti-chop (gen-anti-chopper))
+	      ,(fastnum 'rem-flow (gen-remove-overflow))
+	      ,(fastnum '%%ref (gen-%%ref spec))
+	      ,(fastnum 'add (gen-add))
+	      ,(gen-with-offset))))
 
-     (defun add (a b)
-       (declare (optimize (speed 3) (safety 0))
-		(type fixnum a b))
-       (rem-flow (+ a b)))
-     ;;bind-vars with the offset
-     ,(coge:rp spec (gen-with-offset))))
-
-(defun %ref (i j k)
-  (declare (optimize (speed 3) (safety 0))
-	   (type fixnum i j k))
-  (the (unsigned-byte 12)
-       (logior (the fixnum (ash (mod k 16) 8))
-	       (the fixnum (ash (mod j 16) 4))
-	       (the fixnum (mod i 16)))))
-
-(declaim (inline %%ref))
-(defun %%ref (code)
-  (declare (optimize (speed 3) (safety 0))
-	   (type fixnum code))
-  (let ((c (anti-chop code)))
-    (the (unsigned-byte 12)
-	 (ash (logior (the fixnum (ash c 44))
-		      (the fixnum (ash c 22))
-		      c) -44))))
 
 (defun codes (num0-start num0-size chopx
 	      num1-start num1-size chopy 
-	      num2-start num2-size chopz)
+ 	      num2-start num2-size chopz)
   (define-fixnum-ops
       (derived-parts
        (fixnum-op-spec (coge:gen-spec)
@@ -161,29 +167,42 @@
 (defun genhash ()
   (make-hash-table :test 'eq))
 
+(defun gen-getter ()
+  `((i j k)
+    (let ((block-code (chunkhashfunc i k j)))
+      (let ((chunk-code (chop block-code)))
+	(let ((chunk (gethash chunk-code p!chunk-container)))
+	  (declare (type (or p!data-type null) chunk))
+	  (if chunk
+	      (values (aref chunk (%%ref block-code)) t)
+	      (values p!vacuum-state nil)))))))
+
+(defun gen-setter ()
+  `((i j k blockid)
+    (let ((block-code (chunkhashfunc i k j)))
+      (let ((chunk-code (chop block-code)))
+	(let ((chunk (or (gethash chunk-code p!chunk-container)
+			 (setf
+			  (gethash chunk-code p!chunk-container)
+			  p!space-provider))))
+	  (declare (type p!data-type chunk))
+	  (setf (aref chunk (%%ref block-code)) blockid))))))
+
+(coge:defspec field-spec (data-type chunk-container
+			  vacuum-state space-provider))
+
+;;;block getter and setters are declared inline
 (defmacro prep-hash (bits setter-name getter-name thathash defaultval creator)
-  `(progn
-     (defun ,getter-name (i j k)
-       (declare (optimize (speed 3) (safety 0))
-		(type fixnum i j k))
-       (let ((block-code (chunkhashfunc i k j)))
-	 (let ((chunk-code (chop block-code)))
-	   (let ((chunk (gethash chunk-code ,thathash)))
-	     (declare (type (or (simple-array (unsigned-byte ,bits) (4096))
-				null) chunk))
-	     (if chunk
-		 (values (aref chunk (%%ref block-code)) t)
-		 (values ,defaultval nil))))))
-     (defun ,setter-name (i j k blockid)
-       (declare (optimize (speed 3) (safety 0))
-		(type fixnum i j k))
-       (let ((block-code (chunkhashfunc i k j)))
-	 (let ((chunk-code (chop block-code)))
-	   (let ((chunk (or (gethash chunk-code ,thathash)
-			    (setf
-			     (gethash chunk-code ,thathash)
-			     ,creator))))
-	     (declare (type (simple-array (unsigned-byte ,bits) (4096)) chunk))
-	     (setf (aref chunk (%%ref block-code)) blockid)))))
-     (defun (setf ,getter-name) (new i j k)
-       (,setter-name i j k new))))
+  (let ((spec (coge:gen-spec)))
+    (field-spec spec
+		`(simple-array (unsigned-byte ,bits) (4096))
+		thathash
+		defaultval
+		creator)
+		
+    (coge:rp spec
+	     `(progn
+		,(not-too-fast getter-name (fixnums! (gen-getter)))
+		,(not-too-fast setter-name (fixnums! (gen-setter)))
+		(defun (setf ,getter-name) (new i j k)
+		  (,setter-name i j k new))))))

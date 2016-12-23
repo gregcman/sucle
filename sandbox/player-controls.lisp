@@ -274,7 +274,7 @@
   (mouse-looking ourcam))
 
 (defun outofbounds (camera)
-  (if (> 0 (row-major-aref (simplecam-pos camera) 1))
+  (if (> -256 (row-major-aref (simplecam-pos camera) 1))
       (progn	  
 	(setf (row-major-aref cameraVelocity 1) 0)
 	(setf (row-major-aref (simplecam-pos camera) 1) 0)

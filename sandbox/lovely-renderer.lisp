@@ -143,12 +143,11 @@
 (defun giveworktomesherThread (thechunk)
   (setf mesher-thread
 	(sb-thread:make-thread
-	 (lambda (achunk)
+	 (lambda (chunk-position)
 	   (sb-thread:return-from-thread
-	    (multiple-value-bind (x y z) (vox::unhashfunc achunk)
-	      (values
-	       achunk
-	       (chunk-shape x z y)))))
+	    (values
+	     chunk-position
+	     (chunk-shape chunk-position))))
 	 :arguments (list thechunk))))
 
 (defun settime ()
@@ -721,35 +720,35 @@
 
 (defparameter shapebuffer (make-shape))
 
-(defun chunk-shape (io jo ko)
+(defun chunk-shape (chunk-position)
   (declare (optimize (speed 3)))
-  
-  (let* ((new-shape (destroy-shape shapebuffer)))
-    (dorange
-     (i io 16)
-     (dorange
-      (j jo 16)
+  (multiple-value-bind (io ko jo) (vox::unhashfunc chunk-position)
+    (let* ((new-shape (destroy-shape shapebuffer)))
       (dorange
-       (k ko 16)
-       (let ((blockid (getblock i j k)))
-	 (if (not (zerop blockid))
-	     (let ((fineshape
-		    (blockshape
-		     io jo ko
-		     blockid
-		     (lambda (a b c)
-		       (getblock (+ a i) (+ b j) (+ c k)))
-		     (lambda (a b c)
-		       (getlight (+ a i) (+ b j) (+ c k)))
-		     (lambda (a b c)
-		       (skygetlight (+ a i) (+ b j) (+ c k))) )))
-	       (dolist (face (coerce (delete nil fineshape) 'list))
-		 (increment-verts i j k face))
-	       (reduce
-		#'add-verts
-		fineshape
-		:initial-value new-shape)))))))
-    new-shape))
+       (i io 16)
+       (dorange
+	(j jo 16)
+	(dorange
+	 (k ko 16)
+	 (let ((blockid (getblock i j k)))
+	   (if (not (zerop blockid))
+	       (let ((fineshape
+		      (blockshape
+		       io jo ko
+		       blockid
+		       (lambda (a b c)
+			 (getblock (+ a i) (+ b j) (+ c k)))
+		       (lambda (a b c)
+			 (getlight (+ a i) (+ b j) (+ c k)))
+		       (lambda (a b c)
+			 (skygetlight (+ a i) (+ b j) (+ c k))) )))
+		 (dolist (face (coerce (delete nil fineshape) 'list))
+		   (increment-verts i j k face))
+		 (reduce
+		  #'add-verts
+		  fineshape
+		  :initial-value new-shape)))))))
+      new-shape)))
 
 (defun blockshape (i j k blockid getempty betlight getskylightz)
   (let ((faces

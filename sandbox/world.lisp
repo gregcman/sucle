@@ -2,10 +2,10 @@
 
 ;;chunkhash stores all of the chunks in a hashmap.
 ;;chunks accessed by '(x y z) in chunk coords
-(defparameter chunkhash (vox::genhash))
-(defparameter lighthash (vox::genhash))
-(defparameter skylighthash (vox::genhash))
-(defparameter metahash (vox::genhash))
+(defparameter chunkhash nil)
+(defparameter lighthash nil)
+(defparameter skylighthash nil)
+(defparameter metahash nil)
 
 (defparameter heighthash (make-hash-table))
 
@@ -65,23 +65,32 @@
       (send-to-free-mem heighthash))
   (clean-dirty))
 
+(defparameter system-codes (vox::codes
+			    0 25 4
+			    26 25 4
+			    52 9 4))
+
 ;;look at all the repetition here!! its clear a macro is in order
 ;;vox needs to be cleaned up
-(eval-when (:compile-toplevel :load-toplevel)
- (progn
-   (eval (vox::codes
-	  0 25 4
-	  26 25 4
-	  52 9 4))
-   (vox::prep-hash 8 setblock getblock chunkhash 0 (recycle:get-from freechunkmempool8 0))
-   (vox::prep-hash 4 setlight getlight lighthash 0 (recycle:get-from freechunkmempool4 0))
-   (vox::prep-hash 4 skysetlight skygetlight skylighthash 15 (recycle:get-from freechunkmempool4 15))
-   (vox::prep-hash 4 setmeta getmeta metahash 0 (recycle:get-from freechunkmempool4 0))))
+(defun establish-system ()
+  (progn
+    (eval system-codes)
+    (vox::prep-hash 8 setblock getblock chunkhash 0 (recycle:get-from freechunkmempool8 0))
+    (vox::prep-hash 4 setlight getlight lighthash 0 (recycle:get-from freechunkmempool4 0))
+    (vox::prep-hash 4 skysetlight skygetlight skylighthash 15 (recycle:get-from freechunkmempool4 15))
+    (vox::prep-hash 4 setmeta getmeta metahash 0 (recycle:get-from freechunkmempool4 0)))
+  (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
+  (setf (fdefinition 'setheight) (pix::func-set heighthash 0))
+  (defun (setf getheight) (new x y)
+    (setheight x y new)))
 
-(setf (fdefinition 'getheight) (pix::func-get heighthash 0))
-(setf (fdefinition 'setheight) (pix::func-set heighthash 0))
-(defun (setf getheight) (new x y)
-  (setheight x y new))
+(defun setup-hashes ()
+  (setf chunkhash (vox::genhash))
+  (setf lighthash (vox::genhash))
+  (setf skylighthash (vox::genhash))
+  (setf metahash (vox::genhash)))
+
+(establish-system)
 
 (defun block-dirtify (i j k)
   (dirty-push (vox::chop (vox::chunkhashfunc i k j))))
