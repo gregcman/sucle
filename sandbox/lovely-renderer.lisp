@@ -725,11 +725,11 @@
   (declare (optimize (speed 3)))
   
   (let* ((new-shape (destroy-shape shapebuffer)))
-    (!%::dorange
+    (dorange
      (i io 16)
-     (!%::dorange
+     (dorange
       (j jo 16)
-      (!%::dorange
+      (dorange
        (k ko 16)
        (let ((blockid (getblock i j k)))
 	 (if (not (zerop blockid))
@@ -962,7 +962,7 @@
 		   (1uno (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))))
 	      (setf (elt v 3) (apply #'vector (mapcar #'lightfunc (list uno dos tres quatro))))
 	      (setf (elt v 4) (apply #'vector (mapcar #'lightfunc (list 1uno 1dos 1tres 1quatro))))
-	      (!%::progno
+	      (progno
 	       (let ((anum (lightfunc (avg (max 1uno uno)
 					   (max 1dos dos)
 					   (max 1tres tres)

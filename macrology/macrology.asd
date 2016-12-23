@@ -1,5 +1,5 @@
-(asdf:defsystem #:big-mac
-  :description "some macros"
+(asdf:defsystem #:macrology
+  :description "general purpose macros"
   :author "Gregorio Manabat"
   :maintainer "Gregorio Manabat"
 
@@ -8,4 +8,4 @@
   :serial t
   :components  
   ((:file "package")
-(:file "big-mac")))
+(:file "macrology")))

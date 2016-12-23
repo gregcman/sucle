@@ -1,5 +1,5 @@
 (defpackage #:sandbox
-  (:use #:cl)
+  (:use #:cl #:macrology)
   (:export #:main))
 
 (defpackage #:mc-blocks

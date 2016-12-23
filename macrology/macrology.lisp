@@ -1,4 +1,4 @@
-(in-package :big-mac)
+(in-package :macrology)
 
 (defmacro toggle (var)
   `(setf ,var (not ,var)))

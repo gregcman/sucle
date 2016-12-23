@@ -5,7 +5,9 @@
   :maintainer "tain mainer"
   :licence "i am not sure"
 
-  :depends-on ()
+  :depends-on (
+:code-generation
+:recycler		)
 
   :serial t
   :components  

@@ -10,9 +10,6 @@
 (defparameter heighthash (make-hash-table))
 
 (defparameter daytime 1.0)
-(vox::define-fixnum-ops 0 25 4
-			26 25 4
-			52 9 4)
 ;;dirty chunks is a list of modified chunks
 ;;we do not want anyone to see a raw list!
 (defparameter dirtychunks nil)
@@ -31,16 +28,28 @@
    hash)
   (clrhash hash))
 
+;;clearing a chunk, referencing data inside a chunk,
+;;creating a new chunk
+(defun clearchunk (achunk &optional (value 0))
+  (dotimes (x (array-total-size achunk))
+    (setf (row-major-aref achunk x) value))
+  achunk)
+
+(defmacro %new-chunk (type defaultval chopx chopy chopz)
+  `(make-array (ash 1 (+ ,chopx ,chopy ,chopz))
+	       :element-type ',type
+	       :initial-element ,defaultval))
+
 (defparameter freechunkmempool8
-  (vox::make-provider
-   :create-func #'(lambda (&optional (x 0)) (vox::%new-chunk (unsigned-byte 8) x 4 4 4))
-   :cleanup-func #'vox::clearchunk
+  (recycle:make-recycler
+   :create-func #'(lambda (&optional (x 0)) (%new-chunk (unsigned-byte 8) x 4 4 4))
+   :cleanup-func #'clearchunk
    :size-cap 128))
 
 (defparameter freechunkmempool4
-  (vox::make-provider
-   :create-func #'(lambda (&optional (x 0)) (vox::%new-chunk (unsigned-byte 4) x 4 4 4))
-   :cleanup-func #'vox::clearchunk
+  (recycle:make-recycler
+   :create-func #'(lambda (&optional (x 0)) (%new-chunk (unsigned-byte 4) x 4 4 4))
+   :cleanup-func #'clearchunk
    :size-cap 512))
 
 ;;initialize the world
@@ -58,11 +67,16 @@
 
 ;;look at all the repetition here!! its clear a macro is in order
 ;;vox needs to be cleaned up
-(progn
-  (vox::prep-hash 8 setblock getblock chunkhash 0 (vox::get-from freechunkmempool8 0))
-  (vox::prep-hash 4 setlight getlight lighthash 0 (vox::get-from freechunkmempool4 0))
-  (vox::prep-hash 4 skysetlight skygetlight skylighthash 15 (vox::get-from freechunkmempool4 15))
-  (vox::prep-hash 4 setmeta getmeta metahash 0 (vox::get-from freechunkmempool4 0)))
+(eval-when (:compile-toplevel :load-toplevel)
+ (progn
+   (eval (vox::codes
+	  0 25 4
+	  26 25 4
+	  52 9 4))
+   (vox::prep-hash 8 setblock getblock chunkhash 0 (recycle:get-from freechunkmempool8 0))
+   (vox::prep-hash 4 setlight getlight lighthash 0 (recycle:get-from freechunkmempool4 0))
+   (vox::prep-hash 4 skysetlight skygetlight skylighthash 15 (recycle:get-from freechunkmempool4 15))
+   (vox::prep-hash 4 setmeta getmeta metahash 0 (recycle:get-from freechunkmempool4 0))))
 
 (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
 (setf (fdefinition 'setheight) (pix::func-set heighthash 0))

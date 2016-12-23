@@ -158,9 +158,9 @@
 
 (defun test-light ()
   (clearworld)
-  (!%::dorange (x -32 32)
-	   (!%::dorange (y 0 88)
-		    (!%::dorange (z -32 32)
+  (dorange (x -32 32)
+	   (dorange (y 0 88)
+		    (dorange (z -32 32)
 				 (setblock x y z (1+ (random 4)))
 				 (skysetlight x y z 0))))
   (update-world-vao))

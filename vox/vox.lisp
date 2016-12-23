@@ -1,64 +1,4 @@
 (in-package :vox)
-
-
-;;1. start with a bunch of constant specifications
-;;2. generate multiple functions according to the specifications
-;;3. specifications are in a hash table which hash names bound to constants
-;;4. function generating functions are toplevel so they can be tested
-(defun gen-spec (body)
-  (let ((hash-table (make-hash-table :test 'eq)))
-    (dolist (pair body)
-      (setf (gethash (car pair) hash-table) (second pair)))
-    hash-table))
-
-(defun add-spec (spec body)
-  (dolist (pair body)
-    (setf (gethash (car pair) spec) (second pair))))
-
-(defun spec-assoc (hash)
-  (let ((acc nil))
-    (maphash
-     (lambda (k v)
-       (push (cons k v) acc))
-     hash)
-    acc))
-
-;;replace all symbols which start with p!x.. with
-;;the value from the hash table with keyx..
-(defun is-param (symbol)
-  (let ((string (symbol-name symbol)))
-    (if (> (length string) 2)
-	(if (string= "P!" (subseq string 0 2))
-	    (intern (subseq string 2) (symbol-package symbol))))))
-
-;;rp = replace params
-(defun rp (spec code)
-  (labels ((rec (piece)
-	     (if (atom piece)
-		 (if (symbolp piece)
-		     (let ((val (is-param piece)))
-		       (if val
-			   (gethash val spec)
-			   piece))
-		     piece)
-		 (cons (rec (car piece))
-		       (rec (cdr piece))))))
-    (rec code)))
-
-(defun legal-p (symbol)
-  (if (member symbol '(&optional &rest &body &key &optional t))
-      nil
-      symbol))
-(defun get-actual-args (headless-lambda)
-  (let ((argument-list (car headless-lambda))
-	(actual-args nil))
-    (dolist (arg argument-list actual-args)
-      (if (atom arg)
-	  (if (legal-p arg)
-	      (push arg actual-args))
-	  (push (car arg) actual-args)))))
-
-
 ;;inline the headless lambda, give it a name, give it speed and recklessness
 (defun make-fast (nombre headless-lambda)
   `(progn
@@ -69,7 +9,7 @@
 
 (defun fixnums! (headless-lambda)
   `(,(car headless-lambda)
-     (declare (type fixnum ,@(get-actual-args headless-lambda)))
+     (declare (type fixnum ,@(coge:get-actual-args (car headless-lambda))))
      ,@(cdr headless-lambda)))
 
 (defun fastnum (name headless-lambda)
@@ -116,10 +56,13 @@
 		 (the fixnum (ash (mod y (ash p!offset1 1)) p!num1-start))
 		 (the fixnum (ash (mod x (ash p!offset0 1)) p!num0-start))))))
 
+(defmacro signed-unsiged (x n)
+  (let ((n (eval n)))
+    `(- (mod (the fixnum (+ ,x ,(/ n 2))) ,n) ,(/ n 2))))
 (defun gen-unpacker(spec)
   `((fixnum)
     (values (signed-unsiged
-	     ,(if (zerop (rp spec 'p!num0-start))
+	     ,(if (zerop (coge:rp spec 'p!num0-start))
 		  `(logand fixnum (1- (ash 1 p!num0-size)))  
 		  `(ldb (byte p!num0-size p!num0-start) fixnum)) p!offset0)
 	    (signed-unsiged
@@ -142,59 +85,46 @@
       (ash (1- (ash 1 p!chopx)) p!num1-start)
       (ash (1- (ash 1 p!chopz)) p!num2-start)))
 
+(defun gen-with-offset ()
+  `(defmacro with-offset (pos (xv yv zv) &body body)
+     `(let ((,xv (ldb (byte p!chopx p!num0-start) ,pos))
+	    (,yv (ldb (byte p!chopy p!num1-start) ,pos))
+	    (,zv (ldb (byte p!chopz p!num2-start) ,pos)))
+	,@body)))
+
+(defun derived-parts (spec)
+  (coge:add-spec
+   spec
+   `((offset0 . ,(eval (coge:rp spec '(ash 1 (1- p!num0-size)))))
+     (offset1 . ,(eval (coge:rp spec '(ash 1 (1- p!num1-size)))))
+     (offset2 . ,(eval (coge:rp spec '(ash 1 (1- p!num2-size)))))))
+  (coge:add-spec
+   spec
+   `((overflow-mask . ,(coge:rp spec (gen-mask-overflow)))
+     (truncate-mask . ,(coge:rp spec (gen-mask-truncate)))
+     (anti-truncate-mask . ,(coge:rp spec (gen-mask-anti-truncate))))))
+
 
 ;;there is a pattern here and it is ugly
 
-(declaim (inline signed-unsiged))
-(defmacro signed-unsiged (x n)
-  (let ((n (eval n)))
-    `(- (mod (the fixnum (+ ,x ,(/ n 2))) ,n) ,(/ n 2))))
+(coge:defspec fixnum-op-spec (num0-start num0-size chopx
+			      num1-start num1-size chopy 
+			      num2-start num2-size chopz))
 
-(defun fuckme (x)
-  (declare (optimize (speed 3) (safety 0))
-	   (type fixnum x))
-  (signed-unsiged x (ash 1 9)))
+(defun define-fixnum-ops (spec)
+  `(progn
+     ,(coge:rp spec (fastnum 'unhashfunc (gen-unpacker spec)))
+     ,(coge:rp spec (fastnum 'chunkhashfunc (gen-packer)))
+     ,(coge:rp spec (fastnum 'chop (gen-chopper)))
+     ,(coge:rp spec (fastnum 'anti-chop (gen-anti-chopper)))
+     ,(coge:rp spec (fastnum 'rem-flow (gen-remove-overflow)))
 
-(defparameter foobar nil)
-
-(defmacro define-fixnum-ops (num0-start num0-size chopx
-			     num1-start num1-size chopy 
-			     num2-start num2-size chopz)
-  (let ((spec (gen-spec `((num0-start ,num0-start)
-			  (num1-start ,num1-start)
-			  (num2-start ,num2-start)
-			  (num0-size ,num0-size)
-			  (num1-size ,num1-size)
-			  (num2-size ,num2-size)
-			  (chopx ,chopx)
-			  (chopy ,chopy)
-			  (chopz ,chopz)
-			  (offset0 ,(ash 1 (1- num0-size)))
-			  (offset1 ,(ash 1 (1- num1-size)))
-			  (offset2 ,(ash 1 (1- num2-size)))))))
-    (add-spec spec `((overflow-mask ,(rp spec (gen-mask-overflow)))
-		     (truncate-mask ,(rp spec (gen-mask-truncate)))
-		     (anti-truncate-mask ,(rp spec (gen-mask-anti-truncate)))))
-    (setf foobar spec)
-    `(progn
-       ,(rp spec (fastnum 'unhashfunc (gen-unpacker spec)))
-       ,(rp spec (fastnum 'chunkhashfunc (gen-packer)))
-       ,(rp spec (fastnum 'chop (gen-chopper)))
-       ,(rp spec (fastnum 'anti-chop (gen-anti-chopper)))
-       ,(rp spec (fastnum 'rem-flow (gen-remove-overflow)))
-
-       (defun add (a b)
-	 (declare (optimize (speed 3) (safety 0))
-		  (type fixnum a b))
-	 (rem-flow (+ a b)))
-
-       ;;bind-vars with the offset
-
-       (defmacro with-offset (pos (xv yv zv) &body body)
-	 `(let ((,xv (ldb (byte ,,chopx ,,num0-start) ,pos))
-		(,yv (ldb (byte ,,chopy ,,num1-start) ,pos))
-		(,zv (ldb (byte ,,chopz ,,num2-start) ,pos)))
-	    ,@body)))))
+     (defun add (a b)
+       (declare (optimize (speed 3) (safety 0))
+		(type fixnum a b))
+       (rem-flow (+ a b)))
+     ;;bind-vars with the offset
+     ,(coge:rp spec (gen-with-offset))))
 
 (defun %ref (i j k)
   (declare (optimize (speed 3) (safety 0))
@@ -214,51 +144,22 @@
 		      (the fixnum (ash c 22))
 		      c) -44))))
 
+(defun codes (num0-start num0-size chopx
+	      num1-start num1-size chopy 
+	      num2-start num2-size chopz)
+  (define-fixnum-ops
+      (derived-parts
+       (fixnum-op-spec (coge:gen-spec)
+		       num0-start num0-size chopx
+		       num1-start num1-size chopy 
+		       num2-start num2-size chopz))))
+
 ;;print the twos complement binary representation of a number, padded to n 
 (defun print-bits (n size)
   (let ((string (concatenate 'string "~" (write-to-string size) ",'0B")))
     (let ((num (ldb (byte size 0) n)))      
       (format t string num)
       num)))
-
-;;next up is memory pooling
-;;the pool is a data structure which holds things that can be reused
-;;such as (simple-array (unsigned-byte 8) (4096))
-;;and (simple-array (unsigned-byte 4) (4096))
-;;if the pool is empty, it will make another object to give
-;;1. need an array, ask pool for space
-;;2. (if (pool empty) (pool makes another) ())
-;;3. pool gives u array
-(defstruct provider
-  create-func
-  cleanup-func
-  (pool-size 0)
-  (pool nil)
-  size-cap)
-(defun get-from (provider &rest specs)
-  (if (provider-pool provider)
-      (progn
-	(decf (provider-pool-size provider))
-	(let ((new-item (pop (provider-pool provider))))
-	  (apply (provider-cleanup-func provider) new-item specs)))
-      (apply (provider-create-func provider) specs)))
-(defun give-to (provider item &rest specs)
-  (apply (provider-cleanup-func provider) item specs)
-  (when (< (provider-pool-size provider) (provider-size-cap provider))
-    (push item (provider-pool provider))
-    (incf (provider-pool-size provider))))
-
-;;code for clearing a chunk, referencing data inside a chunk,
-;;creating a new chunk
-(defun clearchunk (achunk &optional (value 0))
-  (dotimes (x (array-total-size achunk))
-    (setf (row-major-aref achunk x) value))
-  achunk)
-
-(defmacro %new-chunk (type defaultval chopx chopy chopz)
-  `(make-array (ash 1 (+ ,chopx ,chopy ,chopz))
-	       :element-type ',type
-	       :initial-element ,defaultval))
 
 ;;the type of hash table that lets fixnums be equated [default is eql]
 ;;combine the number of bits per individual item, the get/set names,
