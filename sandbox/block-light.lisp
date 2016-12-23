@@ -162,5 +162,4 @@
 	   (dorange (y 0 88)
 		    (dorange (z -32 32)
 				 (setblock x y z (1+ (random 4)))
-				 (skysetlight x y z 0))))
-  (update-world-vao))
+				 (skysetlight x y z 0)))))

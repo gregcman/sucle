@@ -65,20 +65,35 @@
       (send-to-free-mem heighthash))
   (clean-dirty))
 
-(defparameter system-codes (vox::codes
-			    0 25 4
-			    26 25 4
-			    52 9 4))
+(defun system ()
+  (let ((uniform-spec (coge:gen-spec)))
+    (vox::layout uniform-spec 25 0 25 26 9 52)
+    (vox::truncation uniform-spec 4 4 4)
+    (vox::derived-parts uniform-spec)
+    (vox::offset uniform-spec 0 0 0)
+    (vox::names uniform-spec
+		'vox::unhashfunc 'vox::chunkhashfunc
+		'vox::chop 'vox::anti-chop 'vox::rem-flow 'vox::%%ref 'vox::add)
+    uniform-spec))
+
+
+(defun gen-holder (bits setter getter hash default creator)
+  (let ((new (system)))
+    (vox::field new `(simple-array (unsigned-byte ,bits) (4096)) hash default creator)
+    (vox::access new getter setter)
+    (vox::prep-hash new)))
 
 ;;look at all the repetition here!! its clear a macro is in order
 ;;vox needs to be cleaned up
 (defun establish-system ()
   (progn
-    (eval system-codes)
-    (vox::prep-hash 8 setblock getblock chunkhash 0 (recycle:get-from freechunkmempool8 0))
-    (vox::prep-hash 4 setlight getlight lighthash 0 (recycle:get-from freechunkmempool4 0))
-    (vox::prep-hash 4 skysetlight skygetlight skylighthash 15 (recycle:get-from freechunkmempool4 15))
-    (vox::prep-hash 4 setmeta getmeta metahash 0 (recycle:get-from freechunkmempool4 0)))
+    (eval (print (vox::define-fixnum-ops (system))))
+    (eval (print (list
+		  'progn
+		  (gen-holder 8 'setblock 'getblock 'chunkhash 0 '(recycle:get-from freechunkmempool8 0))
+		  (gen-holder 4 'setlight 'getlight 'lighthash 0 '(recycle:get-from freechunkmempool4 0))
+		  (gen-holder 4 'skysetlight 'skygetlight 'skylighthash 15 '(recycle:get-from freechunkmempool4 15))
+		  (gen-holder 4 'setmeta 'getmeta 'metahash 0 '(recycle:get-from freechunkmempool4 0))))))
   (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
   (setf (fdefinition 'setheight) (pix::func-set heighthash 0))
   (defun (setf getheight) (new x y)
@@ -90,6 +105,7 @@
   (setf skylighthash (vox::genhash))
   (setf metahash (vox::genhash)))
 
+(setup-hashes)
 (establish-system)
 
 (defun block-dirtify (i j k)

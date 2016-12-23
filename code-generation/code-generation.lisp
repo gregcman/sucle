@@ -48,7 +48,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
   (defun legal-p (symbol)
-    (if (member symbol '(&optional &rest &body &key &optional t))
+    (if (member symbol '(&optional &rest &body &key &optional &aux t))
 	nil
 	symbol))
   (defun get-actual-args (lambda-list)
