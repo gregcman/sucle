@@ -122,7 +122,7 @@
   (unless (mesherthreadbusy)
     (if mesher-thread
 	(getmeshersfinishedshit))
-    (let ((achunk (world:dirty-pop)))
+    (let ((achunk (dirty-pop)))
       (when achunk
 	(giveworktomesherthread achunk)))))
 
@@ -133,7 +133,7 @@
 	    (progn
 	      (setf (gethash coords vaohash) (shape-list shape))
 	      (setf worldlist (genworldcallist)))
-	    (world:dirty-push coords))))
+	    (dirty-push coords))))
   (setf mesher-thread nil))
 
 (defun mesherthreadbusy ()
@@ -201,7 +201,7 @@
   (maphash
    (lambda (k v)
      (declare (ignore v))
-     (world:dirty-push k))
+     (dirty-push k))
    world::chunkhash))
 
 (defun use-program (name)

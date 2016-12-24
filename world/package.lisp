@@ -3,43 +3,46 @@
   (:nicknames #:w)
   (:export 
 
-;;;;block accessors
-#:getblock #:setblock
-#:%getblock #:%setblock
-#:getlight #:setlight
-#:%getlight #:%setlight
-#:skygetlight #:skysetlight
-#:%skygetlight #:%skysetlight
-#:setmeta #:getmeta
+;;;block accessors
+   #:getblock #:setblock
+   #:%getblock #:%setblock
+   #:getlight #:setlight
+   #:%getlight #:%setlight
+   #:skygetlight #:skysetlight
+   #:%skygetlight #:%skysetlight
+   #:setmeta #:getmeta
 
-;;;;pointer manipulation
-#:%%ref 
-#:chop
-#:rem-flow
-#:anti-chop
-#:add
-#:unhashfunc
-#:chunkhashfunc
+;;;pointer manipulation
+   #:%%ref 
+   #:chop
+   #:rem-flow
+   #:anti-chop
+   #:add
+   #:unhashfunc
+   #:chunkhashfunc
 
-;;;;keep track of changes
-#:clean-dirty
-#:dirty-pop
-#:dirty-push
-#:block-dirtify
+;;;initialization
+   #:setup-hashes
+   #:define-accessors
+   #:establish-stystem
+   #:gen-holder
+   #:system
+   #:world-init
 
-;;;;initialization
-#:setup-hashes
-#:define-accessors
-#:establish-stystem
-#:gen-holder
-#:system
-#:world-init
 
-;;;;chunks
-#:clearchunk
-#:%new-chunk
+;;;containers
+   #:chunkhash
+   #:lighthash
+   #:skylighthash
+   #:metahash
 
-;;;;the apocalypse
-#:clearworld
-#:send-to-free-mem
-))
+   #:heighthash
+
+;;;chunks
+   #:clearchunk
+   #:%new-chunk
+
+;;;the apocalypse
+   #:clearworld
+   #:send-to-free-mem
+   ))

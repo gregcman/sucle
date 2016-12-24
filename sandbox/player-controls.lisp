@@ -188,7 +188,6 @@
 (defparameter defaultfov 70)
 
 (defun physinnit ()
-  (world:world-init)
   (sb-int:set-floating-point-modes :traps nil)
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
@@ -394,6 +393,18 @@ collect all the nearest collisions with the player"
    (round y)
    (round z)))
 
+;;dirty chunks is a list of modified chunks
+;;we do not want anyone to see a raw list!
+(defparameter dirtychunks nil)
+(defun clean-dirty ()
+  (setf dirtychunks (q::make-uniq-q)))
+(defun dirty-pop ()
+  (q::uniq-pop dirtychunks))
+(defun dirty-push (item)
+  (q::uniq-push item dirtychunks))
+(defun block-dirtify (i j k)
+  (dirty-push (world:chop (world:chunkhashfunc i k j))))
+
 (defun setblock-with-update (i j k blockid new-light-value)
   (if (/= blockid (world:getblock i j k))
    (let ((old-light-value (world:getlight i j k)))
@@ -405,4 +416,10 @@ collect all the nearest collisions with the player"
        (sky-de-light-node i j k)
        (unless (zerop new-light-value)
 	 (light-node i j k))
-       (world:block-dirtify i j k)))))
+       (block-dirtify i j k)))))
+
+(defun world-setup ()
+  (clean-dirty)
+  (world:setup-hashes))
+
+(world-setup)
