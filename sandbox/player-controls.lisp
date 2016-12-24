@@ -141,19 +141,22 @@
 	(k (elt pos 2)))
     (dotimes (a 3)
       (dotimes (b 3)
-	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid)))))
+	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid
+				    (aref mc-blocks::lightvalue blockid))))))
 
 (defun %aplatform (pos blockid)
   (let ((i (elt pos 0))
 	(j (elt pos 1))
 	(k (elt pos 2)))
-    (setblock-with-update (+ i) (- j 1) (+ k) blockid)))
+    (setblock-with-update (+ i) (- j 1) (+ k) blockid
+				(aref mc-blocks::lightvalue blockid))))
 
 (defun oneplatform (pos blockid)
   (let ((i (elt pos 0))
 	(j (elt pos 1))
 	(k (elt pos 2)))
-    (setblock-with-update (+ i) (- j 1) (+ k) blockid)))
+    (setblock-with-update (+ i) (- j 1) (+ k) blockid
+				(aref mc-blocks::lightvalue blockid))))
 
 (defun notaplatform (pos)
   (let ((i (elt pos 0))
@@ -161,7 +164,8 @@
 	(k (elt pos 2)))
     (dotimes (a 3)
       (dotimes (b 3)
-	(setblock-with-update (+ a i -1) (+ j) (+ b k -1) 0)))))
+	(setblock-with-update (+ a i -1) (+ j) (+ b k -1) 0
+				    0)))))
 
 
 ;;fuck me
@@ -175,6 +179,7 @@
 
 (defparameter onground nil)
 (defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
+(defparameter daytime 1.0)
 
 (defun ease (x target fraction)
   (+ x (* fraction (- target x))))
@@ -183,7 +188,7 @@
 (defparameter defaultfov 70)
 
 (defun physinnit ()
-  (world-init)
+  (world:world-init)
   (sb-int:set-floating-point-modes :traps nil)
   (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
   (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
@@ -384,7 +389,20 @@ collect all the nearest collisions with the player"
     places))
 
 (defun round-pos (x y z)
-  (getblock
+  (world:getblock
    (round x)
    (round y)
    (round z)))
+
+(defun setblock-with-update (i j k blockid new-light-value)
+  (if (/= blockid (world:getblock i j k))
+   (let ((old-light-value (world:getlight i j k)))
+     (when (setf (world:getblock i j k) blockid)
+       (if (< new-light-value old-light-value)
+	   (progn
+	     (de-light-node i j k)))
+       (setf (world:getlight i j k) new-light-value)
+       (sky-de-light-node i j k)
+       (unless (zerop new-light-value)
+	 (light-node i j k))
+       (world:block-dirtify i j k)))))

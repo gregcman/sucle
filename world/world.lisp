@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package #:world)
 
 ;;chunkhash stores all of the chunks in a hashmap.
 ;;chunks accessed by '(x y z) in chunk coords
@@ -72,32 +72,53 @@
     (vox::derived-parts uniform-spec)
     (vox::offset uniform-spec 0 0 0)
     (vox::names uniform-spec
-		'vox::unhashfunc 'vox::chunkhashfunc
-		'vox::chop 'vox::anti-chop 'vox::rem-flow 'vox::%%ref 'vox::add)
+		'unhashfunc 'chunkhashfunc
+		'chop 'anti-chop 'rem-flow '%%ref 'add)
     uniform-spec))
 
 
-(defun gen-holder (bits setter getter hash default creator)
+(defun gen-holder (bits setter getter %setter %getter hash default creator)
   (let ((new (system)))
     (vox::field new `(simple-array (unsigned-byte ,bits) (4096)) hash default creator)
-    (vox::access new getter setter)
-    (vox::prep-hash new)))
+    (vox::access new %getter %setter)
+    (list'progn
+     (vox::prep-hash new)
+     (define-accessors getter setter %getter %setter))))
 
 ;;look at all the repetition here!! its clear a macro is in order
 ;;vox needs to be cleaned up
 (defun establish-system ()
   (progn
     (eval (print (vox::define-fixnum-ops (system))))
-    (eval (print (list
-		  'progn
-		  (gen-holder 8 'setblock 'getblock 'chunkhash 0 '(recycle:get-from freechunkmempool8 0))
-		  (gen-holder 4 'setlight 'getlight 'lighthash 0 '(recycle:get-from freechunkmempool4 0))
-		  (gen-holder 4 'skysetlight 'skygetlight 'skylighthash 15 '(recycle:get-from freechunkmempool4 15))
-		  (gen-holder 4 'setmeta 'getmeta 'metahash 0 '(recycle:get-from freechunkmempool4 0))))))
+    (eval (print (gen-holder 8 'setblock 'getblock
+			     '%setblock '%getblock
+			     'chunkhash 0
+			     '(recycle:get-from freechunkmempool8 0))))
+    (eval (print (gen-holder 4 'setlight 'getlight
+			     '%setlight '%getlight
+			     'lighthash 0
+			     '(recycle:get-from freechunkmempool4 0))))
+    (eval (print (gen-holder 4 'skysetlight 'skygetlight
+			     '%skysetlight '%skygetlight
+			     'skylighthash 15
+			     '(recycle:get-from freechunkmempool4 15))))
+    (eval (print (gen-holder 4 'setmeta 'getmeta
+			     '%setmeta '%getmeta
+			     'metahash 0
+			     '(recycle:get-from freechunkmempool4 0)))))
   (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
   (setf (fdefinition 'setheight) (pix::func-set heighthash 0))
   (defun (setf getheight) (new x y)
     (setheight x y new)))
+
+(defun define-accessors (getter-name setter-name %getter-name %setter-name)
+  `(progn
+     (defun ,getter-name (i j k)
+       (,%getter-name (chunkhashfunc i k j)))
+     (defun ,setter-name (i j k new)
+       (,%setter-name (chunkhashfunc i k j) new))
+     (defun (setf ,getter-name) (new i j k)
+       (,setter-name i j k new))))
 
 (defun setup-hashes ()
   (setf chunkhash (vox::genhash))
@@ -106,34 +127,12 @@
   (setf metahash (vox::genhash)))
 
 (setup-hashes)
+(clean-dirty)
 (establish-system)
 
+
 (defun block-dirtify (i j k)
-  (dirty-push (vox::chop (vox::chunkhashfunc i k j))))
+  (dirty-push (chop (chunkhashfunc i k j))))
 
-(defun update-height (x y)
-  (block wow
-    (dorange (z 0 255)
-	     (let ((val (- 255 z)))
-	       (let ((the-block (getblock x val y)))
-		 (let ((ans 
-			 (eq t 
-			      (aref mc-blocks::opaquecubelooukup the-block))))
-		   (if ans
-		       (return-from wow
-			 (setf (getheight x y) val)))))))
-    (setheight x y 0)))
 
-(defun setblock-with-update (i j k blockid)
-  (if (/= blockid (getblock i j k))
-   (let ((new-light-value (aref mc-blocks::lightvalue blockid))
-	 (old-light-value (getlight i j k)))
-     (when (setblock i j k blockid)
-       (if (< new-light-value old-light-value)
-	   (progn
-	     (de-light-node i j k)))
-       (setlight i j k new-light-value)
-       (sky-de-light-node i j k)
-       (unless (zerop new-light-value)
-	 (light-node i j k))
-       (block-dirtify i j k)))))
+

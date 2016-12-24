@@ -68,13 +68,13 @@
 ;;(eval (CREATE-PACKED-NUM 'chunkhashfunc 'unhashfunc spec))
 
 (defun gen-remove-overflow ()
-  `((pos) (logand pos p!overflow-mask)))
+  `((pos) (the fixnum (logand pos p!overflow-mask))))
 
 (defun gen-chopper ()
-  `((pos) (logand p!truncate-mask pos)))
+  `((pos) (the fixnum (logand p!truncate-mask pos))))
 
 (defun gen-anti-chopper ()
-  `((pos) (logand p!anti-truncate-mask pos)))
+  `((pos) (the fixnum (logand p!anti-truncate-mask pos))))
 
 (defun gen-packer ()
   `((x y z)
@@ -131,29 +131,23 @@
   `((a b) (p!rem-flow (+ a b))))
 
 (defun gen-getter ()
-  `((i j k)
-    (let ((block-code (p!chunkhashfunc i k j)))
-      (let ((chunk-code (p!chop block-code)))
-	(let ((chunk (gethash chunk-code p!chunk-container)))
-	  (declare (type (or p!data-type null) chunk))
-	  (if chunk
-	      (values (aref chunk (p!%%ref block-code)) t)
-	      (values p!vacuum-state nil)))))))
+  `((block-code)   
+    (let ((chunk-code (p!chop block-code)))
+      (let ((chunk (gethash chunk-code p!chunk-container)))
+	(declare (type (or p!data-type null) chunk))
+	(if chunk
+	    (values (aref chunk (p!%%ref block-code)) t)
+	    (values p!vacuum-state nil))))))
 
 (defun gen-setter ()
-  `((i j k blockid)
-    (let ((block-code (p!chunkhashfunc i k j)))
-      (let ((chunk-code (p!chop block-code)))
-	(let ((chunk (or (gethash chunk-code p!chunk-container)
-			 (setf
-			  (gethash chunk-code p!chunk-container)
-			  p!space-provider))))
-	  (declare (type p!data-type chunk))
-	  (setf (aref chunk (p!%%ref block-code)) blockid))))))
-
-
-;;;;
-;;;; what follows is the apparent usage of the code generation
+  `((block-code blockid)
+    (let ((chunk-code (p!chop block-code)))
+      (let ((chunk (or (gethash chunk-code p!chunk-container)
+		       (setf
+			(gethash chunk-code p!chunk-container)
+			p!space-provider))))
+	(declare (type p!data-type chunk))
+	(setf (aref chunk (p!%%ref block-code)) blockid)))))
 
 (defun derived-parts (spec)
   (coge:add-spec
@@ -185,11 +179,10 @@
 (defun genhash ()
   (make-hash-table :test 'eq))
 
-;;;block getter and setters are declared inline
 (defun prep-hash (spec)
   (coge:rp spec
 	   `(progn
 	      ,(not-too-fast (coge:rp spec 'p!getter) (fixnums! (gen-getter)))
 	      ,(not-too-fast (coge:rp spec 'p!setter) (fixnums! (gen-setter)))
-	      (defun (setf p!getter) (new i j k)
-		(,(coge:rp spec 'p!setter) i j k new)))))
+	      (defun (setf p!getter) (new location)
+		(,(coge:rp spec 'p!setter) location new)))))

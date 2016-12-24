@@ -13,27 +13,27 @@
 	    (sandbox::flat3-chunk
 	     light
 	     (lambda (x y z b)
-	       (setlight x y z b))
+	       (setf (getlight x y z) b))
 	     xscaled 0 yscaled)
 	    (sandbox::flat3-chunk
 	     skylight
 	     (lambda (x y z b)
-	       (skysetlight x y z b))
+	       (setf (skygetlight x y z) b))
 	     xscaled 0 yscaled)
 	    (sandbox::flat3-chunk
 	     meta
 	     (lambda (x y z b)
-	       (setmeta x y z b))
+	       (setf (getmeta x y z) b))
 	     xscaled 0 yscaled)
 	    (sandbox::flat2-chunk
 	     leheight
 	     (lambda (x y b)
-	       (setheight x y b))
+	       (setf (getheight x y) b))
 	     xscaled yscaled)
 	    (sandbox::flat3-chunk
 	     blocks
 	     (lambda (x y z b)
-	       (setblock x y z b))
+	       (setf  (getblock x y z) b))
 	     xscaled 0 yscaled))))))
 
 (defun flat3-chunk (data setfunc xoffset yoffset zoffset)

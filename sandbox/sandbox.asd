@@ -11,6 +11,7 @@
 		 
 		 #:macrology
 		 #:queue
+                 #:world
 		 #:window
 		 #:cl-mc-shit
 		 #:the-matrix-is-everywhere
@@ -23,7 +24,6 @@
     ((:file "package")
      (:file "magic") ;;file io type stuff
      (:file "blocks") ;;list of minecraft block values
-     (:file "world") ;;get blocks, contain blocks, set blocks...
      (:file "lovely-renderer") ;;all the rendering shit packed into a file---
      (:file "player-controls") ;;moving the player around, collision ---
      (:file "block-light") ;;lighting
