@@ -1,5 +1,5 @@
 (asdf:defsystem #:macrology
-  :description "general purpose macros"
+  :description "general purpose macros and code generation facilities"
   :author "Gregorio Manabat"
   :maintainer "Gregorio Manabat"
 
@@ -8,4 +8,5 @@
   :serial t
   :components  
   ((:file "package")
-(:file "macrology")))
+   (:file "macrology")
+   (:file "code-generation")))

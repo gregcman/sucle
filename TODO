@@ -1,0 +1,35 @@
+{package cl-mc-shit}:
+-fully flesh out bindings to cnbt
+
+{package sandbox}:
+-clean up world-loading.lisp
+-allow flying, noclip in player-control.lisp
+-lovely-renderer.lisp: separate into multiple files and multiple packages: glsl, gpu buffers, meshing, multithreading, block-meshing, vbos and display lists
+-make mc-blocks not so retardedly long
+
+{package vox}:
+//current state: layout 25 25 9 works for finxums on 64 bit machines. will break if not using 25 25 9 or on a 32 bit machine.
+
+{package the-matrix-is-everywhere}:
+-rename the system "the-matrix-is-everywhere" to something not so silly or use an optimized well tested library.
+//current state: copy pasted matrix multiplication code from internet. allocates a new matrix every time. types not fun to convert between
+
+{package aabbcc}:
+-add facilities for intersection with a single rectangular plane
+-intersection with lines
+
+{package window}:
+-clean up unused cruft
+-control opengl versions
+
+[in general]:
+-learn opengl, cffi, streams,
+-shortcuts for emacs/paredit
+-common lisp: pathnames, filesystem, streams
+-format comments, give functions resonable names, use docstrings and type declarations
+
+[future features]:
+-crosshairs and punching things
+-inventory
+-entities and physics and stuff
+-dynamic package creation

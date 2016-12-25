@@ -1,0 +1,4 @@
+24 dec 2016:
+-create a TODO and a TODONE file
+{package macrology/code-generation}:
+-merge macrology and code-generation into one package because they are similar

@@ -3,7 +3,7 @@
   :author "Gregorio Manabat"
   :maintainer "Gregorio Manabat"
 
-  :depends-on (:vox :code-generation :queue :pix :recycler)
+  :depends-on (:vox :macrology :queue :pix :recycler)
 
   :serial t
   :components  

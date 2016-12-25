@@ -1,4 +1,4 @@
-(in-package :code-generation)
+(in-package :macrology)
 
 ;;1. start with a bunch of constant specifications
 ;;2. generate multiple functions according to the specifications

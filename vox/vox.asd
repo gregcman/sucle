@@ -6,7 +6,7 @@
   :licence "i am not sure"
 
   :depends-on (
-:code-generation
+:macrology
 :recycler		)
 
   :serial t

@@ -186,11 +186,11 @@
 ;;70 is normal
 ;;110 is quake pro
 (defparameter defaultfov 70)
+(setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
+(setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
 
 (defun physinnit ()
   (sb-int:set-floating-point-modes :traps nil)
-  (setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
-  (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
   (setf isprinting nil)
   (setf wprev most-negative-fixnum))
 

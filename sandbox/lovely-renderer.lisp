@@ -24,16 +24,20 @@
 (defun render ()
   "responsible for rendering the world"
   (let ((camera ourcam))
-    (use-program "blockshader")
+
     (gl:clear :depth-buffer-bit :color-buffer-bit)
     (if (in:key-p :g)
 	(update-world-vao))
+    (if (in:key-p :5)
+	(load-block-shader))
     (if (in:key-p :q)
 	(progn
 	  (setf drawmode (not drawmode))
 	  (if drawmode
 	      (gl:polygon-mode :front-and-back :line)
 	      (gl:polygon-mode :front-and-back :fill))))
+    
+    (use-program "blockshader")
     (setupmatrices camera)
     (designatemeshing)
     (settime)
@@ -77,19 +81,19 @@
 (defparameter cloudheight 100)
 
 (defun setupmatrices (camera)
-  (set-matrix "modelview"
-	      (mat:easy-lookat
-	       (mat:add (mat:onebyfour
-			 (list 0
-			       (if isneaking (- 1.5 1/8) 1.5)
-			       0 0))
-			(simplecam-pos camera))
-	       (simplecam-pitch camera)
-	       (simplecam-yaw camera)))
-  (set-matrix "projection"
-	      (mat:projection-matrix
-	       (deg-rad (simplecam-fov camera))
-	       (/ out::pushed-width out::pushed-height) 0.01 128)) )
+  (let ((modelview (mat:easy-lookat
+		    (mat:add (mat:onebyfour
+			      (list 0
+				    (if isneaking (- 1.5 1/8) 1.5)
+				    0 0))
+			     (simplecam-pos camera))
+		    (simplecam-pitch camera)
+		    (simplecam-yaw camera)))
+	(projection (mat:projection-matrix
+		     (deg-rad (simplecam-fov camera))
+		     (/ out::pushed-width out::pushed-height) 0.01 128)))
+    (set-matrix "projectionmodelview"
+		(mat:mmul projection modelview))))
 
 (defun genworldcallist ()
   (let ((ourlist (gl:gen-lists 1)))
@@ -198,6 +202,7 @@
 
 (defun update-world-vao ()
   "updates all of the vaos in the chunkhash. takes a long time"
+  (clrhash vaohash)
   (maphash
    (lambda (k v)
      (declare (ignore v))
@@ -231,6 +236,11 @@
   (setf mesher-thread nil)
   (clrhash vaohash)
   (clrhash shaderhash)
+  (load-block-shader)
+  (load-simple-shader)
+  (update-world-vao))
+
+(defun load-block-shader ()
   (load-a-shader
    "blockshader"
    "blockshader/transforms.vs"
@@ -239,14 +249,16 @@
      ("texCoord" . 2)
      ("color" . 3)
      ("blockLight" . 8)
-     ("skyLight" . 12)))
-  (progn (load-a-shader
-	  "simpleshader"
-	  "simpleshader/transforms.vs"
-	  "simpleshader/basictexcoord.frag"
-	  '(("position" . 0)
-	    ("texCoord" . 2)
-	    ("color" . 3)))))
+     ("skyLight" . 12))))
+
+(defun load-simple-shader ()
+  (load-a-shader
+   "simpleshader"
+   "simpleshader/transforms.vs"
+   "simpleshader/basictexcoord.frag"
+   '(("position" . 0)
+     ("texCoord" . 2)
+     ("color" . 3))))
 
 (defun load-into-texture-library (name &optional (othername name))
   (let ((thepic (gethash name picture-library)))
