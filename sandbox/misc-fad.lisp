@@ -1,0 +1,15 @@
+(in-package :sandbox)
+
+(defun file-string (path)
+  (with-open-file (stream path)
+    (let ((data (make-string (file-length stream))))
+      (read-sequence data stream)
+      data)))
+
+(defun byte-read (path)
+  (with-open-file (stream path :element-type '(unsigned-byte 8))
+    (let* ((len (file-length stream))
+	   (data (make-array len :element-type '(unsigned-byte 8))))
+      (dotimes (n len)
+	(setf (aref data n) (read-byte stream)))
+      data)))

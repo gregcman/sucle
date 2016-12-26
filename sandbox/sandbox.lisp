@@ -4,28 +4,6 @@
 ;;physics thread
 ;;rendering thread
 
-(defun loud-thread (func name)
-  "makes a thread that reads and writes to stdio"
-  (sb-thread:make-thread 
-   #'(lambda (standard-output standard-input)    
-       (let ((*standard-output* standard-output) (*standard-input* standard-input))
-	 (funcall func)))
-   :arguments (list *standard-output* *standard-input*)
-   :name name))
-
-(defun timer ()
-  "control the fps execution"
-  (let ((prevtime (fine-time)))
-    (lambda (time afunc)
-      (let* ((now (fine-time))
-	     (diff (- now prevtime)))
-	(if (> diff time)
-	    (progn
-	      (setf prevtime now)
-	      (funcall afunc)
-	      diff)
-	    nil)))))
-
 (defun main (&rest args)
   "application entry point"
   (window:arise)
@@ -98,7 +76,3 @@
        kill-button
        (not window:status))
       (physthread)))
-
-(defun fine-time ()
-  (multiple-value-bind (s m) (sb-ext:get-time-of-day)
-    (+ (* (expt 10 6) s) m)))

@@ -24,49 +24,6 @@
   (setf (gethash name texture-library)
 	(create-texture-wot tex-data width height)))
 
-(defun file-string (path)
-  (with-open-file (stream path)
-    (let ((data (make-string (file-length stream))))
-      (read-sequence data stream)
-      data)))
-
-(defun flatten (obj)
-  (do* ((result (list obj))
-        (node result))
-       ((null node) (delete nil result))
-    (cond ((consp (car node))
-           (when (cdar node) (push (cdar node) (cdr node)))
-           (setf (car node) (caar node)))
-          (t (setf node (cdr node))))))
-
-(defun fatten (some-array)
-  (let* ((total-size (array-total-size some-array))
-	 (new-array (make-array total-size)))
-    (dotimes (x total-size)
-      (setf (aref new-array x) (row-major-aref some-array x)))
-    new-array))
-
-(defun getapixel (x y somepic)
-  (let* ((dims (array-dimensions somepic))
-	 (width (first dims))
-	 (depth (third dims)))
-    (let ((basenum (+ (*  depth width y) (* depth x))))
-      (vector (row-major-aref somepic (+ 0 basenum))
-	      (row-major-aref somepic (+ 1 basenum))
-	      (row-major-aref somepic (+ 2 basenum))
-	      (row-major-aref somepic (+ 3 basenum))))))
-
-(defun flip-image(darray)
-  (let* ((dims (array-dimensions darray))
-	 (myray (make-array dims)))   
-    (dotimes (w (first dims))
-      (dotimes (h (second dims))
-	(dotimes (val (third dims))
-	  (setf
-	   (aref myray (- (first dims) w 1) h val)
-	   (aref darray w h val)))))   
-    myray))
-
 (defun get-file-paths-and-metadata (x currentpath)
   (if (consp x)
       (let* ((dirnombre (first x))
@@ -137,14 +94,6 @@
        "moon.png" "sun.png")
       ("title/"
        "black.png" "mclogo.png" "mojang.png"))))
-
-(defun byte-read (path)
-  (with-open-file (stream path :element-type '(unsigned-byte 8))
-    (let* ((len (file-length stream))
-	   (data (make-array len :element-type '(unsigned-byte 8))))
-      (dotimes (n len)
-	(setf (aref data n) (read-byte stream)))
-      data)))
 
 (defparameter texturesloaded? nil)
 

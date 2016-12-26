@@ -1,9 +1,9 @@
 (asdf:defsystem #:sandbox
-    :description "when parts come together"
+    :description "???"
     :version "0.0.0"
-    :author "a little boy in the sand"
-    :maintainer "tain mainer"
-    :licence "fuck that shit"
+    :author "Gregorio Manabat III"
+    :maintainer "???"
+    :licence "???"
 
     :depends-on (#:cl-opengl
 		 #:cl-utilities  
@@ -23,6 +23,11 @@
     :components  
     ((:file "package")
      (:file "misc-math") ;;random math stuff
+     (:file "misc-list") ;;random list stuff
+     (:file "misc-image") ;;random image array manipulation
+     (:file "misc-fad");;;miscellaneous file and directory stuff
+     (:file "timer") ;;;facilities for dealing with time
+     (:file "thread") ;;; threading utilities
      (:file "meshing") ;;generic meshing utilities
      (:file "misc-opengl") ;;random opengl stuff
      (:file "shader") ;;generic shader utilities

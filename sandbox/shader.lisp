@@ -27,6 +27,13 @@
    (gl:get-uniform-location shaderProgram name)
    thefloat))
 
+(defun load-a-shader (name vs frag attribs)
+  (setf (gethash name shaderhash)
+	(load-and-make-shader
+	 vs
+	 frag
+	 attribs)))
+
 (defun load-and-make-shader (vpath fpath attribs)
   "loads a shader from a filepath and puts it into a program"
   (make-shader-program-from-strings
@@ -70,11 +77,4 @@
     (unless (eql ourprog shaderProgram)
       (setq shaderProgram ourprog)
       (gl:use-program ourprog))))
-
-(defun load-a-shader (name vs frag attribs)
-  (setf (gethash name shaderhash)
-	(load-and-make-shader
-	 vs
-	 frag
-	 attribs)))
 

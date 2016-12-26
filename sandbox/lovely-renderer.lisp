@@ -74,7 +74,7 @@
 
   (gl:enable :cull-face)
   (gl:cull-face :back)
-  (bind-shit (case 2
+  (bind-shit (case 0
 	       (0 "terrain.png")
 	       (1 "pack.png")
 	       (2 "default.png")))
