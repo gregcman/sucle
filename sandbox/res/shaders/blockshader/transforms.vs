@@ -6,7 +6,7 @@ attribute vec4 skyLight;
 attribute vec4 blockLight;
 
 varying vec2 TexCoord;
-varying float mycolor;
+varying vec4 mycolor;
 varying float fogratio;
 
 uniform mat4 projectionmodelview;
@@ -26,6 +26,6 @@ TexCoord = texCoord;
 fogratio = min(gl_Position.z*foglet+aratio, 1.0);
 
 ///max is some amount of cycles, timeday multiply is one, dot is one
-mycolor = dot(max(blockLight, timeday*skyLight), vec4(0.25));
+mycolor = color * dot(max(blockLight, timeday*skyLight), vec4(0.25));
 
 } 

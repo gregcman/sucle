@@ -167,6 +167,13 @@
 	(setblock-with-update (+ a i -1) (+ j) (+ b k -1) 0
 				    0)))))
 
+(defun test-light ()
+  (world:clearworld)
+  (dorange (x -16 32)
+	   (dorange (y 0 88)
+		    (dorange (z -16 32)
+			     (setf (world:getblock x y z) 5)
+			     (setf (world:skygetlight x y z) 0)))))
 
 ;;fuck me
 ;;this file contains::
@@ -200,7 +207,7 @@
 
 (defun physics ()
   "a messy function for the bare bones physics"
-  (setf daytime (case 10
+  (setf daytime (case 9
 		  (0 27.5069)
 		  (2 9)
 		  (9 0)
@@ -273,6 +280,15 @@
 	  (* (expt 0.98 tickscale)
 	     (row-major-aref cameraVelocity 1)))
     (outofbounds camera)))
+
+(defun mat-lis (mat)
+  (let ((thelist nil))
+    (dotimes (x 3)
+       (push (row-major-aref mat x) thelist))
+    (nreverse thelist)))
+
+(defun hypot (list)
+  (sqrt (apply (function +) (mapcar (lambda (x) (* x x)) list))))
 
 (defun look-around ()
   (mouse-looking ourcam))

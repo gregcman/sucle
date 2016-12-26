@@ -1,6 +1,6 @@
 #version 120
 varying vec2 TexCoord;
-varying float mycolor;
+varying vec4 mycolor;
 varying float fogratio;
 
 uniform sampler2D ourTexture;

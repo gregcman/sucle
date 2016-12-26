@@ -155,11 +155,3 @@
 	       (check 0 0 1))
 	     (go rep)))))
   lighting-bfs)
-
-(defun test-light ()
-  (world:clearworld)
-  (dorange (x -32 32)
-	   (dorange (y 0 88)
-		    (dorange (z -32 32)
-			     (setf (world:getblock x y z) (1+ (random 4)))
-			     (setf (world:skygetlight x y z) 0)))))

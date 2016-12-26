@@ -1,5 +1,7 @@
 (in-package #:sandbox)
 
+;;;;This file: "magic" contains facilities to load images and stuff
+
 (defparameter ourdir
   (make-pathname :host (pathname-host #.(or *compile-file-truename*
 					    *load-truename*))
@@ -152,3 +154,29 @@
 	(get-all-mc-textures)
 	(setf texturesloaded? t))))
 
+
+(defun load-into-texture-library (name &optional (othername name))
+  (let ((thepic (gethash name picture-library)))
+    (if thepic
+	(let ((dims (array-dimensions thepic)))
+	    (load-shit
+	     (fatten thepic)
+	     othername (first dims) (second dims))))))
+
+(defun create-texture-wot (tex-data width height)
+  "creates an opengl texture from data"
+  (let ((the-shit (car (gl:gen-textures 1))))
+    (gl:bind-texture :texture-2d the-shit)
+    (gl:tex-parameter :texture-2d :texture-min-filter :nearest-mipmap-linear)
+    (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
+    (gl:tex-parameter :texture-2d :texture-wrap-s :repeat)
+    (gl:tex-parameter :texture-2d :texture-wrap-t :repeat)
+    (gl:tex-parameter :texture-2d :texture-border-color '(0 0 0 0))
+    (gl:tex-parameter :texture-2d :generate-mipmap :true)
+    (gl:tex-image-2d
+     :texture-2d 0
+     :rgba width height 0 :rgba :unsigned-byte tex-data)
+    (gl:generate-mipmap :texture-2d)
+    the-shit))
+
+;;create image library and a texture library
