@@ -63,7 +63,11 @@
     (if (in:key-pressed-p :c) 
 	(oneplatform
 	 (mat-world-pos (simplecam-pos camera))
-	 91))))
+	 91))
+    (if (in:key-pressed-p :f) 
+	(oneplatform
+	 (mat-world-pos (simplecam-pos camera))
+	 0))))
 
 (defun mat-world-pos (mat)
   (vector
@@ -207,7 +211,7 @@
 
 (defun physics ()
   "a messy function for the bare bones physics"
-  (setf daytime (case 9
+  (setf daytime (case 10
 		  (0 27.5069)
 		  (2 9)
 		  (9 0)
@@ -294,11 +298,8 @@
   (mouse-looking ourcam))
 
 (defun outofbounds (camera)
-  (if (> -256 (row-major-aref (simplecam-pos camera) 1))
-      (progn	  
-	(setf (row-major-aref cameraVelocity 1) 0)
-	(setf (row-major-aref (simplecam-pos camera) 1) 0)
-	(setf (simplecam-pos camera) (mat:onebyfour (list 0 128 0 1))))))
+  (when (> -256 (row-major-aref (simplecam-pos camera) 1))
+      (setf (simplecam-pos camera) (mat:onebyfour (list 0 256 0 1)))))
 
 (defun vec-mat (vec)
   (let ((newmat (mat:onebyfour '(0 0 0 0))))
@@ -422,17 +423,26 @@ collect all the nearest collisions with the player"
   (dirty-push (world:chop (world:chunkhashfunc i k j))))
 
 (defun setblock-with-update (i j k blockid new-light-value)
-  (if (/= blockid (world:getblock i j k))
-   (let ((old-light-value (world:getlight i j k)))
-     (when (setf (world:getblock i j k) blockid)
-       (if (< new-light-value old-light-value)
-	   (progn
-	     (de-light-node i j k)))
-       (setf (world:getlight i j k) new-light-value)
-       (sky-de-light-node i j k)
-       (unless (zerop new-light-value)
-	 (light-node i j k))
-       (block-dirtify i j k)))))
+  (let ((old-blockid (world:getblock i j k)))
+    (if (/= blockid old-blockid)
+	(let ((old-light-value (world:getlight i j k)))
+	  (when (setf (world:getblock i j k) blockid)
+	    (when (< new-light-value old-light-value)  
+	      (de-light-node i j k))
+	    (setf (world:getlight i j k) new-light-value)
+	    (sky-de-light-node i j k)
+	    (unless (zerop new-light-value)
+	      (light-node i j k))
+	    (flet ((check (a b c)
+		     (light-node (+ i a) (+ j b) (+ k c))
+		     (sky-light-node (+ i a) (+ j b) (+ k c))))
+	      (check -1 0 0)
+	      (check 1 0 0)
+	      (check 0 -1 0)
+	      (check 0 1 0)
+	      (check 0 0 -1)
+	      (check 0 0 1))
+	    (block-dirtify i j k))))))
 
 (defun world-setup ()
   (clean-dirty)

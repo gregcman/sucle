@@ -1,20 +1,5 @@
 (in-package :sandbox)
 
-;;why in the world is everything lumped in here?
-;;meshing
-;;vaos
-;;gpu data
-;;vbos and vaos
-;;meshing data
-;;main controls
-;;handling libraries
-;;handling environment
-;;handling blocks
-
-;;vaohash holds all the vaos which correlate to each chunk
-(defparameter vaohash (make-hash-table :test #'equal))
-(defparameter drawmode nil)
-
 (defstruct simplecam
   (pos (mat:onebyfour '(0.0 0.0 0.0 1)))
   (up (mat:onebyfour '(0.0 1.0 0.0 0)))
@@ -22,6 +7,7 @@
   (pitch 0)
   (fov 100))
 (defparameter ourcam (make-simplecam))
+(defparameter shaderProgram nil)
 
 (defun render ()
   "responsible for rendering the world"
@@ -32,7 +18,7 @@
   (if (in:key-p :5)
       (load-block-shader))
 
-  (use-program "blockshader")
+  (use-program :blockshader)
   (setupmatrices ourcam)
   (designatemeshing)
   (set-float "timeday" daytime)
@@ -65,7 +51,7 @@
        (if t
 	   (gl:call-list vao)
 	   (draw-vao vao)))
-     vaohash)
+    *g/call-list*)
     (gl:end-list)
     ourlist))
 
@@ -75,9 +61,9 @@
   (gl:enable :cull-face)
   (gl:cull-face :back)
   (bind-shit (case 0
-	       (0 "terrain.png")
-	       (1 "pack.png")
-	       (2 "default.png")))
+	       (0 :terrain)
+	       (1 :pack)
+	       (2 :default)))
   (if worldlist
       (gl:call-list worldlist)))
 
@@ -85,54 +71,72 @@
 
 (defun update-world-vao ()
   "updates all of the vaos in the chunkhash. takes a long time"
-  (clrhash vaohash)
+  (lclear *g/call-list*)
   (maphash
    (lambda (k v)
      (declare (ignore v))
      (dirty-push k))
    world::chunkhash))
 
+(defun load-block-shader ()
+  (lset *g/shader*
+   :blockshader
+   (make-shader-program-from-strings
+    (lget *g/text* :bs-vs)
+    (lget *g/text* :bs-frag)
+    '(("position" . 0)
+      ("texCoord" . 2)
+      ("color" . 3)
+      ("blockLight" . 8)
+      ("skyLight" . 12)))))
+
+(defun load-simple-shader ()
+  (lset *g/shader*
+   :simpleshader
+   (make-shader-program-from-strings
+    (lget *g/text* :ss-vs)
+    (lget *g/text* :ss-frag)
+    '(("position" . 0)
+      ("texCoord" . 2)
+      ("color" . 3)))))
+
+(defun bind-shit (name)
+  "bind a texture located in the texture library"
+  (let ((num (lget *g/texture* name)))
+    (if num
+	(gl:bind-texture :texture-2d num)
+	(print "error-tried to use NIL texture"))))
+
+(defun use-program (name)
+  (let ((ourprog (lget *g/shader* name)))
+    (unless (eql ourprog shaderProgram)
+      (setq shaderProgram ourprog)
+      (gl:use-program ourprog))))
+
+
 (defun glinnit ()
-  "initializing things"
-  (loadletextures)
-  (load-into-texture-library "items.png")
-  (load-into-texture-library "grasscolor.png")
-  (load-into-texture-library "foliagecolor.png")
-  (load-into-texture-library "terrain.png")
-  (load-into-texture-library "default.png")
-  (load-into-texture-library "pack.png")
-  (load-into-texture-library "clouds.png")
-  (bind-shit "terrain.png")
+  (lpic-ltexture "gui/items.png" :items)
+  (lpic-ltexture "misc/grasscolor.png" :grasscolor)
+  (lpic-ltexture "misc/foliagecolor.png" :foliagecolor)
+  (lpic-ltexture "terrain.png" :terrain)
+  (lpic-ltexture "font/default.png" :default)
+  (lpic-ltexture "pack.png" :pack)
+  (lpic-ltexture "environment/clouds.png" :clouds)
+  
   (setf worldlist nil)
   (setf mesher-thread nil)
   (setf shaderProgram nil)
-  (clrhash vaohash)
-  (clrhash shaderhash)
   (load-block-shader)
   (load-simple-shader)
   (update-world-vao))
 
-(defun load-block-shader ()
-  (load-a-shader
-   "blockshader"
-   "blockshader/transforms.vs"
-   "blockshader/basictexcoord.frag"
-   '(("position" . 0)
-     ("texCoord" . 2)
-     ("color" . 3)
-     ("blockLight" . 8)
-     ("skyLight" . 12))))
-
-(defun load-simple-shader ()
-  (load-a-shader
-   "simpleshader"
-   "simpleshader/transforms.vs"
-   "simpleshader/basictexcoord.frag"
-   '(("position" . 0)
-     ("texCoord" . 2)
-     ("color" . 3))))
-
-(defun bind-shit (name)
-  "bind a texture located in the texture library"
-  (let ((num (gethash name texture-library)))
-    (gl:bind-texture :texture-2d num)))
+;;;turn a picture which is in the image library into an
+;;;opengl texture which is in the texture library
+(defun lpic-ltexture (image-name &optional (texture-name image-name))
+  (let ((thepic (lget *g/image* image-name)))
+    (if thepic
+	(destructuring-bind (h w &rest c) (array-dimensions thepic)
+	  (declare (ignore c))
+	  (let ((new-texture (create-texture-wot (array-flatten thepic) w h)))
+	    (lset *g/texture* texture-name new-texture)
+	    new-texture)))))

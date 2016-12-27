@@ -1,29 +1,24 @@
 (in-package :sandbox)
 
-(defun fatten (some-array)
-  (let* ((total-size (array-total-size some-array))
-	 (new-array (make-array total-size)))
-    (dotimes (x total-size)
-      (setf (aref new-array x) (row-major-aref some-array x)))
-    new-array))
+;;;;Tools for the manipulation of images stored as arrays of rank 3
 
-(defun getapixel (x y somepic)
-  (let* ((dims (array-dimensions somepic))
-	 (width (first dims))
-	 (depth (third dims)))
-    (let ((basenum (+ (*  depth width y) (* depth x))))
-      (vector (row-major-aref somepic (+ 0 basenum))
-	      (row-major-aref somepic (+ 1 basenum))
-	      (row-major-aref somepic (+ 2 basenum))
-	      (row-major-aref somepic (+ 3 basenum))))))
+;;;turn a multidimensional array into a single dimensional array
+;;;of the same total length
+(defun array-flatten (array)
+  (make-array (array-total-size array)
+	      :displaced-to array
+	      :element-type (array-element-type array)))
 
-(defun flip-image(darray)
-  (let* ((dims (array-dimensions darray))
-	 (myray (make-array dims)))   
-    (dotimes (w (first dims))
-      (dotimes (h (second dims))
-	(dotimes (val (third dims))
-	  (setf
-	   (aref myray (- (first dims) w 1) h val)
-	   (aref darray w h val)))))   
-    myray))
+;;;;flip an image in-place - three dimensions - does not conse
+(defun flip-image (image)
+  (destructuring-bind (height width components) (array-dimensions image)
+    (dotimes (h (- height (ash height -1)))
+      (dotimes (w width)
+	(dotimes (c components)
+	  (rotatef (aref image (- height h 1) w c)
+		   (aref image h w c))))))
+  image)
+
+;;;;load a png image from a path
+(defun load-png (filename)
+  (opticl:read-png-file filename))

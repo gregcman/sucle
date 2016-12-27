@@ -22,6 +22,7 @@
     :serial t
     :components  
     ((:file "package")
+     (:file "global") ;;global vars
      (:file "misc-math") ;;random math stuff
      (:file "misc-list") ;;random list stuff
      (:file "misc-image") ;;random image array manipulation
@@ -30,8 +31,9 @@
      (:file "thread") ;;; threading utilities
      (:file "meshing") ;;generic meshing utilities
      (:file "misc-opengl") ;;random opengl stuff
+     (:file "opengl-texture") ;;opengl texture stuff
      (:file "shader") ;;generic shader utilities
-     (:file "magic") ;;file io type stuff
+     (:file "magic") ;;initial asset loading
      (:file "blocks") ;;list of minecraft block values
      (:file "vao");;opengl vertex array objects
      (:file "draw-environment") ;;;drawing environmental factors

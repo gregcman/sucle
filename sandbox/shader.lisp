@@ -1,6 +1,4 @@
 (in-package :sandbox)
-(defparameter shaderProgram nil)
-(defparameter shaderhash (make-hash-table :test #'equal))
 
 (defun set-matrix (name matrix)
   (gl:uniform-matrix-4fv
@@ -26,20 +24,6 @@
   (gl:uniformf
    (gl:get-uniform-location shaderProgram name)
    thefloat))
-
-(defun load-a-shader (name vs frag attribs)
-  (setf (gethash name shaderhash)
-	(load-and-make-shader
-	 vs
-	 frag
-	 attribs)))
-
-(defun load-and-make-shader (vpath fpath attribs)
-  "loads a shader from a filepath and puts it into a program"
-  (make-shader-program-from-strings
-   (load-shader-file vpath)
-   (load-shader-file fpath)
-   attribs))
 
 (defun make-shader-program-from-strings
     (vertex-shader-string fragment-shader-string attribs)
@@ -71,10 +55,3 @@
       (gl:delete-shader vertexShader)
       (gl:delete-shader fragmentShader)
       shaderProgram)))
-
-(defun use-program (name)
-  (let ((ourprog (gethash name shaderhash)))
-    (unless (eql ourprog shaderProgram)
-      (setq shaderProgram ourprog)
-      (gl:use-program ourprog))))
-

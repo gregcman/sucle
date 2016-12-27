@@ -16,7 +16,13 @@
 
 (defparameter kill-button t)
 (defun init ()
+  (ensure-all-libs)
+  (clear-live-libs)
+
+  (load-assets)
+  
   (setq kill-button t)
+  
   (setq out:width (if nil 512 854) out:height (if nil 512 480))
   (out:push-dimensions nil)
   (in::initialize)

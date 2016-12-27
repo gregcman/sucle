@@ -45,7 +45,7 @@
     (if coords
 	(if shape
 	    (progn
-	      (setf (gethash coords vaohash) (shape-list shape))
+	      (lset *g/call-list* coords (shape-list shape))
 	      (setf worldlist (genworldcallist)))
 	    (dirty-push coords))))
   (setf mesher-thread nil))
