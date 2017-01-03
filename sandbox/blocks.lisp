@@ -915,11 +915,11 @@
       (t 3))))
 
 (deffunc colormultiplier 'tallgrass
-  (lambda () (sandbox::getapixel 0 255 (gethash "grasscolor.png" sandbox::picture-library))))
+  (lambda () (sandbox::getapixel 0 255 (sandbox::lget sandbox::*g/image* "misc/grasscolor.png"))))
 (deffunc colormultiplier 'grass
-  (lambda () (sandbox::getapixel 0 255 (gethash "grasscolor.png" sandbox::picture-library))))
+  (lambda () (sandbox::getapixel 0 255 (sandbox::lget sandbox::*g/image* "misc/grasscolor.png"))))
 (deffunc colormultiplier 'leaves
-  (lambda () (sandbox::getapixel 0 255 (gethash "foliagecolor.png" sandbox::picture-library))))
+  (lambda () (sandbox::getapixel 0 255 (sandbox::lget sandbox::*g/image* "misc/foliagecolor.png"))))
 
 (buildblocks)
     

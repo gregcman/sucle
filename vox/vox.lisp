@@ -83,18 +83,29 @@
 		 (the fixnum (ash (mod y p!uoffset1) p!num1-start))
 		 (the fixnum (ash (mod x p!uoffset0) p!num0-start))))))
 
-(defmacro signed-unsiged (x n)
-  (let ((n (eval n)))
-    `(- (mod (the fixnum (+ ,x ,(/ n 2))) ,n) ,(/ n 2))))
+;;;;which one is faster???
+
+(if nil
+    (defmacro signed-unsigned (x n)
+      (let ((n (eval n)))
+	`(- (mod (the fixnum (+ ,x ,(/ n 2))) ,n) ,(/ n 2))))
+
+    (defmacro signed-unsigned (x n)
+      (let ((n (eval n)))
+	`(let ((a ,x))
+	   (if (> ,(/ n 2) a) 
+	       a
+	       (- a ,n))))))
+
 (defun gen-unpacker(spec)
   `((fixnum)
-    (values (signed-unsiged
+    (values (signed-unsigned
 	     ,(if (zerop (coge:rp spec 'p!num0-start))
 		  `(logand fixnum (1- (ash 1 p!num0-size)))  
 		  `(ldb (byte p!num0-size p!num0-start) fixnum)) p!uoffset0)
-	    (signed-unsiged
+	    (signed-unsigned
 	     (LDB (byte p!num1-size p!num1-start) fixnum) p!uoffset1)
-	    (signed-unsiged
+	    (signed-unsigned
 	     (ash fixnum (- p!num2-start)) p!uoffset2))))
 
 (defun gen-mask-overflow ()
@@ -119,13 +130,28 @@
 	(start-1 (coge:rp spec 'p!num1-start))
 	(start-2 (coge:rp spec 'p!num2-start)))
     (let ((first-shift (- start-2 size-0 size-1))
-	  (second-shift (- start-2 start-1 size-1)))
+	  (second-shift (- start-2 start-1 size-1))
+	  (end-size (+ size-0 size-1 size-2)))
       `((code)
-	(let ((c (p!anti-chop code)))
-	  (the (unsigned-byte ,(+ size-0 size-1 size-2))
-	       (ash (logior (the fixnum (ash c ,first-shift))
-			    (the fixnum (ash c ,second-shift))
-			    c) ,(- first-shift))))))))
+	(let ((c (p!anti-chop code)))	  
+	  (the (unsigned-byte ,end-size)
+	       ,(if (and (= size-0 size-1 size-2)
+			 (= start-1 26)
+			 (= start-2 52))
+		    `(ash (logior (the fixnum (ash c ,first-shift))
+				  (the fixnum (ash c ,second-shift))
+				  c)
+			  ,(- first-shift))
+		    `(ash (logior (the fixnum
+				       (ash (logand c ,(1- (ash 1 size-0)))
+						   ,first-shift))
+				  (the fixnum
+				       (ash
+					(logand c ,(ash (1- (ash 1 size-1))
+							start-1))
+					,second-shift))
+				  c)
+			  ,(- first-shift)))))))))
 
 (defun gen-add ()
   `((a b) (p!rem-flow (+ a b))))

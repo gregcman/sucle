@@ -22,3 +22,10 @@
 ;;;;load a png image from a path
 (defun load-png (filename)
   (opticl:read-png-file filename))
+
+(defun getapixel (h w image)
+  (destructuring-bind (height width c) (array-dimensions image)
+    (declare (ignore height))
+    (make-array 4 :element-type (array-element-type image)
+		:displaced-to image
+		:displaced-index-offset (* c (+ w (* h width))))))

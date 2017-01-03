@@ -1,127 +1,5 @@
 (in-package :sandbox)
 
-;;i- i+ j- j+ k- k+
-(defparameter blockfaces
-  (vector
-   (lambda ()
-     (list
-      (vertex
-       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.6) (blocklight) (skylight))
-      (vertex
-       (pos -0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.6) (blocklight) (skylight))
-      (vertex
-       (pos -0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.6) (blocklight) (skylight))
-      (vertex
-       (pos -0.5  0.5 -0.5) (uv 0.0 1.0) (opgray 0.6) (blocklight) (skylight))))
-   (lambda () 
-     (list
-      (vertex
-       (pos 0.5 -0.5 -0.5)  (uv 1.0 0.0) (opgray 0.6) (blocklight) (skylight))
-      (vertex
-       (pos 0.5  0.5 -0.5)  (uv 1.0 1.0) (opgray 0.6) (blocklight) (skylight))
-      (vertex
-       (pos 0.5  0.5  0.5)  (uv 0.0 1.0) (opgray 0.6) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 -0.5  0.5)  (uv 0.0 0.0) (opgray 0.6) (blocklight) (skylight))))
-   (lambda ()
-     (list
-      (vertex
-       (pos -0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 0.5) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 -0.5 -0.5)  (uv 1.0 0.0)  (opgray 0.5) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 -0.5  0.5)  (uv 1.0 1.0)  (opgray 0.5) (blocklight) (skylight))
-      (vertex
-       (pos -0.5 -0.5  0.5)  (uv 0.0 1.0) (opgray 0.5) (blocklight) (skylight))))
-   (lambda ()
-     (list
-      (vertex
-       (pos -0.5 0.5 -0.5) (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos -0.5 0.5 0.5) (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 0.5 0.5) (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))))
-   (lambda ()
-     (list
-      (vertex
-       (pos -0.5 -0.5 -0.5) (uv 1.0 0.0) (opgray 0.8) (blocklight) (skylight))
-      (vertex
-       (pos -0.5 0.5 -0.5) (uv 1.0 1.0) (opgray 0.8)(blocklight) (skylight))
-      (vertex
-       (pos 0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 0.8) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 0.8) (blocklight) (skylight))))
-   (lambda ()
-     (list
-      (vertex
-       (pos -0.5 -0.5  0.5)  (uv 0.0 0.0)(opgray 0.8) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 0.8) (blocklight) (skylight))
-      (vertex
-       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 0.8)(blocklight) (skylight))
-      (vertex
-       (pos -0.5  0.5  0.5)  (uv 0.0 1.0) (opgray 0.8) (blocklight) (skylight))))))
-
-(defun skylight ()
-  (vector 0.0))
-(defun blocklight ()
-  (vector 0.0))
-(defun opgray (val)
-  (rgba val val val 1.0))
-(defun vertex (&rest args)
-  (make-array (length args) :initial-contents args))
-(defun rgba (r g b a)
-  (vector r g b a))
-(defun pos (x y z)
-  (vector x y z))
-(defun uv (u v)
-  (vector u v))
-
-;;current layout: 3 position floats, 2 texcoord floats, 4 color floats
-
-(defun increment-verts (x y z verts)
-  "linear translation of vertices"
-  (dolist (n verts)
-    (let ((pos (elt n 0)))
-      (incf (aref pos 0) x)
-      (incf (aref pos 1) y)
-      (incf (aref pos 2) z)))
-  verts)
-
-(defun fuck-verts (r g b a verts)
-  (dolist (n verts)
-    (let ((color (elt n 2)))
-      (incf (aref color 0) r)
-      (incf (aref color 1) g)
-      (incf (aref color 2) b)
-      (incf (aref color 3) a)))
-  verts)
-
-(defun cunt-verts (r g b a verts)
-  (dolist (n verts)
-    (cunt-vert r g b a (elt n 2)))
-  verts)
-
-(defun cunt-vert (r g b a n)
-  "colorize a vertex"
-  (setf (aref n 0) (* (aref n 0) r))
-  (setf (aref n 1) (* (aref n 1) g))
-  (setf (aref n 2) (* (aref n 2) b))
-  (setf (aref n 3) (* (aref n 3) a))
-  n)
-
-(defun %damn-fuck (verts num)
-  "converts 0-1 texcoords to terrain.png coords"
-  (let* ((xtrans (mod num 16))
-	 (ytrans (- 15 (/ (- num xtrans) 16))))
-    (dolist (vim verts)
-      (let ((v (elt vim 1)))
-	(setf (aref v 0) (+ (/ (aref v 0) 16) (/ xtrans 16)))
-	(setf (aref v 1) (+ (/ (aref v 1) 16) (/  ytrans 16)))))
-    verts))
-
 (defparameter shapebuffer (make-shape))
 
 (defun chunk-shape (chunk-position)
@@ -138,208 +16,226 @@
 	   (if (not (zerop blockid))
 	       (let ((fineshape
 		      (blockshape
-		       io jo ko
-		       blockid
-		       (lambda (a b c)
-			 (world:getblock (+ a i) (+ b j) (+ c k)))
-		       (lambda (a b c)
-			 (world:getlight (+ a i) (+ b j) (+ c k)))
-		       (lambda (a b c)
-			 (world:skygetlight (+ a i) (+ b j) (+ c k))) )))
-		 (dolist (face (coerce (delete nil fineshape) 'list))
-		   (increment-verts i j k face))
+		       i j k
+		       blockid)))
 		 (reduce
 		  #'add-verts
 		  fineshape
 		  :initial-value new-shape)))))))
       new-shape)))
 
-(defun blockshape (i j k blockid getempty betlight getskylightz)
-  (let ((faces
-	 (case (aref mc-blocks::getrendertype blockid)
-	   (0 (renderstandardblock blockid getempty betlight getskylightz))
-	   (1 (renderblockreed blockid i j k betlight getskylightz))
-	   (t (make-array 6 :initial-element nil)))))
-  
-    (if (= blockid 2)
-	(let ((ourfunc (aref mc-blocks::getblocktexture blockid)))
-	  (dotimes (n 6)
-	    (let ((newvert (aref faces n)))
-	      (%damn-fuck newvert (funcall ourfunc n)))))
-	(let ((the-skin (aref mc-blocks::blockIndexInTexture blockid)))
-	  (dotimes (n (length faces))
-	    (let ((newvert (aref faces n)))
-	      (%damn-fuck newvert the-skin)))))
-    (let ((colorizer (aref mc-blocks::colormultiplier blockid)))
-      (if (functionp colorizer)
-	  (if (= 2 blockid)
-	      (let ((face (elt faces 1)))
-		(colorize face (funcall colorizer)))
-	      (dotimes (n (length faces))
-		(let ((face (elt faces n)))
-		  (colorize face (funcall colorizer)))))))
-    faces))
+(defun blockshape (i j k blockid)
+  (ret faces (renderstandardblock blockid i j k)))
 
-(eval-when (:load-toplevel :compile-toplevel :execute)
-  (defun meep (n)
-    (let ((position nil)
-	  (val nil))
-      (multiple-value-bind (a b) (floor n 2)
-	(setf val (if (zerop b)
-		      -1
-		      1))
-	(setf position (mod (- 1 a) 3)))
-      (list position val)))
+;;;if the block is air, the side gets rendered. if the block is transparent
+;;;and the same type ex: texture between glass - there is no texture - if they are
+;;;different - water and glass -it shows
+(defun show-sidep (blockid other-blockid)
+  (or (zerop other-blockid)
+      (and (/= blockid other-blockid)
+	   (not (aref mc-blocks::opaquecubelooukup other-blockid)))))
 
-  (defun moop (n)
-    (let* ((posses (list 0 0 0))
-	   (vals (meep n))
-	   (wowee (vector 0 1 2))
-	   (pair (vector 2 3 0 1 4 5))
-	   (position (first vals)))
-      (setf (elt posses  position) (second vals))
-      (setf wowee (concatenate 'list (remove position wowee) (vector position)))
-      (list* n posses wowee (elt pair n) vals))))
+(defmacro with-texture-translator ((x-name y-name) num-form &body body)
+  (let ((num-form-sym (gensym)))
+    `(progn
+       (let ((,num-form-sym ,num-form))
+	 (let ((,x-name (mod ,num-form-sym 16)))
+	   (let ((,y-name (- 15.0 (ash (- ,num-form-sym ,x-name) -4))))
+	     ,@body))))))
 
-(defmacro drawblockface (side)
-  (let ((vals (moop side)))
-    (let ((a (second vals))
-	  (b (third vals)))
-      `(let ((blockidnexttome (funcall getempty ,@a)))
-	 (if
-	  (or
-	   (zerop blockidnexttome)
-	   (and (not (aref mc-blocks::opaquecubelooukup blockidnexttome))
-		(not (= blockid blockidnexttome))))
-	  (let ((newvert (funcall (elt blockfaces ,(fourth vals)))))
-	    (lightvert2 newvert betlight ,@b getskylightz)
-	    (setf (aref faces ,side) newvert)))))))
 
-(defmacro actuallywow ()
-  (let ((tot (list 'progn)))
-    (dotimes (n 6)
-      (push (list 'drawblockface n) tot))
-    (nreverse tot)))
+(defun trans (foo foo-translator)
+  (/ (+ foo foo-translator) 16.0))
 
-(defun renderstandardblock (blockid getempty betlight getskylightz)
-  (let* ((faces (make-array 6 :initial-element nil)))
-    (actuallywow)
-    faces))
 
-(defparameter xfaces
-  (vector
-   (lambda ()
-     (list
-      (vertex
-       (pos -0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos  0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos  0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos -0.5  0.5 -0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))))
-   (lambda () 
-     (list
-      (vertex
-       (pos -0.5 -0.5 -0.5)  (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos -0.5  0.5 -0.5)  (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos 0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))))
-   (lambda ()
-     (list
-      (vertex
-       (pos 0.5 -0.5 -0.5) (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos 0.5 0.5 -0.5) (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos -0.5 0.5 0.5) (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos -0.5 -0.5 0.5) (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))))
-   (lambda ()
-     (list
-      (vertex
-       (pos 0.5 -0.5  -0.5)  (uv 0.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos -0.5 -0.5  0.5)  (uv 1.0 0.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos -0.5  0.5  0.5)  (uv 1.0 1.0) (opgray 1.0) (blocklight) (skylight))
-      (vertex
-       (pos 0.5  0.5  -0.5)  (uv 0.0 1.0) (opgray 1.0) (blocklight) (skylight))))))
+(defun renderstandardblock (id i j k)
+  (with-texture-translator (tu tv) (aref mc-blocks::blockIndexInTexture id)
+      (ret faces nil
+	(let ((adj-id (world:getblock i (1- j) k)))
+	  (when (show-sidep id adj-id) 
+	    (let ((newvert (side-j i j k tu tv)))
+	      (push newvert faces))))
+	(let ((adj-id (world:getblock i (1+ j) k)))
+	  (when (show-sidep id adj-id) 
+	    (let ((newvert (side+j i j k tu tv)))
+	      (push newvert faces))))
+	(let ((adj-id (world:getblock (1- i) j k)))
+	  (when (show-sidep id adj-id) 
+	    (let ((newvert (side-i i j k tu tv)))
+	      (push newvert faces))))
+	(let ((adj-id (world:getblock (1+ i) j k)))
+	  (when (show-sidep id adj-id) 
+	    (let ((newvert (side+i i j k tu tv)))
+	      (push newvert faces))))
+	(let ((adj-id (world:getblock i j (1- k))))
+	  (when (show-sidep id adj-id)
+	    (let ((newvert (side-k i j k tu tv)))
+	      (push newvert faces))))
+	(let ((adj-id (world:getblock i j (1+ k))))
+	  (when (show-sidep id adj-id) 
+	    (let ((newvert (side+k i j k tu tv)))
+	      (push newvert faces)))))))
 
-(defun renderBlockReed (blockid i j k betlight getskylightz)
-  (let* ((faces (make-array 4 :initial-element nil)))
-    (let ((lighthere (coerce (funcall betlight 0 0 0) 'float))
-	  (skylighthere (coerce (funcall getskylightz 0 0 0) 'float)))
-      (dotimes (n 4)
-	(let ((newface (funcall (elt xfaces n))))
-	  (setf (elt faces n) newface)
-	  (dolist (v newface)
-	    (setf (elt v 3) (allvec4 (lightfunc lighthere)))
-	    (setf (elt v 4) (allvec4 (lightfunc skylighthere)))))))
-    faces))
+(defmacro %edge-aux (getfunc
+		     (x0 y0 z0)
+		     (x1 y1 z1)
+		     (x2 y2 z2)
+		     (x3 y3 z3))
+  `(vector
+    (lightfunc (,getfunc (+ i ,x0) (+ j ,y0) (+ k ,z0)))
+    (lightfunc (,getfunc (+ i ,x1) (+ j ,y1) (+ k ,z1)))
+    (lightfunc (,getfunc (+ i ,x2) (+ j ,y2) (+ k ,z2)))
+    (lightfunc (,getfunc (+ i ,x3) (+ j ,y3) (+ k ,z3)))))
 
-(defun allvec4 (num)
-  (vector
-   num
-   num
-   num
-   num))
-
-(defun colorize (face colorizer)
-  (cunt-verts
-   (/ (elt colorizer 0) 256)
-   (/ (elt colorizer 1) 256)
-   (/ (elt colorizer 2) 256)
-   (/ (elt colorizer 3) 256)
-   face))
+(defun light-edge-i (i j k)
+  (%edge-aux world:getlight
+	     (0 1 1)
+	     (0 0 1)
+	     (0 0 0)
+	     (0 1 0)))
+(defun light-edge-j (i j k)
+  (%edge-aux world:getlight
+	     (1 0 1)
+	     (0 0 1)
+	     (0 0 0)
+	     (1 0 0)))
+(defun light-edge-k (i j k)
+  (%edge-aux world:getlight
+	     (1 1 0)
+	     (0 1 0)
+	     (0 0 0)
+	     (1 0 0)))
+(defun skylight-edge-i (i j k)
+  (%edge-aux world:skygetlight
+	     (0 1 1)
+	     (0 0 1)
+	     (0 0 0)
+	     (0 1 0)))
+(defun skylight-edge-j (i j k)
+  (%edge-aux world:skygetlight
+	     (1 0 1)
+	     (0 0 1)
+	     (0 0 0)
+	     (1 0 0)))
+(defun skylight-edge-k (i j k)
+  (%edge-aux world:skygetlight
+	     (1 1 0)
+	     (0 1 0)
+	     (0 0 0)
+	     (1 0 0)))
 
 (defun lightfunc (light)
   (expt 0.8 (- 15 light)))
 
-(defun vec3getlight (lelight vec3)
-  (coerce
-   (funcall lelight
-	    (elt vec3 0)
-	    (elt vec3 1)
-	    (elt vec3 2))
-   'float))
-
-(defun avg (&rest args)
-  (/ (apply (function +) args) (length args)))
-
-(defun insert-at (num vec place)
-  (let* ((start (subseq vec 0 place))
-	 (end (subseq vec place (length vec))))
-    (concatenate 'vector start (vector num) end)))
-
-(defun lightvert2 (face getlight a b unchange skylit)
-  (dolist (v face)
-    (let ((vert (elt v 0)))    
-      (let ((foo (round (* 2 (elt vert a))))
-	    (bar (round (* 2 (elt vert b))))
-	    (qux (round (* 2 (elt vert unchange)))))
-	(let ((uno (vec3getlight getlight (insert-at  qux (vector foo bar) unchange )))
-	      (dos (vec3getlight getlight (insert-at  qux (vector foo 0) unchange )))
-	      (tres (vec3getlight getlight (insert-at qux (vector 0 bar) unchange )))
-	      (quatro (vec3getlight getlight (insert-at qux (vector 0 0) unchange ))))
-	  (let ((foo (round (* 2 (elt vert a))))
-		(bar (round (* 2 (elt vert b))))
-		(qux (round (* 2 (elt vert unchange)))))
-	    (let* ((1dos (vec3getlight skylit (insert-at qux (vector foo 0) unchange )))
-		   (1tres (vec3getlight skylit (insert-at qux (vector 0 bar) unchange )))
-		   (1quatro (vec3getlight skylit (insert-at qux (vector 0 0) unchange )))
-		   (1uno (vec3getlight skylit (insert-at  qux (vector foo bar) unchange ))))
-	      (setf (elt v 3) (apply #'vector (mapcar #'lightfunc (list uno dos tres quatro))))
-	      (setf (elt v 4) (apply #'vector (mapcar #'lightfunc (list 1uno 1dos 1tres 1quatro))))
-	      (progno
-	       (let ((anum (lightfunc (avg (max 1uno uno)
-					   (max 1dos dos)
-					   (max 1tres tres)
-					   (max 1quatro quatro)))))
-		 (cunt-vert anum anum anum 1.0 (elt v 2)))))))))))
-
 ;;0.9 for nether
-;;0.8 for overworld
+;;0.8 for overworld(in-package :sandbox)
+
+(defmacro squareface (light-edge-fnc
+		      skylight-edge-fnc
+		      color
+		      (x0 y0 z0)
+		      (u0 v0)
+		      (i0 j0 k0)
+		      (x1 y1 z1)
+		      (u1 v1)
+		      (i1 j1 k1)
+		      (x2 y2 z2)
+		      (u2 v2)
+		      (i2 j2 k2)
+		      (x3 y3 z3)
+		      (u3 v3)
+		      (i3 j3 k3))
+  `(list
+    (let ((xpos (+ i ,i0))
+	  (ypos (+ j ,j0))
+	  (zpos (+ k ,k0)))
+      (vertex
+       (pos (+ i ,x0) (+ j ,y0) (+ k ,z0)) (uv (trans ,u0 u-offset) (trans ,v0 v-offset))
+       (opgray ,color)   
+       (,light-edge-fnc xpos ypos zpos)
+       (,skylight-edge-fnc xpos ypos zpos)))
+    (let ((xpos (+ i ,i1))
+	  (ypos (+ j ,j1))
+	  (zpos (+ k ,k1)))
+      (vertex
+       (pos (+ i ,x1) (+ j ,y1) (+ k ,z1)) (uv (trans ,u1 u-offset) (trans ,v1 v-offset))
+       (opgray ,color)
+       (,light-edge-fnc xpos ypos zpos)
+       (,skylight-edge-fnc xpos ypos zpos)))
+    (let ((xpos (+ i ,i2))
+	  (ypos (+ j ,j2))
+	  (zpos (+ k ,k2)))
+      (vertex
+       (pos (+ i ,x2) (+ j ,y2) (+ k ,z2)) (uv (trans ,u2 u-offset) (trans ,v2 v-offset))
+       (opgray ,color)
+       (,light-edge-fnc xpos ypos zpos)
+       (,skylight-edge-fnc xpos ypos zpos)))
+    (let ((xpos (+ i ,i3))
+	  (ypos (+ j ,j3))
+	  (zpos (+ k ,k3)))
+      (vertex
+       (pos (+ i ,x3) (+ j ,y3) (+ k ,z3)) (uv (trans ,u3 u-offset) (trans ,v3 v-offset))
+       (opgray ,color)
+       (,light-edge-fnc xpos ypos zpos)
+       (,skylight-edge-fnc xpos ypos zpos)))))
+
+(defun side-i (i j k u-offset v-offset)
+  (squareface light-edge-i
+	      skylight-edge-i
+	      0.6
+	      (-0.5 -0.5 -0.5) (0.0 0.0) (-1 -1 -1)
+	      (-0.5 -0.5  0.5) (1.0 0.0) (-1 -1 00)
+	      (-0.5  0.5  0.5) (1.0 1.0) (-1 00 00)
+	      (-0.5  0.5 -0.5) (0.0 1.0) (-1 00 -1)))
+(defun side+i (i j k u-offset v-offset) 
+  (squareface light-edge-i
+	      skylight-edge-i
+	      0.6
+	      (0.5 -0.5 -0.5) (1.0 0.0) (1 -1 -1)
+	      (0.5  0.5 -0.5) (1.0 1.0) (1 00 -1)
+	      (0.5  0.5  0.5) (0.0 1.0) (1 00 00)
+	      (0.5 -0.5  0.5) (0.0 0.0) (1 -1 00)))
+(defun side-j (i j k u-offset v-offset)
+  (squareface light-edge-j
+	      skylight-edge-j
+	      0.5
+	      (-0.5 -0.5 -0.5) (0.0 0.0) (-1 -1 -1)
+	      ( 0.5 -0.5 -0.5) (1.0 0.0) (00 -1 -1)
+	      ( 0.5 -0.5  0.5) (1.0 1.0) (00 -1 00)
+	      (-0.5 -0.5  0.5) (0.0 1.0) (-1 -1 00)))
+(defun side+j (i j k u-offset v-offset)
+  (squareface light-edge-j
+	      skylight-edge-j
+	      1.0
+	      (-0.5 0.5 -0.5) (0.0 0.0) (-1 1 -1)
+	      (-0.5 0.5  0.5) (1.0 0.0) (-1 1 00)
+	      ( 0.5 0.5  0.5) (1.0 1.0) (00 1 00)
+	      ( 0.5 0.5 -0.5) (0.0 1.0) (00 1 -1)))
+(defun side-k (i j k u-offset v-offset)
+  (squareface light-edge-k
+	      skylight-edge-k
+	      0.8   
+	      (-0.5 -0.5 -0.5) (1.0 0.0) (-1 -1 -1)
+	      (-0.5  0.5 -0.5) (1.0 1.0) (-1 00 -1)
+	      ( 0.5  0.5 -0.5) (0.0 1.0) (00 00 -1)
+	      ( 0.5 -0.5 -0.5) (0.0 0.0) (00 -1 -1)))
+(defun side+k (i j k u-offset v-offset)
+  (squareface  light-edge-k
+	       skylight-edge-k
+	       0.8     
+	       (-0.5 -0.5  0.5) (0.0 0.0) (-1 -1 1)
+	       ( 0.5 -0.5  0.5) (1.0 0.0) (00 -1 1)    
+	       ( 0.5  0.5  0.5) (1.0 1.0) (00 00 1)    
+	       (-0.5  0.5  0.5) (0.0 1.0) (-1 00 1)))
+
+
+(defun opgray (val)
+  (rgba val val val 1.0))
+(defun vertex (&rest args)
+  (make-array (length args) :initial-contents args))
+(defun rgba (r g b a)
+  (vector r g b a))
+(defun pos (x y z)
+  (vector x y z))
+(defun uv (u v)
+  (vector u v))

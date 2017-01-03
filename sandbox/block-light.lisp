@@ -104,7 +104,7 @@
 		 (%0check -1 0 0)
 		 (%0check 1 0 0)
 		 (if (= 15 light-level)
-		     (downcheck 0 -1 0)`
+		     (downcheck 0 -1 0)
 		     (%0check 0 -1 0))
 		 (%0check 0 1 0)
 		 (%0check 0 0 -1)
