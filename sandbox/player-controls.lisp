@@ -393,9 +393,9 @@ collect all the nearest collisions with the player"
 (defun get-blocks-around-player (px py pz)
   "get the blocks around player"
   (let ((places nil))
-    (dotimes (x 5)
+    (dotimes (x 6)
       (dotimes (y 6)
-	(dotimes (z 5)
+	(dotimes (z 6)
  	  (let ((blockx (round (- (+ x px) 2)))
 		(blocky (round (- (ceiling (+ y py)) 2)))
 		(blockz (round (- (+ z pz) 2))))
