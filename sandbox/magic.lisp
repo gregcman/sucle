@@ -33,12 +33,15 @@
 (defparameter ?images nil)
 (defparameter ?shaders nil)
 
+(defun load-shaders ()
+  (load-file-text (shader-path "blockshader/transforms.vs") :bs-vs)
+  (load-file-text (shader-path "blockshader/basictexcoord.frag") :bs-frag)
+  (load-file-text (shader-path "simpleshader/transforms.vs") :ss-vs)
+  (load-file-text (shader-path "simpleshader/basictexcoord.frag") ::ss-frag))
+
 (defun load-assets ()
   (unless ?shaders
-    (load-file-text (shader-path "blockshader/transforms.vs") :bs-vs)
-    (load-file-text (shader-path "blockshader/basictexcoord.frag") :bs-frag)
-    (load-file-text (shader-path "simpleshader/transforms.vs") :ss-vs)
-    (load-file-text (shader-path "simpleshader/basictexcoord.frag") ::ss-frag)
+    (load-shaders)
     (setf ?shaders t))
   (unless ?images
     (load-file-images (expand-paths png-resources) dir-mc-assets)

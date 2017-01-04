@@ -10,33 +10,39 @@
 	(giveworktomesherthread achunk)))))
 
 (defun shape-list (the-shape)
+ ;; (declare (optimize (speed 3) (safety 0)))
   (let ((ourlist (gl:gen-lists 1))
 	(verts (shape-vs the-shape))
-	(vertsize 17))
+	(vertsize 6))
+    (declare (type (simple-array single-float *) verts))
     (gl:new-list ourlist :compile)
     (macrolet ((wow (num start)
 		 `(gl:vertex-attrib ,num
-				    (elt verts (+ base ,start 0))
-				    (elt verts (+ base ,start 1))
-				    (elt verts (+ base ,start 2))
-				    (elt verts (+ base ,start 3))))
+				    (aref verts (+ base (+ ,start 0)))
+				    (aref verts (+ base (+ ,start 1)))
+				    (aref verts (+ base (+ ,start 2)))
+				    (aref verts (+ base (+ ,start 3)))))
 	       (wow2 (num start)
 		 `(gl:vertex-attrib ,num
-				    (elt verts (+ base ,start 0))
-				    (elt verts (+ base ,start 1))))
+				    (aref verts (+ base (+ ,start 0)))
+				    (aref verts (+ base (+ ,start 1)))))
 	       (wow3 (num start)
 		 `(gl:vertex-attrib ,num
-				    (elt verts (+ base ,start 0))
-				    (elt verts (+ base ,start 1))
-				    (elt verts (+ base ,start 2)))))
+				    (aref verts (+ base (+ ,start 0)))
+				    (aref verts (+ base (+ ,start 1)))
+				    (aref verts (+ base (+ ,start 2)))))
+	       (wow1 (num start)
+		 `(gl:vertex-attrib ,num
+				    (aref verts (+ base ,start)))))
       (gl:with-primitives :quads
 	(dotimes (x (shape-vertlength the-shape))
 	  (let ((base (* x vertsize)))
-	    (wow2 2 3)
-	    (wow 3 5)
-	    (wow 8 9)
-	    (wow 12 13)
-	    (wow3 0 0)))))
+	    (wow1 8 5) ;darkness
+	    (wow2 2 3) ;uv
+	    ;;	    (wow 8 9)
+	    ;;	    (wow 12 13)
+	    (wow3 0 0) ;position
+	    ))))
     (gl:end-list)
     ourlist))
 
@@ -45,7 +51,10 @@
     (if coords
 	(if shape
 	    (progn
+	      (let ((old-call-list (lget *g/call-list* coords)))
+		(when old-call-list (gl:delete-lists old-call-list 1)))
 	      (lset *g/call-list* coords (shape-list shape))
+	      (when worldlist (gl:delete-lists worldlist 1))
 	      (setf worldlist (genworldcallist)))
 	    (dirty-push coords))))
   (setf mesher-thread nil))

@@ -12,18 +12,22 @@
 (defun render ()
   "responsible for rendering the world"
 
-  (gl:clear :depth-buffer-bit :color-buffer-bit)
+  (gl:clear
+   :color-buffer-bit
+   :depth-buffer-bit)
+
   (if (in:key-p :g)
       (update-world-vao))
-  (if (in:key-p :5)
-      (load-block-shader))
+  (when (in:key-p :5)
+    (load-shaders)
+    (load-block-shader))
 
   (use-program :blockshader)
   (setupmatrices ourcam)
   (designatemeshing)
   (set-float "timeday" daytime)
   (set-overworld-fog daytime)
-    
+  
   (draw-chunk-meshes)
   (window:update-display))
 
@@ -71,6 +75,10 @@
 
 (defun update-world-vao ()
   "updates all of the vaos in the chunkhash. takes a long time"
+  (maphash (lambda (k v)
+	     (declare (ignorable k))
+		   (gl:delete-lists v 1))
+	   *g/call-list*)
   (lclear *g/call-list*)
   (maphash
    (lambda (k v)
@@ -86,9 +94,10 @@
     (lget *g/text* :bs-frag)
     '(("position" . 0)
       ("texCoord" . 2)
-      ("color" . 3)
-      ("blockLight" . 8)
-      ("skyLight" . 12)))))
+      ("darkness" . 8)
+  ;;    ("blockLight" . 8)
+   ;;   ("skyLight" . 12)
+      ))))
 
 (defun load-simple-shader ()
   (lset *g/shader*

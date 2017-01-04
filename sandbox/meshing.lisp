@@ -6,13 +6,12 @@
 
 (defstruct shape
   (is (make-array 0 :adjustable t :fill-pointer 0))
-  (vs (make-array 0 :adjustable t :fill-pointer 0))
-  (vertlength 0)
-  (indexlength 0))
+  (vs (make-array (ash 2 20) :element-type 'single-float))
+  (vertlength 0 :type fixnum)
+  (indexlength 0 :type fixnum))
 
 (defun destroy-shape (leshape)
   (setf (fill-pointer (shape-is leshape)) 0)
-  (setf (fill-pointer (shape-vs leshape)) 0)
   (setf (shape-vertlength leshape) 0)
   (setf (shape-indexlength leshape) 0)
   leshape)
@@ -64,10 +63,12 @@
     (incf (shape-vertlength s1) len)
     (incf (shape-indexlength s1) (- len 2))
     (dolist (v verts)
-      (dotimes (n (length v))
-	(let ((indivdata (aref v n)))
-	  (dotimes (q (length indivdata))
-	    (vector-push-extend (aref indivdata q) (shape-vs s1))))))
+      (add-vert s1 v))
     s1))
 
 
+(defun add-vert (shape v)
+;  (incf (shape-vertlength shape))
+  (dotimes (n (length v))
+    (let ((indivdata (aref v n)))
+      (vector-push-extend indivdata (shape-vs shape)))))

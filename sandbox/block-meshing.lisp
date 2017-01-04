@@ -1,6 +1,28 @@
 (in-package :sandbox)
 
 (defparameter shapebuffer (make-shape))
+(defparameter shapebuffer-vs (shape-vs shapebuffer))
+
+(declaim (inline add-to-shapebuffer))
+(defun add-to-shapebuffer (x y z u v darkness b0 b1 b2 b3 s0 s1 s2 s3)
+  (declare (type (simple-array single-float *) shapebuffer-vs))
+  (declare (type single-float x y z darkness b0 b1 b2 b3 s0 s1 s2 s3))
+  ;(declare (optimize (speed 3) (safety 0)))
+  (let ((vertlength (shape-vertlength shapebuffer)))
+    (declare (type fixnum vertlength))
+    (let ((fp (* 6 vertlength)))
+      (setf (aref shapebuffer-vs (+ fp 0)) x
+	    (aref shapebuffer-vs (+ fp 1)) y
+	    (aref shapebuffer-vs (+ fp 2)) z
+	    (aref shapebuffer-vs (+ fp 3)) (coerce u 'single-float)
+	    (aref shapebuffer-vs (+ fp 4)) (coerce v 'single-float)	    
+	    (aref shapebuffer-vs (+ fp 5)) (* 0.25
+					      darkness
+					      (+ (max b0 (* daytime s0))
+						 (max b1 (* daytime s1))
+						 (max b2 (* daytime s2))
+						 (max b3 (* daytime s3)))))))
+  (incf (shape-vertlength shapebuffer)))
 
 (defun chunk-shape (chunk-position)
   (declare (optimize (speed 3)))
@@ -13,15 +35,10 @@
 	(dorange
 	 (k ko 16)
 	 (let ((blockid (world:getblock i j k)))
-	   (if (not (zerop blockid))
-	       (let ((fineshape
-		      (blockshape
-		       i j k
-		       blockid)))
-		 (reduce
-		  #'add-verts
-		  fineshape
-		  :initial-value new-shape)))))))
+	   (unless (zerop blockid)
+	     (blockshape
+	      i j k
+	      blockid))))))
       new-shape)))
 
 (defun blockshape (i j k blockid)
@@ -40,95 +57,124 @@
     `(progn
        (let ((,num-form-sym ,num-form))
 	 (let ((,x-name (mod ,num-form-sym 16)))
-	   (let ((,y-name (- 15.0 (ash (- ,num-form-sym ,x-name) -4))))
+	   (let ((,y-name (- 15 (ash (- ,num-form-sym ,x-name) -4))))
 	     ,@body))))))
 
-
-(defun trans (foo foo-translator)
-  (/ (+ foo foo-translator) 16.0))
 
 
 (defun renderstandardblock (id i j k)
   (with-texture-translator (tu tv) (aref mc-blocks::blockIndexInTexture id)
-      (ret faces nil
-	(let ((adj-id (world:getblock i (1- j) k)))
-	  (when (show-sidep id adj-id) 
-	    (let ((newvert (side-j i j k tu tv)))
-	      (push newvert faces))))
-	(let ((adj-id (world:getblock i (1+ j) k)))
-	  (when (show-sidep id adj-id) 
-	    (let ((newvert (side+j i j k tu tv)))
-	      (push newvert faces))))
-	(let ((adj-id (world:getblock (1- i) j k)))
-	  (when (show-sidep id adj-id) 
-	    (let ((newvert (side-i i j k tu tv)))
-	      (push newvert faces))))
-	(let ((adj-id (world:getblock (1+ i) j k)))
-	  (when (show-sidep id adj-id) 
-	    (let ((newvert (side+i i j k tu tv)))
-	      (push newvert faces))))
-	(let ((adj-id (world:getblock i j (1- k))))
-	  (when (show-sidep id adj-id)
-	    (let ((newvert (side-k i j k tu tv)))
-	      (push newvert faces))))
-	(let ((adj-id (world:getblock i j (1+ k))))
-	  (when (show-sidep id adj-id) 
-	    (let ((newvert (side+k i j k tu tv)))
-	      (push newvert faces)))))))
+    (let ((adj-id (world:getblock i (1- j) k)))
+      (when (show-sidep id adj-id) 
+	(side-j i j k tu tv)))
+    (let ((adj-id (world:getblock i (1+ j) k)))
+      (when (show-sidep id adj-id) 
+	(side+j i j k tu tv)))
+    (let ((adj-id (world:getblock (1- i) j k)))
+      (when (show-sidep id adj-id) 
+	(side-i i j k tu tv)))
+    (let ((adj-id (world:getblock (1+ i) j k)))
+      (when (show-sidep id adj-id) 
+	(side+i i j k tu tv)))    
+    (let ((adj-id (world:getblock i j (1- k))))
+      (when (show-sidep id adj-id)
+	(side-k i j k tu tv)))
+    (let ((adj-id (world:getblock i j (1+ k))))
+      (when (show-sidep id adj-id) 
+	(side+k i j k tu tv)))))
 
-(defmacro %edge-aux (getfunc
+(defmacro %edge-aux ((i j k)
+		     getfunc
 		     (x0 y0 z0)
 		     (x1 y1 z1)
 		     (x2 y2 z2)
 		     (x3 y3 z3))
-  `(vector
-    (lightfunc (,getfunc (+ i ,x0) (+ j ,y0) (+ k ,z0)))
-    (lightfunc (,getfunc (+ i ,x1) (+ j ,y1) (+ k ,z1)))
-    (lightfunc (,getfunc (+ i ,x2) (+ j ,y2) (+ k ,z2)))
-    (lightfunc (,getfunc (+ i ,x3) (+ j ,y3) (+ k ,z3)))))
+  `((let ((xd (+ ,i ,x0))
+	  (yd (+ ,j ,y0))
+	  (zd (+ ,k ,z0)))
+      (declare (type fixnum xd yd zd))
+      (lightfunc (,getfunc xd yd zd)))
+    (let ((xd (+ ,i ,x1))
+	  (yd (+ ,j ,y1))
+	  (zd (+ ,k ,z1)))
+      (declare (type fixnum xd yd zd))
+      (lightfunc (,getfunc xd yd zd)))
+    (let ((xd (+ ,i ,x2))
+	  (yd (+ ,j ,y2))
+	  (zd (+ ,k ,z2)))
+      (declare (type fixnum xd yd zd))
+      (lightfunc (,getfunc xd yd zd)))
+    (let ((xd (+ ,i ,x3))
+	  (yd (+ ,j ,y3))
+	  (zd (+ ,k ,z3)))
+      (declare (type fixnum xd yd zd))
+      (lightfunc (,getfunc xd yd zd)))))
+(eval-when (:compile-toplevel)
+  (progn
+    (defun light-edge-i (i j k)
+      (macroexpand-1
+       `(%edge-aux (,i ,j ,k)
+		   world:getlight
+		   (0 1 1)
+		   (0 0 1)
+		   (0 0 0)
+		   (0 1 0))))
+    (defun light-edge-j (i j k)
+      (macroexpand-1
+       `(%edge-aux (,i ,j ,k)
+		   world:getlight 
+		   (1 0 1)
+		   (0 0 1)
+		   (0 0 0)
+		   (1 0 0))))
+    (defun light-edge-k (i j k)
+      (macroexpand-1
+       `(%edge-aux (,i ,j ,k)
+		   world:getlight
+		   (1 1 0)
+		   (0 1 0)
+		   (0 0 0)
+		   (1 0 0))))
+    (defun skylight-edge-i (i j k)
+      (macroexpand-1
+       `(%edge-aux (,i ,j ,k)
+		   world:skygetlight
+		   (0 1 1)
+		   (0 0 1)
+		   (0 0 0)
+		   (0 1 0))))
+    (defun skylight-edge-j (i j k)
+      (macroexpand-1
+       `(%edge-aux (,i ,j ,k)
+		   world:skygetlight
+		   (1 0 1)
+		   (0 0 1)
+		   (0 0 0)
+		   (1 0 0))))
+    (defun skylight-edge-k (i j k)
+      (macroexpand-1
+       `(%edge-aux (,i ,j ,k)
+		   world:skygetlight
+		   (1 1 0)
+		   (0 1 0)
+		   (0 0 0)
+		   (1 0 0))))))
 
-(defun light-edge-i (i j k)
-  (%edge-aux world:getlight
-	     (0 1 1)
-	     (0 0 1)
-	     (0 0 0)
-	     (0 1 0)))
-(defun light-edge-j (i j k)
-  (%edge-aux world:getlight
-	     (1 0 1)
-	     (0 0 1)
-	     (0 0 0)
-	     (1 0 0)))
-(defun light-edge-k (i j k)
-  (%edge-aux world:getlight
-	     (1 1 0)
-	     (0 1 0)
-	     (0 0 0)
-	     (1 0 0)))
-(defun skylight-edge-i (i j k)
-  (%edge-aux world:skygetlight
-	     (0 1 1)
-	     (0 0 1)
-	     (0 0 0)
-	     (0 1 0)))
-(defun skylight-edge-j (i j k)
-  (%edge-aux world:skygetlight
-	     (1 0 1)
-	     (0 0 1)
-	     (0 0 0)
-	     (1 0 0)))
-(defun skylight-edge-k (i j k)
-  (%edge-aux world:skygetlight
-	     (1 1 0)
-	     (0 1 0)
-	     (0 0 0)
-	     (1 0 0)))
+(defparameter light-index-table
+  (ret foo-array (make-array 16 :element-type 'single-float)
+    (dotimes (x 16)
+      (setf (aref foo-array x) (expt 0.8 (- 15 x))))))
 
+(declaim (inline lightfunc))
 (defun lightfunc (light)
-  (expt 0.8 (- 15 light)))
+  (aref light-index-table light))
 
 ;;0.9 for nether
 ;;0.8 for overworld(in-package :sandbox)
+
+(declaim (inline trans))
+(defun trans (foo foo-translator)
+  (/ (+ foo foo-translator) 16.0))
 
 (defmacro squareface (light-edge-fnc
 		      skylight-edge-fnc
@@ -145,97 +191,118 @@
 		      (x3 y3 z3)
 		      (u3 v3)
 		      (i3 j3 k3))
-  `(list
-    (let ((xpos (+ i ,i0))
-	  (ypos (+ j ,j0))
-	  (zpos (+ k ,k0)))
-      (vertex
-       (pos (+ i ,x0) (+ j ,y0) (+ k ,z0)) (uv (trans ,u0 u-offset) (trans ,v0 v-offset))
-       (opgray ,color)   
-       (,light-edge-fnc xpos ypos zpos)
-       (,skylight-edge-fnc xpos ypos zpos)))
-    (let ((xpos (+ i ,i1))
-	  (ypos (+ j ,j1))
-	  (zpos (+ k ,k1)))
-      (vertex
-       (pos (+ i ,x1) (+ j ,y1) (+ k ,z1)) (uv (trans ,u1 u-offset) (trans ,v1 v-offset))
-       (opgray ,color)
-       (,light-edge-fnc xpos ypos zpos)
-       (,skylight-edge-fnc xpos ypos zpos)))
-    (let ((xpos (+ i ,i2))
-	  (ypos (+ j ,j2))
-	  (zpos (+ k ,k2)))
-      (vertex
-       (pos (+ i ,x2) (+ j ,y2) (+ k ,z2)) (uv (trans ,u2 u-offset) (trans ,v2 v-offset))
-       (opgray ,color)
-       (,light-edge-fnc xpos ypos zpos)
-       (,skylight-edge-fnc xpos ypos zpos)))
-    (let ((xpos (+ i ,i3))
-	  (ypos (+ j ,j3))
-	  (zpos (+ k ,k3)))
-      (vertex
-       (pos (+ i ,x3) (+ j ,y3) (+ k ,z3)) (uv (trans ,u3 u-offset) (trans ,v3 v-offset))
-       (opgray ,color)
-       (,light-edge-fnc xpos ypos zpos)
-       (,skylight-edge-fnc xpos ypos zpos)))))
+  `(progn
+     (let ((xpos (+ i ,i0))
+	   (ypos (+ j ,j0))
+	   (zpos (+ k ,k0))
+	   (xp (+ i ,x0))
+	   (yp (+ j ,y0))
+	   (zp (+ k ,z0)))
+       (declare (type fixnum xpos ypos zpos xp yp zp))
+       (add-to-shapebuffer
+	(coerce xp 'single-float) (coerce yp 'single-float) (coerce zp 'single-float) 
+	(trans ,u0 u-offset) (trans ,v0 v-offset)
+	,color
+	,@(funcall (symbol-function light-edge-fnc) 'xpos 'ypos 'zpos)
+	,@(funcall (symbol-function skylight-edge-fnc) 'xpos 'ypos 'zpos)))
+     (let ((xpos (+ i ,i1))
+	   (ypos (+ j ,j1))
+	   (zpos (+ k ,k1))
+	   (xp (+ i ,x1))
+	   (yp (+ j ,y1))
+	   (zp (+ k ,z1)))
+       (declare (type fixnum xpos ypos zpos xp yp zp))
+       (add-to-shapebuffer
+	(coerce xp 'single-float) (coerce yp 'single-float) (coerce zp 'single-float) 
+	(trans ,u1 u-offset) (trans ,v1 v-offset)
+	,color
+	,@(funcall (symbol-function light-edge-fnc) 'xpos 'ypos 'zpos)
+	,@(funcall (symbol-function skylight-edge-fnc) 'xpos 'ypos 'zpos)))
+     (let ((xpos (+ i ,i2))
+	   (ypos (+ j ,j2))
+	   (zpos (+ k ,k2))
+	   (xp (+ i ,x2))
+	   (yp (+ j ,y2))
+	   (zp (+ k ,z2)))
+       (declare (type fixnum xpos ypos zpos xp yp zp))
+       (add-to-shapebuffer
+	(coerce xp 'single-float) (coerce yp 'single-float) (coerce zp 'single-float) 
+	(trans ,u2 u-offset) (trans ,v2 v-offset)
+	,color
+	,@(funcall (symbol-function light-edge-fnc) 'xpos 'ypos 'zpos)
+	,@(funcall (symbol-function skylight-edge-fnc) 'xpos 'ypos 'zpos)))
+     (let ((xpos (+ i ,i3))
+	   (ypos (+ j ,j3))
+	   (zpos (+ k ,k3))
+	   (xp (+ i ,x3))
+	   (yp (+ j ,y3))
+	   (zp (+ k ,z3)))
+       (declare (type fixnum xpos ypos zpos xp yp zp))
+       (add-to-shapebuffer
+	(coerce xp 'single-float) (coerce yp 'single-float) (coerce zp 'single-float) 
+	(trans ,u3 u-offset) (trans ,v3 v-offset)
+	,color
+	,@(funcall (symbol-function light-edge-fnc) 'xpos 'ypos 'zpos)
+	,@(funcall (symbol-function skylight-edge-fnc) 'xpos 'ypos 'zpos)))))
 
-(defun side-i (i j k u-offset v-offset)
-  (squareface light-edge-i
-	      skylight-edge-i
-	      0.6
-	      (-0.5 -0.5 -0.5) (0.0 0.0) (-1 -1 -1)
-	      (-0.5 -0.5  0.5) (1.0 0.0) (-1 -1 00)
-	      (-0.5  0.5  0.5) (1.0 1.0) (-1 00 00)
-	      (-0.5  0.5 -0.5) (0.0 1.0) (-1 00 -1)))
-(defun side+i (i j k u-offset v-offset) 
-  (squareface light-edge-i
-	      skylight-edge-i
-	      0.6
-	      (0.5 -0.5 -0.5) (1.0 0.0) (1 -1 -1)
-	      (0.5  0.5 -0.5) (1.0 1.0) (1 00 -1)
-	      (0.5  0.5  0.5) (0.0 1.0) (1 00 00)
-	      (0.5 -0.5  0.5) (0.0 0.0) (1 -1 00)))
-(defun side-j (i j k u-offset v-offset)
-  (squareface light-edge-j
-	      skylight-edge-j
-	      0.5
-	      (-0.5 -0.5 -0.5) (0.0 0.0) (-1 -1 -1)
-	      ( 0.5 -0.5 -0.5) (1.0 0.0) (00 -1 -1)
-	      ( 0.5 -0.5  0.5) (1.0 1.0) (00 -1 00)
-	      (-0.5 -0.5  0.5) (0.0 1.0) (-1 -1 00)))
-(defun side+j (i j k u-offset v-offset)
-  (squareface light-edge-j
-	      skylight-edge-j
-	      1.0
-	      (-0.5 0.5 -0.5) (0.0 0.0) (-1 1 -1)
-	      (-0.5 0.5  0.5) (1.0 0.0) (-1 1 00)
-	      ( 0.5 0.5  0.5) (1.0 1.0) (00 1 00)
-	      ( 0.5 0.5 -0.5) (0.0 1.0) (00 1 -1)))
-(defun side-k (i j k u-offset v-offset)
-  (squareface light-edge-k
-	      skylight-edge-k
-	      0.8   
-	      (-0.5 -0.5 -0.5) (1.0 0.0) (-1 -1 -1)
-	      (-0.5  0.5 -0.5) (1.0 1.0) (-1 00 -1)
-	      ( 0.5  0.5 -0.5) (0.0 1.0) (00 00 -1)
-	      ( 0.5 -0.5 -0.5) (0.0 0.0) (00 -1 -1)))
-(defun side+k (i j k u-offset v-offset)
-  (squareface  light-edge-k
-	       skylight-edge-k
-	       0.8     
-	       (-0.5 -0.5  0.5) (0.0 0.0) (-1 -1 1)
-	       ( 0.5 -0.5  0.5) (1.0 0.0) (00 -1 1)    
-	       ( 0.5  0.5  0.5) (1.0 1.0) (00 00 1)    
-	       (-0.5  0.5  0.5) (0.0 1.0) (-1 00 1)))
-
-
-(defun opgray (val)
-  (rgba val val val 1.0))
-(defun vertex (&rest args)
-  (make-array (length args) :initial-contents args))
-(defun rgba (r g b a)
-  (vector r g b a))
-(defun pos (x y z)
-  (vector x y z))
-(defun uv (u v)
-  (vector u v))
+(progn
+  (defun side-i (i j k u-offset v-offset)
+    (declare (type fixnum i j k u-offset v-offset))
+    (declare (optimize (speed 3) (safety 0)))
+    (squareface light-edge-i
+		skylight-edge-i
+		0.6
+		(0 0 0) (0 0) (-1 -1 -1)
+		(0 0 1) (1 0) (-1 -1 00)
+		(0 1 1) (1 1) (-1 00 00)
+		(0 1 0) (0 1) (-1 00 -1)))
+  (defun side+i (i j k u-offset v-offset)
+    (declare (type fixnum i j k u-offset v-offset))
+    (declare (optimize (speed 3) (safety 0)))
+    (squareface light-edge-i
+		skylight-edge-i
+		0.6
+		(1 0 0) (1 0) (1 -1 -1)
+		(1 1 0) (1 1) (1 00 -1)
+		(1 1 1) (0 1) (1 00 00)
+		(1 0 1) (0 0) (1 -1 00)))
+  (defun side-j (i j k u-offset v-offset)
+    (declare (type fixnum i j k u-offset v-offset))
+    (declare (optimize (speed 3) (safety 0)))
+    (squareface light-edge-j
+		skylight-edge-j
+		0.5
+		(0 0 0) (0 0) (-1 -1 -1)
+		(1 0 0) (1 0) (00 -1 -1)
+		(1 0 1) (1 1) (00 -1 00)
+		(0 0 1) (0 1) (-1 -1 00)))
+  (defun side+j (i j k u-offset v-offset)
+    (declare (type fixnum i j k u-offset v-offset))
+    (declare (optimize (speed 3) (safety 0)))
+    (squareface light-edge-j
+		skylight-edge-j
+		1.0
+		(0 1 0) (0 0) (-1 1 -1)
+		(0 1 1) (1 0) (-1 1 00)
+		(1 1 1) (1 1) (00 1 00)
+		(1 1 0) (0 1) (00 1 -1)))
+  (defun side-k (i j k u-offset v-offset)
+    (declare (type fixnum i j k u-offset v-offset))
+    (declare (optimize (speed 3) (safety 0)))
+    (squareface light-edge-k
+		skylight-edge-k
+		0.8   
+		(0 0 0) (1 0) (-1 -1 -1)
+		(0 1 0) (1 1) (-1 00 -1)
+		(1 1 0) (0 1) (00 00 -1)
+		(1 0 0) (0 0) (00 -1 -1)))
+  (defun side+k (i j k u-offset v-offset)
+    (declare (type fixnum i j k u-offset v-offset))
+    (declare (optimize (speed 3) (safety 0)))
+    (squareface light-edge-k
+		skylight-edge-k
+		0.8     
+		(0 0 1) (0 0) (-1 -1 1)
+		(1 0 1) (1 0) (00 -1 1)    
+		(1 1 1) (1 1) (00 00 1)    
+		(0 1 1) (0 1) (-1 00 1))))

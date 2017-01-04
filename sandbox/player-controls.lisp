@@ -71,9 +71,9 @@
 
 (defun mat-world-pos (mat)
   (vector
-   (round (row-major-aref mat 0))
-   (ceiling (row-major-aref mat 1))
-   (round (row-major-aref mat 2))))
+   (floor (row-major-aref mat 0))
+   (floor (row-major-aref mat 1))
+   (floor (row-major-aref mat 2))))
 
 (defun mouse-looking (camera)
   (let* ((change (in:delta))
@@ -316,17 +316,17 @@
 
 (defun block-aabb ()
   (aabbcc::make-aabb
-   :minx -0.5
-   :miny -0.5
-   :minz -0.5
-   :maxx 0.5
-   :maxy 0.5
-   :maxz 0.5))
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx 1.0
+   :maxy 1.0
+   :maxz 1.0))
 
 (defun player-aabb ()
   (aabbcc::make-aabb
    :minx -0.3
-   :miny 0
+   :miny 0.0
    :minz -0.3
    :maxx 0.3
    :maxy 1.62
@@ -393,12 +393,12 @@ collect all the nearest collisions with the player"
 (defun get-blocks-around-player (px py pz)
   "get the blocks around player"
   (let ((places nil))
-    (dotimes (x 3)
-      (dotimes (y 4)
-	(dotimes (z 3)
- 	  (let ((blockx (round (- (+ x px) 1)))
-		(blocky (round (- (ceiling (+ y py)) 1)))
-		(blockz (round (- (+ z pz) 1))))
+    (dotimes (x 5)
+      (dotimes (y 6)
+	(dotimes (z 5)
+ 	  (let ((blockx (round (- (+ x px) 2)))
+		(blocky (round (- (ceiling (+ y py)) 2)))
+		(blockz (round (- (+ z pz) 2))))
 	    (let ((blockid (round-pos blockx blocky blockz)))
 	      (if (eq t (aref mc-blocks::iscollidable blockid))
 		  (push (vector blockx blocky blockz) places)))))))
