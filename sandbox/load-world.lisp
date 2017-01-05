@@ -13,27 +13,27 @@
 	    (sandbox::flat3-chunk
 	     light
 	     (lambda (x y z b)
-	       (setf (getlight x y z) b))
+	       (setf (world:getlight x y z) b))
 	     xscaled 0 yscaled)
 	    (sandbox::flat3-chunk
 	     skylight
 	     (lambda (x y z b)
-	       (setf (skygetlight x y z) b))
+	       (setf (world:skygetlight x y z) b))
 	     xscaled 0 yscaled)
 	    (sandbox::flat3-chunk
 	     meta
 	     (lambda (x y z b)
-	       (setf (getmeta x y z) b))
+	       (setf (world:getmeta x y z) b))
 	     xscaled 0 yscaled)
 	    (sandbox::flat2-chunk
 	     leheight
 	     (lambda (x y b)
-	       (setf (getheight x y) b))
+	       (setf (world::getheight x y) b))
 	     xscaled yscaled)
 	    (sandbox::flat3-chunk
 	     blocks
 	     (lambda (x y z b)
-	       (setf  (getblock x y z) b))
+	       (setf  (world:getblock x y z) b))
 	     xscaled 0 yscaled))))))
 
 (defun flat3-chunk (data setfunc xoffset yoffset zoffset)
@@ -51,10 +51,9 @@
 	       (elt data (+ i (+ (* 16 j))))))))
 
 
-(progno
-  (defparameter atest (if nil
-			  cl-mc-shit::testchunk
-			  (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))))
+(defparameter atest (if t
+			(byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr")
+			(byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr")))
 
 (defparameter atest cl-mc-shit::testchunk)
 

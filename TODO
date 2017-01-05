@@ -4,8 +4,8 @@
 {package sandbox}:
 -clean up world-loading.lisp
 -allow flying, noclip in player-control.lisp
--lovely-renderer.lisp: separate into multiple files and multiple packages: glsl, gpu buffers, meshing, multithreading, block-meshing, vbos and display lists
--make mc-blocks not so retardedly long
+-make blocks not so retardedly long
+-separate into more packages :lists, files and directories, generic rendering
 
 {package vox}:
 //current state: layout 25 25 9 works for finxums on 64 bit machines. will break if not using 25 25 9 or on a 32 bit machine.

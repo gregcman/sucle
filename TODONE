@@ -2,3 +2,9 @@
 -create a TODO and a TODONE file
 {package macrology/code-generation}:
 -merge macrology and code-generation into one package because they are similar
+
+4 jan 2017
+{package sandbox}
+-lovely-renderer.lisp: separate into multiple files and multiple packages: glsl, gpu buffers, meshing, multithreading, block-meshing, vbos and display lists
+-make mc-blocks not so retardedly long
+
