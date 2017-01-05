@@ -11,14 +11,14 @@
 
 ;;;;load a single text file and plop it in the global library
 (defun load-file-text (path text-name)
-  (let ((text (file-string path)))
+  (let ((text (pathwise:file-string path)))
     (lset *g/text* text-name text)
     text))
 
 ;;;;load a single image and plop it in the global library
 (defun load-file-image (path image-name)
-  (let ((png (load-png path)))
-    (flip-image png)
+  (let ((png (imagewise:load-png path)))
+    (imagewise:flip-image png)
     (lset *g/image* image-name png)
     png))
 
@@ -44,7 +44,7 @@
     (load-shaders)
     (setf ?shaders t))
   (unless ?images
-    (load-file-images (expand-paths png-resources) dir-mc-assets)
+    (load-file-images (pathwise:expand-paths png-resources) dir-mc-assets)
     (setf ?images t)))
 
 (defparameter png-resources

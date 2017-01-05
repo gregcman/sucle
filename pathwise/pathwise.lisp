@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :pathwise)
 
 ;;;load a file into a string
 (defun file-string (path)
@@ -20,10 +20,11 @@
 ;;;and the other items in the rest of the list are either more lists or just plain strings.
 ;;;returns a flat list which is the collection of all the resulting pathnames
 (defun expand-paths (dir-list)
-  (ret acc ()
+  (let (acc) 
       (labels ((rec (x currentpath)
 		 (if (consp x)
 		     (dolist (sub (cdr x))
 		       (rec sub (merge-pathnames (car x) currentpath)))
 		     (push (merge-pathnames x currentpath) acc))))
-	(rec dir-list #P""))))
+	(rec dir-list #P"") acc)))
+

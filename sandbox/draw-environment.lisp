@@ -9,5 +9,5 @@
 	(z (fractionalize (* time 1.0)))
 	(w 1.0))
     (gl:clear-color x y z w)
-    (set-vec3 "fogcolor"
+    (glshader:set-vec3 "fogcolor"
 	      (vector x y z w))))

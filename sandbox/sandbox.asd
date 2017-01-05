@@ -6,9 +6,10 @@
     :licence "???"
 
     :depends-on (#:cl-opengl
-		 #:cl-utilities  
-		 #:opticl
 		 
+		 #:imagewise
+                 #:pathwise
+		 #:glshader
 		 #:macrology
 		 #:queue
                  #:world
@@ -23,19 +24,22 @@
     :components  
     ((:file "package")
      (:file "global") ;;global vars
+
      (:file "misc-math") ;;random math stuff
-     (:file "misc-list") ;;random list stuff
-     (:file "misc-image") ;;random image array manipulation
-     (:file "misc-fad");;;miscellaneous file and directory stuff
+
      (:file "timer") ;;;facilities for dealing with time
+
      (:file "thread") ;;; threading utilities
+
      (:file "meshing") ;;generic meshing utilities
+
      (:file "misc-opengl") ;;random opengl stuff
+
      (:file "opengl-texture") ;;opengl texture stuff
-     (:file "shader") ;;generic shader utilities
+
      (:file "magic") ;;initial asset loading
      (:file "blocks") ;;list of minecraft block values
-     (:file "vao");;opengl vertex array objects
+
      (:file "draw-environment") ;;;drawing environmental factors
      (:file "lovely-renderer") ;;all the rendering shit packed into a file---
      (:file "meshing-thread");;send the meshing work to a separate thread to prevent lag

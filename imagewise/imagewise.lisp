@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :imagewise)
 
 ;;;;Tools for the manipulation of images stored as arrays of rank 3
 
@@ -29,3 +29,4 @@
     (make-array 4 :element-type (array-element-type image)
 		:displaced-to image
 		:displaced-index-offset (* c (+ w (* h width))))))
+

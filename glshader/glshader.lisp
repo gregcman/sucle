@@ -1,30 +1,17 @@
-(in-package :sandbox)
+(in-package :glshader)
 
-(defun set-matrix (name matrix)
-  (gl:uniform-matrix-4fv
-   (gl:get-uniform-location shaderProgram name)
-   (mat:to-flat matrix)))
+;;;opengl can only use one shaderprogram at once,
+;;;so there is a global *shader-program* variable
+(defparameter *shader-program* nil)
 
-(defun set-int (name thenumber)
-  (gl:uniformi
-   (gl:get-uniform-location shaderProgram name)
-   thenumber))
+;;;check if the 
+(defun use-program (ourprog)
+  (unless (eql ourprog *shader-program*)
+    (setq *shader-program* ourprog)
+    (gl:use-program ourprog)))
 
-(defun set-vec4 (name thevec4)
-  (gl:uniformfv
-   (gl:get-uniform-location shaderProgram name)
-   thevec4))
-
-(defun set-vec3 (name thevec3)
-  (gl:uniformfv
-   (gl:get-uniform-location shaderProgram name)
-   thevec3))
-
-(defun set-float (name thefloat)
-  (gl:uniformf
-   (gl:get-uniform-location shaderProgram name)
-   thefloat))
-
+;;;attribs is an alist with a string in the car representing an attribute
+;;;and a number representing the location in the cdr
 (defun make-shader-program-from-strings
     (vertex-shader-string fragment-shader-string attribs)
   "makes a shader program from strings. makes noises if something goes wrong"
@@ -55,3 +42,30 @@
       (gl:delete-shader vertexShader)
       (gl:delete-shader fragmentShader)
       shaderProgram)))
+
+;;;various functions for setting uniforms 
+(defun set-matrix (name matrix)
+  (gl:uniform-matrix-4fv
+   (gl:get-uniform-location *shader-program* name)
+   matrix))
+
+(defun set-int (name thenumber)
+  (gl:uniformi
+   (gl:get-uniform-location *shader-program* name)
+   thenumber))
+
+(defun set-vec4 (name thevec4)
+  (gl:uniformfv
+   (gl:get-uniform-location *shader-program* name)
+   thevec4))
+
+(defun set-vec3 (name thevec3)
+  (gl:uniformfv
+   (gl:get-uniform-location *shader-program* name)
+   thevec3))
+
+(defun set-float (name thefloat)
+  (gl:uniformf
+   (gl:get-uniform-location *shader-program* name)
+   thefloat))
+

@@ -7,7 +7,6 @@
   (pitch 0)
   (fov 100))
 (defparameter ourcam (make-simplecam))
-(defparameter shaderProgram nil)
 
 (defun render ()
   "responsible for rendering the world"
@@ -22,14 +21,17 @@
     (load-shaders)
     (load-block-shader))
 
-  (use-program :blockshader)
+  (luse-shader :blockshader)
   (setupmatrices ourcam)
   (designatemeshing)
-  (set-float "timeday" daytime)
+  (glshader:set-float "timeday" daytime)
   (set-overworld-fog daytime)
   
   (draw-chunk-meshes)
   (window:update-display))
+
+(defun luse-shader (name)
+  (glshader:use-program (lget *g/shader* name)))
 
 (defun setupmatrices (camera)
   (let ((modelview (mat:easy-lookat
@@ -43,18 +45,16 @@
 	(projection (mat:projection-matrix
 		     (deg-rad (simplecam-fov camera))
 		     (/ out::pushed-width out::pushed-height) 0.01 128)))
-    (set-matrix "projectionmodelview"
-		(mat:mmul projection modelview))))
+    (glshader:set-matrix "projectionmodelview"
+			 (mat:to-flat (mat:mmul projection modelview)))))
 
 (defun genworldcallist ()
   (let ((ourlist (gl:gen-lists 1)))
     (gl:new-list ourlist :compile)
     (maphash
-     (lambda (key vao)
+     (lambda (key display-list)
        (declare (ignore key))
-       (if t
-	   (gl:call-list vao)
-	   (draw-vao vao)))
+       (gl:call-list display-list))
     *g/call-list*)
     (gl:end-list)
     ourlist))
@@ -87,27 +87,33 @@
    world::chunkhash))
 
 (defun load-block-shader ()
+  (let ((old (lget *g/shader* :blockshader)))
+    (when old
+      (gl:delete-program old)))
   (lset *g/shader*
-   :blockshader
-   (make-shader-program-from-strings
-    (lget *g/text* :bs-vs)
-    (lget *g/text* :bs-frag)
-    '(("position" . 0)
-      ("texCoord" . 2)
-      ("darkness" . 8)
-  ;;    ("blockLight" . 8)
-   ;;   ("skyLight" . 12)
-      ))))
+	:blockshader
+	(glshader:make-shader-program-from-strings
+	 (lget *g/text* :bs-vs)
+	 (lget *g/text* :bs-frag)
+	 '(("position" . 0)
+	   ("texCoord" . 2)
+	   ("darkness" . 8)
+	   ;;    ("blockLight" . 8)
+	   ;;   ("skyLight" . 12)
+	   ))))
 
 (defun load-simple-shader ()
+  (let ((old (lget *g/shader* :simpleshader)))
+    (when old
+      (gl:delete-program old)))
   (lset *g/shader*
-   :simpleshader
-   (make-shader-program-from-strings
-    (lget *g/text* :ss-vs)
-    (lget *g/text* :ss-frag)
-    '(("position" . 0)
-      ("texCoord" . 2)
-      ("color" . 3)))))
+	:simpleshader
+	(glshader:make-shader-program-from-strings
+	 (lget *g/text* :ss-vs)
+	 (lget *g/text* :ss-frag)
+	 '(("position" . 0)
+	   ("texCoord" . 2)
+	   ("color" . 3)))))
 
 (defun bind-shit (name)
   "bind a texture located in the texture library"
@@ -115,13 +121,6 @@
     (if num
 	(gl:bind-texture :texture-2d num)
 	(print "error-tried to use NIL texture"))))
-
-(defun use-program (name)
-  (let ((ourprog (lget *g/shader* name)))
-    (unless (eql ourprog shaderProgram)
-      (setq shaderProgram ourprog)
-      (gl:use-program ourprog))))
-
 
 (defun glinnit ()
   (lpic-ltexture "gui/items.png" :items)
@@ -146,6 +145,6 @@
     (if thepic
 	(destructuring-bind (h w &rest c) (array-dimensions thepic)
 	  (declare (ignore c))
-	  (let ((new-texture (create-texture-wot (array-flatten thepic) w h)))
+	  (let ((new-texture (create-texture-wot (imagewise:array-flatten thepic) w h)))
 	    (lset *g/texture* texture-name new-texture)
 	    new-texture)))))

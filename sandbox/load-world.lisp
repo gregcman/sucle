@@ -1,5 +1,7 @@
 (in-package :sandbox)
 
+(defparameter atest nil)
+
 (defun someseq (x y)
   (let* ((thechunk (helpchunk x y)))
     (if thechunk
@@ -50,19 +52,23 @@
       (funcall setfunc (+ xoffset i) (+ yoffset j)
 	       (elt data (+ i (+ (* 16 j))))))))
 
+(defun setatest (x)
+  (prog2 (setf atest
+	       (case x
+		 (0 (pathwise:byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr"))
+		 (1 (pathwise:byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))
+		 (2 cl-mc-shit::testchunk)))
+      x))
 
-(defparameter atest (if t
-			(byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr")
-			(byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr")))
-
-(defparameter atest cl-mc-shit::testchunk)
+(eval-when (:load-toplevel)
+  (setatest 0))
 
 (defun helpchunk (x y)
-   (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
-     (if thechunk
-	 (cl-mc-shit:chunk-data
-	  thechunk)
-	 nil)))
+  (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
+    (if thechunk
+	(cl-mc-shit:chunk-data
+	 thechunk)
+	nil)))
 
 (defun expand-nibbles (vec)
   (let* ((len (length vec))
