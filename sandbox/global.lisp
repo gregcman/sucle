@@ -18,6 +18,8 @@
 (defparameter *g/texture* nil);;opengl textures
 (defparameter *g/shader* nil);;opengl shaders
 
+(defparameter *g/args* nil);;original arguments passed to main
+
 (defmacro ensure-lib (libname type)
   `(unless ,libname
      (setf ,libname (create-lib ',type))))
@@ -27,17 +29,22 @@
   (ensure-lib *g/image* equal)
   (ensure-lib *g/text* equal)
   (ensure-lib *g/tree* equal)
-  
+
+  (ensure-lib *g/args* eq)
   (ensure-lib *g/thread* eq)
   (ensure-lib *g/call-list* eq)
   (ensure-lib *g/shader* eq)
   (ensure-lib *g/texture* eq))
 
 (defun clear-live-libs ()
+  (lclear *g/args*)
   (lclear *g/thread*)
   (lclear *g/call-list*)
   (lclear *g/shader*)
   (lclear *g/texture*))
+
+(defun (setf lget) (new lib name)
+  (lset lib name new))
 
 (defun create-lib (test)
   (make-hash-table :test test))
@@ -49,3 +56,7 @@
   (clrhash lib))
 (defun lremove (lib name)
   (remhash name lib))
+
+(defun initlib ()
+  (ensure-all-libs)
+  (clear-live-libs))

@@ -30,6 +30,10 @@
 (defun shader-path (name)
   (merge-pathnames name dir-shader))
 
+(defun lcreate-thread (name func &optional (stringname (string name)))
+  (let ((the-thread (sb-thread:make-thread func :name stringname)))
+    (setf (lget *g/thread* name) the-thread)))
+
 (defparameter ?images nil)
 (defparameter ?shaders nil)
 

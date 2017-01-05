@@ -130,10 +130,16 @@
   (lpic-ltexture "font/default.png" :default)
   (lpic-ltexture "pack.png" :pack)
   (lpic-ltexture "environment/clouds.png" :clouds)
-  
+
+  (let ((vsync? (lget *g/args* :vsync)))    
+    (cond (vsync? (window::set-vsync t)
+		  (setf render-delay 0))
+	  (t (window::set-vsync nil)
+	     (setf render-delay (/ 1000000.0 59.88)))))
+
+  (setf glshader:*shader-program* nil)
   (setf worldlist nil)
   (setf mesher-thread nil)
-  (setf shaderProgram nil)
   (load-block-shader)
   (load-simple-shader)
   (update-world-vao))

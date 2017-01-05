@@ -318,3 +318,8 @@
 
 (defun update-display ()
   (glfw:swap-buffers))
+
+(defun set-vsync (bool)
+  (if bool
+      (glfw:swap-interval 1) ;;1 is on
+      (glfw:swap-interval 0))) ;;0 is off

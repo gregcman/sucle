@@ -11,11 +11,12 @@
                  #:pathwise
 		 #:glshader
 		 #:macrology
+		 #:the-matrix-is-everywhere
+
 		 #:queue
                  #:world
 		 #:window
 		 #:cl-mc-shit
-		 #:the-matrix-is-everywhere
 		 #:aabbcc
 		 #:vox
 		 #:pix)
@@ -28,8 +29,6 @@
      (:file "misc-math") ;;random math stuff
 
      (:file "timer") ;;;facilities for dealing with time
-
-     (:file "thread") ;;; threading utilities
 
      (:file "meshing") ;;generic meshing utilities
 

@@ -191,6 +191,8 @@
 (defparameter onground nil)
 (defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
 (defparameter daytime 1.0)
+(defparameter ticks/sec nil)
+(defparameter tickscale nil)
 
 (defun ease (x target fraction)
   (+ x (* fraction (- target x))))
@@ -201,7 +203,14 @@
 (setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
 
 (defun physinnit ()
-  (sb-int:set-floating-point-modes :traps nil)
+  (setf ticks/sec 60.0)
+  (setf tickscale (/ 20.0 ticks/sec))
+  (setf tick-delay (/ 1000000.0 ticks/sec))
+
+  (in:p+1 :ESCAPE (lambda () (setq alivep nil)))
+  ;;escape to quit
+  (in:p+1 :E (function window:toggle-mouse-capture))
+  ;;e to escape mouse
   (setf isprinting nil)
   (setf wprev most-negative-fixnum))
 
@@ -211,6 +220,9 @@
 
 (defun physics ()
   "a messy function for the bare bones physics"
+
+  (if (in:ismousecaptured)
+      (controls))
   (setf daytime (case 10
 		  (0 27.5069)
 		  (2 9)

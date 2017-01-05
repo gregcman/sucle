@@ -66,9 +66,8 @@
 (defun giveworktomesherThread (thechunk)
   (setf mesher-thread
 	(sb-thread:make-thread
-	 (lambda (chunk-position)
+	 (lambda ()
 	   (sb-thread:return-from-thread
 	    (values
-	     chunk-position
-	     (chunk-shape chunk-position))))
-	 :arguments (list thechunk))))
+	     thechunk
+	     (chunk-shape thechunk)))))))
