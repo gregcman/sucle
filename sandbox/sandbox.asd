@@ -27,6 +27,7 @@
     :serial t
     :components  
     ((:file "package")
+
      (:file "global") ;;global vars
 
      (:file "misc-math") ;;random math stuff
@@ -37,9 +38,13 @@
      (:file "draw-environment") ;;;drawing environmental factors
      (:file "lovely-renderer") ;;all the rendering shit packed into a file---
      (:file "meshing-thread");;send the meshing work to a separate thread to prevent lag
+
+
      (:file "player-controls") ;;moving the player around, collision ---
      (:file "block-meshing") ;;turn world data into a mesh to render
      (:file "block-light") ;;lighting
      (:file "load-world");;importing nbt data into the game
+
+
      (:file "sandbox") ;;timer for physics and rendering threads
      ))
