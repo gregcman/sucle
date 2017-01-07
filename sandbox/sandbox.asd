@@ -10,8 +10,11 @@
 		 #:imagewise
                  #:pathwise
 		 #:glshader
+                 #:gltexture
+                 #:glinfo
 		 #:macrology
-		 #:the-matrix-is-everywhere
+		 #:the-matrix-is-everywhere	
+                 #:timer
 
 		 #:queue
                  #:world
@@ -27,14 +30,6 @@
      (:file "global") ;;global vars
 
      (:file "misc-math") ;;random math stuff
-
-     (:file "timer") ;;;facilities for dealing with time
-
-     (:file "meshing") ;;generic meshing utilities
-
-     (:file "misc-opengl") ;;random opengl stuff
-
-     (:file "opengl-texture") ;;opengl texture stuff
 
      (:file "magic") ;;initial asset loading
      (:file "blocks") ;;list of minecraft block values

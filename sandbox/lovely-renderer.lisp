@@ -1,5 +1,27 @@
 (in-package :sandbox)
 
+(defun glinnit ()
+  (lpic-ltexture "gui/items.png" :items)
+  (lpic-ltexture "misc/grasscolor.png" :grasscolor)
+  (lpic-ltexture "misc/foliagecolor.png" :foliagecolor)
+  (lpic-ltexture "terrain.png" :terrain)
+  (lpic-ltexture "font/default.png" :default)
+  (lpic-ltexture "pack.png" :pack)
+  (lpic-ltexture "environment/clouds.png" :clouds)
+
+  (let ((vsync? (lget *g/args* :vsync)))    
+    (cond (vsync? (window::set-vsync t)
+		  (setf render-delay 0))
+	  (t (window::set-vsync nil)
+	     (setf render-delay (/ 1000000.0 59.88)))))
+
+  (setf glshader:*shader-program* nil)
+  (setf worldlist nil)
+  (setf mesher-thread nil)
+  (load-block-shader)
+  (load-simple-shader)
+  (update-world-vao))
+
 (defstruct simplecam
   (pos (mat:onebyfour '(0.0 0.0 0.0 1)))
   (up (mat:onebyfour '(0.0 1.0 0.0 0)))
@@ -122,28 +144,6 @@
 	(gl:bind-texture :texture-2d num)
 	(print "error-tried to use NIL texture"))))
 
-(defun glinnit ()
-  (lpic-ltexture "gui/items.png" :items)
-  (lpic-ltexture "misc/grasscolor.png" :grasscolor)
-  (lpic-ltexture "misc/foliagecolor.png" :foliagecolor)
-  (lpic-ltexture "terrain.png" :terrain)
-  (lpic-ltexture "font/default.png" :default)
-  (lpic-ltexture "pack.png" :pack)
-  (lpic-ltexture "environment/clouds.png" :clouds)
-
-  (let ((vsync? (lget *g/args* :vsync)))    
-    (cond (vsync? (window::set-vsync t)
-		  (setf render-delay 0))
-	  (t (window::set-vsync nil)
-	     (setf render-delay (/ 1000000.0 59.88)))))
-
-  (setf glshader:*shader-program* nil)
-  (setf worldlist nil)
-  (setf mesher-thread nil)
-  (load-block-shader)
-  (load-simple-shader)
-  (update-world-vao))
-
 ;;;turn a picture which is in the image library into an
 ;;;opengl texture which is in the texture library
 (defun lpic-ltexture (image-name &optional (texture-name image-name))
@@ -151,6 +151,6 @@
     (if thepic
 	(destructuring-bind (h w &rest c) (array-dimensions thepic)
 	  (declare (ignore c))
-	  (let ((new-texture (create-texture-wot (imagewise:array-flatten thepic) w h)))
+	  (let ((new-texture (gltexture:create-texture (imagewise:array-flatten thepic) w h)))
 	    (lset *g/texture* texture-name new-texture)
 	    new-texture)))))

@@ -9,10 +9,10 @@
       (when achunk
 	(giveworktomesherthread achunk)))))
 
-(defun shape-list (the-shape)
+(defun shape-list (the-shape len)
  ;; (declare (optimize (speed 3) (safety 0)))
   (let ((ourlist (gl:gen-lists 1))
-	(verts (shape-vs the-shape))
+	(verts the-shape)
 	(vertsize 6))
     (declare (type (simple-array single-float *) verts))
     (gl:new-list ourlist :compile)
@@ -35,7 +35,7 @@
 		 `(gl:vertex-attrib ,num
 				    (aref verts (+ base ,start)))))
       (gl:with-primitives :quads
-	(dotimes (x (shape-vertlength the-shape))
+	(dotimes (x len)
 	  (let ((base (* x vertsize)))
 	    (wow1 8 5) ;darkness
 	    (wow2 2 3) ;uv
@@ -47,13 +47,13 @@
     ourlist))
 
 (defun getmeshersfinishedshit ()
-  (multiple-value-bind (coords shape) (sb-thread:join-thread mesher-thread)
+  (multiple-value-bind (shape len coords) (sb-thread:join-thread mesher-thread)
     (if coords
 	(if shape
 	    (progn
 	      (let ((old-call-list (lget *g/call-list* coords)))
 		(when old-call-list (gl:delete-lists old-call-list 1)))
-	      (lset *g/call-list* coords (shape-list shape))
+	      (lset *g/call-list* coords (shape-list shape len))
 	      (when worldlist (gl:delete-lists worldlist 1))
 	      (setf worldlist (genworldcallist)))
 	    (dirty-push coords))))
@@ -68,6 +68,4 @@
 	(sb-thread:make-thread
 	 (lambda ()
 	   (sb-thread:return-from-thread
-	    (values
-	     thechunk
-	     (chunk-shape thechunk)))))))
+	    (chunk-shape thechunk))))))

@@ -1,10 +1,10 @@
-(in-package :sandbox)
+(in-package :gltexture)
 
 (defun glActiveTexture (num)
   "sets the active texture"
-  (gl:active-texture (+ num (get-gl-constant :texture0))))
+  (gl:active-texture (+ num (glinfo:get-gl-constant :texture0))))
 
-(defun create-texture-wot (tex-data width height)
+(defun create-texture (tex-data width height)
   "creates an opengl texture from data"
   (let ((the-shit (car (gl:gen-textures 1))))
     (gl:bind-texture :texture-2d the-shit)
@@ -19,3 +19,4 @@
      :rgba width height 0 :rgba :unsigned-byte tex-data)
     (gl:generate-mipmap :texture-2d)
     the-shit))
+

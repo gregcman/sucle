@@ -79,8 +79,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute) 
   (setf handoff-four
 	(lambda ()
-	  (setf phystimer (timer))
-	  (setf rendertimer (timer))  
+	  (setf phystimer (timer:timer))
+	  (setf rendertimer (timer:timer))  
 	  (unwind-protect (hairy-programs)
 	    (cleanup)))))
 (defparameter alivep nil)

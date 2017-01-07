@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :timer)
 
 ;;;timer: fire function only after a certain interval
 ;;;the interval is the time
@@ -19,3 +19,4 @@
 (defun fine-time ()
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)
     (+ (* (expt 10 6) s) m)))
+

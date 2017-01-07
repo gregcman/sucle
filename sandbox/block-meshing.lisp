@@ -1,14 +1,14 @@
 (in-package :sandbox)
 
-(defparameter shapebuffer (make-shape))
-(defparameter shapebuffer-vs (shape-vs shapebuffer))
+(defparameter shapebuffer-index 0)
+(defparameter shapebuffer-vs (make-array (ash 2 20) :element-type 'single-float))
 
 (declaim (inline add-to-shapebuffer))
 (defun add-to-shapebuffer (x y z u v darkness b0 b1 b2 b3 s0 s1 s2 s3)
   (declare (type (simple-array single-float *) shapebuffer-vs))
   (declare (type single-float x y z darkness b0 b1 b2 b3 s0 s1 s2 s3))
   ;(declare (optimize (speed 3) (safety 0)))
-  (let ((vertlength (shape-vertlength shapebuffer)))
+  (let ((vertlength shapebuffer-index))
     (declare (type fixnum vertlength))
     (let ((fp (* 6 vertlength)))
       (setf (aref shapebuffer-vs (+ fp 0)) x
@@ -22,12 +22,13 @@
 						 (max b1 (* daytime s1))
 						 (max b2 (* daytime s2))
 						 (max b3 (* daytime s3)))))))
-  (incf (shape-vertlength shapebuffer)))
+  (incf shapebuffer-index))
 
 (defun chunk-shape (chunk-position)
   (declare (optimize (speed 3)))
   (multiple-value-bind (io ko jo) (world:unhashfunc chunk-position)
-    (let* ((new-shape (destroy-shape shapebuffer)))
+    (setf shapebuffer-index 0)
+    (let ((new-shape shapebuffer-vs))
       (dorange
        (i io 16)
        (dorange
@@ -39,7 +40,10 @@
 	     (blockshape
 	      i j k
 	      blockid))))))
-      new-shape)))
+      (values
+       new-shape
+       shapebuffer-index
+       chunk-position))))
 
 (defun blockshape (i j k blockid)
   (ret faces (renderstandardblock blockid i j k)))
