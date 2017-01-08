@@ -1,5 +1,20 @@
 (in-package :sandbox)
 
+(defstruct camera
+  xpos
+  ypos 
+  zpos 
+  upx 
+  upy 
+  upz 
+  yaw 
+  pitch 
+  fov)
+
+(defparameter *camera* nil)
+(defparameter *view-matrix* nil)
+(defparameter *projection-matrix* nil)
+
 (defun glinnit ()
   (lpic-ltexture "gui/items.png" :items)
   (lpic-ltexture "misc/grasscolor.png" :grasscolor)
@@ -15,20 +30,23 @@
 	  (t (window::set-vsync nil)
 	     (setf render-delay (/ 1000000.0 59.88)))))
 
+  (setf *camera* (make-camera
+		  :xpos 0
+		  :ypos 0
+		  :zpos 0
+		  :upx 0
+		  :upy 1
+		  :upz 0
+		  :yaw 0
+		  :pitch 0
+		  :fov 70))
+  
   (setf glshader:*shader-program* nil)
   (setf worldlist nil)
   (setf mesher-thread nil)
   (load-block-shader)
   (load-simple-shader)
   (update-world-vao))
-
-(defstruct simplecam
-  (pos (mat:onebyfour '(0.0 0.0 0.0 1)))
-  (up (mat:onebyfour '(0.0 1.0 0.0 0)))
-  (yaw 0)
-  (pitch 0)
-  (fov 100))
-(defparameter ourcam (make-simplecam))
 
 (defun render ()
   "responsible for rendering the world"
@@ -39,12 +57,27 @@
 
   (if (in:key-p :g)
       (update-world-vao))
-  (when (in:key-p :5)
-    (load-shaders)
-    (load-block-shader))
-
   (luse-shader :blockshader)
-  (setupmatrices ourcam)
+  (with-slots (xpos ypos zpos fov pitch yaw) *camera*
+    (set-projection-matrix
+     (coerce (deg-rad fov) 'single-float)
+     (/ out::pushed-width out::pushed-height)
+     0.01
+     1024.0)
+    (set-view-matrix
+     (sb-cga:vec (coerce xpos 'single-float)
+		 (coerce ypos 'single-float)
+		 (coerce zpos 'single-float))
+     (unit-pitch-yaw (coerce pitch 'single-float)
+		     (coerce yaw 'single-float))
+     (sb-cga:vec 0.0 1.0 0.0)))
+
+  (glshader:set-matrix
+   "projectionmodelview"
+   (sb-cga:transpose-matrix
+    (sb-cga:matrix* *projection-matrix* *view-matrix*)))
+
+  
   (designatemeshing)
   (glshader:set-float "timeday" daytime)
   (set-overworld-fog daytime)
@@ -52,23 +85,16 @@
   (draw-chunk-meshes)
   (window:update-display))
 
+(defun set-projection-matrix (fovy aspect near far)
+  (let ((projection-matrix (projection-matrix fovy aspect near far)))
+    (setf *projection-matrix* projection-matrix)))
+
+(defun set-view-matrix (camera-position direction up)
+  (let ((view (relative-lookat camera-position direction up)))
+    (setf *view-matrix* view)))
+
 (defun luse-shader (name)
   (glshader:use-program (lget *g/shader* name)))
-
-(defun setupmatrices (camera)
-  (let ((modelview (mat:easy-lookat
-		    (mat:add (mat:onebyfour
-			      (list 0
-				    (if isneaking (- 1.5 1/8) 1.5)
-				    0 0))
-			     (simplecam-pos camera))
-		    (simplecam-pitch camera)
-		    (simplecam-yaw camera)))
-	(projection (mat:projection-matrix
-		     (deg-rad (simplecam-fov camera))
-		     (/ out::pushed-width out::pushed-height) 0.01 128)))
-    (glshader:set-matrix "projectionmodelview"
-			 (mat:to-flat (mat:mmul projection modelview)))))
 
 (defun genworldcallist ()
   (let ((ourlist (gl:gen-lists 1)))

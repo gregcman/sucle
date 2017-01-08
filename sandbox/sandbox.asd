@@ -6,14 +6,17 @@
     :licence "???"
 
     :depends-on (#:cl-opengl
+	         #:sb-cga
+		 
 		 
 		 #:imagewise
                  #:pathwise
+
 		 #:glshader
                  #:gltexture
                  #:glinfo
+
 		 #:macrology
-		 #:the-matrix-is-everywhere	
                  #:timer
 
 		 #:queue
@@ -31,6 +34,7 @@
      (:file "global") ;;global vars
 
      (:file "misc-math") ;;random math stuff
+     (:file "camera-matrix") ;;matrices for cameras - view, projection
 
      (:file "magic") ;;initial asset loading
      (:file "blocks") ;;list of minecraft block values

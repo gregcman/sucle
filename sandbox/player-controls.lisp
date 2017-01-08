@@ -1,330 +1,83 @@
 (in-package :sandbox)
 
-;;in this file
-;;sprinting
-;;sneaking
-;;walking
-;;collision with blocks
-;;jumping
-;;strafing
-;;gravity
-;;looking around
-;;naturally this will be quite messy, as there are many facets
-;;to player movement. before, the light code and importing and world
-;; "world hash?!" were lumped with this for some reason-----
+;;;;150 ms delay for sprinting
+;;;;player eye height is 1.5, subtract 1/8 for sneaking
 
-(defparameter lastw nil)
-(defparameter wprev most-negative-fixnum)
-(defparameter wpressprev nil)
-(defparameter isprinting nil)
-(defparameter isneaking nil)
+;;gravity is (* -0.08 (expt tickscale 2)) 0 0
+;;falling friction is 0.98
+;;0.6 * 0.91 is walking friction
 
+;;fov::
+;;70 is normal
+;;110 is quake pro
+
+
+(defparameter *yaw* nil)
+(defparameter *pitch* nil)
+(defparameter *xpos* nil)
+(defparameter *ypos* nil)
+(defparameter *zpos* nil)
+(defparameter defaultfov 70)
+
+(setf *xpos* 0
+      *ypos* 0
+      *zpos* 0
+      *yaw* 0
+      *pitch* 0)
 (defun controls ()
-  (let ((camera ourcam))
-    (mat:add!
-     cameraVelocity
-     (keymovement camera))
-    (progn
-      (if (in:key-p :w)
-	 ;;if it was pressed last round
-	 (progn
-	   (if (not wpressprev)
-	       (progn
-		 (if (> 150 (- (get-internal-run-time) wprev))
-		     (setf isprinting t))))
-	   (setf wpressprev t))
-	 (progn
-	   (setf isprinting nil)
-	   (if wpressprev
-	       (progn
-		 (setf wprev (get-internal-run-time))
-		 (setf wpressprev nil))))))
-    
-    (if (in:key-p :left-shift)
-	(progn
-	  (setf isprinting nil)
-	  (setf isneaking t))
-	(setf isneaking nil))
+  (when (in:key-p :w)
+    (incf *xpos*))
+  (when (in:key-p :a)
+    (decf *zpos*))
+  (when (in:key-p :s)
+    (decf *xpos*))
+  (when (in:key-p :d)
+    (incf *zpos*))
+  (when (in:key-p :space)
+    (incf *ypos*))
+  (when (in:key-p :left-shift)
+    (decf *ypos*)))
 
-    (in:key-pressed-hook #\h (lambda () (someseq
-			    (floor (row-major-aref (simplecam-pos camera) 0) 16)
-			    (floor (row-major-aref (simplecam-pos camera) 2) 16))))
-
-    (if (in:key-p :z)
-	(%aplatform
-	 (mat-world-pos (simplecam-pos camera))
-	 3))
-    (if (in:key-pressed-p :x)
-	(progn
-	  (notaplatform (mat-world-pos (simplecam-pos camera)))
-	  (let ((wot (mat-world-pos (simplecam-pos camera))))
-	    (incf (elt wot 1) 1)
-	    (notaplatform wot))))
-    (if (in:key-pressed-p :c) 
-	(oneplatform
-	 (mat-world-pos (simplecam-pos camera))
-	 91))
-    (if (in:key-pressed-p :f) 
-	(oneplatform
-	 (mat-world-pos (simplecam-pos camera))
-	 0))))
-
-(defun mat-world-pos (mat)
-  (vector
-   (floor (row-major-aref mat 0))
-   (floor (row-major-aref mat 1))
-   (floor (row-major-aref mat 2))))
-
-(defun mouse-looking (camera)
+(defun mouse-looking ()
   (let* ((change (in:delta))
 	 (x (* 1.25 1/360 (aref change 0)))
 	 (y (* 1.25 1/360 (aref change 1))))
-    (setf
-     (simplecam-yaw camera)
-     (mod (+ (simplecam-yaw camera) x) (* 2 pi)))
-    (setf (simplecam-pitch camera)
-	  (anothershit
-	   (+ (simplecam-pitch camera) y) (/ pi 2)))))
+    (setf *yaw*
+	  (mod (+ *yaw* x) (* 2 pi)))
+    (setf *pitch*
+	  (clamp (+ y *pitch*)
+		 (* 0.99 (/ pi -2))
+		 (* 0.99 (/ pi 2))))))
 
-(defun anothershit (x whatthefuck)
-  "used to clamp the pitch"
-  (if (> x whatthefuck)
-      whatthefuck
-      (if (< x (- whatthefuck))
-	  (- whatthefuck)
-	  x)))
+(defun set-render-cam ()
+  (setf (camera-xpos *camera*) *xpos*
+	(camera-ypos *camera*) *ypos*
+	(camera-zpos *camera*) *zpos*
+	(camera-pitch *camera*) *pitch*
+	(camera-yaw *camera*) *yaw*))
 
-(defun good-func (some-number)
-  "maps keys to vectors"
-  (lambda (x)
-    (if (in::akeydown (first x))
-	(mat:add! some-number
-		  (mat:onebyfour (second x))))))
-
-(defun empty-vec4 ()
-  (mat:onebyfour '(0 0 0 0)))
-
-(defun key-legs ()
-  "keys for walking"
-  (let* ((delta (empty-vec4))
-	 (lemod (good-func delta)))
-    (mapcar
-     lemod
-     '((:s ( 1  0  0  0))
-       (:w (-1  0  0  0))
-       (:a ( 0  0  1  0))
-       (:d ( 0  0 -1  0))))
-    (mat:scale! (mat:normalize! delta) (* 0.4 (expt tickscale 2)))
-    (if isneaking
-	(mat:scale! delta 0.2))
-    (if isprinting
-	(mat:scale! delta 1.3))
-    (if (not onground)
-	(mat:scale! delta 0.2))
-    delta))
-
-(defun key-jumps ()
-  "keys for jumping"
-  (let* ((delta (empty-vec4))
-	 (lemod (good-func delta)))
-    (if onground
-	(mapcar
-	 lemod
-	 `((:space (0 ,(* 0.42 (expt tickscale 1)) 0 0)))))
-    delta))
-
-(defun keymovement (camera)
-  "total keymovement"
-  (mat:mmul! (mat:add (key-legs) (key-jumps))
-	     (mat:rotation-matrix 0 1 0
-				  (simplecam-yaw camera))))
-
-(defun aplatform (pos blockid)
-  (let ((i (elt pos 0))
-	(j (elt pos 1))
-	(k (elt pos 2)))
-    (dotimes (a 3)
-      (dotimes (b 3)
-	(setblock-with-update (+ a i -1) (- j 1) (+ b k -1) blockid
-				    (aref mc-blocks::lightvalue blockid))))))
-
-(defun %aplatform (pos blockid)
-  (let ((i (elt pos 0))
-	(j (elt pos 1))
-	(k (elt pos 2)))
-    (setblock-with-update (+ i) (- j 1) (+ k) blockid
-				(aref mc-blocks::lightvalue blockid))))
-
-(defun oneplatform (pos blockid)
-  (let ((i (elt pos 0))
-	(j (elt pos 1))
-	(k (elt pos 2)))
-    (setblock-with-update (+ i) (- j 1) (+ k) blockid
-				(aref mc-blocks::lightvalue blockid))))
-
-(defun notaplatform (pos)
-  (let ((i (elt pos 0))
-	(j (elt pos 1))
-	(k (elt pos 2)))
-    (dotimes (a 3)
-      (dotimes (b 3)
-	(setblock-with-update (+ a i -1) (+ j) (+ b k -1) 0
-				    0)))))
-
-(defun test-light ()
-  (world:clearworld)
-  (dorange (x -16 32)
-	   (dorange (y 0 88)
-		    (dorange (z -16 32)
-			     (setf (world:getblock x y z) 5)
-			     (setf (world:skygetlight x y z) 0)))))
-
-;;fuck me
-;;this file contains::
-;;loading nbt into the world
-;;vector operations
-;;player controls
-;;player movement among blocks
-;;this is not pretty
-;;why did i name everything so retardedly?
-
-(defparameter onground nil)
-(defparameter cameraVelocity (mat:onebyfour '(0.0 0.0 0.0 0)))
 (defparameter daytime 1.0)
 (defparameter ticks/sec nil)
 (defparameter tickscale nil)
-
-(defun ease (x target fraction)
-  (+ x (* fraction (- target x))))
-;;70 is normal
-;;110 is quake pro
-(defparameter defaultfov 70)
-(setf (simplecam-pos ourcam) (mat:onebyfour '(0 128 0 0)))
-(setf cameraVelocity (mat:onebyfour '(0 0 0 0)))
 
 (defun physinnit ()
   (setf ticks/sec 60.0)
   (setf tickscale (/ 20.0 ticks/sec))
   (setf tick-delay (/ 1000000.0 ticks/sec))
 
-  (in:p+1 :ESCAPE (lambda () (setq alivep nil)))
   ;;escape to quit
-  (in:p+1 :E (function window:toggle-mouse-capture))
-  ;;e to escape mouse
-  (setf isprinting nil)
-  (setf wprev most-negative-fixnum))
-
-;;gravity is (* -0.08 (expt tickscale 2)) 0 0
-;;falling friction is 0.98
-;;0.6 * 0.91 is walking friction
+  (in:p+1 :ESCAPE (lambda () (setq alivep nil)))
+  
+    ;;e to escape mouse
+  (in:p+1 :E (function window:toggle-mouse-capture)))
 
 (defun physics ()
-  "a messy function for the bare bones physics"
-
   (if (in:ismousecaptured)
       (controls))
-  (setf daytime (case 10
-		  (0 27.5069)
-		  (2 9)
-		  (9 0)
-  		  (3 0)
-		  (1 (/ (+ 0  (cos (/ (get-internal-real-time) 2000))) 0.5))
-		  (10 1.0)))
-  (let ((camera ourcam))
-    (if isprinting
-      (setf (simplecam-fov camera)
-	    (ease (simplecam-fov camera) (* 1.15 defaultfov) 0.2))
-      (setf (simplecam-fov camera)
-	    (ease (simplecam-fov camera) defaultfov 0.2)))
-
-
-    (let ((pos (mat-vec (simplecam-pos camera)))
-	  (vel (mat-vec cameraVelocity)))
-      (multiple-value-bind (px py pz ccx ccy ccz)
-	  (aabbcc::step-motion #'myafunc
-			       (elt pos 0)
-			       (elt pos 1)
-			       (elt pos 2)
-			       (elt vel 0)
-			       (elt vel 1)
-			       (elt vel 2))
-      ;;;;;WOWWOOWOWOWOWOW
-	(if (and (>= 0 (elt vel 1)) ccy)
-	    (setf onground t)
-	    (setf onground nil))
-	(setf (simplecam-pos camera) (vec-mat (vector px py pz)))
-	(let ((foo (mat-vec cameravelocity)))
-	  (setf cameraVelocity
-		(vec-mat
-		 (multiple-value-bind
-		       (a b c) (aabbcc::clamp-vec (elt foo 0)
-						  (elt foo 1)
-						  (elt foo 2)
-						  ccx ccy ccz)
-		   (vector a b c))))))
-      (let ((pos (mat-vec (simplecam-pos camera))))
-	(let ((blocks-around (get-blocks-around-player (elt pos 0)
-						       (elt pos 1)
-						       (elt pos 2))))
-	  (multiple-value-bind (x+ x- y+ y- z+ z-)
-	      (block-touches blocks-around
-			     (elt pos 0)
-			     (elt pos 1)
-			     (elt pos 2))
-	    (setf onground y-)))))
-
-    
-    (if (not onground)
-	(mat:add! cameraVelocity (mat:onebyfour (list 0 (* -0.08 (expt tickscale 2)) 0 0))))
-    (let ((airscaled
-	   (mat:onebyfour
-	    (list
-	     (row-major-aref cameraVelocity 0)
-	     0
-	     (row-major-aref cameraVelocity 2)
-	     0))))
-      (mat:scale! airscaled (* 0.9))
-      (if onground (mat:scale! airscaled (* 0.6 0.91)))
-      (if nil
-	  (let ((speed (hypot (mat-lis airscaled))))
-	    (print speed)
-	    (if (> 0.05 speed)
-		(setf isprinting nil))))
-      (setf (row-major-aref cameraVelocity 0) (row-major-aref airscaled 0))
-      (setf (row-major-aref cameraVelocity 2) (row-major-aref airscaled 2)))
-    (setf (row-major-aref cameraVelocity 1)
-	  (* (expt 0.98 tickscale)
-	     (row-major-aref cameraVelocity 1)))
-    (outofbounds camera)))
-
-(defun mat-lis (mat)
-  (let ((thelist nil))
-    (dotimes (x 3)
-       (push (row-major-aref mat x) thelist))
-    (nreverse thelist)))
-
-(defun hypot (list)
-  (sqrt (apply (function +) (mapcar (lambda (x) (* x x)) list))))
+  (set-render-cam))
 
 (defun look-around ()
-  (mouse-looking ourcam))
-
-(defun outofbounds (camera)
-  (when (> -256 (row-major-aref (simplecam-pos camera) 1))
-      (setf (simplecam-pos camera) (mat:onebyfour (list 0 256 0 1)))))
-
-(defun vec-mat (vec)
-  (let ((newmat (mat:onebyfour '(0 0 0 0))))
-    (dotimes (x (length vec))
-      (setf (row-major-aref newmat x) (elt vec x)))
-    newmat))
-
-(defun mat-vec (mat)
-  (vector
-   (row-major-aref mat 0)
-   (row-major-aref mat 1)
-   (row-major-aref mat 2)))
-
+  (mouse-looking))
 
 (defun block-aabb ()
   (aabbcc::make-aabb
@@ -337,9 +90,9 @@
 
 (defun player-aabb ()
   (aabbcc::make-aabb
-   :minx -0.3
+   :minx 0.3
    :miny 0.0
-   :minz -0.3
+   :minz 0.3
    :maxx 0.3
    :maxy 1.62
    :maxz 0.3))
@@ -366,7 +119,9 @@ collect all the nearest collisions with the player"
 	   player-aabb
 	   px py pz
 	   block-aabb
-	  ablock
+	   (elt ablock 0)
+	   (elt ablock 1)
+	   (elt ablock 2)
 	   vx vy vz)
 	(if (= minimum tot-min)
 	    (push type actual-contacts)
@@ -405,22 +160,16 @@ collect all the nearest collisions with the player"
 (defun get-blocks-around-player (px py pz)
   "get the blocks around player"
   (let ((places nil))
-    (dotimes (x 6)
-      (dotimes (y 6)
-	(dotimes (z 6)
- 	  (let ((blockx (round (- (+ x px) 2)))
-		(blocky (round (- (ceiling (+ y py)) 2)))
-		(blockz (round (- (+ z pz) 2))))
-	    (let ((blockid (round-pos blockx blocky blockz)))
+    (dotimes (x 10)
+      (dotimes (y 10)
+	(dotimes (z 10)
+ 	  (let ((blockx (floor (- (+ x px) 4)))
+		(blocky (floor (- (+ y py) 4)))
+		(blockz (floor (- (+ z pz) 4))))
+	    (let ((blockid (world:getblock blockx blocky blockz)))
 	      (if (eq t (aref mc-blocks::iscollidable blockid))
 		  (push (vector blockx blocky blockz) places)))))))
     places))
-
-(defun round-pos (x y z)
-  (world:getblock
-   (round x)
-   (round y)
-   (round z)))
 
 ;;dirty chunks is a list of modified chunks
 ;;we do not want anyone to see a raw list!
@@ -455,9 +204,3 @@ collect all the nearest collisions with the player"
 	      (check 0 0 -1)
 	      (check 0 0 1))
 	    (block-dirtify i j k))))))
-
-(defun world-setup ()
-  (clean-dirty)
-  (world:setup-hashes))
-
-(world-setup)

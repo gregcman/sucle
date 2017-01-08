@@ -9,3 +9,5 @@
   "converts degrees to radians"
   (* deg pi 1/180))
 
+(defun ease (x target fraction)
+  (+ x (* fraction (- target x))))

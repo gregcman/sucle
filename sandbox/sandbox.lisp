@@ -120,3 +120,9 @@
       (setf physrate difference)))
   (when (alive?)
     (physthread)))
+
+(defun world-setup ()
+  (clean-dirty)
+  (world:setup-hashes))
+
+(world-setup)
