@@ -1,20 +1,25 @@
 (in-package :sandbox)
 
 (defun spec-projection-matrix (near far left right top bottom)
-  (sb-cga:matrix
-   (/ (+ near near) (- right left)) 0.0 (/ (+ right left) (- right left)) 0.0
-   0.0 (/ (+ near near) (- top bottom)) (/ (+ top bottom) (- top bottom)) 0.0
-   0.0 0.0 (- (/ (+ far near) (- far near))) (/ (* -2 far near) (- far near))
-   0.0 0.0 -1.0 0.0))
+  (let ((near-2 (* 2 near))
+	(top-bottom (- top bottom))
+	(far-near (- far near)))
+      (sb-cga:matrix
+       (/ near-2 (- right left)) 0.0 (/ (+ right left) (- right left)) 0.0
+       0.0 (/ near-2 top-bottom) (/ (+ top bottom) top-bottom) 0.0
+       0.0 0.0 (- (/ (+ far near) far-near)) (/ (* -2 far near) far-near)
+       0.0 0.0 -1.0 0.0)))
 
 (defun projection-matrix (fovy aspect near far)
   (let ((cot (/ (cos (/ fovy 2))
 		(sin (/ fovy 2)))))
-    (sb-cga:matrix 
-     (/ cot aspect) 0.0 0.0 0.0
-     0.0 cot 0.0 0.0
-     0.0 0.0 (/ (+ far near) (- near far)) (/ (* -2 far near) (- far near))
-     0.0 0.0 -1.0 0.0)))
+    (let ((sum (+ far near))
+	  (difference (- near far)))
+      (sb-cga:matrix 
+       (/ cot aspect) 0.0 0.0 0.0
+       0.0 cot 0.0 0.0
+       0.0 0.0 (/ sum difference) (/ (* 2 far near) difference)
+       0.0 0.0 -1.0 0.0))))
 
 (defun relative-lookat (eye relative-target up)
   (let ((camright (sb-cga:cross-product up relative-target)))

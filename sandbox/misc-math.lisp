@@ -11,3 +11,9 @@
 
 (defun ease (x target fraction)
   (+ x (* fraction (- target x))))
+
+(define-modify-macro *= (&rest args)
+  *)
+
+(defun int-scale (int scale)
+  (truncate (* int scale)))

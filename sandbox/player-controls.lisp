@@ -19,24 +19,40 @@
 (defparameter *zpos* nil)
 (defparameter defaultfov 70)
 
+(defparameter *xvel* 0)
+(defparameter *yvel* 0)
+(defparameter *zvel* 0)
+
+(defparameter friction 0.9)
+
 (setf *xpos* 0
       *ypos* 0
       *zpos* 0
       *yaw* 0
       *pitch* 0)
+
 (defun controls ()
-  (when (in:key-p :w)
-    (incf *xpos*))
-  (when (in:key-p :a)
-    (decf *zpos*))
-  (when (in:key-p :s)
-    (decf *xpos*))
-  (when (in:key-p :d)
-    (incf *zpos*))
-  (when (in:key-p :space)
-    (incf *ypos*))
-  (when (in:key-p :left-shift)
-    (decf *ypos*)))
+  (let ((speed 0.024))
+    (let ((dir (complex 0 0)))
+      (when (in:key-p :w)
+	(incf dir #C(-1 0)))
+      (when (in:key-p :a)
+	(incf dir #C(0 1)))
+      (when (in:key-p :s)
+	(incf dir #C(1 0)))
+      (when (in:key-p :d)
+	(incf dir #C(0 -1)))
+      (unless (zerop dir)
+	(let ((rot-dir (* dir (cis *yaw*))))
+	  (incf *xvel* (* speed (realpart rot-dir)))
+	  (incf *zvel* (* speed (imagpart rot-dir))))))
+    (when (in:key-p :space)
+      (incf *yvel* speed))
+    (when (in:key-p :left-shift)
+      (decf *yvel* speed)))
+  (setf *xvel* (* *xvel* friction))
+  (setf *yvel* (* *yvel* friction))
+  (setf *zvel* (* *zvel* friction)))
 
 (defun mouse-looking ()
   (let* ((change (in:delta))
@@ -68,14 +84,30 @@
   ;;escape to quit
   (in:p+1 :ESCAPE (lambda () (setq alivep nil)))
   
-    ;;e to escape mouse
+  ;;e to escape mouse
   (in:p+1 :E (function window:toggle-mouse-capture)))
 
 (defun physics ()
   (if (in:ismousecaptured)
       (controls))
-  (set-render-cam))
 
+  (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
+      (aabbcc::step-motion #'myafunc
+			   *xpos* *ypos* *zpos*
+			   *xvel* *yvel* *zvel*)
+    (setf *xpos* new-x)
+    (setf *ypos* new-y)
+    (setf *zpos* new-z)
+    (multiple-value-bind (x y z) (aabbcc::clamp-vec
+				  *xvel* *yvel* *zvel*
+				  xclamp yclamp zclamp)
+      (setf *xvel* x)
+      (setf *yvel* y)
+      (setf *zvel* z))))
+
+
+(defun shit (x)
+  (print x global-output))
 (defun look-around ()
   (mouse-looking))
 
@@ -90,11 +122,11 @@
 
 (defun player-aabb ()
   (aabbcc::make-aabb
-   :minx 0.3
-   :miny 0.0
-   :minz 0.3
+   :minx -0.3
+   :miny -1.5
+   :minz -0.3
    :maxx 0.3
-   :maxy 1.62
+   :maxy 0.12
    :maxz 0.3))
 
 
@@ -107,6 +139,11 @@
       (multiple-value-bind (xclamp yclamp zclamp)
 	  (aabbcc::collapse-types blocktouches vx vy vz)
 	(values minimum xclamp yclamp zclamp)))))
+
+(defun goto (x y z)
+  (setf *xpos* x
+	*ypos* y
+	*zpos* z))
 
 (defun blocktocontact (blocklist px py pz vx vy vz)
   "for a list of blocks, a position, and velocity, 
@@ -163,12 +200,16 @@ collect all the nearest collisions with the player"
     (dotimes (x 10)
       (dotimes (y 10)
 	(dotimes (z 10)
- 	  (let ((blockx (floor (- (+ x px) 4)))
-		(blocky (floor (- (+ y py) 4)))
-		(blockz (floor (- (+ z pz) 4))))
+ 	  (let ((blockx (floor (- (+ x (truncate px)) 4)))
+		(blocky (floor (- (+ y (truncate py)) 4)))
+		(blockz (floor (- (+ z (truncate pz)) 4))))
 	    (let ((blockid (world:getblock blockx blocky blockz)))
 	      (if (eq t (aref mc-blocks::iscollidable blockid))
-		  (push (vector blockx blocky blockz) places)))))))
+		  (push (vector
+			 blockx
+			 blocky
+			 blockz
+			 ) places)))))))
     places))
 
 ;;dirty chunks is a list of modified chunks

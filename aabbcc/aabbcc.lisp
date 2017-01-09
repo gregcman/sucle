@@ -2,8 +2,6 @@
 
 (in-package #:aabbcc)
 
-;;;below is code that I thought super hard about
-;;;I hope it gives u a hard on
 
 (defstruct aabb
   (minx)
@@ -211,13 +209,12 @@ similarly, there cannot be a xyz when there is xy or a subset"
 		   (l (minusp ,d1)))
 		 (/ delta ,diff))))))
 
+;;;if the velocity is zero, there is no point to test it
+;;;if it is nonzero, we check the direction
+;;;if the direction is positive but surface 2 is in the
+;;;negative direction relative to surface 1 we discard
+;;;spits out three values which indicate movement in the x y z directions.
 (defun %collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
-  "if the velocity is zero, there is no point to test it
-  if it is nonzero, we check the direction
-   if the direction is positive but surface 2 is in the
-  negative direction relative to surface 1 we discard
-
-spits out three values which indicate movement in the x y z directions. " 
   (values
    (unless (zerop dx)
      (if (plusp dx)
