@@ -7,7 +7,7 @@ attribute float darkness;
 
 varying vec2 TexCoord;
 varying float mycolor;
-//varying float fogratio;
+varying float fogratio;
 
 uniform mat4 projectionmodelview;
 uniform float timeday;
@@ -23,7 +23,7 @@ gl_Position = projectionmodelview * position;
 TexCoord = texCoord;
 
 ///multiply then add is one instruction. then minimum
-//fogratio = min(gl_Position.z*foglet+aratio, 1.0);
+fogratio = min(gl_Position.z*foglet+aratio, 1.0);
 
 ///max is some amount of cycles, timeday multiply is one, dot is one
 mycolor = darkness;//dot(color * max(blockLight, timeday*skyLight), vec4(0.25));

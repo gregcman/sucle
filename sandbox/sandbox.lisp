@@ -23,7 +23,7 @@
 ;;;decide whether to stay in the main thread [forever?] or free up the repl
 (defparameter handoff-two nil)
 (defparameter default-args
-  '(:main nil :vsync t))
+  '(:main nil :vsync nil))
 ;;;put the arguments passed to main in the global argument library
 (defun put-global-args (argument-list)
   (let ((node argument-list))
@@ -99,28 +99,34 @@
 (defparameter renderrate nil)
 (defun injection ()
   (multiple-value-bind (val happened? difference)
-      (funcall rendertimer render-delay #'render)
+      (funcall rendertimer render-delay (lambda ()(funcall window:base-needs);;where to put?
+						(render) (physics)))
     (declare (ignorable val))
     (when happened?
-      (setf renderrate difference)))
-  (funcall window:base-needs)
-  (if (in:ismousecaptured)
-      (look-around))
-  (set-render-cam)
+      (setf renderrate difference))
+    (if happened?
+	(set-render-cam-pos 0)
+	(set-render-cam-pos (min difference tick-delay))))
   (when (alive?) 
     (injection)))
+;;;;when the renderer and physics go together its as smooth as ice cream
+
+
 (defparameter tick-delay nil)
 (defparameter phystimer nil)
 (defparameter physrate nil)
 (defun physthread ()
-  (sb-int:set-floating-point-modes :traps nil);;;;;;;;WHATHAHWHTAHWTAHTAHWTWHATH
-  (multiple-value-bind (val happened? difference)
-      (funcall phystimer tick-delay #'physics)
-    (declare (ignorable val))
-    (when happened?
-      (setf physrate difference)))
+
+  (progno (multiple-value-bind (val happened? difference)
+	      (funcall phystimer tick-delay #'physics)
+	    (declare (ignorable val))
+	    (if happened?
+		(set-render-cam-pos 0)
+		(set-render-cam-pos (min difference tick-delay)))
+	    (when happened?
+	      (setf physrate difference))))
   (when (alive?)
-    (physthread)))
+    (progno (physthread))))
 
 (defun world-setup ()
   (clean-dirty)

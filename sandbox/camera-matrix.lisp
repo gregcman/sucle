@@ -52,10 +52,3 @@
       0.0 1.0 0.0 (- py)
       0.0 0.0 1.0 (- pz)
       0.0 0.0 0.0 1.0))))
-
-(defun unit-pitch-yaw (pitch yaw)
-  (let ((cos-pitch (cos pitch)))
-    (sb-cga:vec
-     (* cos-pitch (cos yaw))
-     (sin pitch)
-     (* cos-pitch (sin yaw)))))

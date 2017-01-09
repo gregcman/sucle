@@ -9,10 +9,9 @@ uniform vec4 fogcolor;
 void main()
 {
 
-	gl_FragColor= 
-//mix(fogcolor, 
+	gl_FragColor= mix(fogcolor, 
 mycolor *  texture2D(ourTexture, TexCoord)
-//, fogratio)
+, fogratio)
 ;
 }
 

@@ -25,6 +25,8 @@
 
 (defparameter friction 0.9)
 
+(defparameter noclip nil)
+
 (setf *xpos* 0
       *ypos* 0
       *zpos* 0
@@ -49,27 +51,40 @@
     (when (in:key-p :space)
       (incf *yvel* speed))
     (when (in:key-p :left-shift)
-      (decf *yvel* speed)))
-  (setf *xvel* (* *xvel* friction))
-  (setf *yvel* (* *yvel* friction))
-  (setf *zvel* (* *zvel* friction)))
+      (decf *yvel* speed))))
+
+(defparameter mouse-sensitivity (* 60.0 pi 1/180))
 
 (defun mouse-looking ()
   (let* ((change (in:delta))
-	 (x (* 1.25 1/360 (aref change 0)))
-	 (y (* 1.25 1/360 (aref change 1))))
-    (setf *yaw*
-	  (mod (+ *yaw* x) (* 2 pi)))
-    (setf *pitch*
-	  (clamp (+ y *pitch*)
-		 (* 0.99 (/ pi -2))
-		 (* 0.99 (/ pi 2))))))
+	 (x (* mouse-sensitivity (/ (aref change 0) 360.0)))
+	 (y (* mouse-sensitivity (/ (aref change 1) 360.0))))
+    (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
+      (setf *yaw* (mod (+ *yaw* dyaw) (* 2 pi)))
+      (setf *pitch* (clamp (+ *pitch* dpitch)
+			   (* 0.99 (/ pi -2))
+			   (* 0.99 (/ pi 2)))))))
 
-(defun set-render-cam ()
-  (setf (camera-xpos *camera*) *xpos*
-	(camera-ypos *camera*) *ypos*
-	(camera-zpos *camera*) *zpos*
-	(camera-pitch *camera*) *pitch*
+(defun %sphere-mouse-help (x y)
+  (if (zerop x)
+      (if (zerop y)
+	  (values 0.0 0.0)
+	  (values 0.0 y))
+      (if (zerop y)
+	  (values x 0.0)
+	  (new-direction (coerce x 'single-float)
+			 (coerce y 'single-float)))))
+
+(defun set-render-cam-pos (millisecs)
+  (let ((multiplier (/ millisecs tick-delay)))
+    (setf (camera-xpos *camera*) (+ *xpos* (* multiplier *xvel*))
+	  (camera-ypos *camera*) (+ *ypos* (* multiplier *yvel*))
+	  (camera-zpos *camera*) (+ *zpos* (* multiplier *zvel*))
+	  (camera-pitch *camera*) *pitch*
+	  (camera-yaw *camera*) *yaw*)))
+
+(defun set-render-cam-look ()
+  (setf (camera-pitch *camera*) *pitch*
 	(camera-yaw *camera*) *yaw*))
 
 (defparameter daytime 1.0)
@@ -90,7 +105,13 @@
 (defun physics ()
   (if (in:ismousecaptured)
       (controls))
+  (setf *xvel* (* *xvel* friction))
+  (setf *yvel* (* *yvel* friction))
+  (setf *zvel* (* *zvel* friction))
+  (unless noclip
+    (collide-with-world)))
 
+(defun collide-with-world ()
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
       (aabbcc::step-motion #'myafunc
 			   *xpos* *ypos* *zpos*
@@ -104,7 +125,6 @@
       (setf *xvel* x)
       (setf *yvel* y)
       (setf *zvel* z))))
-
 
 (defun shit (x)
   (print x global-output))
@@ -197,19 +217,18 @@ collect all the nearest collisions with the player"
 (defun get-blocks-around-player (px py pz)
   "get the blocks around player"
   (let ((places nil))
-    (dotimes (x 10)
-      (dotimes (y 10)
-	(dotimes (z 10)
- 	  (let ((blockx (floor (- (+ x (truncate px)) 4)))
-		(blocky (floor (- (+ y (truncate py)) 4)))
-		(blockz (floor (- (+ z (truncate pz)) 4))))
+    (dotimes (x 5)
+      (dotimes (y 4)
+	(dotimes (z 5)
+ 	  (let ((blockx (floor (- (+ x (truncate px)) 2)))
+		(blocky (floor (- (+ y (truncate py)) 2)))
+		(blockz (floor (- (+ z (truncate pz)) 2))))
 	    (let ((blockid (world:getblock blockx blocky blockz)))
 	      (if (eq t (aref mc-blocks::iscollidable blockid))
 		  (push (vector
 			 blockx
 			 blocky
-			 blockz
-			 ) places)))))))
+			 blockz) places)))))))
     places))
 
 ;;dirty chunks is a list of modified chunks
@@ -245,3 +264,19 @@ collect all the nearest collisions with the player"
 	      (check 0 0 -1)
 	      (check 0 0 1))
 	    (block-dirtify i j k))))))
+
+(defun plain-setblock (i j k blockid new-light-value)
+  (let ((old-blockid (world:getblock i j k)))
+    (if (/= blockid old-blockid)
+	(when (setf (world:getblock i j k) blockid)
+	  (setf (world:getlight i j k) new-light-value)))))
+
+
+(defmacro doblocks ((xvar xstart xnum)
+		    (yvar ystart ynum)
+		    (zvar zstart znum)
+		    &body body)
+  `(dorange (,xvar ,xstart ,xnum)
+	    (dorange (,yvar ,ystart ,ynum)
+		     (dorange (,zvar ,zstart ,znum)
+			      ,@body))))

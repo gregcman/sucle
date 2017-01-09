@@ -28,7 +28,7 @@
     (cond (vsync? (window::set-vsync t)
 		  (setf render-delay 0))
 	  (t (window::set-vsync nil)
-	     (setf render-delay (/ 1000000.0 59.88)))))
+	     (setf render-delay (if t 0 (/ 1000000.0 59.88))))))
 
   (setf *camera* (make-camera
 		  :xpos 0
@@ -51,19 +51,14 @@
 (defun render ()
   "responsible for rendering the world"
 
-  (gl:clear
-   :color-buffer-bit
-   :depth-buffer-bit)
-
-  (if (in:key-p :g)
-      (update-world-vao))
-  (luse-shader :blockshader)
+  (if (in:ismousecaptured)
+      (look-around))
   (with-slots (xpos ypos zpos fov pitch yaw) *camera*
     (set-projection-matrix
      (coerce (deg-rad fov) 'single-float)
      (/ out::pushed-width out::pushed-height)
      0.01
-     1024.0)
+     128)
     (set-view-matrix
      (sb-cga:vec (coerce xpos 'single-float)
 		 (coerce ypos 'single-float)
@@ -72,18 +67,28 @@
 		     (coerce yaw 'single-float))
      (sb-cga:vec 0.0 1.0 0.0)))
 
+  (luse-shader :blockshader)
   (glshader:set-matrix
    "projectionmodelview"
    (sb-cga:transpose-matrix
     (sb-cga:matrix* *projection-matrix* *view-matrix*)))
+  
+  (draw-chunk-meshes)
+  (window:update-display)
 
+  
+  (set-render-cam-look)
+  (if (in:key-p :g)
+      (update-world-vao))
+  (if (in:key-p :5)
+      (load-shaders))
   
   (designatemeshing)
   (glshader:set-float "timeday" daytime)
   (set-overworld-fog daytime)
-  
-  (draw-chunk-meshes)
-  (window:update-display))
+  (gl:clear
+;   :color-buffer-bit
+   :depth-buffer-bit))
 
 (defun set-projection-matrix (fovy aspect near far)
   (let ((projection-matrix (projection-matrix fovy aspect near far)))
@@ -116,8 +121,14 @@
 	       (0 :terrain)
 	       (1 :pack)
 	       (2 :default)))
-  (if worldlist
-      (gl:call-list worldlist)))
+  (maphash
+     (lambda (key display-list)
+       (declare (ignore key))
+       (gl:call-list display-list))
+    *g/call-list*)
+  (progno
+    (if worldlist
+	(gl:call-list worldlist))))
 
 (defparameter worldlist nil)
 
