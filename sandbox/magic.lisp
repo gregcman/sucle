@@ -93,4 +93,30 @@
     ("terrain/"
      "moon.png" "sun.png")
     ("title/"
-     "black.png" "mclogo.png" "mojang.png")))
+     "black.png" "mclogo.png" "mojang.png")
+    ("skybox/"
+     "cheap.png")))
+
+(defun ubyte-mult (a b)
+  (truncate (* a b) 256))
+
+(defun multiply-into (vecinto other)
+  (macrolet ((aux (a b num)
+	       `(let ((at (aref ,a ,num))
+		      (bt (aref ,b ,num)))
+		  (setf (aref ,a ,num) (ubyte-mult at bt)))))
+    (aux vecinto other 0)
+    (aux vecinto other 1)
+    (aux vecinto other 2)
+    (aux vecinto other 3)))
+
+;;;grass is 0 240
+;;;leaves is [64 80] 192
+(defun modify-greens (xpos ypos &optional
+				  (color (imagewise:getapixel
+					  255 0
+					  (lget *g/image* "misc/grasscolor.png"))))
+  (let ((terrain (lget *g/image* "terrain.png")))
+    (dorange (x xpos 16)
+	     (dorange (y ypos 16)
+		      (multiply-into (imagewise:getapixel y x terrain) color)))))

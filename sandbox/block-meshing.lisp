@@ -46,7 +46,9 @@
        chunk-position))))
 
 (defun blockshape (i j k blockid)
-  (ret faces (renderstandardblock blockid i j k)))
+  (case blockid
+    (2 (rendergrass blockid i j k))
+    (t (renderstandardblock blockid i j k))))
 
 ;;;if the block is air, the side gets rendered. if the block is transparent
 ;;;and the same type ex: texture between glass - there is no texture - if they are
@@ -64,7 +66,28 @@
 	   (let ((,y-name (- 15 (ash (- ,num-form-sym ,x-name) -4))))
 	     ,@body))))))
 
-
+(defun rendergrass (id i j k)
+  (with-texture-translator (tu tv) 2
+    (let ((adj-id (world:getblock i (1- j) k)))
+      (when (show-sidep id adj-id) 
+	(side-j i j k tu tv))))
+  (with-texture-translator (tu tv) 0
+    (let ((adj-id (world:getblock i (1+ j) k)))
+      (when (show-sidep id adj-id) 
+	(side+j i j k tu tv))))
+  (with-texture-translator (tu tv) 3
+    (let ((adj-id (world:getblock (1- i) j k)))
+      (when (show-sidep id adj-id) 
+	(side-i i j k tu tv)))
+    (let ((adj-id (world:getblock (1+ i) j k)))
+      (when (show-sidep id adj-id) 
+	(side+i i j k tu tv)))    
+    (let ((adj-id (world:getblock i j (1- k))))
+      (when (show-sidep id adj-id)
+	(side-k i j k tu tv)))
+    (let ((adj-id (world:getblock i j (1+ k))))
+      (when (show-sidep id adj-id) 
+	(side+k i j k tu tv)))))
 
 (defun renderstandardblock (id i j k)
   (with-texture-translator (tu tv) (aref mc-blocks::blockIndexInTexture id)

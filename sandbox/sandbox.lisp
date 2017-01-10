@@ -23,7 +23,7 @@
 ;;;decide whether to stay in the main thread [forever?] or free up the repl
 (defparameter handoff-two nil)
 (defparameter default-args
-  '(:main nil :vsync nil))
+  '(:main nil :vsync t))
 ;;;put the arguments passed to main in the global argument library
 (defun put-global-args (argument-list)
   (let ((node argument-list))
@@ -97,18 +97,36 @@
 (defparameter render-delay nil)
 (defparameter rendertimer nil)
 (defparameter renderrate nil)
+
+(defun averager (amount)
+  (let ((the-array (make-array amount :element-type 'fixnum))
+	(index 0)
+	(tot 0))
+    (lambda (x)
+      (let ((old (aref the-array index)))
+	(setf tot (+ tot x (- old)))
+	(setf (aref the-array index) x))
+      (setf index (mod (1+ index) amount))
+      (values (/ (coerce tot 'single-float) amount) the-array))))
+
+(defparameter fps-func (averager 256))
+(defparameter fps nil)
 (defun injection ()
   (multiple-value-bind (val happened? difference)
       (funcall rendertimer render-delay (lambda ()(funcall window:base-needs);;where to put?
 						(render) (physics)))
     (declare (ignorable val))
     (when happened?
-      (setf renderrate difference))
+      (setf renderrate difference)
+      (setf fps (/ 1000000.0 (funcall fps-func difference)))
+      (window:set-caption (format nil "~2,4$" fps)))
     (if happened?
 	(set-render-cam-pos 0)
 	(set-render-cam-pos (min difference tick-delay))))
   (when (alive?) 
     (injection)))
+
+
 ;;;;when the renderer and physics go together its as smooth as ice cream
 
 

@@ -21,14 +21,14 @@
        0.0 0.0 (/ sum difference) (/ (* 2 far near) difference)
        0.0 0.0 -1.0 0.0))))
 
-(defun relative-lookat (eye relative-target up)
+(defun relative-lookat (relative-target up)
   (let ((camright (sb-cga:cross-product up relative-target)))
     (let ((camup (sb-cga:cross-product relative-target camright)))
       (get-lookat (sb-cga:normalize camright)
 		  (sb-cga:normalize camup)
-		  relative-target eye))))
+		  relative-target))))
 
-(defun get-lookat (right up direction position)
+(defun get-lookat (right up direction)
   (let ((rx (aref right 0))
 	(ry (aref right 1))
 	(rz (aref right 2))
@@ -37,18 +37,10 @@
 	(uz (aref up 2))
 	(dx (aref direction 0))
 	(dy (aref direction 1))
-	(dz (aref direction 2))
-	(px (aref position 0))
-	(py (aref position 1))
-	(pz (aref position 2)))    
-    (sb-cga:matrix*
-     (sb-cga:matrix
-      rx ry rz 0.0
-      ux uy uz 0.0
-      dx dy dz 0.0
-      0.0 0.0 0.0 1.0)
-     (sb-cga:matrix
-      1.0 0.0 0.0 (- px)
-      0.0 1.0 0.0 (- py)
-      0.0 0.0 1.0 (- pz)
-      0.0 0.0 0.0 1.0))))
+	(dz (aref direction 2)))    
+    ;(sb-cga:matrix*)
+    (sb-cga:matrix
+     rx ry rz 0.0
+     ux uy uz 0.0
+     dx dy dz 0.0
+     0.0 0.0 0.0 1.0)))

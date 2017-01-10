@@ -11,18 +11,25 @@
   pitch 
   fov)
 
-(defparameter *camera* nil)
-(defparameter *view-matrix* nil)
-(defparameter *projection-matrix* nil)
+;;matrix multiplication is associative
+
+(defparameter *camera* nil) ;;global camera
+(defparameter *view-matrix* nil) ;;view matrix
+(defparameter *projection-matrix* nil) ;;projection matrix
+(defparameter *projection-view-matrix* nil) ;;projection * view matrix
+(defparameter *player-matrix* nil) ;;positional information of camera
 
 (defun glinnit ()
-  (lpic-ltexture "gui/items.png" :items)
-  (lpic-ltexture "misc/grasscolor.png" :grasscolor)
-  (lpic-ltexture "misc/foliagecolor.png" :foliagecolor)
+  ;(lpic-ltexture "gui/items.png" :items)
+  ;(lpic-ltexture "misc/grasscolor.png" :grasscolor)
+  ;(lpic-ltexture "misc/foliagecolor.png" :foliagecolor)
   (lpic-ltexture "terrain.png" :terrain)
-  (lpic-ltexture "font/default.png" :default)
-  (lpic-ltexture "pack.png" :pack)
-  (lpic-ltexture "environment/clouds.png" :clouds)
+  (lpic-ltexture "skybox/cheap.png" :skybox)
+  (lpic-ltexture "terrain/sun.png" :sun)
+  (lpic-ltexture "terrain/moon.png" :moon)
+  ;(lpic-ltexture "font/default.png" :default)
+  ;(lpic-ltexture "pack.png" :pack)
+  ;(lpic-ltexture "environment/clouds.png" :clouds)
 
   (let ((vsync? (lget *g/args* :vsync)))    
     (cond (vsync? (window::set-vsync t)
@@ -42,10 +49,8 @@
 		  :fov 70))
   
   (setf glshader:*shader-program* nil)
-  (setf worldlist nil)
   (setf mesher-thread nil)
-  (load-block-shader)
-  (load-simple-shader)
+  (load-shader-programs)
   (update-world-vao))
 
 (defun render ()
@@ -53,67 +58,66 @@
 
   (if (in:ismousecaptured)
       (look-around))
+  (set-render-cam-look)
   (with-slots (xpos ypos zpos fov pitch yaw) *camera*
     (set-projection-matrix
      (coerce (deg-rad fov) 'single-float)
      (/ out::pushed-width out::pushed-height)
      0.01
      128)
+    
     (set-view-matrix
-     (sb-cga:vec (coerce xpos 'single-float)
-		 (coerce ypos 'single-float)
-		 (coerce zpos 'single-float))
      (unit-pitch-yaw (coerce pitch 'single-float)
 		     (coerce yaw 'single-float))
-     (sb-cga:vec 0.0 1.0 0.0)))
+     (sb-cga:vec 0.0 1.0 0.0))
+
+    (set-player-matrix  (coerce xpos 'single-float)
+			(coerce ypos 'single-float)
+			(coerce zpos 'single-float)))
+  (update-projection-view-matrix)
 
   (luse-shader :blockshader)
+
   (glshader:set-matrix
    "projectionmodelview"
    (sb-cga:transpose-matrix
-    (sb-cga:matrix* *projection-matrix* *view-matrix*)))
-  
+    (sb-cga:matrix* *projection-view-matrix* *player-matrix*)))
+  ;;;static geometry with no translation whatsoever
   (draw-chunk-meshes)
   (window:update-display)
-
-  
-  (set-render-cam-look)
+  (draw-sky)
   (if (in:key-p :g)
       (update-world-vao))
   (if (in:key-p :5)
       (load-shaders))
-  
   (designatemeshing)
   (glshader:set-float "timeday" daytime)
   (set-overworld-fog daytime)
   (gl:clear
-;   :color-buffer-bit
+   ;color-buffer-bit
    :depth-buffer-bit))
+
+(defun update-projection-view-matrix ()
+  (setf *projection-view-matrix* (sb-cga:matrix* *projection-matrix* *view-matrix*)))
 
 (defun set-projection-matrix (fovy aspect near far)
   (let ((projection-matrix (projection-matrix fovy aspect near far)))
     (setf *projection-matrix* projection-matrix)))
 
-(defun set-view-matrix (camera-position direction up)
-  (let ((view (relative-lookat camera-position direction up)))
+(defun set-view-matrix (direction up)
+  (let ((view (relative-lookat direction up)))
     (setf *view-matrix* view)))
+
+(defun set-player-matrix (x y z)
+  (let ((player-matrix (sb-cga:translate* (- x) (- y) (- z))))
+    (setf *player-matrix* player-matrix)))
 
 (defun luse-shader (name)
   (glshader:use-program (lget *g/shader* name)))
 
-(defun genworldcallist ()
-  (let ((ourlist (gl:gen-lists 1)))
-    (gl:new-list ourlist :compile)
-    (maphash
-     (lambda (key display-list)
-       (declare (ignore key))
-       (gl:call-list display-list))
-    *g/call-list*)
-    (gl:end-list)
-    ourlist))
-
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)
+  (gl:depth-func :less)
 
   (gl:enable :cull-face)
   (gl:cull-face :back)
@@ -125,12 +129,7 @@
      (lambda (key display-list)
        (declare (ignore key))
        (gl:call-list display-list))
-    *g/call-list*)
-  (progno
-    (if worldlist
-	(gl:call-list worldlist))))
-
-(defparameter worldlist nil)
+    *g/call-list*))
 
 (defun update-world-vao ()
   "updates all of the vaos in the chunkhash. takes a long time"
@@ -144,6 +143,30 @@
      (declare (ignore v))
      (dirty-push k))
    world::chunkhash))
+
+(defun bind-shit (name)
+  "bind a texture located in the texture library"
+  (let ((num (lget *g/texture* name)))
+    (if num
+	(gl:bind-texture :texture-2d num)
+	(print "error-tried to use NIL texture"))))
+
+;;;turn a picture which is in the image library into an
+;;;opengl texture which is in the texture library
+(defun lpic-ltexture (image-name &optional (texture-name image-name))
+  (let ((thepic (lget *g/image* image-name)))
+    (if thepic
+	(destructuring-bind (h w c) (array-dimensions thepic)
+	  (let ((type (case c
+			(3 :rgb)
+			(4 :rgba))))
+	    (let ((new-texture (gltexture:create-texture (imagewise:array-flatten thepic) w h type)))
+	      (lset *g/texture* texture-name new-texture)
+	      new-texture))))))
+
+(defun load-shader-programs ()
+  (load-block-shader)
+  (load-simple-shader))
 
 (defun load-block-shader ()
   (let ((old (lget *g/shader* :blockshader)))
@@ -173,21 +196,3 @@
 	 '(("position" . 0)
 	   ("texCoord" . 2)
 	   ("color" . 3)))))
-
-(defun bind-shit (name)
-  "bind a texture located in the texture library"
-  (let ((num (lget *g/texture* name)))
-    (if num
-	(gl:bind-texture :texture-2d num)
-	(print "error-tried to use NIL texture"))))
-
-;;;turn a picture which is in the image library into an
-;;;opengl texture which is in the texture library
-(defun lpic-ltexture (image-name &optional (texture-name image-name))
-  (let ((thepic (lget *g/image* image-name)))
-    (if thepic
-	(destructuring-bind (h w &rest c) (array-dimensions thepic)
-	  (declare (ignore c))
-	  (let ((new-texture (gltexture:create-texture (imagewise:array-flatten thepic) w h)))
-	    (lset *g/texture* texture-name new-texture)
-	    new-texture)))))
