@@ -84,6 +84,14 @@
     (sb-cga:matrix* *projection-view-matrix* *player-matrix*)))
   ;;;static geometry with no translation whatsoever
   (draw-chunk-meshes)
+
+  ;;;;draw the fist hitbox
+  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
+	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
+      fist-aabb
+    (draw-box (+ minx fistx -0) (+  miny fisty -0) (+  minz fistz -0)
+	      (+ maxx fistx -0) (+  maxy fisty -0) (+  maxz fistz -0)))
+  
   (window:update-display)
   (draw-sky)
   (if (in:key-p :g)
@@ -160,7 +168,7 @@
 	  (let ((type (case c
 			(3 :rgb)
 			(4 :rgba))))
-	    (let ((new-texture (gltexture:create-texture (imagewise:array-flatten thepic) w h type)))
+	    (let ((new-texture (create-texture (imagewise:array-flatten thepic) w h type)))
 	      (lset *g/texture* texture-name new-texture)
 	      new-texture))))))
 
@@ -196,3 +204,25 @@
 	 '(("position" . 0)
 	   ("texCoord" . 2)
 	   ("color" . 3)))))
+
+(defun glActiveTexture (num)
+  "sets the active texture"
+  (gl:active-texture (+ num (glinfo:get-gl-constant :texture0))))
+
+(defun create-texture (tex-data width height &optional (type :rgba))
+  "creates an opengl texture from data"
+  (let ((the-shit (car (gl:gen-textures 1))))
+    (gl:bind-texture :texture-2d the-shit)
+    (gl:tex-parameter :texture-2d :texture-min-filter :nearest; :nearest-mipmap-nearest
+		      )
+    (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
+    (gl:tex-parameter :texture-2d :texture-wrap-s :repeat)
+    (gl:tex-parameter :texture-2d :texture-wrap-t :repeat)
+    (gl:tex-parameter :texture-2d :texture-border-color '(0 0 0 0))
+   ; (gl:tex-parameter :texture-2d :generate-mipmap :true)
+    (gl:tex-image-2d
+     :texture-2d 0
+     type width height 0 type :unsigned-byte tex-data)
+ ;   (gl:generate-mipmap :texture-2d)
+    the-shit))
+

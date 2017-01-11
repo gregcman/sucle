@@ -25,7 +25,7 @@
 
 (defparameter friction 0.9)
 
-(defparameter noclip nil)
+(defparameter noclip t)
 
 (setf *xpos* 0
       *ypos* 0
@@ -103,13 +103,32 @@
   (in:p+1 :E (function window:toggle-mouse-capture)))
 
 (defun physics ()
-  (if (in:ismousecaptured)
-      (controls))
+  (when (in:ismousecaptured)
+    (controls)
+    (in:key-pressed-hook :r
+			 (lambda ()
+			   (setblock-with-update (floor fistx)
+						 (floor fisty)
+						 (floor fistz)
+						 49
+						 0))))
   (setf *xvel* (* *xvel* friction))
   (setf *yvel* (* *yvel* friction))
   (setf *zvel* (* *zvel* friction))
-  (unless noclip
-    (collide-with-world)))
+  (collide-with-world)
+  (let ((cos-pitch (cos *pitch*)))
+    (let ((vx (- (* reach (* cos-pitch (cos *yaw*)))))
+	  (vy (- (* reach (sin *pitch*))))
+	  (vz (- (* reach (* cos-pitch (sin *yaw*))))))
+      (multiple-value-bind (frac xclamp yclamp zclamp)
+	  (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
+	(setf fistx (+ *xpos* (* frac vx))
+	      fisty (+ *ypos* (* frac vy))
+	      fistz (+ *zpos* (* frac vz)))))))
+
+(defparameter fistx 0.0)
+(defparameter fisty 0.0)
+(defparameter fistz 0.0)
 
 (defun collide-with-world ()
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
@@ -149,12 +168,53 @@
    :maxy 0.12
    :maxz 0.3))
 
+(defun fist-aabb ()
+  (aabbcc::make-aabb
+   :minx -0.005
+   :miny -0.005
+   :minz -0.005
+   :maxx 0.005
+   :maxy 0.005
+   :maxz 0.005))
 
 (defparameter block-aabb (block-aabb))
 (defparameter player-aabb (player-aabb))
+(defparameter fist-aabb (fist-aabb))
+
+(defparameter reach 5.0)
+
+(defun fist-collide (blocklist px py pz dx dy dz)
+  (let ((tot-min 1)
+	(actual-contacts nil))
+    (dolist (ablock blocklist)
+      (multiple-value-bind (minimum type)
+	  (aabbcc::aabb-collide
+	   fist-aabb
+	   px py pz
+	   block-aabb
+	   (elt ablock 0)
+	   (elt ablock 1)
+	   (elt ablock 2)
+	   dx dy dz)
+	(if (= minimum tot-min)
+	    (push type actual-contacts)
+	    (if (< minimum tot-min)
+		(progn
+		  (setq tot-min minimum)
+		  (setq actual-contacts (list type)))))))
+    (values
+     tot-min
+     actual-contacts)))
+
+(defun punch-func (px py pz vx vy vz)
+  (let ((ourblocks (get-blocks-around-player px py pz)))
+    (multiple-value-bind (minimum blocktouches) (fist-collide ourblocks px py pz vx vy vz)
+      (multiple-value-bind (xclamp yclamp zclamp)
+	  (aabbcc::collapse-types blocktouches vx vy vz)
+	(values minimum xclamp yclamp zclamp)))))
 
 (defun myafunc (px py pz vx vy vz)
-  (let ((ourblocks (get-blocks-around-player px py pz)))
+  (let ((ourblocks (unless noclip (get-blocks-around-player px py pz))))
     (multiple-value-bind (minimum blocktouches) (blocktocontact ourblocks px py pz vx vy vz)
       (multiple-value-bind (xclamp yclamp zclamp)
 	  (aabbcc::collapse-types blocktouches vx vy vz)

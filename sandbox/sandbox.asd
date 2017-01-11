@@ -13,7 +13,6 @@
                  #:pathwise
 
 		 #:glshader
-                 #:gltexture
                  #:glinfo
 
 		 #:macrology

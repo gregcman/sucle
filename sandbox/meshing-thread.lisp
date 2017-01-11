@@ -53,11 +53,7 @@
 	    (progn
 	      (let ((old-call-list (lget *g/call-list* coords)))
 		(lset *g/call-list* coords (shape-list shape len))
-		(when old-call-list (gl:delete-lists old-call-list 1)))
-	      (let ((old-world-list worldlist))
-		(setf worldlist (genworldcallist))
-		(when old-world-list
-		  (gl:delete-lists old-world-list 1))))
+		(when old-call-list (gl:delete-lists old-call-list 1))))
 	    (dirty-push coords))))
   (setf mesher-thread nil))
 

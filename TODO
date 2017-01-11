@@ -3,20 +3,10 @@
 
 {package sandbox}:
 -clean up world-loading.lisp
--allow flying, noclip in player-control.lisp
--make blocks not so retardedly long
--separate into more packages :lists, files and directories, generic rendering
+-generic rendering
 
 {package vox}:
-//current state: layout 25 25 9 works for finxums on 64 bit machines. will break if not using 25 25 9 or on a 32 bit machine.
-
-{package the-matrix-is-everywhere}:
--rename the system "the-matrix-is-everywhere" to something not so silly or use an optimized well tested library.
-//current state: copy pasted matrix multiplication code from internet. allocates a new matrix every time. types not fun to convert between
-
-{package aabbcc}:
--add facilities for intersection with a single rectangular plane
--intersection with lines
+-verify whether the code generation works for other 3 - number layouts
 
 {package window}:
 -clean up unused cruft
