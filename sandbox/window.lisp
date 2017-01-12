@@ -29,6 +29,14 @@
 	       (:just-released (print "huh?") :just-pressed)
 	       ((t) t)))))
 
+(defun step-hash (hash)
+  (loop for key being the hash-keys of hash
+     using (hash-value value)
+     do (case value
+	  (:just-pressed (setf (gethash key hash) t))
+	  (:just-released (setf (gethash key hash) nil))
+	  ((nil) (remhash key hash)))))
+
 (macrolet ((key (key)
 	     `(gethash ,key *keypress-hash*))
 	   (mice (mice)
@@ -109,6 +117,8 @@
   (setf *scroll-x* 0.0d0
 	*scroll-y* 0.0d0)
   (setq *status* (glfw:window-should-close-p))
+  (step-hash *keypress-hash*)
+  (step-hash *mousepress-hash*)
   (glfw:poll-events))
 
 (defun opengl-main-thread-p ()

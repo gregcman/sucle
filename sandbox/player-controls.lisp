@@ -124,14 +124,20 @@
   (when (e:key-p :ESCAPE) (setq alivep nil))
   
   ;;e to escape mouse
-  (when (e:key-p :E) (window:toggle-mouse-capture))
+  (when (e:key-j-p :E) (window:toggle-mouse-capture))
   (when (window:mice-locked-p)
     (controls)
-    (when (e:key-p :r)
+    (when (e:mice-j-p :right)
       (setblock-with-update (floor fistx)
 			    (floor fisty)
 			    (floor fistz)
 			    49
+			    0))
+    (when (e:mice-j-p :left)
+      (setblock-with-update (floor fistx)
+			    (floor fisty)
+			    (floor fistz)
+			    0
 			    0)))
   (setf *xvel* (* *xvel* friction))
   (setf *yvel* (* *yvel* friction))
