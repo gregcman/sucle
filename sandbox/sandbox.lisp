@@ -23,7 +23,7 @@
 ;;;decide whether to stay in the main thread [forever?] or free up the repl
 (defparameter handoff-two nil)
 (defparameter default-args
-  '(:main nil :vsync t))
+  '(:main nil :vsync t :window-width 854 :window-height 480))
 ;;;put the arguments passed to main in the global argument library
 (defun put-global-args (argument-list)
   (let ((node argument-list))
@@ -41,20 +41,21 @@
       (funcall func)
       (lcreate-thread :son-of-main func)))
 (eval-when (:compile-toplevel :load-toplevel :execute) 
-  (setf handoff-one
-	(lambda () (initlib)
-		(put-global-args default-args)
-		(put-global-args original-args)
-		(designate-initial-threads handoff-two))))
+  (defun handoff-one ()
+    (initlib)
+    (put-global-args default-args)
+    (put-global-args original-args)
+    (designate-initial-threads handoff-two))
+  (setf handoff-one #'handoff-one))
 
 ;;;stage 3: initialize window and opengl
 (defparameter handoff-three nil)
-(eval-when (:compile-toplevel :load-toplevel :execute) 
-  (setf handoff-two
-	(lambda ()
-	  (sb-int:set-floating-point-modes :traps nil) ;for some odd reason
-	  (window:arise)
-	  (funcall window:wrapper handoff-three))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun handoff-two ()
+    (sb-int:set-floating-point-modes :traps nil) ;for some odd reason
+    (window:init)
+    (window::wrapper handoff-three))
+  (setf handoff-two #'handoff-two))
 
 ;;;stage 4: load initial assets
 ;;;initialize window options, keyboard, renderer, physics
@@ -62,31 +63,32 @@
 ;;;by now all the initilization code is to be loaded. the only thing left to do is
 ;;;to launch the thread which execute the program: renderer and physics
 (eval-when (:compile-toplevel :load-toplevel :execute) 
-  (setf handoff-three
-	(lambda ()
-	  (load-assets) ;assets 
-	  (setq out:width (if nil 512 854) out:height (if nil 512 480)) ;;window
-	  (out:push-dimensions nil)
-	  (in::initialize);keyboard
-	  (glinnit) ;opengl
-	  (physinnit) ;physics
-	  (funcall handoff-four))))
+  (defun handoff-three ()
+    (load-assets) ;assets
+    (let ((width (lget *g/args* :window-width))
+	  (height (lget *g/args* :window-height)))
+      (window:push-dimensions width height))
+    (glinnit) ;opengl
+    (physinnit) ;physics
+    (funcall handoff-four))
+  (setf handoff-three #'(lambda () (wowwow #'handoff-three))))
 
 ;;;stage 5: launch the main constituent threads:
 ;;the renderthread, if vsync is on, gets locked at a certain fps. The camera and looking around is
 ;;synced with it for smooth looking
 ;;;the physics thread can do whatever it wants
 (eval-when (:compile-toplevel :load-toplevel :execute) 
-  (setf handoff-four
-	(lambda ()
-	  (setf phystimer (timer:timer))
-	  (setf rendertimer (timer:timer))  
-	  (unwind-protect (hairy-programs)
-	    (cleanup)))))
+  (defun handoff-four ()
+    (setf phystimer (timer:timer))
+    (setf rendertimer (timer:timer))  
+    (unwind-protect (hairy-programs)
+      (cleanup)))
+  (setf handoff-four #'handoff-four))
+
 (defparameter alivep nil)
 (defun alive? ()
   (and alivep
-       (not window:status)))
+       (not window:*status*)))
 (defun hairy-programs ()
   (setq alivep t)
   (lcreate-thread :phys #'physthread)
@@ -98,22 +100,12 @@
 (defparameter rendertimer nil)
 (defparameter renderrate nil)
 
-(defun averager (amount)
-  (let ((the-array (make-array amount :element-type 'fixnum))
-	(index 0)
-	(tot 0))
-    (lambda (x)
-      (let ((old (aref the-array index)))
-	(setf tot (+ tot x (- old)))
-	(setf (aref the-array index) x))
-      (setf index (mod (1+ index) amount))
-      (values (/ (coerce tot 'single-float) amount) the-array))))
-
 (defparameter fps-func (averager 256))
 (defparameter fps nil)
 (defun injection ()
   (multiple-value-bind (val happened? difference)
-      (funcall rendertimer render-delay (lambda ()(funcall window:base-needs);;where to put?
+      (funcall rendertimer render-delay (lambda ()(window:poll);;where to put?
+						  (remove-spurious-mouse-input)
 						(render) (physics)))
     (declare (ignorable val))
     (when happened?
@@ -125,6 +117,25 @@
 	(set-render-cam-pos (min difference tick-delay))))
   (when (alive?) 
     (injection)))
+
+(defun wowwow (func)
+  (tagbody
+     (handler-bind
+	 ((error
+	   (lambda (condition)
+	     (print condition)
+	     (window::get-mouse-out)
+	     (restart-case
+		 (let ((r (find-restart 'my-restart)))
+		   (invoke-restart r))
+	       (my-restart () (go huh))))))
+       (funcall func))
+     (return-from wowwow)
+   huh
+     (print "ENTER ANY NUMBER TO CONTINUE")
+     (let ((response (read)))
+       (if (numberp response)
+	   (wowwow func)))))
 
 
 ;;;;when the renderer and physics go together its as smooth as ice cream
@@ -151,3 +162,4 @@
   (world:setup-hashes))
 
 (world-setup)
+

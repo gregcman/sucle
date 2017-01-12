@@ -19,6 +19,10 @@
 (defparameter *projection-view-matrix* nil) ;;projection * view matrix
 (defparameter *player-matrix* nil) ;;positional information of camera
 
+(defparameter *window-height* nil)
+(defparameter *window-width* nil)
+(defparameter *aspect-ratio* nil)
+
 (defun glinnit ()
   ;(lpic-ltexture "gui/items.png" :items)
   ;(lpic-ltexture "misc/grasscolor.png" :grasscolor)
@@ -55,14 +59,14 @@
 
 (defun render ()
   "responsible for rendering the world"
-
-  (if (in:ismousecaptured)
-      (look-around))
+  (when (window:mice-locked-p)
+    (look-around))
   (set-render-cam-look)
+  (setf *aspect-ratio* (/ window:*width* window:*height*))
   (with-slots (xpos ypos zpos fov pitch yaw) *camera*
     (set-projection-matrix
      (coerce (deg-rad fov) 'single-float)
-     (/ out::pushed-width out::pushed-height)
+     *aspect-ratio*
      0.01
      128)
     
@@ -75,7 +79,7 @@
 			(coerce ypos 'single-float)
 			(coerce zpos 'single-float)))
   (update-projection-view-matrix)
-
+  (gl:viewport 0 0 window:*width* window:*height*)
   (luse-shader :blockshader)
 
   (glshader:set-matrix
@@ -94,10 +98,6 @@
   
   (window:update-display)
   (draw-sky)
-  (if (in:key-p :g)
-      (update-world-vao))
-  (if (in:key-p :5)
-      (load-shaders))
   (designatemeshing)
   (glshader:set-float "timeday" daytime)
   (set-overworld-fog daytime)

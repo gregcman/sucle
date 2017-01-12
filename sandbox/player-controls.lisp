@@ -25,7 +25,7 @@
 
 (defparameter friction 0.9)
 
-(defparameter noclip t)
+(defparameter noclip nil)
 
 (setf *xpos* 0
       *ypos* 0
@@ -36,34 +36,45 @@
 (defun controls ()
   (let ((speed 0.024))
     (let ((dir (complex 0 0)))
-      (when (in:key-p :w)
+      (when (e:key-p :w)
 	(incf dir #C(-1 0)))
-      (when (in:key-p :a)
+      (when (e:key-p :a)
 	(incf dir #C(0 1)))
-      (when (in:key-p :s)
+      (when (e:key-p :s)
 	(incf dir #C(1 0)))
-      (when (in:key-p :d)
+      (when (e:key-p :d)
 	(incf dir #C(0 -1)))
       (unless (zerop dir)
 	(let ((rot-dir (* dir (cis *yaw*))))
 	  (incf *xvel* (* speed (realpart rot-dir)))
 	  (incf *zvel* (* speed (imagpart rot-dir))))))
-    (when (in:key-p :space)
+    (when (e:key-p :space)
       (incf *yvel* speed))
-    (when (in:key-p :left-shift)
+    (when (e:key-p :left-shift)
       (decf *yvel* speed))))
 
 (defparameter mouse-sensitivity (* 60.0 pi 1/180))
 
 (defun mouse-looking ()
-  (let* ((change (in:delta))
-	 (x (* mouse-sensitivity (/ (aref change 0) 360.0)))
-	 (y (* mouse-sensitivity (/ (aref change 1) 360.0))))
-    (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
-      (setf *yaw* (mod (+ *yaw* dyaw) (* 2 pi)))
-      (setf *pitch* (clamp (+ *pitch* dpitch)
-			   (* 0.99 (/ pi -2))
-			   (* 0.99 (/ pi 2)))))))
+  (multiple-value-bind (dx dy) (delta)
+    (let ((x (* mouse-sensitivity (/ dx 360.0)))
+	  (y (* mouse-sensitivity (/ dy 360.0))))
+      (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
+	(setf *yaw* (mod (+ *yaw* dyaw) (* 2 pi)))
+	(setf *pitch* (clamp (+ *pitch* dpitch)
+			     (* 0.99 (/ pi -2))
+			     (* 0.99 (/ pi 2))))))))
+
+(defparameter old-mouse-x 0)
+(defparameter old-mouse-y 0)
+(defun delta ()
+  (multiple-value-bind (newx newy) (window:get-mouse-position)
+    (multiple-value-prog1 (values
+			   (- newx old-mouse-x)
+			   (- newy old-mouse-y))
+      (setf old-mouse-x newx
+	    old-mouse-y newy))))
+
 
 (defun %sphere-mouse-help (x y)
   (if (zerop x)
@@ -74,6 +85,18 @@
 	  (values x 0.0)
 	  (new-direction (coerce x 'single-float)
 			 (coerce y 'single-float)))))
+
+
+(defparameter mousecapturestate nil)
+(defun remove-spurious-mouse-input ()
+  (if (window:mice-locked-p)
+      (case mousecapturestate
+	((nil) 
+	 (delta) ;;toss spurious mouse movement 
+	 (setf mousecapturestate :justcaptured))
+	(:justcaptured (setq mousecapturestate t))
+	((t)))
+      (setq mousecapturestate nil)))
 
 (defun set-render-cam-pos (millisecs)
   (let ((multiplier (/ millisecs tick-delay)))
@@ -94,24 +117,22 @@
 (defun physinnit ()
   (setf ticks/sec 60.0)
   (setf tickscale (/ 20.0 ticks/sec))
-  (setf tick-delay (/ 1000000.0 ticks/sec))
-
-  ;;escape to quit
-  (in:p+1 :ESCAPE (lambda () (setq alivep nil)))
-  
-  ;;e to escape mouse
-  (in:p+1 :E (function window:toggle-mouse-capture)))
+  (setf tick-delay (/ 1000000.0 ticks/sec)))
 
 (defun physics ()
-  (when (in:ismousecaptured)
+  ;;escape to quitx
+  (when (e:key-p :ESCAPE) (setq alivep nil))
+  
+  ;;e to escape mouse
+  (when (e:key-p :E) (window:toggle-mouse-capture))
+  (when (window:mice-locked-p)
     (controls)
-    (in:key-pressed-hook :r
-			 (lambda ()
-			   (setblock-with-update (floor fistx)
-						 (floor fisty)
-						 (floor fistz)
-						 49
-						 0))))
+    (when (e:key-p :r)
+      (setblock-with-update (floor fistx)
+			    (floor fisty)
+			    (floor fistz)
+			    49
+			    0)))
   (setf *xvel* (* *xvel* friction))
   (setf *yvel* (* *yvel* friction))
   (setf *zvel* (* *zvel* friction))
@@ -331,12 +352,3 @@ collect all the nearest collisions with the player"
 	(when (setf (world:getblock i j k) blockid)
 	  (setf (world:getlight i j k) new-light-value)))))
 
-
-(defmacro doblocks ((xvar xstart xnum)
-		    (yvar ystart ynum)
-		    (zvar zstart znum)
-		    &body body)
-  `(dorange (,xvar ,xstart ,xnum)
-	    (dorange (,yvar ,ystart ,ynum)
-		     (dorange (,zvar ,zstart ,znum)
-			      ,@body))))

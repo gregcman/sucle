@@ -7,7 +7,8 @@
 
     :depends-on (#:cl-opengl
 	         #:sb-cga
-		 
+ 		 #:cl-glfw3
+		 #:trivial-main-thread
 		 
 		 #:imagewise
                  #:pathwise
@@ -20,7 +21,8 @@
 
 		 #:queue
                  #:world
-		 #:window
+
+
 		 #:cl-mc-shit
 		 #:aabbcc
 		 #:vox
@@ -29,6 +31,8 @@
     :serial t
     :components  
     ((:file "package")
+     (:file "window")
+     (:file "misc")
 
      (:file "global") ;;global vars
 
