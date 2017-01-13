@@ -23,9 +23,15 @@
 (defparameter *yvel* 0)
 (defparameter *zvel* 0)
 
-(defparameter friction 0.9)
+(defparameter air-friction 0.2)
+(defparameter air-friction 0.98)
+(defparameter walking-friction (* 0.6 0.9))
 
-(defparameter noclip nil)
+(defparameter noclip t)
+(defparameter gravity t)
+(defparameter fly t)
+
+(defparameter onground nil)
 
 (setf *xpos* 0
       *ypos* 0
@@ -34,7 +40,19 @@
       *pitch* 0)
 
 (defun controls ()
-  (let ((speed 0.024))
+  (let ((speed (* 0.4 (expt tickscale 2))))
+    (when fly
+      (setf speed 0.024)
+      (when (e:key-p :space)
+	(incf *yvel* speed))
+      (when (e:key-p :left-shift)
+	(decf *yvel* speed)))
+    (unless fly
+      (when onground
+	(when (e:key-p :space)
+	  (incf *yvel* (* (if t 0.49 0.42) (expt tickscale 1)))))
+      (unless onground
+	(setf speed (* speed 0.2))))    
     (let ((dir (complex 0 0)))
       (when (e:key-p :w)
 	(incf dir #C(-1 0)))
@@ -46,12 +64,9 @@
 	(incf dir #C(0 -1)))
       (unless (zerop dir)
 	(let ((rot-dir (* dir (cis *yaw*))))
-	  (incf *xvel* (* speed (realpart rot-dir)))
-	  (incf *zvel* (* speed (imagpart rot-dir))))))
-    (when (e:key-p :space)
-      (incf *yvel* speed))
-    (when (e:key-p :left-shift)
-      (decf *yvel* speed))))
+	  (let ((normalized (/ rot-dir (complex-modulus rot-dir))))
+	    (incf *xvel* (* speed (realpart normalized)))
+	    (incf *zvel* (* speed (imagpart normalized)))))))))
 
 (defparameter mouse-sensitivity (* 60.0 pi 1/180))
 
@@ -121,11 +136,17 @@
 
 (defun physics ()
   ;;escape to quitx
-  (when (e:key-p :ESCAPE) (setq alivep nil))
-  
+  (when (e:key-p :ESCAPE) (setq alivep nil))  
   ;;e to escape mouse
   (when (e:key-j-p :E) (window:toggle-mouse-capture))
+
   (when (window:mice-locked-p)
+    (when (e:key-j-p :v) (toggle noclip))
+    (when (e:key-j-p :g) (toggle gravity))
+    (when (e:key-j-p :f) (toggle fly))
+    (if fly
+	(setf air-friction 0.9)
+	(setf air-friction 0.98))
     (controls)
     (when (e:mice-j-p :right)
       (setblock-with-update (floor fistx)
@@ -139,16 +160,27 @@
 			    (floor fistz)
 			    0
 			    0)))
-  (setf *xvel* (* *xvel* friction))
-  (setf *yvel* (* *yvel* friction))
-  (setf *zvel* (* *zvel* friction))
   (collide-with-world)
+  (setf onground (nth-value 2 (block-touches *xpos* *ypos* *zpos* player-aabb)))
+  (if fly
+      (progn
+	(setf *xvel* (* *xvel* air-friction))
+	(setf *zvel* (* *zvel* air-friction)))
+      (cond (onground
+	     (setf *xvel* (* *xvel* walking-friction))
+	     (setf *zvel* (* *zvel* walking-friction)))
+	    (t (setf *xvel* (* *xvel* 0.9))
+	       (setf *zvel* (* *zvel* 0.9)))))
+  (when (and gravity (not onground))
+    (decf *yvel* (* 0.08 (expt tickscale 2))))
+  (setf *yvel* (* *yvel* air-friction))
   (let ((cos-pitch (cos *pitch*)))
     (let ((vx (- (* reach (* cos-pitch (cos *yaw*)))))
 	  (vy (- (* reach (sin *pitch*))))
 	  (vz (- (* reach (* cos-pitch (sin *yaw*))))))
       (multiple-value-bind (frac xclamp yclamp zclamp)
 	  (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
+	(declare (ignorable xclamp yclamp zclamp))
 	(setf fistx (+ *xpos* (* frac vx))
 	      fisty (+ *ypos* (* frac vy))
 	      fistz (+ *zpos* (* frac vz)))))))
@@ -172,8 +204,10 @@
       (setf *yvel* y)
       (setf *zvel* z))))
 
-(defun shit (x)
-  (print x global-output))
+(defun goto (x y z)
+  (setf *xpos* x
+	*ypos* y
+	*zpos* z))
 (defun look-around ()
   (mouse-looking))
 
@@ -210,113 +244,76 @@
 
 (defparameter reach 5.0)
 
-(defun fist-collide (blocklist px py pz dx dy dz)
-  (let ((tot-min 1)
-	(actual-contacts nil))
-    (dolist (ablock blocklist)
-      (multiple-value-bind (minimum type)
-	  (aabbcc::aabb-collide
-	   fist-aabb
-	   px py pz
-	   block-aabb
-	   (elt ablock 0)
-	   (elt ablock 1)
-	   (elt ablock 2)
-	   dx dy dz)
-	(if (= minimum tot-min)
-	    (push type actual-contacts)
-	    (if (< minimum tot-min)
-		(progn
-		  (setq tot-min minimum)
-		  (setq actual-contacts (list type)))))))
-    (values
-     tot-min
-     actual-contacts)))
+
 
 (defun punch-func (px py pz vx vy vz)
-  (let ((ourblocks (get-blocks-around-player px py pz)))
-    (multiple-value-bind (minimum blocktouches) (fist-collide ourblocks px py pz vx vy vz)
-      (multiple-value-bind (xclamp yclamp zclamp)
-	  (aabbcc::collapse-types blocktouches vx vy vz)
-	(values minimum xclamp yclamp zclamp)))))
+  (blocktocontact fist-aabb px py pz vx vy vz))
 
 (defun myafunc (px py pz vx vy vz)
-  (let ((ourblocks (unless noclip (get-blocks-around-player px py pz))))
-    (multiple-value-bind (minimum blocktouches) (blocktocontact ourblocks px py pz vx vy vz)
+  (if noclip
+      (values 1 nil nil nil)
+      (blocktocontact player-aabb px py pz vx vy vz)))
+
+(defun blocktocontact (aabb px py pz vx vy vz)
+  (let ((tot-min 1))
+    (let (xyz? xy? xz? yz? x? y? z?)
+      (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around-player px py pz)
+	(dobox ((x minx maxx)
+		(y miny maxy)
+		(z minz maxz))
+	       (when (aref mc-blocks::iscollidable (world:getblock x y z))
+		 (multiple-value-bind (minimum type)
+		     (aabbcc::aabb-collide
+		      aabb
+		      px py pz
+		      block-aabb
+		      x
+		      y
+		      z
+		      vx vy vz)
+		   (unless (> minimum tot-min)
+		     (when (< minimum tot-min)
+		       (setq tot-min minimum)
+		       (null! xyz? xy? yz? xz? x? y? z?))
+		     (case type
+		       (:xyz (setf xyz? t))
+		       (:xy (setf xy? t))
+		       (:xz (setf xz? t))
+		       (:yz (setf yz? t))
+		       (:x (setf x? t))
+		       (:y (setf y? t))
+		       (:z (setf z? t))))))))
       (multiple-value-bind (xclamp yclamp zclamp)
-	  (aabbcc::collapse-types blocktouches vx vy vz)
-	(values minimum xclamp yclamp zclamp)))))
+	  (aabbcc::type-collapser vx vy vz xyz? xy? xz? yz? x? y? z?)
+	(values
+	 tot-min
+	 xclamp yclamp zclamp)))))
 
-(defun goto (x y z)
-  (setf *xpos* x
-	*ypos* y
-	*zpos* z))
-
-(defun blocktocontact (blocklist px py pz vx vy vz)
-  "for a list of blocks, a position, and velocity, 
-collect all the nearest collisions with the player"
-  (let ((tot-min 1)
-	(actual-contacts nil))
-    (dolist (ablock blocklist)
-      (multiple-value-bind (minimum type)
-	  (aabbcc::aabb-collide
-	   player-aabb
-	   px py pz
-	   block-aabb
-	   (elt ablock 0)
-	   (elt ablock 1)
-	   (elt ablock 2)
-	   vx vy vz)
-	(if (= minimum tot-min)
-	    (push type actual-contacts)
-	    (if (< minimum tot-min)
-		(progn
-		  (setq tot-min minimum)
-		  (setq actual-contacts (list type)))))))
-    (values
-     tot-min
-     actual-contacts)))
-
-(defun block-touches (blocklist px py pz)
-  "return a list of which sides are touching a block"
-  (let ((x+ nil)
-	(x- nil)
-	(y+ nil)
-	(y- nil)
-	(z+ nil)
-	(z- nil))
-    (dolist (theplace blocklist)
-      (multiple-value-bind (bx sx by sy bz sz) ;;b = big =positive s = small = negative
-	  (aabbcc::aabb-contact px py pz
-				player-aabb
-				(elt theplace 0)
-				(elt theplace 1)
-				(elt theplace 2)
-				block-aabb)
-	(if bx (setq x+ t))
-	(if sx (setq x- t))
-	(if by (setq y+ t))
-	(if sy (setq y- t))
-	(if bz (setq z+ t))
-	(if sz (setq z- t))))
-    (values x+ x- y+ y- z+ z-)))
+(defun block-touches (px py pz aabb)
+  (let (x- x+ y- y+ z- z+)
+    (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around-player px py pz)
+      (dobox ((x minx maxx)
+	      (y miny maxy)
+	      (z minz maxz))
+	     (when (aref mc-blocks::iscollidable (world:getblock x y z))
+	       (multiple-value-bind (i+ i- j+ j- k+ k-)
+		   (aabbcc::aabb-contact px py pz aabb x y z block-aabb)
+		 (if i+ (setq x+ t))
+		 (if i- (setq x- t))
+		 (if j+ (setq y+ t))
+		 (if j- (setq y- t))
+		 (if k+ (setq z+ t))
+		 (if k- (setq z- t))))))
+    (values x- x+ y- y+ z- z+)))
 
 (defun get-blocks-around-player (px py pz)
-  "get the blocks around player"
-  (let ((places nil))
-    (dotimes (x 5)
-      (dotimes (y 4)
-	(dotimes (z 5)
- 	  (let ((blockx (floor (- (+ x (truncate px)) 2)))
-		(blocky (floor (- (+ y (truncate py)) 2)))
-		(blockz (floor (- (+ z (truncate pz)) 2))))
-	    (let ((blockid (world:getblock blockx blocky blockz)))
-	      (if (eq t (aref mc-blocks::iscollidable blockid))
-		  (push (vector
-			 blockx
-			 blocky
-			 blockz) places)))))))
-    places))
+  (let ((minx (- (truncate px) 2))
+	(miny (- (truncate py) 2))
+	(minz (- (truncate pz) 2)))
+    (let ((maxx (+ minx 5))
+	  (maxy (+ miny 4))
+	  (maxz (+ minz 5)))
+      (values minx miny minz maxx maxy maxz))))
 
 ;;dirty chunks is a list of modified chunks
 ;;we do not want anyone to see a raw list!

@@ -29,17 +29,14 @@
   (multiple-value-bind (io ko jo) (world:unhashfunc chunk-position)
     (setf shapebuffer-index 0)
     (let ((new-shape shapebuffer-vs))
-      (dorange
-       (i io 16)
-       (dorange
-	(j jo 16)
-	(dorange
-	 (k ko 16)
-	 (let ((blockid (world:getblock i j k)))
-	   (unless (zerop blockid)
-	     (blockshape
-	      i j k
-	      blockid))))))
+      (dobox ((i io (+ 16 io))
+	      (j jo (+ 16 jo))
+	      (k ko (+ 16 ko)))
+	     (let ((blockid (world:getblock i j k)))
+	       (unless (zerop blockid)
+		 (blockshape
+		  i j k
+		  blockid))))
       (values
        new-shape
        shapebuffer-index

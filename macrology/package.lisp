@@ -6,9 +6,11 @@
   (:export
    #:toggle
    #:dorange
+   #:dobox
    #:progno
    #:ret
-   #:rename)
+   #:rename
+   #:null!)
 
 ;;;common rebindings
   (:export

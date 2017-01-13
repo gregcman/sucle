@@ -117,6 +117,6 @@
 					  255 0
 					  (lget *g/image* "misc/grasscolor.png"))))
   (let ((terrain (lget *g/image* "terrain.png")))
-    (dorange (x xpos 16)
-	     (dorange (y ypos 16)
+    (dorange (x 16 xpos)
+	     (dorange (y 16 ypos)
 		      (multiply-into (imagewise:getapixel y x terrain) color)))))

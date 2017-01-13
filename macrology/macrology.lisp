@@ -7,26 +7,6 @@
 ;;;comment out code the macro way!
 (defmacro progno (&rest args))
 
-;;;like dotimes, but for a range, and without a return
-(defmacro dorange ((var start length) &rest body)
-  (let ((temp (gensym))
-	(temp2 (gensym))
-	(tempstart (gensym))
-	(templength (gensym)))
-    `(block nil
-       (let* ((,templength ,length)
-	      (,tempstart ,start)
-	      (,var ,tempstart))
-	 (declare (type signed-byte ,var))
-	 (tagbody
-	    (go ,temp2)
-	    ,temp
-	    (tagbody ,@body)
-	    (psetq ,var (1+ ,var))
-	    ,temp2
-	    (unless (>= ,var (+ ,tempstart ,templength)) (go ,temp))
-	    (return-from nil (progn nil)))))))
-
 ;;;when the only let value is returned at the end
 (defmacro ret (var bound-form &body body)
   `(let ((,var ,bound-form))
@@ -47,3 +27,50 @@
 (rename (defparameter dp)
 	(lambda l)
 	(multiple-value-bind mvb))
+
+(defmacro dorange ((var times-form start-form) &rest body)
+  (let ((times (gensym)))
+    `(let ((,times ,times-form))
+       (dobox ((,var ,times (+ ,times ,start-form))) ,@body))))
+
+;;;iterate through a multidimensional box 
+(defmacro dobox ((&rest interval-forms) &rest body)
+  (let ((let-one nil)
+	(let-one-declarations nil))
+    (let ((body (cons 'progn body)))
+      (dolist (form interval-forms)
+	(multiple-value-bind (let-len temp-length let-end temp-end bod)
+	    (apply #'dorange-generator body form)
+	  (push let-len let-one)
+	  (push temp-length let-one-declarations)
+	  (push let-end let-one)
+	  (push temp-end let-one-declarations)
+	  (setq body bod)))
+      `(progn (let ,let-one
+		(declare (type fixnum ,@let-one-declarations))
+		,body)))))
+
+(defun dorange-generator (body var start-form end-form)
+  (let ((temp (gensym))
+	(temp2 (gensym))
+	(start (gensym))
+	(end (gensym)))
+    (values
+     `(,start ,start-form) ;;length init
+     start  ;;;var names for declarations
+     `(,end ,end-form)
+     end   
+     `(let ((,var ,start))
+	(tagbody
+	   (go ,temp2)
+	   ,temp
+	   ,body
+	   (psetq ,var (1+ ,var))
+	   ,temp2
+	   (unless (>= ,var ,end) (go ,temp)))))))
+
+(defmacro null! (&rest args)
+  (let (acc)
+    (dolist (arg args)
+      (push `(setf ,arg nil) acc))
+    `(progn ,@acc)))

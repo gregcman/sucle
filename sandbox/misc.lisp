@@ -21,9 +21,9 @@
 		    (yvar ystart ynum)
 		    (zvar zstart znum)
 		    &body body)
-  `(dorange (,xvar ,xstart ,xnum)
-	    (dorange (,yvar ,ystart ,ynum)
-		     (dorange (,zvar ,zstart ,znum)
+  `(dorange (,xvar ,xnum ,xstart)
+	    (dorange (,yvar ,ynum ,ystart)
+		     (dorange (,zvar ,znum ,zstart)
 			      ,@body))))
 
 
@@ -36,9 +36,18 @@
   (doblocks (x 0 128) (y 0 64) (z -128 128) (plain-setblock x y z 0 0)))
 
 (defun test-world ()
-   (dorange (x 0 8) (dorange (y -8 8) (someseq x y))))
+   (dorange (x 8 0) (dorange (y 8 -8) (someseq x y))))
 
 (defun color-grasses ()
   (modify-greens 64 192)
   (modify-greens 80 192)
   (modify-greens 0 240))
+
+(defun complex-modulus (c)
+  (sqrt (realpart (* c (conjugate c)))))
+
+(defun shit (x)
+  (print x global-output))
+
+(defun force-quit ()
+  (SB-THREAD:terminate-thread (lget *g/thread* :SON-OF-MAIN)))

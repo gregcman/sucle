@@ -83,17 +83,17 @@ edge, or no case"
 		(if xt
 		    (if yt
 			(if zt
-			    'xyz
-			    'xy)
+			    :xyz
+			    :xy)
 			(if zt
-			    'xz
-			    'x))
+			    :xz
+			    :x))
 		    (if yt
 			(if zt
-			    'yz
-			    'y)
+			    :yz
+			    :y)
 			(if zt
-			    'z
+			    :z
 			    nil)))))))
 
 (defun type-translator (type ddx ddy ddz)
@@ -101,7 +101,7 @@ edge, or no case"
 	(dy (abs ddy))
 	(dz (abs ddz)))
     (case type
-      (xyz (if (= dx dy)
+      (:xyz (if (= dx dy)
 	       (if (= dx dz)
 		   (values t t t) ;;all equal sitting on corner
 		   (values t t nil));;dx dy equal dz wins
@@ -118,72 +118,56 @@ edge, or no case"
 			       (values nil nil t);;dz smallest
 			       (values t nil nil);;dx beaten twice
 			       ))))))
-      (xy (if (= dx dy)
+      (:xy (if (= dx dy)
 	      (values t t nil)
 	      (if (> dx dy)
 		  (values nil t nil)
 		  (values t nil nil))))
-      (xz (if (= dx dz)
+      (:xz (if (= dx dz)
 	      (values t nil t)
 	      (if (> dx dz)
 		  (values nil nil t)
 		  (values t nil nil))))
-      (yz (if (= dy dz)
+      (:yz (if (= dy dz)
 	      (values nil t t)
 	      (if (> dy dz)
 		  (values nil nil t)
 		  (values nil t nil))))
-      (x (values t nil nil))
-      (y (values nil t nil))
-      (z (values nil nil t))
+      (:x (values t nil nil))
+      (:y (values nil t nil))
+      (:z (values nil nil t))
       (nil (values nil nil nil)))))
 
 
-(defun collapse-types (type-list dx dy dz)
-  "rationale: there cannot be an xy collision when there is an x face collision.
-similarly, there cannot be a xyz when there is xy or a subset"
-  (let ((xyz? nil)
-	(xy? nil)
-	(xz? nil)
-	(yz? nil)
-	(x? nil)
-	(y? nil)
-	(z? nil))
-    (dolist (type type-list)
-      (case type
-	(xyz (setq xyz? t))
-	(xy (setq xy? t))
-	(xz (setq xz? t))
-	(yz (setq yz? t))
-	(x (setq x? t))
-	(y (setq y? t)) 
-	(z (setq z? t))))
-    (if (or xy? xz? yz? x? y? z?)
-	(setq xyz? nil))
-    (if (or x? y?)
-	(setq xy? nil))
-    (if (or x? z?)
-	(setq xz? nil))
-    (if (or y? z?)
-	(setq yz? nil))
-    (let ((xclamp nil)
-	  (yclamp nil)
-	  (zclamp nil))
-      (macrolet
-	  ((add (type)
-	     `(multiple-value-bind (xc yc zc)
-		  (type-translator (quote ,type) dx dy dz)
-		(if xc (setq xclamp t))
-		(if yc (setq yclamp t))
-		(if zc (setq zclamp t)))))
-	(if xyz? (add xyz))
-	(if xy? (add xy))
-	(if xz? (add xz))
-	(if yz? (add yz))
-	(if x? (add x))
-	(if y? (add y))
-	(if z? (add z)))
-      (values xclamp yclamp zclamp))))
+;;rationale: there cannot be an xy collision when there is an x face collision.
+;;similarly, there cannot be a xyz when there is xy or a subset
+(defun type-collapser (dx dy dz xyz? xy? xz? yz? x? y? z?)
+  (if (or xy? xz? yz? x? y? z?)
+      (setq xyz? nil))
+  (if (or x? y?)
+      (setq xy? nil))
+  (if (or x? z?)
+      (setq xz? nil))
+  (if (or y? z?)
+      (setq yz? nil))
+  (let ((xclamp nil)
+	(yclamp nil)
+	(zclamp nil))
+    (macrolet
+	((add (type)
+	   `(multiple-value-bind (xc yc zc)
+		(type-translator ,type dx dy dz)
+	      (if xc (setq xclamp t))
+	      (if yc (setq yclamp t))
+	      (if zc (setq zclamp t)))))
+      (if xyz? (add :xyz))
+      (if xy? (add :xy))
+      (if xz? (add :xz))
+      (if yz? (add :yz))
+      (if x? (add :x))
+      (if y? (add :y))
+      (if z? (add :z)))
+    (values xclamp yclamp zclamp)))
 
 
 ;;pattern of checking each face
@@ -229,12 +213,12 @@ similarly, there cannot be a xyz when there is xy or a subset"
 	 (checkface (<= az1 bz0) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1))
 	 (checkface (>= az0 bz1) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1))))))
 
+;;determine how rectangles intersect .0 
+;;means the edges touch. positive number means there is space between
+;;negative means it is past. the symbols u r l and b represent the top,
+;;right, left, and bottom of the first rectangle. nil means none at all
+;;t means an area intersection
 (defun r-intersect (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)
-  "determine how rectangles intersect .0 
-means the edges touch. positive number means there is space between
-negative means it is past. the symbols u r l and b represent the top,
-right, left, and bottom of the first rectangle. nil means none at all
-t means an area intersection"
   (let ((dbottom (- ay0 by1))
 	(dright (- bx0 ax1))
 	(dup (- by0 ay1))
@@ -257,8 +241,8 @@ t means an area intersection"
 		   (plusp dup)
 		   (plusp dleft)))))))
 
+;;face contact between two aabbs. edges and corners do not count
 (defun aabb-contact (x0 y0 z0 aabb0 x1 y1 z1 aabb1)
-  "face contact between two aabbs. edges and corners do not count"
   (%contact (+ x0 (aabb-minx aabb0)) (+ y0 (aabb-miny aabb0)) (+ z0 (aabb-minz aabb0))
 	    (+ x0 (aabb-maxx aabb0)) (+ y0 (aabb-maxy aabb0)) (+ z0 (aabb-maxz aabb0))
 	    (+ x1 (aabb-minx aabb1)) (+ y1 (aabb-miny aabb1)) (+ z1 (aabb-minz aabb1))
