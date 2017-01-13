@@ -143,25 +143,29 @@
   (when (window:mice-locked-p)
     (when (e:key-j-p :v) (toggle noclip))
     (when (e:key-j-p :g) (toggle gravity))
+    (when (e:key-j-p :t) (update-world-vao))
     (when (e:key-j-p :f) (toggle fly))
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
     (controls)
-    (when (e:mice-j-p :right)
-      (setblock-with-update (floor fistx)
-			    (floor fisty)
-			    (floor fistz)
-			    49
-			    0))
-    (when (e:mice-j-p :left)
-      (setblock-with-update (floor fistx)
-			    (floor fisty)
-			    (floor fistz)
-			    0
-			    0)))
+    (when fist?
+      (when (e:mice-j-p :right)
+	(setblock-with-update (floor fistx)
+			      (floor fisty)
+			      (floor fistz)
+			      5
+			      0))
+      (when (e:mice-j-p :left)
+	(setblock-with-update fist-side-x
+			      fist-side-y
+			      fist-side-z
+			      0
+			      0))))
   (collide-with-world)
-  (setf onground (nth-value 2 (block-touches *xpos* *ypos* *zpos* player-aabb)))
+  (mvb (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
+       (declare (ignorable i- i+ j- j+ k- k+))
+       (setf onground j-))
   (if fly
       (progn
 	(setf *xvel* (* *xvel* air-friction))
@@ -178,13 +182,24 @@
     (let ((vx (- (* reach (* cos-pitch (cos *yaw*)))))
 	  (vy (- (* reach (sin *pitch*))))
 	  (vz (- (* reach (* cos-pitch (sin *yaw*))))))
-      (multiple-value-bind (frac xclamp yclamp zclamp)
-	  (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
-	(declare (ignorable xclamp yclamp zclamp))
-	(setf fistx (+ *xpos* (* frac vx))
-	      fisty (+ *ypos* (* frac vy))
-	      fistz (+ *zpos* (* frac vz)))))))
+      (mvb (frac type blockx blocky blockz)
+	   (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
+	   (if frac
+	       (setf fist? t
+		     fist-side type
+		     fist-side-x blockx
+		     fist-side-y blocky
+		     fist-side-z blockz
+		     fistx (+ *xpos* (* frac vx))
+		     fisty (+ *ypos* (* frac vy))
+		     fistz (+ *zpos* (* frac vz)))
+	       (setf fist? nil))))))
+(defparameter fist-side-x nil)
+(defparameter fist-side-y nil)
+(defparameter fist-side-z nil)
 
+(defparameter fist? nil)
+(defparameter fist-side nil)
 (defparameter fistx 0.0)
 (defparameter fisty 0.0)
 (defparameter fistz 0.0)
@@ -242,47 +257,73 @@
 (defparameter player-aabb (player-aabb))
 (defparameter fist-aabb (fist-aabb))
 
-(defparameter reach 5.0)
+(defparameter reach 4.0)
 
 
 
 (defun punch-func (px py pz vx vy vz)
-  (blocktocontact fist-aabb px py pz vx vy vz))
+  (let ((tot-min 2)
+	(type :nothing)
+	(ansx nil)
+	(ansy nil)
+	(ansz nil))
+     (aabb-collect-blocks px py pz vx vy vz fist-aabb
+			  (lambda (x y z)
+			    (when (aref mc-blocks::iscollidable (world:getblock x y z))
+			      (multiple-value-bind (minimum contact-type)
+				  (aabbcc::aabb-collide
+				   fist-aabb
+				   px py pz
+				   block-aabb
+				   x y z
+				   vx vy vz)
+				(when (< minimum tot-min)
+				  (setq tot-min minimum
+					type contact-type
+					ansx x
+					ansy y
+					ansz z))))))
+     (values (if (= 2 tot-min) nil tot-min) type ansx ansy ansz)))
 
 (defun myafunc (px py pz vx vy vz)
   (if noclip
       (values 1 nil nil nil)
       (blocktocontact player-aabb px py pz vx vy vz)))
 
+(defmacro with-collidable-blocks ((xvar yvar zvar) (px py pz aabb vx vy vz) &body body)
+  `(multiple-value-bind (minx miny minz maxx maxy maxz)
+       (get-blocks-around ,px ,py ,pz ,aabb ,vx ,vy ,vz)
+     (dobox ((,xvar minx maxx)
+	     (,yvar miny maxy)
+	     (,zvar minz maxz))
+	    ,@body)))
+
 (defun blocktocontact (aabb px py pz vx vy vz)
   (let ((tot-min 1))
     (let (xyz? xy? xz? yz? x? y? z?)
-      (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around-player px py pz)
-	(dobox ((x minx maxx)
-		(y miny maxy)
-		(z minz maxz))
-	       (when (aref mc-blocks::iscollidable (world:getblock x y z))
-		 (multiple-value-bind (minimum type)
-		     (aabbcc::aabb-collide
-		      aabb
-		      px py pz
-		      block-aabb
-		      x
-		      y
-		      z
-		      vx vy vz)
-		   (unless (> minimum tot-min)
-		     (when (< minimum tot-min)
-		       (setq tot-min minimum)
-		       (null! xyz? xy? yz? xz? x? y? z?))
-		     (case type
-		       (:xyz (setf xyz? t))
-		       (:xy (setf xy? t))
-		       (:xz (setf xz? t))
-		       (:yz (setf yz? t))
-		       (:x (setf x? t))
-		       (:y (setf y? t))
-		       (:z (setf z? t))))))))
+      (with-collidable-blocks (x y z) (px py pz aabb vx vy vz)
+	(when (aref mc-blocks::iscollidable (world:getblock x y z))
+	  (multiple-value-bind (minimum type)
+	      (aabbcc::aabb-collide
+	       aabb
+	       px py pz
+	       block-aabb
+	       x
+	       y
+	       z
+	       vx vy vz)
+	    (unless (> minimum tot-min)
+	      (when (< minimum tot-min)
+		(setq tot-min minimum)
+		(null! xyz? xy? yz? xz? x? y? z?))
+	      (case type
+		(:xyz (setf xyz? t))
+		(:xy (setf xy? t))
+		(:xz (setf xz? t))
+		(:yz (setf yz? t))
+		(:x (setf x? t))
+		(:y (setf y? t))
+		(:z (setf z? t)))))))
       (multiple-value-bind (xclamp yclamp zclamp)
 	  (aabbcc::type-collapser vx vy vz xyz? xy? xz? yz? x? y? z?)
 	(values
@@ -291,8 +332,8 @@
 
 (defun block-touches (px py pz aabb)
   (let (x- x+ y- y+ z- z+)
-    (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around-player px py pz)
-      (dobox ((x minx maxx)
+    (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around px py pz player-aabb 0 0 0)
+       (dobox ((x minx maxx)
 	      (y miny maxy)
 	      (z minz maxz))
 	     (when (aref mc-blocks::iscollidable (world:getblock x y z))
@@ -306,7 +347,8 @@
 		 (if k- (setq z- t))))))
     (values x- x+ y- y+ z- z+)))
 
-(defun get-blocks-around-player (px py pz)
+(defun get-blocks-around (px py pz aabb vx vy vz)
+  (declare (ignorable aabb vx vy vz))
   (let ((minx (- (truncate px) 2))
 	(miny (- (truncate py) 2))
 	(minz (- (truncate pz) 2)))

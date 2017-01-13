@@ -89,12 +89,6 @@
   ;;;static geometry with no translation whatsoever
   (draw-chunk-meshes)
 
-  ;;;;draw the fist hitbox
-  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
-	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
-      fist-aabb
-    (draw-box (+ minx fistx -0) (+  miny fisty -0) (+  minz fistz -0)
-	      (+ maxx fistx -0) (+  maxy fisty -0) (+  maxz fistz -0)))
   
   (window:update-display)
   (draw-sky)
@@ -129,10 +123,7 @@
 
   (gl:enable :cull-face)
   (gl:cull-face :back)
-  (bind-shit (case 0
-	       (0 :terrain)
-	       (1 :pack)
-	       (2 :default)))
+  (bind-shit :terrain)
   (maphash
      (lambda (key display-list)
        (declare (ignore key))

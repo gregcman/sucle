@@ -106,7 +106,7 @@
   (multiple-value-bind (val happened? difference)
       (funcall rendertimer render-delay (lambda ()(window:poll);;where to put?
 						  (remove-spurious-mouse-input)
-						(render) (physics)))
+						  (render) (physics)))
     (declare (ignorable val))
     (when happened?
       (setf renderrate difference)
