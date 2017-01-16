@@ -1,8 +1,0 @@
-- this directory is for "half-baked" code
-
-example: vao.lisp
-
-- layout not decoupled from creation of code
-- gpu buffers? 
-- vao object?
-- using display lists because it is simpler/faster for some reason 

@@ -17,31 +17,50 @@
       (setf index (mod (1+ index) amount))
       (values (/ (coerce tot 'single-float) amount) the-array))))
 
-(defmacro doblocks ((xvar xstart xnum)
-		    (yvar ystart ynum)
-		    (zvar zstart znum)
-		    &body body)
-  `(dorange (,xvar ,xnum ,xstart)
-	    (dorange (,yvar ,ynum ,ystart)
-		     (dorange (,zvar ,znum ,zstart)
-			      ,@body))))
-
-
 (defun fun-setup ()
   (color-grasses)
   (test-world)
   (erase-bottom))
 
 (defun erase-bottom ()
-  (doblocks (x 0 128) (y 0 64) (z -128 128) (plain-setblock x y z 0 0)))
+  (dobox ((x 0 128) (y 0 64) (z -128 0))
+	 (plain-setblock x y z 0 0)))
 
 (defun test-world ()
-   (dorange (x 8 0) (dorange (y 8 -8) (someseq x y))))
+  (dobox ((x 0 8) (y -8 0))
+	 (someseq x y)))
+
+(defun spawn ()
+  (goto 64 80 -64))
 
 (defun color-grasses ()
   (modify-greens 64 192)
   (modify-greens 80 192)
   (modify-greens 0 240))
+
+(defun ubyte-mult (a b)
+  (truncate (* a b) 256))
+
+(defun multiply-into (vecinto other)
+  (macrolet ((aux (a b num)
+	       `(let ((at (aref ,a ,num))
+		      (bt (aref ,b ,num)))
+		  (setf (aref ,a ,num) (ubyte-mult at bt)))))
+    (aux vecinto other 0)
+    (aux vecinto other 1)
+    (aux vecinto other 2)
+    (aux vecinto other 3)))
+
+;;;grass is 0 240
+;;;leaves is [64 80] 192
+(defun modify-greens (xpos ypos &optional
+				  (color (imagewise:getapixel
+					  0 255
+					  (lget *g/image* "misc/grasscolor.png"))))
+  (let ((terrain (lget *g/image* "terrain.png")))
+    (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
+	   (multiply-into (imagewise:getapixel y x terrain) color))))
+
 
 (defun complex-modulus (c)
   (sqrt (realpart (* c (conjugate c)))))

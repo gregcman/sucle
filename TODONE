@@ -22,3 +22,9 @@ on a fetus, it is not so well defined how to label it
 -rename the system "the-matrix-is-everywhere" to something not so silly or use 
 an optimized well tested library. [sb-cga]
 //current state: copy pasted matrix multiplication code from internet. allocates a new matrix every time. types not fun to convert between
+
+13 jan 2017
+{package window}:
+-clean up unused cruft
+-control opengl versions
+

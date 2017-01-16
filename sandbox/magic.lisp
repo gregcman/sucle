@@ -12,14 +12,14 @@
 ;;;;load a single text file and plop it in the global library
 (defun load-file-text (path text-name)
   (let ((text (pathwise:file-string path)))
-    (lset *g/text* text-name text)
+    (setf (lget *g/text* text-name) text)
     text))
 
 ;;;;load a single image and plop it in the global library
 (defun load-file-image (path image-name)
   (let ((png (imagewise:load-png path)))
     (imagewise:flip-image png)
-    (lset *g/image* image-name png)
+    (setf (lget *g/image* image-name) png)
     png))
 
 (defun load-file-images (path-list start-dir)
@@ -40,16 +40,29 @@
 (defun load-shaders ()
   (load-file-text (shader-path "blockshader/transforms.vs") :bs-vs)
   (load-file-text (shader-path "blockshader/basictexcoord.frag") :bs-frag)
-  (load-file-text (shader-path "simpleshader/transforms.vs") :ss-vs)
-  (load-file-text (shader-path "simpleshader/basictexcoord.frag") ::ss-frag))
+  (load-file-text (shader-path "solidshader/transforms.vs") :ss-vs)
+  (load-file-text (shader-path "solidshader/basictexcoord.frag") :ss-frag)
+)
 
 (defun load-assets ()
   (unless ?shaders
     (load-shaders)
     (setf ?shaders t))
   (unless ?images
-    (load-file-images (pathwise:expand-paths png-resources) dir-mc-assets)
+    (load-file-images (pathwise:expand-paths simple-resources) dir-mc-assets)
     (setf ?images t)))
+
+(defparameter simple-resources
+  '(""
+    "terrain.png"
+    ("terrain/"
+     "moon.png" "sun.png")
+    ("skybox/"
+     "cheap.png")
+    ("misc/"
+     "grasscolor.png")
+    ("gui/"
+     "gui.png")))
 
 (defparameter png-resources
   '(""
@@ -96,27 +109,3 @@
      "black.png" "mclogo.png" "mojang.png")
     ("skybox/"
      "cheap.png")))
-
-(defun ubyte-mult (a b)
-  (truncate (* a b) 256))
-
-(defun multiply-into (vecinto other)
-  (macrolet ((aux (a b num)
-	       `(let ((at (aref ,a ,num))
-		      (bt (aref ,b ,num)))
-		  (setf (aref ,a ,num) (ubyte-mult at bt)))))
-    (aux vecinto other 0)
-    (aux vecinto other 1)
-    (aux vecinto other 2)
-    (aux vecinto other 3)))
-
-;;;grass is 0 240
-;;;leaves is [64 80] 192
-(defun modify-greens (xpos ypos &optional
-				  (color (imagewise:getapixel
-					  255 0
-					  (lget *g/image* "misc/grasscolor.png"))))
-  (let ((terrain (lget *g/image* "terrain.png")))
-    (dorange (x 16 xpos)
-	     (dorange (y 16 ypos)
-		      (multiply-into (imagewise:getapixel y x terrain) color)))))

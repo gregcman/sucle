@@ -98,7 +98,10 @@
 	*scroll-y* y))
 (defparameter *status* nil)
 (glfw:def-window-size-callback update-viewport (window w h)
-  (setf *width* w *height* h))
+  (setf *width* w *height* h)
+  (funcall *resize-hook* w h))
+
+(defparameter *resize-hook* (constantly nil))
 
 (defun init ()
   (setf *scroll-x* 0.0d0
@@ -124,7 +127,10 @@
 (defun opengl-main-thread-p ()
   (or
    #+darwin t
-      ))
+   ))
+
+(defun get-proc-address ()
+  #'glfw:get-proc-address)
 
 ;;Graphics calls on OS X must occur in the main thread
 (defun wrapper (func)
@@ -132,7 +138,6 @@
 	   (glfw:with-init-window (:title ""
 				   :width 1 :height 1
 				   :resizable t)
-	     (setf %gl:*gl-get-proc-address* #'glfw:get-proc-address)
 	     (glfw:set-mouse-button-callback 'mouse-callback)
 	     (glfw:set-key-callback 'key-callback)
 	     (glfw:set-scroll-callback 'scroll-callback)

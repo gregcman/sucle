@@ -10,50 +10,56 @@
 	(giveworktomesherthread achunk)))))
 
 (defun shape-list (the-shape len)
- ;; (declare (optimize (speed 3) (safety 0)))
-  (let ((ourlist (gl:gen-lists 1))
-	(verts the-shape)
-	(vertsize 6))
-    (declare (type (simple-array single-float *) verts))
-    (gl:new-list ourlist :compile)
-    (macrolet ((wow (num start)
-		 `(gl:vertex-attrib ,num
-				    (aref verts (+ base (+ ,start 0)))
-				    (aref verts (+ base (+ ,start 1)))
-				    (aref verts (+ base (+ ,start 2)))
-				    (aref verts (+ base (+ ,start 3)))))
-	       (wow2 (num start)
-		 `(gl:vertex-attrib ,num
-				    (aref verts (+ base (+ ,start 0)))
-				    (aref verts (+ base (+ ,start 1)))))
-	       (wow3 (num start)
-		 `(gl:vertex-attrib ,num
-				    (aref verts (+ base (+ ,start 0)))
-				    (aref verts (+ base (+ ,start 1)))
-				    (aref verts (+ base (+ ,start 2)))))
-	       (wow1 (num start)
-		 `(gl:vertex-attrib ,num
-				    (aref verts (+ base ,start)))))
-      (gl:with-primitives :quads
-	(dotimes (x len)
-	  (let ((base (* x vertsize)))
-	    (wow1 8 5) ;darkness
-	    (wow2 2 3) ;uv
-	    ;;	    (wow 8 9)
-	    ;;	    (wow 12 13)
-	    (wow3 0 0) ;position
-	    ))))
-    (gl:end-list)
-    ourlist))
+  ;; (declare (optimize (speed 3) (safety 0)))
+  (unless (zerop len)
+    (let ((ourlist (gl:gen-lists 1))
+	  (verts the-shape)
+	  (vertsize 6))
+      (declare (type (simple-array single-float *) verts))
+      (gl:new-list ourlist :compile)
+      (macrolet ((wow (num start)
+		   `(gl:vertex-attrib ,num
+				      (aref verts (+ base (+ ,start 0)))
+				      (aref verts (+ base (+ ,start 1)))
+				      (aref verts (+ base (+ ,start 2)))
+				      (aref verts (+ base (+ ,start 3)))))
+		 (wow2 (num start)
+		   `(gl:vertex-attrib ,num
+				      (aref verts (+ base (+ ,start 0)))
+				      (aref verts (+ base (+ ,start 1)))))
+		 (wow3 (num start)
+		   `(gl:vertex-attrib ,num
+				      (aref verts (+ base (+ ,start 0)))
+				      (aref verts (+ base (+ ,start 1)))
+				      (aref verts (+ base (+ ,start 2)))))
+		 (wow1 (num start)
+		   `(gl:vertex-attrib ,num
+				      (aref verts (+ base ,start)))))
+	(gl:with-primitives :quads
+	  (dotimes (x len)
+	    (let ((base (* x vertsize)))
+	      (wow1 8 5) ;darkness
+	      (wow2 2 3) ;uv
+	      ;;	    (wow 8 9)
+	      ;;	    (wow 12 13)
+	      (wow3 0 0) ;position
+	      ))))
+      (gl:end-list)
+      ourlist)))
 
 (defun getmeshersfinishedshit ()
   (multiple-value-bind (shape len coords) (sb-thread:join-thread mesher-thread)
     (if coords
 	(if shape
-	    (progn
-	      (let ((old-call-list (lget *g/call-list* coords)))
-		(lset *g/call-list* coords (shape-list shape len))
-		(when old-call-list (gl:delete-lists old-call-list 1))))
+	    (let ((old-call-list (lget *g/call-list* coords)))
+	      (let ((new (shape-list shape len)))
+		(if new
+		    (setf (lget *g/call-list* coords) new)
+		    (lremove *g/call-list* coords)))
+	      (when old-call-list (gl:delete-lists old-call-list 1))
+	      (let ((old-world (lget *g/call-list* :world)))
+		(lremove *g/call-list* :world)
+		(when old-world (gl:delete-lists old-world 1))))
 	    (dirty-push coords))))
   (setf mesher-thread nil))
 

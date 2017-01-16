@@ -8,10 +8,6 @@
 {package vox}:
 -verify whether the code generation works for other 3 - number layouts
 
-{package window}:
--clean up unused cruft
--control opengl versions
-
 [in general]:
 -learn opengl, cffi, streams,
 -shortcuts for emacs/paredit

@@ -23,7 +23,6 @@
 (defparameter *yvel* 0)
 (defparameter *zvel* 0)
 
-(defparameter air-friction 0.2)
 (defparameter air-friction 0.98)
 (defparameter walking-friction (* 0.6 0.9))
 
@@ -40,6 +39,7 @@
       *pitch* 0)
 
 (defun controls ()
+  (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
   (let ((speed (* 0.4 (expt tickscale 2))))
     (when fly
       (setf speed 0.024)
@@ -49,24 +49,29 @@
 	(decf *yvel* speed)))
     (unless fly
       (when onground
-	(when (e:key-p :space)
+	(when (or (e:mice-j-p :|3|) (e:key-p :space)) ;;jumping
 	  (incf *yvel* (* (if t 0.49 0.42) (expt tickscale 1)))))
       (unless onground
 	(setf speed (* speed 0.2))))    
     (let ((dir (complex 0 0)))
-      (when (e:key-p :w)
+      (when (e:key-p :w) ;;w
 	(incf dir #C(-1 0)))
-      (when (e:key-p :a)
+      (when (or (e:key-p :a)) ;;a
 	(incf dir #C(0 1)))
-      (when (e:key-p :s)
+      (when (e:key-p :s) ;;s
 	(incf dir #C(1 0)))
-      (when (e:key-p :d)
+      (when (or (e:key-p :d)) ;;d
 	(incf dir #C(0 -1)))
       (unless (zerop dir)
 	(let ((rot-dir (* dir (cis *yaw*))))
 	  (let ((normalized (/ rot-dir (complex-modulus rot-dir))))
 	    (incf *xvel* (* speed (realpart normalized)))
-	    (incf *zvel* (* speed (imagpart normalized)))))))))
+	    (incf *zvel* (* speed (imagpart normalized)))))))
+    (progno
+     (let ((speed (* net-scroll -0.002)))
+       (incf *xvel* (* speed look-x))
+       (incf *yvel* (* speed look-y))
+       (incf *zvel* (* speed look-z))))))
 
 (defparameter mouse-sensitivity (* 60.0 pi 1/180))
 
@@ -119,7 +124,8 @@
 	  (camera-ypos *camera*) (+ *ypos* (* multiplier *yvel*))
 	  (camera-zpos *camera*) (+ *zpos* (* multiplier *zvel*))
 	  (camera-pitch *camera*) *pitch*
-	  (camera-yaw *camera*) *yaw*)))
+	  (camera-yaw *camera*) *yaw*
+	  (camera-fov *camera*) defaultfov)))
 
 (defun set-render-cam-look ()
   (setf (camera-pitch *camera*) *pitch*
@@ -134,12 +140,30 @@
   (setf tickscale (/ 20.0 ticks/sec))
   (setf tick-delay (/ 1000000.0 ticks/sec)))
 
+(defparameter net-scroll 0)
+
 (defun physics ()
   ;;escape to quitx
   (when (e:key-p :ESCAPE) (setq alivep nil))  
   ;;e to escape mouse
   (when (e:key-j-p :E) (window:toggle-mouse-capture))
-
+  (hotbar-add e:*scroll-y*)
+  (unless (zerop e:*scroll-y*)
+    (lcalllist-invalidate :hotbar-selector))
+  (macrolet ((k (number-key)
+	       (let ((symb (intern (write-to-string number-key) :keyword)))
+		 `(when (e:key-j-p ,symb)
+		    (setf *hotbar-selection* ,(1- number-key))
+		    (lcalllist-invalidate :hotbar-selector)))))
+    (k 1)
+    (k 2)
+    (k 3)
+    (k 4)
+    (k 5)
+    (k 6)
+    (k 7)
+    (k 8)
+    (k 9))
   (when (window:mice-locked-p)
     (when (e:key-j-p :v) (toggle noclip))
     (when (e:key-j-p :g) (toggle gravity))
@@ -149,23 +173,21 @@
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
     (controls)
-    (when fist?
-      (when (e:mice-j-p :right)
-	(setblock-with-update (floor fistx)
-			      (floor fisty)
-			      (floor fistz)
-			      5
-			      0))
-      (when (e:mice-j-p :left)
-	(setblock-with-update fist-side-x
-			      fist-side-y
-			      fist-side-z
-			      0
-			      0))))
+    (progn
+     (when fist?
+       (when (e:mice-j-p :left)
+	 (setblock-with-update fist-side-x
+			       fist-side-y
+			       fist-side-z
+			       0
+			       0))
+       (when (e:mice-j-p :right)
+	 (setblock-with-update (floor fistx)
+			       (floor fisty)
+			       (floor fistz)
+			       5
+			       0)))))
   (collide-with-world)
-  (mvb (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
-       (declare (ignorable i- i+ j- j+ k- k+))
-       (setf onground j-))
   (if fly
       (progn
 	(setf *xvel* (* *xvel* air-friction))
@@ -178,22 +200,41 @@
   (when (and gravity (not onground))
     (decf *yvel* (* 0.08 (expt tickscale 2))))
   (setf *yvel* (* *yvel* air-friction))
+  (mvb (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
+       (cond ((plusp *xvel*) (when i+ (setf *xvel* 0.0))
+	      (minusp *xvel*) (when i- (setf *xvel* 0.0))))
+       (cond ((plusp *yvel*) (when j+ (setf *yvel* 0.0))
+	      (minusp *yvel*) (when j- (setf *yvel* 0.0))))
+       (cond ((plusp *zvel*) (when k+ (setf *zvel* 0.0))
+	      (minusp *zvel*) (when k- (setf *zvel* 0.0))))
+       (setf onground j-))
   (let ((cos-pitch (cos *pitch*)))
-    (let ((vx (- (* reach (* cos-pitch (cos *yaw*)))))
-	  (vy (- (* reach (sin *pitch*))))
-	  (vz (- (* reach (* cos-pitch (sin *yaw*))))))
-      (mvb (frac type blockx blocky blockz)
-	   (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
-	   (if frac
-	       (setf fist? t
-		     fist-side type
-		     fist-side-x blockx
-		     fist-side-y blocky
-		     fist-side-z blockz
-		     fistx (+ *xpos* (* frac vx))
-		     fisty (+ *ypos* (* frac vy))
-		     fistz (+ *zpos* (* frac vz)))
-	       (setf fist? nil))))))
+    (let ((avx (* cos-pitch (cos *yaw*)))
+	  (avy (sin *pitch*))
+	  (avz (* cos-pitch (sin *yaw*))))
+      (setf look-x avx
+	    look-y avy
+	    look-z avz)
+      (let ((vx (- (* reach avx)))
+	    (vy (- (* reach avy)))
+	    (vz (- (* reach avz))))
+	(mvb (frac type blockx blocky blockz)
+	     (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
+	     (if frac
+		 (setf fist? t
+		       fist-side type
+		       fist-side-x blockx
+		       fist-side-y blocky
+		       fist-side-z blockz
+		       fistx (+ *xpos* (* frac vx))
+		       fisty (+ *ypos* (* frac vy))
+		       fistz (+ *zpos* (* frac vz)))
+		 (setf fist? nil)))))))
+
+(defparameter look-x 0.0)
+(defparameter look-y 0.0)
+(defparameter look-z 0.0)
+
 (defparameter fist-side-x nil)
 (defparameter fist-side-y nil)
 (defparameter fist-side-z nil)

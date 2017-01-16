@@ -30,7 +30,7 @@
     (tagbody
        rep
        (unless (null node)
-	 (lset *g/args* (first node) (second node))
+	 (setf (lget *g/args* (first node)) (second node))
 	 (setf node (cddr node))
 	 (go rep)))))
 ;;;in some environments [mac os] the opengl thread has to be the same thread

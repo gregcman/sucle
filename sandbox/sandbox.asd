@@ -7,8 +7,7 @@
 
     :depends-on (#:cl-opengl
 	         #:sb-cga
- 		 #:cl-glfw3
-		 #:trivial-main-thread
+                 #:window-glfw3
 		 
 		 #:imagewise
                  #:pathwise
@@ -22,16 +21,12 @@
 		 #:queue
                  #:world
 
-
 		 #:cl-mc-shit
-		 #:aabbcc
-		 #:vox
-		 #:pix)
+		 #:aabbcc)
 
     :serial t
     :components  
     ((:file "package")
-     (:file "window")
      (:file "misc")
 
      (:file "global") ;;global vars
@@ -42,9 +37,9 @@
      (:file "magic") ;;initial asset loading
      (:file "blocks") ;;list of minecraft block values
 
+     (:file "lovely-renderer")
      (:file "draw-environment") ;;;drawing environmental factors
-     (:file "lovely-renderer") ;;all the rendering shit packed into a file---
-     (:file "meshing-thread");;send the meshing work to a separate thread to prevent lag
+     (:file "meshing-thread");;send the meshing work to a separate thread
 
 
      (:file "player-controls") ;;moving the player around, collision ---
