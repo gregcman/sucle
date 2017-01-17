@@ -4,3 +4,6 @@
 
 (defpackage #:mc-blocks
   (:use #:cl))
+
+(defpackage #:aabbcc
+  (:use #:cl))

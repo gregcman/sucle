@@ -1,111 +1,41 @@
 (in-package #:sandbox)
 
-(defparameter ourdir
-  (make-pathname :host (pathname-host #.(or *compile-file-truename*
-					    *load-truename*))
-		 :directory (pathname-directory #.(or *compile-file-truename*
-						      *load-truename*))))
-(defparameter dir-resource (merge-pathnames #P"res/" ourdir))
-(defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
-(defparameter dir-mc-assets (merge-pathnames "moreshit/" dir-resource))
+(progn
+  (defparameter *g/image* (make-hash-table :test 'equal))		    ;;raw image arrays
+  (defun get-image (name)
+    (let ((img (gethash name *g/image*)))
+      (if img
+	  img
+	  (get-image-backup name))))
+  (defun set-image (name image-data)
+    (setf (gethash name *g/image*) image-data))
+  (defun remove-image (name)
+    (remhash name *g/image*)))
+(progn
+  (defparameter *g/image-backup* (make-hash-table :test 'equal))
+  (defun get-image-backup (name)
+    (let ((image-func (gethash name *g/image-backup*)))
+      (when (functionp image-func)
+	(let ((ans (funcall image-func name)))
+	  (when ans
+	    (set-image name ans)))))))
 
-;;;;load a single text file and plop it in the global library
-(defun load-file-text (path text-name)
-  (let ((text (pathwise:file-string path)))
-    (setf (lget *g/text* text-name) text)
-    text))
-
-;;;;load a single image and plop it in the global library
-(defun load-file-image (path image-name)
-  (let ((png (imagewise:load-png path)))
-    (imagewise:flip-image png)
-    (setf (lget *g/image* image-name) png)
-    png))
-
-(defun load-file-images (path-list start-dir)
-  (dolist (path path-list)
-    (let ((filepath (merge-pathnames path start-dir)))
-      (load-file-image filepath (namestring path)))))
-
-(defun shader-path (name)
-  (merge-pathnames name dir-shader))
-
-(defun lcreate-thread (name func &optional (stringname (string name)))
-  (let ((the-thread (sb-thread:make-thread func :name stringname)))
-    (setf (lget *g/thread* name) the-thread)))
-
-(defparameter ?images nil)
-(defparameter ?shaders nil)
-
-(defun load-shaders ()
-  (load-file-text (shader-path "blockshader/transforms.vs") :bs-vs)
-  (load-file-text (shader-path "blockshader/basictexcoord.frag") :bs-frag)
-  (load-file-text (shader-path "solidshader/transforms.vs") :ss-vs)
-  (load-file-text (shader-path "solidshader/basictexcoord.frag") :ss-frag)
-)
-
-(defun load-assets ()
-  (unless ?shaders
-    (load-shaders)
-    (setf ?shaders t))
-  (unless ?images
-    (load-file-images (pathwise:expand-paths simple-resources) dir-mc-assets)
-    (setf ?images t)))
-
-(defparameter simple-resources
-  '(""
-    "terrain.png"
-    ("terrain/"
-     "moon.png" "sun.png")
-    ("skybox/"
-     "cheap.png")
-    ("misc/"
-     "grasscolor.png")
-    ("gui/"
-     "gui.png")))
-
-(defparameter png-resources
-  '(""
-    "terrain.png"
-    "pack.png" "particles.png" 
-    ("achievement/"
-     "bg.png" "icons.png")
-    ("armor/"
-     "chain_1.png" "chain_2.png" "cloth_1.png" "cloth_2.png"
-     "diamond_1.png" "diamond_2.png"
-     "gold_1.png" "gold_2.png"
-     "iron_1.png" "iron_2.png" "power.png")
-    ("art/"
-     "kz.png")
-    ("environment/"
-     "clouds.png" "rain.png" "snow.png")
-    ("font/"
-     "default.png")
-    ("gui/"
-     "background.png" "container.png"
-     "crafting.png" "furnace.png" "gui.png" "icons.png"
-     "inventory.png"
-     "items.png" "logo.png" "particles.png" "slot.png"
-     "trap.png" "unknown_pack.png")
-    ("item/"
-     "arrows.png" "boat.png" "cart.png" "door.png" "sign.png")
-    ("misc/"
-     "dial.png" "foliagecolor.png" "footprint.png"
-     "grasscolor.png"
-     "mapbg.png" "mapicons.png" "pumpkinblur.png"
-     "shadow.png" "vignette.png" "water.png" "watercolor.png")
-    ("mob/"
-     "char.png" "chicken.png" "cow.png"  "creeper.png"
-     "ghast.png" "ghast_fire.png"
-     "pig.png" "pigman.png" "pigzombie.png"
-     "saddle.png" "sheep.png" "sheep_fur.png" "silverfish.png"
-     "skeleton.png"
-     "slime.png" "spider.png" "spider_eyes.png"
-     "squid.png" "wolf.png" "wolf_angry.png" "wolf_tame.png"
-     "zombie.png")
-    ("terrain/"
-     "moon.png" "sun.png")
-    ("title/"
-     "black.png" "mclogo.png" "mojang.png")
-    ("skybox/"
-     "cheap.png")))
+(progn
+  (defparameter *g/text* (make-hash-table :test 'equal))   ;;text: sequences of bytes
+  (defun get-text (name)
+    (let ((text (gethash name *g/text*)))
+      (if text
+	  text
+	  (get-text-backup name))))
+  (defun set-text (name text-data)
+    (setf (gethash name *g/text*) text-data))
+  (defun remove-text (name)
+    (remhash name *g/text*)))
+(progn
+  (defparameter *g/text-backup* (make-hash-table :test 'equal))
+  (defun get-text-backup (name)
+    (let ((text-func (gethash name *g/text-backup*)))
+      (when (functionp text-func)
+	(let ((ans (funcall text-func name)))
+	  (when ans
+	    (set-text name ans)))))))

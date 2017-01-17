@@ -51,14 +51,14 @@
   (multiple-value-bind (shape len coords) (sb-thread:join-thread mesher-thread)
     (if coords
 	(if shape
-	    (let ((old-call-list (lget *g/call-list* coords)))
+	    (let ((old-call-list (get-chunk-display-list coords)))
 	      (let ((new (shape-list shape len)))
 		(if new
-		    (setf (lget *g/call-list* coords) new)
-		    (lremove *g/call-list* coords)))
+		    (set-chunk-display-list coords new)
+		    (remove-chunk-display-list coords)))
 	      (when old-call-list (gl:delete-lists old-call-list 1))
-	      (let ((old-world (lget *g/call-list* :world)))
-		(lremove *g/call-list* :world)
+	      (let ((old-world (get-display-list :world)))
+		(remove-display-list :world)
 		(when old-world (gl:delete-lists old-world 1))))
 	    (dirty-push coords))))
   (setf mesher-thread nil))

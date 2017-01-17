@@ -26,11 +26,29 @@
 (defparameter air-friction 0.98)
 (defparameter walking-friction (* 0.6 0.9))
 
-(defparameter noclip t)
-(defparameter gravity t)
+(defparameter noclip nil)
+(defparameter gravity nil)
 (defparameter fly t)
 
+(defparameter *hotbar-selection* 2)
+
 (defparameter onground nil)
+
+(defparameter look-x 0.0)
+(defparameter look-y 0.0)
+(defparameter look-z 0.0)
+
+(defparameter fist-side-x nil)
+(defparameter fist-side-y nil)
+(defparameter fist-side-z nil)
+
+(defparameter fist? nil)
+(defparameter fist-side nil)
+(defparameter fistx 0.0)
+(defparameter fisty 0.0)
+(defparameter fistz 0.0)
+
+(defparameter reach 4.0)
 
 (setf *xpos* 0
       *ypos* 0
@@ -74,7 +92,8 @@
        (incf *zvel* (* speed look-z))))))
 
 (defparameter mouse-sensitivity (* 60.0 pi 1/180))
-
+(defun look-around ()
+  (mouse-looking))
 (defun mouse-looking ()
   (multiple-value-bind (dx dy) (delta)
     (let ((x (* mouse-sensitivity (/ dx 360.0)))
@@ -118,18 +137,8 @@
 	((t)))
       (setq mousecapturestate nil)))
 
-(defun set-render-cam-pos (millisecs)
-  (let ((multiplier (/ millisecs tick-delay)))
-    (setf (camera-xpos *camera*) (+ *xpos* (* multiplier *xvel*))
-	  (camera-ypos *camera*) (+ *ypos* (* multiplier *yvel*))
-	  (camera-zpos *camera*) (+ *zpos* (* multiplier *zvel*))
-	  (camera-pitch *camera*) *pitch*
-	  (camera-yaw *camera*) *yaw*
-	  (camera-fov *camera*) defaultfov)))
-
-(defun set-render-cam-look ()
-  (setf (camera-pitch *camera*) *pitch*
-	(camera-yaw *camera*) *yaw*))
+(defun hotbar-add (num)
+  (setf *hotbar-selection* (truncate (mod (+ num *hotbar-selection*) 9))))
 
 (defparameter daytime 1.0)
 (defparameter ticks/sec nil)
@@ -175,7 +184,7 @@
     (controls)
     (progn
      (when fist?
-       (when (e:mice-j-p :left)
+       (when (or (e:key-p :q) (e:mice-j-p :left))
 	 (setblock-with-update fist-side-x
 			       fist-side-y
 			       fist-side-z
@@ -231,19 +240,6 @@
 		       fistz (+ *zpos* (* frac vz)))
 		 (setf fist? nil)))))))
 
-(defparameter look-x 0.0)
-(defparameter look-y 0.0)
-(defparameter look-z 0.0)
-
-(defparameter fist-side-x nil)
-(defparameter fist-side-y nil)
-(defparameter fist-side-z nil)
-
-(defparameter fist? nil)
-(defparameter fist-side nil)
-(defparameter fistx 0.0)
-(defparameter fisty 0.0)
-(defparameter fistz 0.0)
 
 (defun collide-with-world ()
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
@@ -259,48 +255,6 @@
       (setf *xvel* x)
       (setf *yvel* y)
       (setf *zvel* z))))
-
-(defun goto (x y z)
-  (setf *xpos* x
-	*ypos* y
-	*zpos* z))
-(defun look-around ()
-  (mouse-looking))
-
-(defun block-aabb ()
-  (aabbcc::make-aabb
-   :minx 0.0
-   :miny 0.0
-   :minz 0.0
-   :maxx 1.0
-   :maxy 1.0
-   :maxz 1.0))
-
-(defun player-aabb ()
-  (aabbcc::make-aabb
-   :minx -0.3
-   :miny -1.5
-   :minz -0.3
-   :maxx 0.3
-   :maxy 0.12
-   :maxz 0.3))
-
-(defun fist-aabb ()
-  (aabbcc::make-aabb
-   :minx -0.005
-   :miny -0.005
-   :minz -0.005
-   :maxx 0.005
-   :maxy 0.005
-   :maxz 0.005))
-
-(defparameter block-aabb (block-aabb))
-(defparameter player-aabb (player-aabb))
-(defparameter fist-aabb (fist-aabb))
-
-(defparameter reach 4.0)
-
-
 
 (defun punch-func (px py pz vx vy vz)
   (let ((tot-min 2)
@@ -398,43 +352,91 @@
 	  (maxz (+ minz 5)))
       (values minx miny minz maxx maxy maxz))))
 
-;;dirty chunks is a list of modified chunks
-;;we do not want anyone to see a raw list!
-(defparameter dirtychunks nil)
-(defun clean-dirty ()
-  (setf dirtychunks (q::make-uniq-q)))
-(defun dirty-pop ()
-  (q::uniq-pop dirtychunks))
-(defun dirty-push (item)
-  (q::uniq-push item dirtychunks))
-(defun block-dirtify (i j k)
-  (dirty-push (world:chop (world:chunkhashfunc i k j))))
+(defun smallest (i j k)
+  (if (< i j)
+      (if (< i k) ;;i < j j is out
+	  (values i t nil nil)	  ;;; i < k and i < j
+	  (if (= i k)
+	      (values i t nil t) ;;;tied for smallest
+	      (values k nil nil t)	     ;;; k < i <j
+	      ))
+      (if (< j k) ;;i>=j
+	  (if (= i j)
+	      (values i t t nil)
+	      (values j nil t nil)) ;;j<k and i<=j k is nout
+	  (if (= i k)
+	      (values i t t t)
+	      (if (= k j)
+		  (values k nil t t)
+		  (values k nil nil t))) ;;i>=j>=k 
+	  )))
 
-(defun setblock-with-update (i j k blockid new-light-value)
-  (let ((old-blockid (world:getblock i j k)))
-    (if (/= blockid old-blockid)
-	(let ((old-light-value (world:getlight i j k)))
-	  (when (setf (world:getblock i j k) blockid)
-	    (when (< new-light-value old-light-value)  
-	      (de-light-node i j k))
-	    (setf (world:getlight i j k) new-light-value)
-	    (sky-de-light-node i j k)
-	    (unless (zerop new-light-value)
-	      (light-node i j k))
-	    (flet ((check (a b c)
-		     (light-node (+ i a) (+ j b) (+ k c))
-		     (sky-light-node (+ i a) (+ j b) (+ k c))))
-	      (check -1 0 0)
-	      (check 1 0 0)
-	      (check 0 -1 0)
-	      (check 0 1 0)
-	      (check 0 0 -1)
-	      (check 0 0 1))
-	    (block-dirtify i j k))))))
+(defun aux-func (x dx)
+  (if (zerop dx)
+      nil
+      (if (plusp dx)
+	  (floor (1+ x))
+	  (ceiling (1- x)))))
 
-(defun plain-setblock (i j k blockid new-light-value)
-  (let ((old-blockid (world:getblock i j k)))
-    (if (/= blockid old-blockid)
-	(when (setf (world:getblock i j k) blockid)
-	  (setf (world:getlight i j k) new-light-value)))))
 
+(defun aabb-collect-blocks (px py pz dx dy dz aabb func)
+  (declare (ignorable aabb))
+  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
+	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz)) aabb
+    (let ((total 1))
+      (let ((pluspdx (plusp dx))
+	    (pluspdy (plusp dy))
+	    (pluspdz (plusp dz))
+	    (zeropdx (zerop dx))
+	    (zeropdy (zerop dy))
+	    (zeropdz (zerop dz)))
+	(declare (ignorable pluspdx pluspdy pluspdz zeropdx zeropdy zeropdz))
+	(let ((xoffset (if zeropdx 0 (if pluspdx maxx minx)))
+	      (yoffset (if zeropdy 0 (if pluspdy maxy miny)))
+	      (zoffset (if zeropdz 0 (if pluspdz maxz minz))))
+	  (let ((x (+ px xoffset))
+		(y (+ py yoffset))
+		(z (+ pz zoffset)))
+	    (tagbody
+	     rep
+	       (let ((i-next (aux-func x dx))
+		     (j-next (aux-func y dy))
+		     (k-next (aux-func z dz)))
+		 (mvb (ratio i? j? k?) (smallest (if i-next
+						     (/ (- i-next x) dx)
+						     most-positive-single-float)
+						 (if j-next
+						     (/ (- j-next y) dy)
+						     most-positive-single-float)
+						 (if k-next
+						     (/ (- k-next z) dz)
+						     most-positive-single-float))	 
+		      (let ((newx (if i? i-next (+ x (* dx ratio))))
+			    (newy (if j? j-next (+ y (* dy ratio))))
+			    (newz (if k? k-next (+ z (* dz ratio)))))
+			(let ((aabb-posx (- newx xoffset))
+			      (aabb-posy (- newy yoffset))
+			      (aabb-posz (- newz zoffset)))
+			  (when i?
+			    (dobox ((j (floor (+ aabb-posy miny))
+				       (ceiling (+ aabb-posy maxy)))
+				    (k (floor (+ aabb-posz minz))
+				       (ceiling (+ aabb-posz maxz))))
+				   (funcall func (if pluspdx newx (1- newx)) j k)))
+			  (when j?
+			    (dobox ((i (floor (+ aabb-posx minx))
+				       (ceiling (+ aabb-posx maxx)))
+				    (k (floor (+ aabb-posz minz))
+				       (ceiling (+ aabb-posz maxz))))
+				   (funcall func i (if pluspdy newy (1- newy)) k)))
+			  (when k?
+			    (dobox ((j (floor (+ aabb-posy miny))
+				       (ceiling (+ aabb-posy maxy)))
+				    (i (floor (+ aabb-posx minx))
+				       (ceiling (+ aabb-posx maxx))))
+				   (funcall func i j (if pluspdz newz (1- newz))))))
+			(setf x newx y newy z newz))
+		      (decf total ratio)
+		      (when (minusp total) (go end))
+		      (go rep)))
+	     end)))))))
