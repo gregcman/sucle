@@ -58,25 +58,13 @@
   (injection))
 (defun cleanup ()
   (setq alivep nil))
-(defparameter render-delay nil)
-(defparameter rendertimer nil)
-(defparameter renderrate nil)
 
-(defparameter fps-func (averager 256))
-(defparameter fps nil)
 (defun injection ()
-  (multiple-value-bind (val happened? difference)
-      (funcall rendertimer render-delay (lambda ()(window:poll);;where to put?
-						  (remove-spurious-mouse-input)
-						  (render) (physics)))
-    (declare (ignorable val))
-    (when happened?
-      (setf renderrate difference)
-      (setf fps (/ 1000000.0 (funcall fps-func difference)))
-      (window:set-caption (format nil "~2,4$" fps)))
-    (if happened?
-	(set-render-cam-pos 0)
-	(set-render-cam-pos (min difference tick-delay))))
+  (window:poll)
+  (physics)
+  (set-render-cam-pos 0)
+  (remove-spurious-mouse-input)
+  (render)
   (when (alive?) 
     (injection)))
 

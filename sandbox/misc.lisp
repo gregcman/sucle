@@ -16,25 +16,18 @@
 
 (defun clamp (x min max)
   (max (min x max) min))
+
+(defparameter float-pi (coerce pi 'single-float))
 (defun rad-deg (rad)
-  (* rad (/ 180.0d0 pi)))
+  (* rad (/ 180.0 float-pi)))
 (defun deg-rad (deg)
-  (* deg (/ pi 180.0d0)))
+  (* deg (/ float-pi 180.0)))
 
 (defun ease (x target fraction)
   (+ x (* fraction (- target x))))
 
 (define-modify-macro *= (&rest args)
   *)
-
-(defun new-direction (dx dy)
-  (let ((dir (sb-cga:vec 1.0 0.0 0.0))
-	(rotation-axis (sb-cga:normalize (sb-cga:vec 0.0 (- dx) dy)))
-	(rot-factor (sqrt (+ (* dx dx) (* dy dy)))))
-    (let ((rot (sb-cga:rotate-around rotation-axis rot-factor)))
-      (let ((new-dir (sb-cga:transform-direction dir rot)))
-	(multiple-value-bind (p y) (extract-polar-coords new-dir)
-	  (values y p))))))
 
 ;;return the pitch and yaw of a unit direction vector
 (defun extract-polar-coords (vec)
@@ -43,11 +36,12 @@
     (values (asin (aref vec 1))
 	    (atan two zero))))
 
-(defun unit-pitch-yaw (pitch yaw)
+(defun unit-pitch-yaw (result pitch yaw)
   (let ((cos-pitch (cos pitch)))
-    (sb-cga:vec
-     (* cos-pitch (cos yaw))
-     (sin pitch)
-     (* cos-pitch (sin yaw)))))
+    (setf (aref result 0) (* cos-pitch (cos yaw))
+	  (aref result 1) (sin pitch)
+	  (aref result 2) (* cos-pitch (sin yaw))))
+  result)
+
 
 

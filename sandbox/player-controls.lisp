@@ -91,7 +91,10 @@
        (incf *yvel* (* speed look-y))
        (incf *zvel* (* speed look-z))))))
 
-(defparameter mouse-sensitivity (* 60.0 pi 1/180))
+(defparameter mouse-sensitivity (coerce (* 60.0 pi 1/180) 'single-float))
+(defconstant two-pi (coerce (* 2 pi) 'single-float))
+(defconstant half-pi (coerce (/ pi 2) 'single-float))
+
 (defun look-around ()
   (mouse-looking))
 (defun mouse-looking ()
@@ -99,10 +102,10 @@
     (let ((x (* mouse-sensitivity (/ dx 360.0)))
 	  (y (* mouse-sensitivity (/ dy 360.0))))
       (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
-	(setf *yaw* (mod (+ *yaw* dyaw) (* 2 pi)))
+	(setf *yaw* (mod (+ *yaw* dyaw) two-pi))
 	(setf *pitch* (clamp (+ *pitch* dpitch)
-			     (* 0.99 (/ pi -2))
-			     (* 0.99 (/ pi 2))))))))
+			     (* -0.99 half-pi)
+			     (* 0.99 half-pi)))))))
 
 (defparameter old-mouse-x 0)
 (defparameter old-mouse-y 0)
@@ -125,6 +128,19 @@
 	  (new-direction (coerce x 'single-float)
 			 (coerce y 'single-float)))))
 
+(defparameter *temp-matrix3* (cg-matrix:identity-matrix))
+
+(defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0))
+(defparameter *new-dir* (cg-matrix:vec 0.0 0.0 0.0))
+(defun new-direction (dx dy)
+  (let ((size (sqrt (+ (* dx dx) (* dy dy)))))
+    (let ((dir *x-unit*))
+      (let ((rot (cg-matrix:%rotate-around*
+		  *temp-matrix3*
+		  0.0 (/ (- dx) size) (/ dy size) size)))
+	(let ((new-dir (cg-matrix:%transform-direction *new-dir* dir rot)))
+	  (multiple-value-bind (p y) (extract-polar-coords new-dir)
+	    (values y p)))))))
 
 (defparameter mousecapturestate nil)
 (defun remove-spurious-mouse-input ()

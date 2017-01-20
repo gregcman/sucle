@@ -94,8 +94,8 @@
 
 (glfw:def-scroll-callback scroll-callback (window x y)
   (declare (ignore window))
-  (setf *scroll-x* x
-	*scroll-y* y))
+  (setf *scroll-x* (coerce x 'single-float)
+	*scroll-y* (coerce y 'single-float)))
 (defparameter *status* nil)
 (glfw:def-window-size-callback update-viewport (window w h)
   (setf *width* w *height* h)
@@ -104,8 +104,8 @@
 (defparameter *resize-hook* (constantly nil))
 
 (defun init ()
-  (setf *scroll-x* 0.0d0
-	*scroll-y* 0.0d0)
+  (setf *scroll-x* 0.0
+	*scroll-y* 0.0)
   (if *keypress-hash*
       (clrhash *keypress-hash*)
       (setf *keypress-hash* (make-hash-table :test 'eq)))
@@ -117,8 +117,8 @@
   (sb-int:set-floating-point-modes :traps nil))
 
 (defun poll ()
-  (setf *scroll-x* 0.0d0
-	*scroll-y* 0.0d0)
+  (setf *scroll-x* 0.0
+	*scroll-y* 0.0)
   (setq *status* (glfw:window-should-close-p))
   (step-hash *keypress-hash*)
   (step-hash *mousepress-hash*)
@@ -177,5 +177,9 @@
       (glfw:swap-interval 1) ;;1 is on
       (glfw:swap-interval 0))) ;;0 is off
 
-(defun get-mouse-position ()
-  (values-list (glfw:get-cursor-position)))
+(defun get-mouse-position (&optional (window glfw:*window*))
+  (cffi:with-foreign-objects ((x :int) (y :int))
+    (cffi:foreign-funcall "glfwGetCursorPos"
+			  %glfw::window window :pointer x :pointer y :void)
+    (values (coerce (cffi:mem-ref x :double) 'single-float)
+	    (coerce (cffi:mem-ref y :double) 'single-float))))

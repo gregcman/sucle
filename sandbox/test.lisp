@@ -230,3 +230,11 @@
     (set-image image-name png)
     png))
 
+
+(defun hash-symbol (symbol)
+  (declare (type symbol symbol))
+  (sxhash symbol))
+
+(defun funcall-test (func)
+  (declare (type (function () (values)) func))
+  (funcall func))

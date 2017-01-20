@@ -9,41 +9,49 @@
       (when achunk
 	(giveworktomesherthread achunk)))))
 
-(defun shape-list (the-shape len)
-  ;; (declare (optimize (speed 3) (safety 0)))
+(defun shape-list (verts len)   
+  (declare (type fixnum len)
+	   (type (simple-array single-float *) verts))
   (unless (zerop len)
     (let ((ourlist (gl:gen-lists 1))
-	  (verts the-shape)
 	  (vertsize 6))
-      (declare (type (simple-array single-float *) verts))
+      (declare (type fixnum vertsize len))
       (gl:new-list ourlist :compile)
       (macrolet ((wow (num start)
-		   `(gl:vertex-attrib ,num
-				      (aref verts (+ base (+ ,start 0)))
-				      (aref verts (+ base (+ ,start 1)))
-				      (aref verts (+ base (+ ,start 2)))
-				      (aref verts (+ base (+ ,start 3)))))
+		   `(%gl:vertex-attrib-4f ,num
+					  (aref verts (+ base ,(+ start 0)))
+					  (aref verts (+ base ,(+ start 1)))
+					  (aref verts (+ base ,(+ start 2)))
+					  (aref verts (+ base ,(+ start 3)))))
 		 (wow2 (num start)
-		   `(gl:vertex-attrib ,num
-				      (aref verts (+ base (+ ,start 0)))
-				      (aref verts (+ base (+ ,start 1)))))
+		   `(%gl:vertex-attrib-2f ,num
+					  (aref verts (+ base ,(+ start 0)))
+					  (aref verts (+ base ,(+ start 1)))))
 		 (wow3 (num start)
-		   `(gl:vertex-attrib ,num
-				      (aref verts (+ base (+ ,start 0)))
-				      (aref verts (+ base (+ ,start 1)))
-				      (aref verts (+ base (+ ,start 2)))))
+		   `(%gl:vertex-attrib-3f ,num
+					  (aref verts (+ base ,(+ start 0)))
+					  (aref verts (+ base ,(+ start 1)))
+					  (aref verts (+ base ,(+ start 2)))))
 		 (wow1 (num start)
-		   `(gl:vertex-attrib ,num
-				      (aref verts (+ base ,start)))))
+		   `(%gl:vertex-attrib-1f ,num
+					  (aref verts (+ base ,start)))))
 	(gl:with-primitives :quads
-	  (dotimes (x len)
-	    (let ((base (* x vertsize)))
-	      (wow1 8 5) ;darkness
-	      (wow2 2 3) ;uv
-	      ;;	    (wow 8 9)
-	      ;;	    (wow 12 13)
-	      (wow3 0 0) ;position
-	      ))))
+	  (BLOCK NIL
+	    (LET ((base 0)
+		  (end (the fixnum (* len vertsize))))
+	      (DECLARE (TYPE UNSIGNED-BYTE end base))
+	      (TAGBODY
+		 (GO end)
+	       rep
+		 (TAGBODY
+		    (wow1 8 5)
+		    (wow2 2 3)
+		    (wow3 0 0)
+		    )
+		 (PSETQ base (the fixnum (+ vertsize base)))
+	       end
+		 (UNLESS (>= base end) (GO rep))
+		 (RETURN-FROM NIL (PROGN NIL)))))))
       (gl:end-list)
       ourlist)))
 

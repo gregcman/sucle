@@ -1,5 +1,25 @@
 (in-package :sandbox)
 
+;;matrix multiplication is associative
+(defparameter *view-matrix* (cg-matrix:identity-matrix))		    ;;view matrix
+(defparameter *projection-matrix* (cg-matrix:identity-matrix))	    ;;projection matrix
+(defparameter *projection-view-matrix* (cg-matrix:identity-matrix)) ;;projection * view matrix
+(defparameter *temp-matrix* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
+(defparameter *temp-matrix2* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
+
+(defun update-projection-view-matrices ()
+  (setf *projection-view-matrix* (cg-matrix:%matrix* *projection-view-matrix*
+						    *projection-matrix*
+						    *view-matrix*)))
+
+(defun set-projection-matrix (fovy aspect near far)
+  (let ((projection-matrix (projection-matrix *projection-matrix* fovy aspect near far)))
+    (setf *projection-matrix* projection-matrix)))
+
+(defun set-view-matrix (direction up)
+  (let ((view (relative-lookat *view-matrix* direction up)))
+    (setf *view-matrix* view)))
+
 (defun name-mesh (display-list-name mesh-func)
   (setf (gethash display-list-name *g/call-list-backup*)
 	(lambda (&optional name)
@@ -52,7 +72,7 @@
 (defun draw-sky ()
   (progn
     (set-matrix "projectionmodelview"
-		(sb-cga:transpose-matrix
+		(cg-matrix:transpose-matrix
 		 *projection-view-matrix*))
     (bind-shit :skybox)
     (gl:bind-texture :texture-2d *framebuffer-texture*)
@@ -60,13 +80,14 @@
   (progn
     (let ((time (daytime)))
       (set-matrix "projectionmodelview"
-		  (sb-cga:transpose-matrix
-		   (sb-cga:matrix*
+		  (cg-matrix:%transpose-matrix
+		   *temp-matrix*
+		   (cg-matrix:matrix*
 		    *projection-view-matrix*
-		    (sb-cga:rotate-around
-		     (sb-cga:vec -1.0 0.0 0.0)
+		    (cg-matrix:rotate-around
+		     (cg-matrix:vec -1.0 0.0 0.0)
 		     time)
-		    (sb-cga:scale* 10.0 10.0 90.0))))
+		    (cg-matrix:scale* 10.0 10.0 90.0))))
 
       (gl:enable :blend)
       (gl:blend-func :src-alpha :src-alpha)
@@ -111,9 +132,12 @@
   fov)
 
 (defparameter *camera* nil) ;;global camera
-(defparameter *player-matrix* nil) ;;positional information of camera
+(defparameter *player-matrix* (cg-matrix:identity-matrix)) ;;positional information of camera
 (defparameter *clip-distance* (ash 1 7))
 (defparameter *fog-ratio* 0.75)
+(defparameter *up-vector* (cg-matrix:vec 0.0 1.0 0.0))
+(defparameter *projection-view-player-matrix* (cg-matrix:identity-matrix))
+(defparameter *forward* (cg-matrix:vec 1.0 0.0 0.0))
 
 (defun render ()
   (declare (optimize (safety 3) (debug 3)))
@@ -130,9 +154,10 @@
        *clip-distance*))
     
     (set-view-matrix
-     (unit-pitch-yaw (coerce pitch 'single-float)
+     (unit-pitch-yaw *forward*
+		     (coerce pitch 'single-float)
 		     (coerce yaw 'single-float))
-     (sb-cga:vec 0.0 1.0 0.0))
+     *up-vector*)
 
     (set-player-matrix  (coerce xpos 'single-float)
 			(coerce ypos 'single-float)
@@ -148,32 +173,42 @@
    :depth-buffer-bit)
   (gl:viewport 0 0 e:*width* e:*height*)
   (gl:disable :blend)
+  (setf *projection-view-player-matrix*
+	(cg-matrix:%matrix* *projection-view-player-matrix*
+			    *projection-view-matrix*
+			    *player-matrix*))
   (set-matrix
    "projectionmodelview"
-   (sb-cga:transpose-matrix
-    (sb-cga:matrix* *projection-view-matrix* *player-matrix*)))
+   (cg-matrix:%transpose-matrix
+    *temp-matrix*
+    *projection-view-player-matrix*))
   ;;;static geometry with no translation whatsoever
   (draw-chunk-meshes)  
   (progn (when fist?
 	   (set-matrix
 	    "projectionmodelview"
-	    (sb-cga:transpose-matrix
-	       (sb-cga:matrix* *projection-view-matrix* *player-matrix*
-			       (sb-cga:translate* (+ (coerce fist-side-x 'single-float))
-						  (+ (coerce fist-side-y 'single-float))
-						  (+ (coerce fist-side-z 'single-float))))))
-	     
-	     (progn
-	       (gl:disable :cull-face :blend)
-	       (gl:polygon-mode :front-and-back :line)
-	       (ldrawlist :selected-box)
-	       (gl:polygon-mode :front-and-back :fill))))
+	    (cg-matrix:%transpose-matrix
+	     *temp-matrix*
+	     (cg-matrix:%matrix*
+	      *temp-matrix2*
+	      *projection-view-player-matrix*
+	      (cg-matrix:%translate*
+	       *temp-matrix*
+	       (+ (coerce fist-side-x 'single-float))
+	       (+ (coerce fist-side-y 'single-float))
+	       (+ (coerce fist-side-z 'single-float))))))
+	   
+	   (progn
+	     (gl:disable :cull-face :blend)
+	     (gl:polygon-mode :front-and-back :line)
+	     (ldrawlist :selected-box)
+	     (gl:polygon-mode :front-and-back :fill))))
 
   (gl:disable :cull-face)
  
   (luse-shader :solidshader)
   (set-matrix "projectionmodelview"
-		       sb-cga:+identity-matrix+)
+		       cg-matrix:+identity-matrix+)
   (gl:enable :blend)
   (gl:depth-func :always)
   (gl:bind-texture :texture-2d *framebuffer-texture*)
@@ -209,8 +244,6 @@
   (gl:enable :cull-face)
   (gl:cull-face :back)
   (bind-shit :terrain)
-  (progno
-   (gl:read-pixels 0 0 256 256 :rgba :unsigned-byte))
   (name-mesh :world #'draw-world)
   (ldrawlist :world))
 
@@ -257,10 +290,8 @@
   (load-shaders)
   (load-some-images)
   (if vsync?
-      (progn (window::set-vsync t)
-	     (setf render-delay 0))
-      (progn (window::set-vsync nil)
-	     (setf render-delay (if t 0 (/ 1000000.0 59.88)))))
+      (window::set-vsync t)
+      (window::set-vsync nil))
 
   (setf *camera* (make-camera
 		  :xpos 0
@@ -300,7 +331,7 @@
   (set-framebuffer))
 
 (defun set-player-matrix (x y z)
-  (let ((player-matrix (sb-cga:translate* (- x) (- y) (- z))))
+  (let ((player-matrix (cg-matrix:%translate* *player-matrix* (- x) (- y) (- z))))
     (setf *player-matrix* player-matrix)))
 
 (defparameter ourdir

@@ -1,10 +1,5 @@
 (in-package :sandbox)
 
-;;matrix multiplication is associative
-(defparameter *view-matrix* nil) ;;view matrix
-(defparameter *projection-matrix* nil) ;;projection matrix
-(defparameter *projection-view-matrix* nil) ;;projection * view matrix
-
 (defparameter *window-height* nil)
 (defparameter *window-width* nil)
 (defparameter *aspect-ratio* nil)
@@ -97,17 +92,6 @@
     (if the-list
 	(gl:call-list the-list)
 	(print "error"))))
-
-(defun update-projection-view-matrices ()
-  (setf *projection-view-matrix* (sb-cga:matrix* *projection-matrix* *view-matrix*)))
-
-(defun set-projection-matrix (fovy aspect near far)
-  (let ((projection-matrix (projection-matrix fovy aspect near far)))
-    (setf *projection-matrix* projection-matrix)))
-
-(defun set-view-matrix (direction up)
-  (let ((view (relative-lookat direction up)))
-    (setf *view-matrix* view)))
 
 (defun luse-shader (name)
   (use-program (get-shader name)))

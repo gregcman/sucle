@@ -1,9 +1,9 @@
 (in-package :sandbox)
 
 (defmacro vvv (darkness u v x y z)
-  `(progn (gl:vertex-attrib 8 ,darkness)
-	  (gl:vertex-attrib 2 ,u ,v)
-	  (gl:vertex-attrib 0 ,x ,y ,z)))
+  `(progn (%gl:vertex-attrib-1f 8 ,darkness)
+	  (%gl:vertex-attrib-2f 2 ,u ,v)
+	  (%gl:vertex-attrib-3f 0 ,x ,y ,z)))
 
 (defun draw-background ()
   (let ((distance 0.99999997))

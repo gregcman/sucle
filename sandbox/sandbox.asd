@@ -6,9 +6,9 @@
     :licence "???"
 
     :depends-on (#:cl-opengl
-	         #:sb-cga
                  #:window-glfw3
                  
+		 #:cg-matrix
                  #:hook
 		 
 		 #:imagewise

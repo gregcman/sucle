@@ -57,7 +57,7 @@
 	       (case x
 		 (0 (pathwise:byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr"))
 		 (1 (pathwise:byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))
-		 (2 cl-mc-shit::testchunk)))
+ 		 (2 cl-mc-shit::testchunk)))
       x))
 
 (eval-when (:load-toplevel)
