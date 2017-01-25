@@ -15,7 +15,7 @@
                  #:pathwise
 
 		 #:macrology
-                 #:timer
+                 #:timer256
 
 		 #:queue
                  #:world
@@ -50,4 +50,10 @@
      (:file "load-world");;importing nbt data into the game
 
      (:file "test") ;;random tests
+
+     (:file "cons-pool");;so cons cells can be reused
+     (:file "hash");;hash functions for standard data
+     (:file "unique-id-fixnum");;give out number names
+     (:file "string-fixnum");;putting strings into fixnums
+     (:file "zymbol");;"symbols" which are not variables
      ))

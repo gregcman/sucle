@@ -12,30 +12,31 @@
 	      (leheight (getheightlizz thechunk)))
 	  (let ((xscaled (ash x 4))
 		(yscaled (ash y 4)))
-	    (sandbox::flat3-chunk
-	     light
-	     (lambda (x y z b)
-	       (setf (world:getlight x y z) b))
-	     xscaled 0 yscaled)
-	    (sandbox::flat3-chunk
-	     skylight
-	     (lambda (x y z b)
-	       (setf (world:skygetlight x y z) b))
-	     xscaled 0 yscaled)
-	    (sandbox::flat3-chunk
-	     meta
-	     (lambda (x y z b)
-	       (setf (world:getmeta x y z) b))
-	     xscaled 0 yscaled)
-	    (sandbox::flat2-chunk
-	     leheight
-	     (lambda (x y b)
-	       (setf (world::getheight x y) b))
-	     xscaled yscaled)
+	    (progno (sandbox::flat3-chunk
+		     light
+		     (lambda (x y z b)
+		       (setf (world:getlight x y z) b))
+		     xscaled 0 yscaled)
+		    (sandbox::flat3-chunk
+		     skylight
+		     (lambda (x y z b)
+		       (setf (world:skygetlight x y z) b))
+		     xscaled 0 yscaled)
+		    (sandbox::flat3-chunk
+		     meta
+		     (lambda (x y z b)
+		       (setf (world:getmeta x y z) b))
+		     xscaled 0 yscaled)
+		    (sandbox::flat2-chunk
+		     leheight
+		     (lambda (x y b)
+		       (setf (world::getheight x y) b))
+		     xscaled yscaled))
 	    (sandbox::flat3-chunk
 	     blocks
 	     (lambda (x y z b)
-	       (setf  (world:getblock x y z) b))
+	       (unless (zerop b)
+		 (setf  (world:getblock x y z) b)))
 	     xscaled 0 yscaled))))))
 
 (defun flat3-chunk (data setfunc xoffset yoffset zoffset)

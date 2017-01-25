@@ -11,10 +11,11 @@
   (truncate (* int scale)))
 
 (defun fun-setup ()
-  (color-grasses)
   (test-world)
-  (erase-bottom)
-  (goto 16 80 -16))
+  (erase-bottom))
+(progno
+ (color-grasses)
+ (goto 16 80 -16))
 
 (defun erase-bottom ()
   (dobox ((x 0 128) (y 0 64) (z -128 0))
@@ -300,71 +301,11 @@
     (declare (type fixnum c))
     c))
 
-(defstruct (zymbol (:constructor %make-zymbol (name hash)))
-  (name (error "must provide name!") :type (or null (simple-array character (*))))
-  (hash (error "NO") :type fixnum)
-  (value nil :type t))
-
-(defun make-zymbol (string)
-  (declare (type (simple-array character *) string))
-  (let ((hash-value (sxhash string)))
-    (%make-zymbol string hash-value)))
-
-(progn
-  (defun pprint-zymbol (stream zymbol)
-    (pprint-logical-block (stream nil)
-      (format stream "#?~a" (zymbol-name zymbol))))
-  (set-pprint-dispatch 'zymbol 'pprint-zymbol))
-
-(progn
-  (defun question-mark-reader (stream sub-char numarg)
-    (declare (ignore sub-char numarg))
-    (make-zymbol (string (read stream t nil t))))
-  (set-dispatch-macro-character #\# #\? #'question-mark-reader))
-
-(defparameter *all-zymbols* (make-hash-table :test 'equal))
-
-(defun make-zymbol-hash ()
-  (make-hash-table :test 'eq :hash-function (lambda (z) (zymbol-hash z))))
-
 (defun make-cons (num)
   (cons num (sxhash num)))
 
 (defun make-cons-hash ()
   (make-hash-table :test 'eq :hash-function #'cdr))
-
-(defparameter fnv-1a-hash-nums
-  (list 16777619 
-	2166136261
-	1099511628211
-	14695981039346656037))
-
-(defconstant +fnv-offset-basis-64+ 14695981039346656037)
-(defconstant +fnv-offset+ 860922984064492325)
-(defconstant +fnv-prime-64+ 1099511628211)
-(defconstant +fnv-first-64+ (logand most-positive-fixnum (*  +fnv-offset+ +fnv-prime-64+)))
-
-(defun fnv-1a-64bit (num)
-  (declare (values fixnum)
-	   (type fixnum num)
-	   (optimize (speed 3) (safety 0)))
-  (macrolet ((k (body)
-	       `(let ((result ,body))
-		  (setf num (ash num -8))
-		  (logxor (mod num 256)
-			  (sb-vm::*-mod64 +fnv-prime-64+ result))))
-	     (the-start ()
-	       `(logxor +fnv-first-64+ (mod num 256))))
-    (the fixnum
-	 (logand most-positive-fixnum
-		 (k
-		  (k 
-		   (k 
-		    (k 
-		     (k 
-		      (k 
-		       (k 
-			(the-start))))))))))))
 
 
 (defun wtf (num)
@@ -375,231 +316,174 @@
     (declare (type (unsigned-byte 64) a))
     (the fixnum (* a num))))
 
-(eval-when (:load-toplevel :execute :compile-toplevel)
-  (defconstant six-bits-in-a-fixnum (floor (logcount most-positive-fixnum) 6)))
-;;;the amount of alpha-numeric characters one can put into a single
-;;;fixnum on a given machine. turns out to be 11 on 64 bit machines
-;;;and 5 on 32 bit machines.
-;;;passing around alphanumeric strings inside integers
-;;;how convenient
-(defun max-fixnum-string-length ()
-  (floor (log most-positive-fixnum 36)))
-
-(defun fresh-fixnum-string ()
-  (make-array six-bits-in-a-fixnum :element-type 'character :initial-element #\ ))
-
-(defun string-number (string)
-  (let ((correct (fresh-fixnum-string)))
-    (dotimes (x (min (length string) six-bits-in-a-fixnum))
-      (setf (schar correct x) (char-upcase (schar string x))))
-    (values
-     (%string-number correct)
-     correct)))
-
-(defun %string-number (string)
-  (declare (type (simple-array character *)))
-  (let ((num 0)
-	(thash 0))
-    (declare (type fixnum num thash))
-    (dotimes (x six-bits-in-a-fixnum)
-      (incf num (ash (- (char-code (schar string x)) 32) thash))
-      (incf thash 6))
-    num))
-
-(defun number-string (number)
-  (declare (type fixnum number))
-  (let ((string (fresh-fixnum-string)))
-    (declare (type (simple-array character #.six-bits-in-a-fixnum)))
-    (dotimes (x six-bits-in-a-fixnum)
-      (if (zerop number)
-	  (return))
-      (setf (schar string x) (code-char (+ 32 (mod number 64))))
-      (setf number (ash number -6)))
-    string))
-
-;;;;turn a string made of letters, [also a minus sign]
-;;;;and numbers into a fixnum 
-(defun %string-number (string)
-  (logand (parse-integer string :radix 36) most-positive-fixnum))
-
-(defparameter *number-names!* (make-hash-table :test 'equal))
-(defun name-it (string)
-  (setf (gethash string *number-names!*) (string-number string)))
-;;;greg - 782008 lisp - 1004137 
-
-(defun print-number-letters (number)
-  (let ((*print-base* 36))
-    (print number)))
-
-(defun interval (a b)
-  (cons a b))
-
-(defun interval-start (interval)
-  (car interval))
-
-(defun interval-end (interval)
-  (cdr interval))
 
 (declaim (type list *id-free-list*))
 (defparameter *id-free-list* (list nil))
 
-(let ((free-cons-cells nil))
-  (defun recycle-cons-cell (cell)
-    (rplaca (rplacd cell free-cons-cells) 0)
-    (setf free-cons-cells cell))
-  (defun cons-free-list ()
-    free-cons-cells)
-  (defun conz (ze1 ze2)
-    (if free-cons-cells
-	(let ((cell free-cons-cells))
-	  (setf free-cons-cells (cdr free-cons-cells))
-	  (rplaca (rplacd cell ze2) ze1))
-	(cons ze1 ze2))))
+(defun swap (a b vector)
+  (rotatef (aref vector a) (aref vector b)))
 
-;;;the free list is a list with nil as the car.
-;;;the first nil is not modified, only the cdr.
-;;;intervals are [] inclusive on both ends.
-;;;ex: (2 . 2) means [2 , 2] which is just a point.
+(defun scramblehash (hash)
+  (let ((keys (make-array 0 :adjustable t :fill-pointer 0))
+	(values (make-array 0 :adjustable t :fill-pointer 0)))
+    (maphash (lambda (k v) (vector-push-extend k keys) (vector-push-extend v values)) hash)
+    (let ((tot (length keys)))
+      (dotimes (x (* tot 10))
+	(swap (random tot) (random tot) keys)))
+    (dotimes (x (length keys))
+      (setf (gethash (vector-pop keys) hash) (vector-pop values)))))
 
-;;;create a fresh free-list for the ids
-(defun fresh-id-free-list ()
-  (cons nil (list (cons 0 most-positive-fixnum))))
+(defmacro nif (test-form else if)
+  `(if ,test-form
+       ,if
+       ,else))
 
-;;;"use" an id - removing it from the free list
-(defun id-use (n free)
-  (declare (type fixnum n)
-	   (type list free))
-  (let ((nextcdr (cdr free)))
-    (declare (type list nextcdr))
-    (when nextcdr
-      (tagbody
-       rep
-	 (let ((cell (car nextcdr)))
-	   (let ((start (car cell))
-		 (end (cdr cell)))
-	     (declare (type fixnum start end))
-	     (if (<= start n) ;;if n is behind, its over because start will only increase
-		 (when (<= n end) ;;if it lies between inclusive, check
-		   (if (= start n)
-		       (progn
-			 (if (= start end)
-			     (setf (cdr free) (cdr nextcdr))
-			     (setf (car cell) (the fixnum (1+ start)))))
-		       (if (= end n) ;;n is greater than start
-			   (progn
-			     (if (= start end)
-				 (setf (cdr free) (cdr nextcdr))
-				 (setf (cdr cell) (the fixnum (1- end)))))
-			   (progn ;;n is between start and end exclusive
-			     (setf (car cell) (the fixnum (1+ n)))
-			     (setf (cdr free)
-				   (cons (cons start (the fixnum (1- n))) nextcdr)))))
-		   (return-from id-use n))
-		 (go end))))
-	 (setf free nextcdr)
-	 (setf nextcdr (cdr nextcdr))
-	 (when nextcdr (go rep))
-       end))))
+(defun remove-empty-chunks ()
+  (maphash (lambda (k v)
+	     (when (all-zeroes-p v)
+	       (remhash k world:chunkhash)))
+	   world:chunkhash))
 
-;;;return an unused id, which is just the lower bound of the smallest interval.
-;;;does not modify the free list
-(defun id-allocate (free)
-  (let ((first-cons (first (cdr free))))
-    (car first-cons)))
+(defun wtf-increment ()
+  (maphash (lambda (k v)
+	     (nreverse v))
+	   world:chunkhash))
 
-;;;determine whether or not a specific id is available - unused
-(defun id-unused-p (n free)
-  (declare (type fixnum n))
-  (dolist (cell (cdr free))
-    (let ((start (car cell))
-	  (end (cdr cell)))
-      (declare (type fixnum start end))
-      (if (<= start n) 
-	  (when (<= n end)
-	    (return t))
-	  (return nil))))) ;;already past intervals which could contain n
+(defun wtf-reverse ()
+  (maphash (lambda (k v)
+	     (map-into v #'1+ v))
+	   world:chunkhash))
 
-;;;unuse an id, putting it back into the free list
-;;;four scenarios can occur:
-;;;a one-hole gap, which merges two intervals - remove a cons cell
-;;;attach to the start of an interval - change car value to "n"
-;;;attach to the end of an interval - change cdr value "n"
-;;;not touch any interval - insert a (cons n n)
-(defun id-free (n freelist)
-  (declare (type fixnum n))
-  (let ((n-1 (1- n)))
-    (declare (type fixnum n-1))
-    (let ((tail (cdr freelist)))
-      (if tail ;;;when all the ids have been used ---
-	  (let ((cell (car tail)))
-	    (let ((first-start (car cell)))
-	      (declare (type fixnum first-start))
-	      (when (< n first-start)
-		(if (= n (1- first-start))
-		    (setf (car cell) n) ;;;extend downwards
-		    (setf (cdr freelist) (cons (cons n n) tail))) ;;;push new interval
-		(return-from id-free t)))
-	;;;initial test over, looping between consecutive cells begins
-	    (let ((next-tail (cdr tail)))
-	      (if next-tail
-		  (let* ((next-cell (car next-tail))
-			 (left (cdr cell)) ;;the most of the lower interval
-			 (right (car next-cell))) ;;the least of the greater interval
-		    (declare (type fixnum left right))
-		    (tagbody
-		     rep
-		       (if (<= n left) ;;it is is equal or less than its not valid
-			   (return-from id-free nil)
-			   (let ((merge-bottom (= left n-1)) ;;whether to merge lower
-				 (merge-top (= (1- right) n))) ;;whether to merge higher
-			     (if merge-top
-				 (if merge-bottom
-				     (progn
-				       (setf (cdr tail) (cdr next-tail))
-				       ;;remove the second interval
-				       (setf (cdr cell) (cdr next-cell))
-				       ;;combine first interval into a big one
-				       (return-from id-free t))
-				     (progn
-				       (setf (car next-cell) n)
-				       ;;lower the top interval
-				       (return-from id-free t)))
-				 (if merge-bottom
-				     (progn
-				       (setf (cdr cell) n)
-				       ;;raise the bottom interval
-				       (return-from id-free t))
-				     (when (< n right)
-				       ;;when its between but there is no merge, create another interval
-				       (setf (cdr tail) (cons (cons n n) next-tail))
-				       (return-from id-free t))))))
+(defun wtf-reverse ()
+  (maphash (lambda (k v)
+	     (map-into v (lambda (x y) (max x y)) v (reverse v)))
+	   world:chunkhash))
 
-		       (let ((new-next (cdr next-tail)))
-			 (when new-next ;;if it is nil then there is no cell to check
-			   (setf tail next-tail
-				 next-tail new-next
-				 cell next-cell 
-				 next-cell (car next-tail)
-				 left (cdr cell)
-				 right (car next-cell))
-			   (go rep)))
+(defun wtf-fill ()
+  (maphash (lambda (k v)
+	     (fill v 1))
+	   world:chunkhash))
 
-	     ;;;;looping between two cells over
-		       (let ((last-end (cdr next-cell)))
-			 (declare (type fixnum last-end))
-			 (when (< last-end n)
-			   (if (= n-1 last-end)
-			       (setf (cdr next-cell) n) ;;extend the last interval ever
-			       (setf (cdr next-tail) (cons (cons n n) nil))) ;;make another
-			   (return-from id-free t)))))
-	      ;;;when there is only one interval and it is short of the most positive fixnum
-		  (let ((first-end (cdr cell)))
-		    (declare (type fixnum first-end))
-		    (when (< first-end n)
-		      (if (= n-1 first-end)
-			  (setf (cdr cell) n) ;;extend the last interval ever
-			  (setf (cdr tail) (cons (cons n n) nil))) ;;make another
-		      (return-from id-free t))))))  
-	  (setf (cdr freelist) (cons (cons n n) nil)))))
-  (return-from id-free nil))
+(defun wtf-squared ()
+  (maphash (lambda (k v)
+	     (map-into v (lambda (x)
+			   (let ((ans (mod (* x 2) 95)))
+			     (if (aref mc-blocks::renderasnormalblock ans)
+				 ans
+				 1))) v))
+	   world:chunkhash))
 
+(defun all-zeroes-p (sequence)
+  (dotimes (x (length sequence))
+    (unless (zerop (aref sequence x))
+      (return-from all-zeroes-p nil)))
+  t)
+
+(defun test= (a b)
+  (declare (type symbol a b)
+	   (optimize (speed 3) (safety 0)))
+  (eq a b))
+
+(defparameter *save* #P"second/")
+
+(defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
+
+(defun save (filename &rest things)
+  (let ((path (merge-pathnames filename *saves-dir*)))
+    (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
+      (dolist (thing things)
+	(print thing stream)))))
+
+(defun save2 (thingfilename &rest things)
+  (apply #'save (merge-pathnames (format nil "~s" thingfilename) *save*) things))
+
+(defun savechunk (position)
+  (let ((position-list (multiple-value-list (world:unhashfunc position))))
+    (save2 position-list
+	   (gethash position world:chunkhash)
+	   (gethash position world:lighthash)
+	   (gethash position world:skylighthash))))
+
+(defun save-world ()
+  (maphash (lambda (k v)
+	     (declare (ignorable v))
+	     (savechunk k))
+	   world:chunkhash))
+
+(defun looad-world ()
+  (let ((files (uiop:directory-files (merge-pathnames *save* *saves-dir*))))
+    (dolist (file files)
+      (loadchunk (apply #'world:chunkhashfunc (read-from-string (pathname-name file)))))))
+
+(defun myload2 (thingfilename)
+  (myload (merge-pathnames (format nil "~s" thingfilename) *save*)))
+
+(defun myload (filename)
+  (let ((path (merge-pathnames filename *saves-dir*)))
+    (let ((things nil))
+      (with-open-file (stream path :direction :input :if-does-not-exist nil)
+	(tagbody rep
+	   (let ((thing (read stream nil nil)))
+	     (when thing
+	       (push thing things)
+	       (go rep)))))
+      (nreverse things))))
+
+(defun loadchunk (position)
+  (let ((position-list (multiple-value-list (world:unhashfunc position))))
+    (let ((data (myload2 position-list)))
+      (when data 
+	(destructuring-bind (blocks light sky) data
+	  (setf (gethash position world:chunkhash) (coerce blocks '(simple-array (unsigned-byte 8) (*))))
+	  (setf (gethash position world:lighthash) (coerce light '(simple-array (unsigned-byte 4) (*))))
+	  (setf (gethash position world:skylighthash) (coerce sky '(simple-array (unsigned-byte 4) (*)))))
+	(return-from loadchunk t)))))
+
+(defun simple-relight ()
+  (dobox ((x 0 128)
+	  (y 64 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   ;(unless (zerop blockid))
+	   (plain-setblock x y z blockid 0 0)))
+  (dobox ((x 0 128)
+	  (y 128 129)
+	  (z -128 0))
+	 (sky-light-node x y z)))
+
+(defun edge-bench ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (unless (zerop blockid)
+	     (when (= 4 (neighbors x y z))
+	       (plain-setblock x y z 58 0 0))))))
+
+(defun corner-obsidian ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (unless (zerop blockid)
+	     (when (= 3 (neighbors x y z))
+	       (plain-setblock x y z 49 0 0))))))
+
+(defun stone? ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (when (= 1 blockid)
+	     (when (> 4 (neighbors x y z))
+	       (plain-setblock x y z 0 0 0))))))
+
+(defun what? ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (setblock-with-update x y z blockid 0))))
+
+(defun meh ()
+  (goto 64 128 -64))

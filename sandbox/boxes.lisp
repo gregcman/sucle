@@ -22,6 +22,16 @@
    :maxy 0.12
    :maxz 0.3))
 
+(defparameter player-aabb+1 (player-aabb+1))
+(defun player-aabb+1 ()
+  (aabbcc::make-aabb
+   :minx -0.3
+   :miny -0.5
+   :minz -0.3
+   :maxx 0.3
+   :maxy 1.12
+   :maxz 0.3))
+
 ;;;a very small cubic fist
 (defun fist-aabb ()
   (aabbcc::make-aabb

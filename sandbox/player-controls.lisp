@@ -210,7 +210,7 @@
 	 (setblock-with-update (floor fistx)
 			       (floor fisty)
 			       (floor fistz)
-			       5
+			       *hotbar-selection*
 			       0)))))
   (collide-with-world)
   (if fly
@@ -243,18 +243,8 @@
       (let ((vx (- (* reach avx)))
 	    (vy (- (* reach avy)))
 	    (vz (- (* reach avz))))
-	(mvb (frac type blockx blocky blockz)
-	     (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
-	     (if frac
-		 (setf fist? t
-		       fist-side type
-		       fist-side-x blockx
-		       fist-side-y blocky
-		       fist-side-z blockz
-		       fistx (+ *xpos* (* frac vx))
-		       fisty (+ *ypos* (* frac vy))
-		       fistz (+ *zpos* (* frac vz)))
-		 (setf fist? nil)))))))
+	(funcall *fist-function* vx vy vz)
+	(standard-fist vx vy vz)))))
 
 
 (defun collide-with-world ()
@@ -271,6 +261,30 @@
       (setf *xvel* x)
       (setf *yvel* y)
       (setf *zvel* z))))
+
+(defparameter *fist-function* (constantly nil))
+
+(defun big-swing-fist (vx vy vz)
+  (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 10 vx) (* 10 vy) (* 10 vz)
+		       player-aabb+1
+		       (lambda (x y z)
+			 (when (and (window:mice-locked-p) (e:mice-p :left))
+			   
+			   (setblock-with-update x y z 0 0)))))
+
+(defun standard-fist (vx vy vz)
+  (mvb (frac type blockx blocky blockz)
+       (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
+       (if frac
+	   (setf fist? t
+		 fist-side type
+		 fist-side-x blockx
+		 fist-side-y blocky
+		 fist-side-z blockz
+		 fistx (+ *xpos* (* frac vx))
+		 fisty (+ *ypos* (* frac vy))
+		 fistz (+ *zpos* (* frac vz)))
+	   (setf fist? nil))))
 
 (defun punch-func (px py pz vx vy vz)
   (let ((tot-min 2)

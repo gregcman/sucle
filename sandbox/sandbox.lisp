@@ -37,6 +37,7 @@
     (unless voxel-world-setup?
       (setf voxel-world-setup? t)
       (world-setup))
+    (clean-dirty)
     (glinnit) ;opengl
     (physinnit) ;physics
     (funcall handoff-four))
@@ -69,8 +70,7 @@
     (injection)))
 
 (defparameter tick-delay nil)
-(defparameter voxel-world-setup? nil)
+(defvar voxel-world-setup? nil)
 
 (defun world-setup ()
-  (clean-dirty)
   (world:setup-hashes))
