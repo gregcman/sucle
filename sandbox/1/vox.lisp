@@ -1,3 +1,6 @@
+(defpackage #:vox
+  (:use #:cl))
+
 ;;;;create a data structure to store chunks which in turn store voxels
 ;;;;or some sort of three dimensional data
 ;;;;Currently implemented by a hash table filled with arrays.

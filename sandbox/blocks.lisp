@@ -1,3 +1,6 @@
+(defpackage #:mc-blocks
+  (:use #:cl))
+
 (in-package :mc-blocks)
 
 ;;the number of different types of blocks in the world. its 8 bit

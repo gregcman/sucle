@@ -359,6 +359,11 @@
 	     (map-into v (lambda (x y) (max x y)) v (reverse v)))
 	   world:chunkhash))
 
+(defun wtf-reverse ()
+  (maphash (lambda (k v)
+	     (map-into v (lambda (x) (if (zerop x) 1 x)) v ))
+	   world:chunkhash))
+
 (defun wtf-fill ()
   (maphash (lambda (k v)
 	     (fill v 1))
@@ -384,7 +389,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* #P"second/")
+(defparameter *save* #P"first/")
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -484,6 +489,15 @@
 	  (z -128 0))
 	 (let ((blockid (world:getblock x y z)))
 	   (setblock-with-update x y z blockid 0))))
+
+(defun clearblock? (id)
+  (declare (type fixnum id))
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (when (= blockid id)
+	     (plain-setblock x y z 0 0)))))
 
 (defun meh ()
   (goto 64 128 -64))

@@ -45,7 +45,6 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute) 
   (defun handoff-four ()
-    (setf rendertimer (timer:timer))  
     (unwind-protect (hairy-programs)
       (cleanup)))
   (setf handoff-four #'handoff-four))

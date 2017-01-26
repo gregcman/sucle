@@ -200,7 +200,7 @@
     (controls)
     (progn
      (when fist?
-       (when (or (e:key-p :q) (e:mice-j-p :left))
+       (when (or (e:key-j-p :q) (e:mice-j-p :left))
 	 (setblock-with-update fist-side-x
 			       fist-side-y
 			       fist-side-z
@@ -213,6 +213,7 @@
 			       *hotbar-selection*
 			       0)))))
   (collide-with-world)
+  
   (if fly
       (progn
 	(setf *xvel* (* *xvel* air-friction))
@@ -269,8 +270,10 @@
 		       player-aabb+1
 		       (lambda (x y z)
 			 (when (and (window:mice-locked-p) (e:mice-p :left))
-			   
-			   (setblock-with-update x y z 0 0)))))
+			   (when (and (<= 0 x 127)
+				      (<= 0 y 127)
+				      (<= -128 z -1)) 
+			       (setblock-with-update x y z 0 (aref mc-blocks::lightvalue 35)))))))
 
 (defun standard-fist (vx vy vz)
   (mvb (frac type blockx blocky blockz)

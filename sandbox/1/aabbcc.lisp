@@ -1,5 +1,6 @@
 ;;;; aabbcc.lisp
-
+(defpackage #:aabbcc
+  (:use #:cl))
 (in-package #:aabbcc)
 
 

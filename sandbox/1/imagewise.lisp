@@ -1,3 +1,11 @@
+(defpackage #:imagewise
+  (:use #:cl)
+  (:export
+
+   #:array-flatten
+   #:getapixel
+   #:flip-image
+   #:load-png))
 (in-package :imagewise)
 
 ;;;;Tools for the manipulation of images stored as arrays of rank 3

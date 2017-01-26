@@ -1,3 +1,12 @@
+(defpackage #:pathwise
+  (:use #:cl)
+  (:export
+
+   #:file-string
+   #:byte-read
+   #:expand-paths))
+
+
 (in-package :pathwise)
 
 ;;;load a file into a string

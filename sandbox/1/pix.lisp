@@ -1,3 +1,7 @@
+(defpackage #:pix
+  (:use #:cl)
+  (:export))
+
 (in-package :pix)
 
 (declaim (inline plus2^30 minus2^30))
