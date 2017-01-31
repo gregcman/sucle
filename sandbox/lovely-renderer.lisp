@@ -6,7 +6,6 @@
 
 (progn
   (defparameter *g/call-list* (make-hash-table :test 'eq));;opengl call lists
-  (hook:add-hook init-hook :call-list (lambda () (clrhash *g/call-list*)))
   (defun get-display-list (name)
     (let ((display-list (gethash name *g/call-list*)))
       (if display-list
@@ -27,7 +26,6 @@
 
 (progn
   (defparameter *g/texture* (make-hash-table :test 'eq)) ;;opengl textures
-  (hook:add-hook init-hook :texture (lambda () (clrhash *g/texture*)))
   (defun get-texture (name)
     (let ((texture (gethash name *g/texture*)))
       (if texture
@@ -48,7 +46,6 @@
 
 (progn
   (defparameter *g/shader* (make-hash-table :test 'eq)) ;;opengl shaders
-  (hook:add-hook init-hook :shader (lambda () (clrhash *g/shader*)))
   (defun get-shader (name)
     (let ((shader-prog (gethash name *g/shader*)))
       (if shader-prog

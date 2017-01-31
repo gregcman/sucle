@@ -43,5 +43,7 @@
 	  (aref result 2) (* cos-pitch (sin yaw))))
   result)
 
-
+(defparameter *fixnum-compare*
+  #+sbcl 'eq
+  #-sbcl 'eql)
 

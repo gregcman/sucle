@@ -112,9 +112,8 @@
   (if *mousepress-hash* 
       (clrhash *mousepress-hash*)
       (setf *mousepress-hash* (make-hash-table :test 'eq)))
-  (setq status nil)
-  (setq mousecapturestate nil)
-  (sb-int:set-floating-point-modes :traps nil))
+  (setq *status* nil)
+  #+sbcl (sb-int:set-floating-point-modes :traps nil))
 
 (defun poll ()
   (setf *scroll-x* 0.0
@@ -124,28 +123,20 @@
   (step-hash *mousepress-hash*)
   (glfw:poll-events))
 
-(defun opengl-main-thread-p ()
-  (or
-   #+darwin t
-   ))
 
 (defun get-proc-address ()
   #'glfw:get-proc-address)
 
 ;;Graphics calls on OS X must occur in the main thread
 (defun wrapper (func)
-  (flet ((wrap ()
-	   (glfw:with-init-window (:title ""
-				   :width 1 :height 1
-				   :resizable t)
-	     (glfw:set-mouse-button-callback 'mouse-callback)
-	     (glfw:set-key-callback 'key-callback)
-	     (glfw:set-scroll-callback 'scroll-callback)
-	     (glfw:set-window-size-callback 'update-viewport)
-	     (funcall func))))
-    (if (opengl-main-thread-p)
-	(trivial-main-thread:with-body-in-main-thread () (wrap))
-	(wrap))))
+  (glfw:with-init
+    (window:init)
+    (glfw:with-window (:title "" :width 1 :height 1 :resizable nil)
+      (glfw:set-mouse-button-callback 'mouse-callback)
+      (glfw:set-key-callback 'key-callback)
+      (glfw:set-scroll-callback 'scroll-callback)
+      (glfw:set-window-size-callback 'update-viewport)
+      (funcall func))))
 
 (defun get-mouse-out ()
   (glfw:set-input-mode :cursor :normal))

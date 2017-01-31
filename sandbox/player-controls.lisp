@@ -159,8 +159,12 @@
 (defparameter daytime 1.0)
 (defparameter ticks/sec nil)
 (defparameter tickscale nil)
+(defparameter tick-delay nil)
+
+(world:setup-hashes)
 
 (defun physinnit ()
+  (clean-dirty)
   (setf ticks/sec 60.0)
   (setf tickscale (/ 20.0 ticks/sec))
   (setf tick-delay (/ 1000000.0 ticks/sec)))
@@ -168,8 +172,6 @@
 (defparameter net-scroll 0)
 
 (defun physics ()
-  ;;escape to quitx
-  (when (e:key-p :ESCAPE) (setq alivep nil))  
   ;;e to escape mouse
   (when (e:key-j-p :E) (window:toggle-mouse-capture))
   (hotbar-add e:*scroll-y*)
@@ -198,20 +200,21 @@
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
     (controls)
-    (progn
-     (when fist?
-       (when (or (e:key-j-p :q) (e:mice-j-p :left))
-	 (setblock-with-update fist-side-x
-			       fist-side-y
-			       fist-side-z
-			       0
-			       0))
-       (when (e:mice-j-p :right)
-	 (setblock-with-update (floor fistx)
-			       (floor fisty)
-			       (floor fistz)
-			       *hotbar-selection*
-			       0)))))
+    (let ((blockval (+ 89 *hotbar-selection*)))
+      (progn
+	(when fist?
+	  (when (e:mice-j-p :left)
+	    (setblock-with-update fist-side-x
+				  fist-side-y
+				  fist-side-z
+				  0
+				  0))
+	  (when (e:mice-j-p :right)
+	    (setblock-with-update (floor fistx)
+				  (floor fisty)
+				  (floor fistz)
+				  blockval
+				  (aref mc-blocks::lightvalue blockval)))))))
   (collide-with-world)
   
   (if fly
@@ -244,7 +247,7 @@
       (let ((vx (- (* reach avx)))
 	    (vy (- (* reach avy)))
 	    (vz (- (* reach avz))))
-	(funcall *fist-function* vx vy vz)
+	(big-swing-fist vx vy vz)
 	(standard-fist vx vy vz)))))
 
 
@@ -266,14 +269,14 @@
 (defparameter *fist-function* (constantly nil))
 
 (defun big-swing-fist (vx vy vz)
-  (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 10 vx) (* 10 vy) (* 10 vz)
-		       player-aabb+1
-		       (lambda (x y z)
-			 (when (and (window:mice-locked-p) (e:mice-p :left))
+  (when (and (window:mice-locked-p) (e:key-p :q))
+    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 10 vx) (* 10 vy) (* 10 vz)
+			 chunk-aabb
+			 (lambda (x y z)
 			   (when (and (<= 0 x 127)
 				      (<= 0 y 127)
 				      (<= -128 z -1)) 
-			       (setblock-with-update x y z 0 (aref mc-blocks::lightvalue 35)))))))
+			     (setblock-with-update x y z 0 (aref mc-blocks::lightvalue 0)))))))
 
 (defun standard-fist (vx vy vz)
   (mvb (frac type blockx blocky blockz)
@@ -473,3 +476,12 @@
 		      (when (minusp total) (go end))
 		      (go rep)))
 	     end)))))))
+
+(defun distance-to-player (x y z)
+  (let ((dx (- *xpos* x))
+	(dy (- *ypos* y))
+	(dz (- *zpos* z)))
+    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
+
+(defun player-pos ()
+  (world:chunkhashfunc (truncate *xpos*) (truncate *zpos*) (truncate *ypos*)))

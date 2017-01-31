@@ -57,27 +57,26 @@
 
 (defun getmeshersfinishedshit ()
   (multiple-value-bind (shape len coords) (sb-thread:join-thread mesher-thread)
-    (if coords
-	(if shape
-	    (let ((old-call-list (get-chunk-display-list coords)))
-	      (let ((new (shape-list shape len)))
-		(if new
-		    (set-chunk-display-list coords new)
-		    (remove-chunk-display-list coords)))
-	      (when old-call-list (gl:delete-lists old-call-list 1))
-	      (let ((old-world (get-display-list :world)))
-		(remove-display-list :world)
-		(when old-world (gl:delete-lists old-world 1))))
-	    (dirty-push coords))))
+    (when coords
+      (when shape
+	(let ((old-call-list (get-chunk-display-list coords)))
+	  (let ((new (shape-list shape len)))
+	    (if new
+		(set-chunk-display-list coords new)
+		(remove-chunk-display-list coords)))
+	  (when old-call-list (gl:delete-lists old-call-list 1))
+	  (let ((old-world (get-display-list :world)))
+	    (remove-display-list :world)
+	    (when old-world (gl:delete-lists old-world 1)))))))
   (setf mesher-thread nil))
 
 (defun mesherthreadbusy ()
   (not (or (eq nil mesher-thread)
-	   (not (sb-thread:thread-alive-p mesher-thread)))))
+	   (not (bordeaux-threads:thread-alive-p mesher-thread)))))
 
 (defun giveworktomesherThread (thechunk)
   (setf mesher-thread
-	(sb-thread:make-thread
+	(bordeaux-threads:make-thread
 	 (lambda ()
 	   (sb-thread:return-from-thread
 	    (chunk-shape thechunk))))))

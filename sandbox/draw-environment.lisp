@@ -20,54 +20,6 @@
   (let ((view (relative-lookat *view-matrix* direction up)))
     (setf *view-matrix* view)))
 
-(defun name-mesh (display-list-name mesh-func)
-  (setf (gethash display-list-name *g/call-list-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (create-call-list-from-func mesh-func))))
-
-(defun name-funcs ()
-  (name-mesh :skybox #'draw-skybox)
-  (name-mesh :sun #'draw-sun)
-  (name-mesh :moon #'draw-moon)
-  (name-mesh :selected-box
-	     (l () (let ((foo 0.005))
-		     (let ((min (- 0.0 foo))
-			   (max (+ 1.0 foo)))
-		       (draw-box min min min max max max)))))
-  (name-mesh :background #'draw-background)
-  (name-mesh :crosshair #'mesh-crosshair)
-  (name-mesh :gui #'draw-hotbar)
-  (name-mesh :hotbar-selector #'draw-hotbar-selector))
-
-(defun texture-imagery (texture-name image-name)
-  (setf (gethash texture-name *g/texture-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (pic-texture (get-image image-name)))))
-
-(defun texture-imageries ()
-  (texture-imagery :terrain "terrain.png")
-  (texture-imagery :skybox "skybox/cheap.png")
-  (texture-imagery :sun "terrain/sun.png")
-  (texture-imagery :moon "terrain/moon.png")
-  (texture-imagery :gui "gui/gui.png"))
-
-(defun name-shader (shader-name vs fs attributes)
-  (setf (gethash shader-name *g/shader-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (make-shader-program-from-strings
-	   (get-text vs) (get-text fs) attributes))))
-
-(defun name-shaders ()
-  (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
-					      ("texCoord" . 2)
-					      ("darkness" . 8)))
-  (name-shader :solidshader :ss-vs :ss-frag '(("position" . 0)
-					      ("texCoord" . 2)
-					      ("darkness" . 8))))
-
 
 (defun draw-sky ()
   (progn
@@ -100,6 +52,7 @@
 
 (defparameter *crosshair-size* 20.0)
 (defparameter *hotbar-box-size* (* 22 4))
+(defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
 
 (defun fractionalize (x)
   (clamp x 0.0 1.0))
@@ -109,8 +62,10 @@
 	(y (fractionalize (* time 0.8)))
 	(z (fractionalize (* time 1.0))))
     (gl:clear-color x y z 1.0)
-    (set-vec3 "fogcolor"
-		       (vector x y z))
+    (setf (aref *avector* 0) x
+	  (aref *avector* 1) y
+	  (aref *avector* 2) z)
+    (set-vec3 "fogcolor" *avector*)
     (set-float "foglet" (/ -1.0 *clip-distance* *fog-ratio*))
     (set-float "aratio" (/ 1.0 *fog-ratio*))))
 
@@ -256,7 +211,6 @@
 
 (progn
   (defparameter *g/chunk-call-list* (make-hash-table :test 'eq));;opengl call lists
-  (hook:add-hook init-hook :chunk-call-list (lambda () (clrhash *g/chunk-call-list*)))
   (defun get-chunk-display-list (name)
     (gethash name *g/chunk-call-list*))
   (defun set-chunk-display-list (name list-num)
@@ -279,6 +233,9 @@
 (defparameter vsync? t)
 
 (defun glinnit ()
+  (let ((width (if t 480 854))
+	(height (if t 360 480)))
+    (window:push-dimensions width height))
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (setf e:*resize-hook* #'on-resize)
   (set-framebuffer)
@@ -305,17 +262,15 @@
 		  :fov 70))
   
   (setf *shader-program* nil)
-  (setf mesher-thread nil)
-  (update-world-vao))
+  (setf mesher-thread nil))
 
-(defun set-render-cam-pos (millisecs)
-  (let ((multiplier (/ millisecs tick-delay)))
-    (setf (camera-xpos *camera*) (+ *xpos* (* multiplier *xvel*))
-	  (camera-ypos *camera*) (+ *ypos* (* multiplier *yvel*))
-	  (camera-zpos *camera*) (+ *zpos* (* multiplier *zvel*))
-	  (camera-pitch *camera*) *pitch*
-	  (camera-yaw *camera*) *yaw*
-	  (camera-fov *camera*) defaultfov)))
+(defun set-render-cam-pos ()
+  (setf (camera-xpos *camera*) *xpos* 
+	(camera-ypos *camera*) *ypos* 
+	(camera-zpos *camera*) *zpos* 
+	(camera-pitch *camera*) *pitch*
+	(camera-yaw *camera*) *yaw*
+	(camera-fov *camera*) defaultfov))
 
 (defun set-render-cam-look ()
   (setf (camera-pitch *camera*) *pitch*
@@ -349,19 +304,24 @@
 (defun img-path (name)
   (merge-pathnames name dir-mc-assets))
 
-(defun load-shaders ()
-  (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
-  (src-text :bs-frag (shader-path "blockshader/basictexcoord.frag"))
-  (src-text :ss-vs (shader-path "solidshader/transforms.vs"))
-  (src-text :ss-frag (shader-path "solidshader/basictexcoord.frag")))
+(defun name-mesh (display-list-name mesh-func)
+  (setf (gethash display-list-name *g/call-list-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (create-call-list-from-func mesh-func))))
 
-(defun load-some-images ()
-  (src-image "gui/gui.png" (img-path #P"gui/gui.png"))
-  (src-image "misc/grasscolor.png" (img-path #P"misc/grasscolor.png"))
-  (src-image "skybox/cheap.png" (img-path #P"skybox/cheap.png"))
-  (src-image "terrain/sun.png" (img-path #P"terrain/sun.png"))
-  (src-image "terrain/moon.png" (img-path #P"terrain/moon.png"))
-  (src-image "terrain.png" (img-path #P"terrain.png")))
+(defun texture-imagery (texture-name image-name)
+  (setf (gethash texture-name *g/texture-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (pic-texture (get-image image-name)))))
+
+(defun name-shader (shader-name vs fs attributes)
+  (setf (gethash shader-name *g/shader-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (make-shader-program-from-strings
+	   (get-text vs) (get-text fs) attributes))))
 
 (defun src-image (name src-path)
   (setf (gethash name *g/image-backup*)
@@ -375,4 +335,45 @@
   (setf (gethash name *g/text-backup*)
 	(lambda (&optional name)
 	  (declare (ignorable name))
-	  (pathwise:file-string src-path))))
+	  (file-string src-path))))
+
+(defun load-some-images ()
+  (src-image "gui/gui.png" (img-path #P"gui/gui.png"))
+  (src-image "misc/grasscolor.png" (img-path #P"misc/grasscolor.png"))
+  (src-image "skybox/cheap.png" (img-path #P"skybox/cheap.png"))
+  (src-image "terrain/sun.png" (img-path #P"terrain/sun.png"))
+  (src-image "terrain/moon.png" (img-path #P"terrain/moon.png"))
+  (src-image "terrain.png" (img-path #P"terrain.png")))
+
+(defun texture-imageries ()
+  (texture-imagery :terrain "terrain.png")
+  (texture-imagery :skybox "skybox/cheap.png")
+  (texture-imagery :sun "terrain/sun.png")
+  (texture-imagery :moon "terrain/moon.png")
+  (texture-imagery :gui "gui/gui.png"))
+(defun name-shaders ()
+  (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
+					      ("texCoord" . 2)
+					      ("darkness" . 8)))
+  (name-shader :solidshader :ss-vs :ss-frag '(("position" . 0)
+					      ("texCoord" . 2)
+					      ("darkness" . 8))))
+(defun name-funcs ()
+  (name-mesh :skybox #'draw-skybox)
+  (name-mesh :sun #'draw-sun)
+  (name-mesh :moon #'draw-moon)
+  (name-mesh :selected-box
+	     (l () (let ((foo 0.005))
+		     (let ((min (- 0.0 foo))
+			   (max (+ 1.0 foo)))
+		       (draw-box min min min max max max)))))
+  (name-mesh :background #'draw-background)
+  (name-mesh :crosshair #'mesh-crosshair)
+  (name-mesh :gui #'draw-hotbar)
+  (name-mesh :hotbar-selector #'draw-hotbar-selector))
+
+(defun load-shaders ()
+  (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
+  (src-text :bs-frag (shader-path "blockshader/basictexcoord.frag"))
+  (src-text :ss-vs (shader-path "solidshader/transforms.vs"))
+  (src-text :ss-frag (shader-path "solidshader/basictexcoord.frag")))

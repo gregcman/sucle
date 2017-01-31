@@ -3,8 +3,7 @@
   :author "Gregorio Manabat"
   :maintainer "Gregorio Manabat"
 
-  :depends-on (#:cl-glfw3
-	       #:trivial-main-thread)
+  :depends-on (#:cl-glfw3)
 
   :serial t
   :components  

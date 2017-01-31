@@ -30,6 +30,16 @@
    :maxx 0.3
    :maxy 1.12
    :maxz 0.3))
+
+(defun chunk-aabb ()
+  (aabbcc::make-aabb
+   :minx -8.0
+   :miny -8.0
+   :minz -8.0
+   :maxx 8.0
+   :maxy 8.0
+   :maxz 8.0))
+(defparameter chunk-aabb (chunk-aabb))
 (defparameter player-aabb+1 (player-aabb+1))
 
 ;;;a very small cubic fist

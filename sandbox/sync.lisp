@@ -2,12 +2,32 @@
 
 ;;;;keeping track of the changes to the world
 (defparameter dirtychunks nil)
+(defparameter *dirty-chunks* nil)
 (defun clean-dirty ()
-  (setf dirtychunks (q::make-uniq-q)))
+  (setf dirtychunks (q:make-uniq-q))
+  ;(setf dirtychunks (pileup:make-heap #'< :name "dirty chunks" :key #'car))
+  ;(setf *dirty-chunks* (make-hash-table :test *fixnum-compare*))
+  )
 (defun dirty-pop ()
-  (q::uniq-pop dirtychunks))
+  (progno
+   (let ((value (pileup:heap-pop dirtychunks)))
+     (let ((ans (cdr value)))
+       (when ans
+	 (recycle-cons-cell value)
+	 (remhash ans *dirty-chunks*))
+       ans)))
+  (q:uniq-pop dirtychunks))
+
+(defun time-func (distance)
+  (let ((a *ticks*))
+    (+ (ash a 10) distance)))
 (defun dirty-push (item)
-  (q::uniq-push item dirtychunks))
+  (progno (unless (gethash item *dirty-chunks*)
+	    (multiple-value-bind (x z y) (world:unhashfunc item)
+	      (let ((value (conz (time-func (truncate (distance-to-player x y z))) item)))
+		(setf (gethash item *dirty-chunks*) item)
+		(pileup:heap-insert value dirtychunks)))))
+  (q:uniq-push item dirtychunks))
 (defun block-dirtify (i j k)
   (dirty-push (world:chop (world:chunkhashfunc i k j))))
 
