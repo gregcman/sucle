@@ -11,6 +11,6 @@ void main()
 
 vec4 texcolor = texture2D(ourTexture, TexCoord);
 gl_FragColor= vec4(mix(fogcolor, mycolor *  texcolor.xyz, fogratio), texcolor.a);
-;
+
 }
 

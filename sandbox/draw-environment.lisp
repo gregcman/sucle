@@ -20,7 +20,7 @@
   (update-matrices *camera*)
   
   (luse-shader :blockshader)
-  (set-overworld-fog daytime)
+ ; (set-overworld-fog daytime)
   (bind-default-framebuffer)
   (gl:clear
    :color-buffer-bit
@@ -138,24 +138,43 @@
     (remhash name *g/chunk-call-list*)))
 
 (defun update-world-vao ()
+  (clean-dirty)
   (maphash (lambda (k v)
 	     (declare (ignorable k))
 	     (gl:delete-lists v 1)
 	     (remove-chunk-display-list k))
 	   *g/chunk-call-list*)
-  (maphash
-   (lambda (k v)
-     (declare (ignore v))
-     (dirty-push k))
-   world::chunkhash))
+  (let ((list nil))
+    (maphash
+     (lambda (k v)
+       (declare (ignore v))
+       (push k list))
+     world::chunkhash)
+    (dolist (x (sort list #'< :key (lambda (x)
+				(multiple-value-bind (i j k) (world:unhashfunc x)
+				  (distance-to-player (- i 8)
+						      
+						      (- k 8)
+						      (- j 8))))))
+      (dirty-push x))))
+
+(defun distance-to-player (x y z)
+  (let ((dx (- *xpos* x))
+	(dy (- *ypos* y))
+	(dz (- *zpos* z)))
+    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 
 (defparameter vsync? t)
 
 (defun glinnit ()
+  (setf *camera* (make-camera))
+  (setf %gl:*gl-get-proc-address* (e:get-proc-address))
+  (setf *shader-program* nil)
+  (setf mesher-thread nil)
+  
   (let ((width (if t 480 854))
 	(height (if t 360 480)))
     (window:push-dimensions width height))
-  (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (setf e:*resize-hook* #'on-resize)
   (set-framebuffer)
 
@@ -164,12 +183,7 @@
   (name-shaders)
 
   (load-shaders)
-  (load-some-images)
-
-  (setf *camera* (make-camera))
-  
-  (setf *shader-program* nil)
-  (setf mesher-thread nil))
+  (load-some-images))
 
 (defun set-render-cam-pos (camera)
   (let ((vec (camera-vec-position camera))

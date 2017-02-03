@@ -472,11 +472,5 @@
 		      (go rep)))
 	     end)))))))
 
-(defun distance-to-player (x y z)
-  (let ((dx (- *xpos* x))
-	(dy (- *ypos* y))
-	(dz (- *zpos* z)))
-    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
-
 (defun player-pos ()
   (world:chunkhashfunc (truncate *xpos*) (truncate *zpos*) (truncate *ypos*)))
