@@ -96,7 +96,7 @@ or all but one multiplicant is an identity matrix."
 	   0f0 0f0 1f0 z
 	   0f0 0f0 0f0 1f0))
 
-(declaim (ftype (sb-cga::sfunction (sb-cga::vec) sb-cga::matrix) %translate))
+(declaim (ftype (sb-cga::sfunction (sb-cga::matrix sb-cga::vec) sb-cga::matrix) %translate))
 (defun %translate (result vec)
   "Construct a translation matrix using first three elements of VEC as the
 translation factors."

@@ -17,7 +17,7 @@
 (defparameter *xpos* nil)
 (defparameter *ypos* nil)
 (defparameter *zpos* nil)
-(defparameter defaultfov 70)
+(defparameter defaultfov (deg-rad 70))
 
 (defparameter *xvel* 0)
 (defparameter *yvel* 0)
@@ -171,6 +171,7 @@
 
 (defparameter net-scroll 0)
 
+(defparameter foo nil)
 (defun physics ()
   ;;e to escape mouse
   (when (e:key-j-p :E) (window:toggle-mouse-capture))
@@ -196,11 +197,12 @@
     (when (e:key-j-p :g) (toggle gravity))
     (when (e:key-j-p :t) (update-world-vao))
     (when (e:key-j-p :f) (toggle fly))
+    (when (e:key-j-p :h) (time (setf foo (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte))))
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
     (controls)
-    (let ((blockval (+ 89 *hotbar-selection*)))
+    (let ((blockval (+ 8 *hotbar-selection*)))
       (progn
 	(when fist?
 	  (when (e:mice-j-p :left)
@@ -300,7 +302,7 @@
 	(ansz nil))
      (aabb-collect-blocks px py pz vx vy vz fist-aabb
 			  (lambda (x y z)
-			    (when (aref mc-blocks::iscollidable (world:getblock x y z))
+			    (unless (zerop (world:getblock x y z))
 			      (multiple-value-bind (minimum contact-type)
 				  (aabbcc::aabb-collide
 				   fist-aabb

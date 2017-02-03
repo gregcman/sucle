@@ -60,7 +60,8 @@
       (dotimes (n len)
 	(setf (aref data n) (read-byte stream)))
       data)))
-(defparameter testchunk (byte-read (merge-pathnames "hell.mcr" test-data-dir)))
+(defparameter testchunk nil)
+(defun testchunk () (byte-read (merge-pathnames "hell.mcr" test-data-dir)))
 
 (defun tonum (nums)
   (let ((danum 0))

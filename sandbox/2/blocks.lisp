@@ -7,7 +7,7 @@
 (defparameter block-types-limit 256)
 
 (defmacro blocktable (type)
-  `(make-array block-types-limit :element-type ,type :initial-element (coerce 0 type)))
+  `(make-array block-types-limit :element-type ,type :initial-element (coerce 0 ,type)))
 
 (defmacro defblockprop (name type)
   `(defparameter ,name (blocktable ,type)))

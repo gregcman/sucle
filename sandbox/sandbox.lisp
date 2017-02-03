@@ -28,7 +28,7 @@
 (defun injection ()
   (window:poll)
   (physics)
-  (set-render-cam-pos)
+  (set-render-cam-pos *camera*)
   (remove-spurious-mouse-input)
   (render)
   (incf *ticks*)
@@ -435,7 +435,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* #P"third/")
+(defparameter *save* #P"second/")
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -778,3 +778,38 @@
    (gettag
     "HeightMap"
     (nbt-open lizz))))
+
+
+(defun draw-sky ()
+  (progn
+    (set-matrix "projectionmodelview"
+		(cg-matrix:transpose-matrix
+		 *projection-view-matrix*))
+    (bind-shit :skybox)
+    (gl:bind-texture :texture-2d *framebuffer-texture*)
+    (ldrawlist :skybox))
+  (progn
+    (let ((time (daytime)))
+      (set-matrix "projectionmodelview"
+		  (cg-matrix:%transpose-matrix
+		   *temp-matrix*
+		   (cg-matrix:matrix*
+		    *projection-view-matrix*
+		    (cg-matrix:rotate-around
+		     (cg-matrix:vec -1.0 0.0 0.0)
+		     time)
+		    (cg-matrix:scale* 10.0 10.0 90.0))))
+
+      (gl:enable :blend)
+      (gl:blend-func :src-alpha :src-alpha)
+      (bind-shit :sun)
+      (ldrawlist :sun)
+      
+      (bind-shit :moon)
+     (ldrawlist :moon))
+    (gl:disable :blend)))
+
+(defun daytime ()
+  (coerce (* (get-internal-run-time)
+	     (/ 840.0 100000000.0))
+	  'single-float))

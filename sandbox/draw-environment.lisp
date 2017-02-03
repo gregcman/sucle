@@ -1,54 +1,97 @@
 (in-package :sandbox)
 
 ;;matrix multiplication is associative
-(defparameter *view-matrix* (cg-matrix:identity-matrix))		    ;;view matrix
-(defparameter *projection-matrix* (cg-matrix:identity-matrix))	    ;;projection matrix
-(defparameter *projection-view-matrix* (cg-matrix:identity-matrix)) ;;projection * view matrix
+
 (defparameter *temp-matrix* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
 (defparameter *temp-matrix2* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
 
-(defun update-projection-view-matrices ()
-  (setf *projection-view-matrix* (cg-matrix:%matrix* *projection-view-matrix*
-						    *projection-matrix*
-						    *view-matrix*)))
+(defun update-matrices (camera)
+  (let ((projection-matrix (camera-matrix-projection camera))
+	(view-matrix (camera-matrix-view camera))
+	(projection-view-matrix (camera-matrix-projection-view camera))
+	(projection-view-player-matrix (camera-matrix-projection-view-player camera))
+	(player-matrix (camera-matrix-player camera))
+	(forward (camera-vec-forward camera))
+	(up (camera-vec-up camera)))
+    (projection-matrix
+     projection-matrix
+     (camera-fov camera)
+     *aspect-ratio*
+     (camera-frustum-near camera)
+     (camera-frustum-far camera))
 
-(defun set-projection-matrix (fovy aspect near far)
-  (let ((projection-matrix (projection-matrix *projection-matrix* fovy aspect near far)))
-    (setf *projection-matrix* projection-matrix)))
+    (relative-lookat view-matrix 					 
+		     forward
+		     up)
+    (cg-matrix:%translate player-matrix (camera-vec-noitisop camera))
+    (cg-matrix:%matrix* projection-view-matrix
+			projection-matrix
+			view-matrix)
+    (cg-matrix:%matrix* projection-view-player-matrix
+			projection-view-matrix
+			player-matrix)))
 
-(defun set-view-matrix (direction up)
-  (let ((view (relative-lookat *view-matrix* direction up)))
-    (setf *view-matrix* view)))
+(defstruct camera
+  (vec-position (cg-matrix:vec 0.0 0.0 0.0) :type cg-matrix:vec)
 
+  (vec-up (cg-matrix:vec 0.0 1.0 0.0) :type cg-matrix:vec)
+  (vec-forward (cg-matrix:vec 1.0 0.0 0.0) :type cg-matrix:vec)
 
-(defun draw-sky ()
-  (progn
-    (set-matrix "projectionmodelview"
-		(cg-matrix:transpose-matrix
-		 *projection-view-matrix*))
-    (bind-shit :skybox)
-    (gl:bind-texture :texture-2d *framebuffer-texture*)
-    (ldrawlist :skybox))
-  (progn
-    (let ((time (daytime)))
-      (set-matrix "projectionmodelview"
-		  (cg-matrix:%transpose-matrix
-		   *temp-matrix*
-		   (cg-matrix:matrix*
-		    *projection-view-matrix*
-		    (cg-matrix:rotate-around
-		     (cg-matrix:vec -1.0 0.0 0.0)
-		     time)
-		    (cg-matrix:scale* 10.0 10.0 90.0))))
+  (vec-noitisop (cg-matrix:vec 0.0 0.0 0.0) :type cg-matrix:vec) ;;;the negative of position
+  (matrix-player (cg-matrix:identity-matrix)) ;;positional information of camera
+  (matrix-view (cg-matrix:identity-matrix))		    ;;view matrix
+  (matrix-projection (cg-matrix:identity-matrix))	    ;;projection matrix
+  (matrix-projection-view (cg-matrix:identity-matrix)) ;;projection * view matrix
+  (matrix-projection-view-player (cg-matrix:identity-matrix))
+  
+  (fov (coerce (/ pi 2.0) 'single-float) :type single-float)
 
-      (gl:enable :blend)
-      (gl:blend-func :src-alpha :src-alpha)
-      (bind-shit :sun)
-      (ldrawlist :sun)
-      
-      (bind-shit :moon)
-     (ldrawlist :moon))
-   (gl:disable :blend)))
+  (frustum-near 0.0078125 :type single-float)
+  (frustum-far 128.0 :type single-float))
+
+(defparameter *camera* nil) ;;global camera
+(defparameter *fog-ratio* 0.75)
+
+(defun render ()
+  (declare (optimize (safety 3) (debug 3)))
+
+  (setf *aspect-ratio* (/ window:*width* window:*height*))
+  (if vsync?
+      (window::set-vsync t)
+      (window::set-vsync nil))
+  (when (window:mice-locked-p)
+    (look-around))
+  (update-matrices *camera*)
+  
+  (luse-shader :blockshader)
+  ;(set-overworld-fog daytime)
+  (bind-default-framebuffer)
+  (gl:clear
+   :color-buffer-bit
+   :depth-buffer-bit)
+  (gl:viewport 0 0 e:*width* e:*height*)
+  (gl:disable :blend)
+  (set-matrix
+   "projectionmodelview"
+   (cg-matrix:%transpose-matrix
+    *temp-matrix*
+    (camera-matrix-projection-view-player *camera*)))
+  ;;;static geometry with no translation whatsoever
+  (draw-chunk-meshes)
+  ;(draw-fistbox)
+  
+  ;(gl:disable :cull-face) 
+  ;(luse-shader :solidshader)
+  ;(set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
+
+  
+  ;(draw-framebuffer)
+  ;(draw-crosshair)
+  (window:update-display)
+  ;(draw-hud)
+  
+  (designatemeshing))
+
 
 (defparameter *crosshair-size* 20.0)
 (defparameter *hotbar-box-size* (* 22 4))
@@ -69,77 +112,9 @@
     (set-float "foglet" (/ -1.0 *clip-distance* *fog-ratio*))
     (set-float "aratio" (/ 1.0 *fog-ratio*))))
 
-(defun daytime ()
-  (coerce (* (get-internal-run-time)
-	     (/ 840.0 100000000.0))
-	  'single-float))
-
-
-(defstruct camera
-  xpos
-  ypos 
-  zpos 
-  upx 
-  upy 
-  upz 
-  yaw 
-  pitch 
-  fov)
-
-(defparameter *camera* nil) ;;global camera
-(defparameter *player-matrix* (cg-matrix:identity-matrix)) ;;positional information of camera
-(defparameter *clip-distance* (ash 1 7))
-(defparameter *fog-ratio* 0.75)
-(defparameter *up-vector* (cg-matrix:vec 0.0 1.0 0.0))
-(defparameter *projection-view-player-matrix* (cg-matrix:identity-matrix))
-(defparameter *forward* (cg-matrix:vec 1.0 0.0 0.0))
-
-(defun render ()
-  (declare (optimize (safety 3) (debug 3)))
-  (when (window:mice-locked-p)
-    (look-around))
-  (set-render-cam-look)
-  (setf *aspect-ratio* (/ window:*width* window:*height*))
-  (with-slots (xpos ypos zpos fov pitch yaw) *camera*
-    (let ((floaty-fov (coerce (deg-rad fov) 'single-float)))
-      (set-projection-matrix
-       floaty-fov
-       *aspect-ratio*
-       0.01
-       *clip-distance*))
-    
-    (set-view-matrix
-     (unit-pitch-yaw *forward*
-		     (coerce pitch 'single-float)
-		     (coerce yaw 'single-float))
-     *up-vector*)
-
-    (set-player-matrix  (coerce xpos 'single-float)
-			(coerce ypos 'single-float)
-			(coerce zpos 'single-float)))
-  (update-projection-view-matrices)
-
-  
-  (luse-shader :blockshader)
-  (set-overworld-fog daytime)
-  (bind-default-framebuffer)
-  (gl:clear
-   :color-buffer-bit
-   :depth-buffer-bit)
-  (gl:viewport 0 0 e:*width* e:*height*)
-  (gl:disable :blend)
-  (setf *projection-view-player-matrix*
-	(cg-matrix:%matrix* *projection-view-player-matrix*
-			    *projection-view-matrix*
-			    *player-matrix*))
-  (set-matrix
-   "projectionmodelview"
-   (cg-matrix:%transpose-matrix
-    *temp-matrix*
-    *projection-view-player-matrix*))
-  ;;;static geometry with no translation whatsoever
-  (draw-chunk-meshes)  
+(defun draw-fistbox ()  
   (progn (when fist?
+	   (gl:line-width 1.0)
 	   (set-matrix
 	    "projectionmodelview"
 	    (cg-matrix:%transpose-matrix
@@ -157,23 +132,13 @@
 	     (gl:disable :cull-face :blend)
 	     (gl:polygon-mode :front-and-back :line)
 	     (ldrawlist :selected-box)
-	     (gl:polygon-mode :front-and-back :fill))))
+	     (gl:polygon-mode :front-and-back :fill)))))
 
-  (gl:disable :cull-face)
- 
-  (luse-shader :solidshader)
-  (set-matrix "projectionmodelview"
-		       cg-matrix:+identity-matrix+)
+(defun draw-framebuffer ()
   (gl:enable :blend)
   (gl:depth-func :always)
   (gl:bind-texture :texture-2d *framebuffer-texture*)
-  (ldrawlist :background)
-  
-  (draw-crosshair)
-  (window:update-display)  
-  (draw-hud)
-  
-  (designatemeshing))
+  (ldrawlist :background))
 
 ;;;the crosshair does not belong in the hud because the blending is
 ;;;different
@@ -246,35 +211,29 @@
 
   (load-shaders)
   (load-some-images)
-  (if vsync?
-      (window::set-vsync t)
-      (window::set-vsync nil))
 
-  (setf *camera* (make-camera
-		  :xpos 0
-		  :ypos 0
-		  :zpos 0
-		  :upx 0
-		  :upy 1
-		  :upz 0
-		  :yaw 0
-		  :pitch 0
-		  :fov 70))
+  (setf *camera* (make-camera))
   
   (setf *shader-program* nil)
   (setf mesher-thread nil))
 
-(defun set-render-cam-pos ()
-  (setf (camera-xpos *camera*) *xpos* 
-	(camera-ypos *camera*) *ypos* 
-	(camera-zpos *camera*) *zpos* 
-	(camera-pitch *camera*) *pitch*
-	(camera-yaw *camera*) *yaw*
-	(camera-fov *camera*) defaultfov))
+(defun set-render-cam-pos (camera)
+  (let ((vec (camera-vec-position camera))
+	(cev (camera-vec-noitisop camera)))
+    (setf (aref vec 0) *xpos*)
+    (setf (aref vec 1) *ypos*)
+    (setf (aref vec 2) *zpos*)
 
-(defun set-render-cam-look ()
-  (setf (camera-pitch *camera*) *pitch*
-	(camera-yaw *camera*) *yaw*))
+    (setf (aref cev 0) (- *xpos*))
+    (setf (aref cev 1) (- *ypos*))
+    (setf (aref cev 2) (- *zpos*))
+
+    (setf (camera-vec-forward *camera*)
+	(unit-pitch-yaw (camera-vec-forward *camera*)
+			(coerce *pitch* 'single-float)
+			(coerce *yaw* 'single-float)))
+    
+    (setf (camera-fov *camera*) defaultfov)))
 
 (defun on-resize (w h)
   (setf *window-height* h
@@ -284,10 +243,6 @@
   (lcalllist-invalidate :crosshair)
   (clean-framebuffers)
   (set-framebuffer))
-
-(defun set-player-matrix (x y z)
-  (let ((player-matrix (cg-matrix:%translate* *player-matrix* (- x) (- y) (- z))))
-    (setf *player-matrix* player-matrix)))
 
 (defparameter ourdir
   (make-pathname :host (pathname-host #.(or *compile-file-truename*
