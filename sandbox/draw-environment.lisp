@@ -5,57 +5,13 @@
 (defparameter *temp-matrix* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
 (defparameter *temp-matrix2* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
 
-(defun update-matrices (camera)
-  (let ((projection-matrix (camera-matrix-projection camera))
-	(view-matrix (camera-matrix-view camera))
-	(projection-view-matrix (camera-matrix-projection-view camera))
-	(projection-view-player-matrix (camera-matrix-projection-view-player camera))
-	(player-matrix (camera-matrix-player camera))
-	(forward (camera-vec-forward camera))
-	(up (camera-vec-up camera)))
-    (projection-matrix
-     projection-matrix
-     (camera-fov camera)
-     *aspect-ratio*
-     (camera-frustum-near camera)
-     (camera-frustum-far camera))
-
-    (relative-lookat view-matrix 					 
-		     forward
-		     up)
-    (cg-matrix:%translate player-matrix (camera-vec-noitisop camera))
-    (cg-matrix:%matrix* projection-view-matrix
-			projection-matrix
-			view-matrix)
-    (cg-matrix:%matrix* projection-view-player-matrix
-			projection-view-matrix
-			player-matrix)))
-
-(defstruct camera
-  (vec-position (cg-matrix:vec 0.0 0.0 0.0) :type cg-matrix:vec)
-
-  (vec-up (cg-matrix:vec 0.0 1.0 0.0) :type cg-matrix:vec)
-  (vec-forward (cg-matrix:vec 1.0 0.0 0.0) :type cg-matrix:vec)
-
-  (vec-noitisop (cg-matrix:vec 0.0 0.0 0.0) :type cg-matrix:vec) ;;;the negative of position
-  (matrix-player (cg-matrix:identity-matrix)) ;;positional information of camera
-  (matrix-view (cg-matrix:identity-matrix))		    ;;view matrix
-  (matrix-projection (cg-matrix:identity-matrix))	    ;;projection matrix
-  (matrix-projection-view (cg-matrix:identity-matrix)) ;;projection * view matrix
-  (matrix-projection-view-player (cg-matrix:identity-matrix))
-  
-  (fov (coerce (/ pi 2.0) 'single-float) :type single-float)
-
-  (frustum-near 0.0078125 :type single-float)
-  (frustum-far 128.0 :type single-float))
-
 (defparameter *camera* nil) ;;global camera
 (defparameter *fog-ratio* 0.75)
 
 (defun render ()
   (declare (optimize (safety 3) (debug 3)))
 
-  (setf *aspect-ratio* (/ window:*width* window:*height*))
+  (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
   (if vsync?
       (window::set-vsync t)
       (window::set-vsync nil))
@@ -64,7 +20,7 @@
   (update-matrices *camera*)
   
   (luse-shader :blockshader)
-  ;(set-overworld-fog daytime)
+  (set-overworld-fog daytime)
   (bind-default-framebuffer)
   (gl:clear
    :color-buffer-bit
@@ -78,17 +34,18 @@
     (camera-matrix-projection-view-player *camera*)))
   ;;;static geometry with no translation whatsoever
   (draw-chunk-meshes)
-  ;(draw-fistbox)
+  (when fist?
+    (draw-fistbox *camera*))
   
-  ;(gl:disable :cull-face) 
-  ;(luse-shader :solidshader)
-  ;(set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
+  (gl:disable :cull-face) 
+  (luse-shader :solidshader)
+  (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
 
   
-  ;(draw-framebuffer)
-  ;(draw-crosshair)
+  (draw-framebuffer)
+  (draw-crosshair)
   (window:update-display)
-  ;(draw-hud)
+  (draw-hud)
   
   (designatemeshing))
 
@@ -109,30 +66,27 @@
 	  (aref *avector* 1) y
 	  (aref *avector* 2) z)
     (set-vec3 "fogcolor" *avector*)
-    (set-float "foglet" (/ -1.0 *clip-distance* *fog-ratio*))
+    (set-float "foglet" (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
     (set-float "aratio" (/ 1.0 *fog-ratio*))))
 
-(defun draw-fistbox ()  
-  (progn (when fist?
-	   (gl:line-width 1.0)
-	   (set-matrix
-	    "projectionmodelview"
-	    (cg-matrix:%transpose-matrix
-	     *temp-matrix*
-	     (cg-matrix:%matrix*
-	      *temp-matrix2*
-	      *projection-view-player-matrix*
-	      (cg-matrix:%translate*
-	       *temp-matrix*
-	       (+ (coerce fist-side-x 'single-float))
-	       (+ (coerce fist-side-y 'single-float))
-	       (+ (coerce fist-side-z 'single-float))))))
-	   
-	   (progn
-	     (gl:disable :cull-face :blend)
-	     (gl:polygon-mode :front-and-back :line)
-	     (ldrawlist :selected-box)
-	     (gl:polygon-mode :front-and-back :fill)))))
+(defun draw-fistbox (camera)
+  (gl:line-width 1.0)
+  (set-matrix
+   "projectionmodelview"
+   (cg-matrix:%transpose-matrix
+    *temp-matrix*
+    (cg-matrix:%matrix*
+     *temp-matrix2*
+     (camera-matrix-projection-view-player camera)
+     (cg-matrix:%translate*
+      *temp-matrix*
+      (+ (coerce fist-side-x 'single-float))
+      (+ (coerce fist-side-y 'single-float))
+      (+ (coerce fist-side-z 'single-float))))))
+  (gl:disable :cull-face :blend)
+  (gl:polygon-mode :front-and-back :line)
+  (ldrawlist :selected-box)
+  (gl:polygon-mode :front-and-back :fill))
 
 (defun draw-framebuffer ()
   (gl:enable :blend)
@@ -228,10 +182,9 @@
     (setf (aref cev 1) (- *ypos*))
     (setf (aref cev 2) (- *zpos*))
 
-    (setf (camera-vec-forward *camera*)
-	(unit-pitch-yaw (camera-vec-forward *camera*)
-			(coerce *pitch* 'single-float)
-			(coerce *yaw* 'single-float)))
+    (unit-pitch-yaw (camera-vec-forward *camera*)
+		    (coerce *pitch* 'single-float)
+		    (coerce *yaw* 'single-float))
     
     (setf (camera-fov *camera*) defaultfov)))
 

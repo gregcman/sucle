@@ -34,10 +34,6 @@
 
 (defparameter onground nil)
 
-(defparameter look-x 0.0)
-(defparameter look-y 0.0)
-(defparameter look-z 0.0)
-
 (defparameter fist-side-x nil)
 (defparameter fist-side-y nil)
 (defparameter fist-side-z nil)
@@ -50,11 +46,11 @@
 
 (defparameter reach 4.0)
 
-(setf *xpos* 0
-      *ypos* 0
-      *zpos* 0
-      *yaw* 0
-      *pitch* 0)
+(setf *xpos* 0.0
+      *ypos* 0.0
+      *zpos* 0.0
+      *yaw* 0.0
+      *pitch* 0.0)
 
 (defun controls ()
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
@@ -239,13 +235,10 @@
        (cond ((plusp *zvel*) (when k+ (setf *zvel* 0.0))
 	      (minusp *zvel*) (when k- (setf *zvel* 0.0))))
        (setf onground j-))
-  (let ((cos-pitch (cos *pitch*)))
-    (let ((avx (* cos-pitch (cos *yaw*)))
-	  (avy (sin *pitch*))
-	  (avz (* cos-pitch (sin *yaw*))))
-      (setf look-x avx
-	    look-y avy
-	    look-z avz)
+  (let ((look-vec (camera-vec-forward *camera*)))
+    (let ((avx (aref look-vec 0))
+	  (avy (aref look-vec 1))
+	  (avz (aref look-vec 2)))
       (let ((vx (- (* reach avx)))
 	    (vy (- (* reach avy)))
 	    (vz (- (* reach avz))))
