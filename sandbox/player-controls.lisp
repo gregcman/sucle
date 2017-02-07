@@ -167,6 +167,7 @@
 
 (defparameter net-scroll 0)
 
+(defparameter walkblock nil)
 (defparameter foo nil)
 (defun physics ()
   ;;e to escape mouse
@@ -193,6 +194,13 @@
     (when (e:key-j-p :g) (toggle gravity))
     (when (e:key-j-p :t) (update-world-vao))
     (when (e:key-j-p :f) (toggle fly))
+    (when (e:key-j-p :c) (toggle walkblock))
+    (when walkblock (setblock-with-update
+			(truncate *xpos*)
+			(- (truncate *ypos*) 2)
+			(- (truncate *zpos*) 1)
+			*hotbar-selection*
+			0))
     (when (e:key-j-p :h) (time (setf foo (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte))))
     (if fly
 	(setf air-friction 0.9)

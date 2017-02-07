@@ -20,7 +20,9 @@
   (update-matrices *camera*)
   
   (luse-shader :blockshader)
- ; (set-overworld-fog daytime)
+  (set-overworld-fog daytime)
+  (set-float "foglet" (/ -1.0 96.0))
+  (set-float "aratio" (/ 4.0 3.0))
   (bind-default-framebuffer)
   (gl:clear
    :color-buffer-bit

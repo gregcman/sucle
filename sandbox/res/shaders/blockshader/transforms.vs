@@ -1,4 +1,4 @@
-#version 120
+#version 100
 attribute vec4 position;
 attribute vec2 texCoord;
 attribute float darkness;
@@ -11,13 +11,17 @@ varying float fogratio;
 uniform mat4 projectionmodelview;
 uniform sampler2D ourTexture;
 
-uniform float foglet = -1.0/(96.0);
-uniform float aratio = 4.0/3.0;
+uniform float foglet;
+uniform float aratio;
 
 void main()
 {
+
+
 ///position as fast as its going to get
 gl_Position = projectionmodelview * position;
+
+
 
 ///nothing to say here...
 TexCoord = texCoord;

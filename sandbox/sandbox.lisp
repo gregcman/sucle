@@ -9,7 +9,7 @@
 	   (lambda ()
 	     (window:wrapper func))))))
 
-(defun main (func)
+(defun qwer (func)
   (window:wrapper func))
 
 ;;(defparameter init-hook (hook:create-hook))
@@ -36,7 +36,7 @@
     (injection)))
 
 (defparameter *ticks* 0)
-(defun qwer ()
+(defun main ()
   (threaded-main #'handoff-three))
 
 
@@ -435,7 +435,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* #P"second/")
+(defparameter *save* #P"third/")
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -813,3 +813,6 @@
   (coerce (* (get-internal-run-time)
 	     (/ 840.0 100000000.0))
 	  'single-float))
+
+(defun delete-shaders ()
+  (clrhash *g/text*))

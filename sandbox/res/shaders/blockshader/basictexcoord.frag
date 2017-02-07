@@ -1,16 +1,18 @@
-#version 120
-varying vec2 TexCoord;
-varying float mycolor;
-varying float fogratio;
+#version 100
+varying highp vec2 TexCoord;
+varying highp float mycolor;
+varying highp float fogratio;
 
 uniform sampler2D ourTexture;
-uniform vec3 fogcolor;
+uniform highp vec3 fogcolor;
 
 void main()
 {
 
-vec4 texcolor = texture2D(ourTexture, TexCoord);
+highp vec4 texcolor = texture2D(ourTexture, TexCoord);
 gl_FragColor= vec4(mix(fogcolor, mycolor *  texcolor.xyz, fogratio), texcolor.a);
+
+//gl_FragColor=texture2D(ourTexture, TexCoord);
 
 }
 
