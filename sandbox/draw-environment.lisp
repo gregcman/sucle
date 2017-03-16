@@ -20,9 +20,7 @@
   (update-matrices *camera*)
   
   (luse-shader :blockshader)
-  (set-overworld-fog daytime)
-  (set-float "foglet" (/ -1.0 96.0))
-  (set-float "aratio" (/ 4.0 3.0))
+   (set-overworld-fog daytime)
   (bind-default-framebuffer)
   (gl:clear
    :color-buffer-bit
@@ -36,18 +34,20 @@
     (camera-matrix-projection-view-player *camera*)))
   ;;;static geometry with no translation whatsoever
   (draw-chunk-meshes)
-  (when fist?
-    (draw-fistbox *camera*))
-  
-  (gl:disable :cull-face) 
-  (luse-shader :solidshader)
-  (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
+  (progn
+   (when fist?
+     (draw-fist *camera*))
+   
+   (gl:disable :cull-face) 
+   (luse-shader :solidshader)
+   (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
 
-  
-  (draw-framebuffer)
-  (draw-crosshair)
+   
+   (draw-framebuffer)
+   (draw-crosshair))
   (window:update-display)
-  (draw-hud)
+  (progn
+   (draw-hud))
   
   (designatemeshing))
 
@@ -59,6 +59,13 @@
 (defun fractionalize (x)
   (clamp x 0.0 1.0))
 
+(defparameter *vec4* (make-array 4 :element-type 'single-float)) 
+(defun vec4 (vec3)
+  (setf (aref *vec4* 0) (aref vec3 0))
+  (setf (aref *vec4* 1) (aref vec3 1))
+  (setf (aref *vec4* 2) (aref vec3 2))
+  *vec4*)
+
 (defun set-overworld-fog (time)
   (let ((x (fractionalize (* time 0.68)))
 	(y (fractionalize (* time 0.8)))
@@ -68,10 +75,11 @@
 	  (aref *avector* 1) y
 	  (aref *avector* 2) z)
     (set-vec3 "fogcolor" *avector*)
+    (set-vec4 "cameraPos" (camera-vec-position *camera*))
     (set-float "foglet" (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
     (set-float "aratio" (/ 1.0 *fog-ratio*))))
 
-(defun draw-fistbox (camera)
+(defun draw-fist (camera)
   (gl:line-width 1.0)
   (set-matrix
    "projectionmodelview"
@@ -106,7 +114,7 @@
 (defun draw-hud ()
   (bind-custom-framebuffer)
   (gl:clear-color 0.0 0.0 0.0 0.0)
-  (gl:clear :color-buffer-bit)
+;  (gl:clear :color-buffer-bit)
   (gl:enable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (bind-shit :gui)

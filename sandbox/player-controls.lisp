@@ -274,12 +274,12 @@
 (defun big-swing-fist (vx vy vz)
   (when (and (window:mice-locked-p) (e:key-p :q))
     (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 10 vx) (* 10 vy) (* 10 vz)
-			 chunk-aabb
+			 block-aabb
 			 (lambda (x y z)
 			   (when (and (<= 0 x 127)
 				      (<= 0 y 127)
 				      (<= -128 z -1)) 
-			     (setblock-with-update x y z 0 (aref mc-blocks::lightvalue 0)))))))
+			     (setblock-with-update x y z 0  (aref mc-blocks::lightvalue 0)))))))
 
 (defun standard-fist (vx vy vz)
   (mvb (frac type blockx blocky blockz)

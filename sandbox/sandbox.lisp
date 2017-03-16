@@ -60,7 +60,7 @@
 	 (plain-setblock x y z 0 0)))
 
 (defun test-world ()
-  (dobox ((x 0 4) (y -4 0))
+  (dobox ((x 0 8) (y -4 4))
 	 (someseq x y)))
 
 (defun spawn ()
@@ -525,16 +525,33 @@
 	  (y 0 128)
 	  (z -128 0))
 	 (let ((blockid (world:getblock x y z)))
-	   (when (= 1 blockid)
-	     (when (> 4 (neighbors x y z))
+	   (unless (zerop blockid)
+	     (when (> 3 (neighbors x y z))
 	       (plain-setblock x y z 0 0 0))))))
 
 (defun what? ()
   (dobox ((x 0 128)
 	  (y 0 128)
 	  (z -128 0))
-	 (let ((blockid (world:getblock x y z)))
+e	 (let ((blockid (world:getblock x y z)))
 	   (setblock-with-update x y z blockid 0))))
+
+(defun what? ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (if (= 49 blockid )
+	       (setblock-with-update x y z (random 95) 0)))))
+
+(defun dirt-sand ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (case blockid
+	     (2 (setblock-with-update x y z 12 0))
+	     (3 (setblock-with-update x y z 24 0))))))
 
 (defun clearblock? (id)
   (declare (type fixnum id))
@@ -559,7 +576,7 @@
 	  (y 0 128)
 	  (z -128 0))
 	 (let ((blockid (world:getblock x y z)))
-	   (when (= blockid 1)
+	   (when (= blockid 3)
 	     (let ((idabove (world:getblock x (1+ y) z)))
 	       (when (zerop idabove)
 		 (plain-setblock x y z 2 0)))))))
@@ -628,7 +645,7 @@
        (read-sequence data stream)
        data)))
 
-(progno
+(progn
  (defpackage #:pathwise
    (:use #:cl)
    (:export
@@ -649,6 +666,7 @@
 ;;;takes a tree list structure where the car of each list is the folder name ex: #P"root/"
 ;;;and the other items in the rest of the list are either more lists or just plain strings.
 ;;;returns a flat list which is the collection of all the resulting pathnames
+
  (defun expand-paths (dir-list)
    (let (acc) 
      (labels ((rec (x currentpath)
@@ -658,126 +676,122 @@
 		    (push (merge-pathnames x currentpath) acc))))
        (rec dir-list #P"") acc))))
 
-(progno 
- (in-package :sandbox)
+(in-package :sandbox)
 
- (defparameter atest nil)
+(defparameter atest nil)
+(setatest 0)
 
- (defun someseq (x y)
-   (let* ((thechunk (helpchunk x y)))
-     (if thechunk
-	 (let ((light (getlightlizz thechunk))
-	       (blocks (getblockslizz thechunk))
-	       (skylight (getskylightlizz thechunk))
-	       (meta (getmetadatalizz thechunk))
-	       (leheight (getheightlizz thechunk)))
-	   (let ((xscaled (ash x 4))
-		 (yscaled (ash y 4)))
-	     (progn (sandbox::flat3-chunk
-		     light
-		     (lambda (x y z b)
-		       (setf (world:getlight x y z) b))
-		     xscaled 0 yscaled)
-		    (sandbox::flat3-chunk
-		     skylight
-		     (lambda (x y z b)
-		       (setf (world:skygetlight x y z) b))
-		     xscaled 0 yscaled)
-		    (sandbox::flat3-chunk
-		     meta
-		     (lambda (x y z b)
-		       (setf (world:getmeta x y z) b))
-		     xscaled 0 yscaled)
-		    (sandbox::flat2-chunk
-		     leheight
-		     (lambda (x y b)
-		       (setf (world::getheight x y) b))
-		     xscaled yscaled))
-	     (sandbox::flat3-chunk
-	      blocks
-	      (lambda (x y z b)
-		(unless (zerop b)
-		  (setf  (world:getblock x y z) b)))
-	      xscaled 0 yscaled))))))
+(defun someseq (x y)
+  (let* ((thechunk (helpchunk x y)))
+    (if thechunk
+	(let ((light (getlightlizz thechunk))
+	      (blocks (getblockslizz thechunk))
+	      (skylight (getskylightlizz thechunk))
+	      (meta (getmetadatalizz thechunk))
+	      (leheight (getheightlizz thechunk)))
+	  (let ((xscaled (ash x 4))
+		(yscaled (ash y 4)))
+	    (progn (sandbox::flat3-chunk
+		    light
+		    (lambda (x y z b)
+		      (setf (world:getlight x y z) b))
+		    xscaled 0 yscaled)
+		   (sandbox::flat3-chunk
+		    skylight
+		    (lambda (x y z b)
+		      (setf (world:skygetlight x y z) b))
+		    xscaled 0 yscaled)
+		   (sandbox::flat3-chunk
+		    meta
+		    (lambda (x y z b)
+		      (setf (world:getmeta x y z) b))
+		    xscaled 0 yscaled)
+		   (sandbox::flat2-chunk
+		    leheight
+		    (lambda (x y b)
+		      (setf (world::getheight x y) b))
+		    xscaled yscaled))
+	    (sandbox::flat3-chunk
+	     blocks
+	     (lambda (x y z b)
+	       (unless (zerop b)
+		 (setf  (world:getblock x y z) b)))
+	     xscaled 0 yscaled))))))
 
- (defun flat3-chunk (data setfunc xoffset yoffset zoffset)
-   (dotimes (wow 8)
-     (dotimes (j 16)
-       (dotimes (i 16)
-	 (dotimes (k 16)
-	   (funcall setfunc (+ xoffset i) (+ yoffset (* 16 wow) j) (+ zoffset k)
-		    (elt data (+ (* i 16 128) (+ j (* 16 wow)) (* k 128)))))))))
+(defun flat3-chunk (data setfunc xoffset yoffset zoffset)
+  (dotimes (wow 8)
+    (dotimes (j 16)
+      (dotimes (i 16)
+	(dotimes (k 16)
+	  (funcall setfunc (+ xoffset i) (+ yoffset (* 16 wow) j) (+ zoffset k)
+		   (elt data (+ (* i 16 128) (+ j (* 16 wow)) (* k 128)))))))))
 
- (defun flat2-chunk (data setfunc xoffset yoffset)
-   (dotimes (j 16)
-     (dotimes (i 16)
-       (funcall setfunc (+ xoffset i) (+ yoffset j)
-		(elt data (+ i (+ (* 16 j))))))))
+(defun flat2-chunk (data setfunc xoffset yoffset)
+  (dotimes (j 16)
+    (dotimes (i 16)
+      (funcall setfunc (+ xoffset i) (+ yoffset j)
+	       (elt data (+ i (+ (* 16 j))))))))
 
- (progno
-  (defun setatest (x)
-    (prog2 (setf atest
-		 (case x
-;(0 (pathwise:byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr"))
-;(1 (pathwise:byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))
-;(2 cl-mc-shit::testchunk)
-		   ))
-	x)))
+(defun setatest (x)
+  (prog2 (setf atest
+	       (case x
+		 (0 (byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr"))
+		 (1 (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))
+		 (2 cl-mc-shit::testchunk)
+		 ))
+      x))
 
- (eval-when (:load-toplevel)
-   (setatest 2))
+(defun helpchunk (x y)
+  (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
+    (if thechunk
+	(cl-mc-shit:chunk-data
+	 thechunk)
+	nil)))
 
- (defun helpchunk (x y)
-   (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))
-     (if thechunk
-	 (cl-mc-shit:chunk-data
-	  thechunk)
-	 nil)))
+(defun expand-nibbles (vec)
+  (let* ((len (length vec))
+	 (newvec (make-array (* 2 len) :element-type '(unsigned-byte 8))))
+    (dotimes (x len)
+      (multiple-value-bind (a b) (floor (aref vec x) 16)
+	(setf (aref newvec (* 2 x)) b)
+	(setf (aref newvec (1+ (* 2 x))) a)))
+    newvec))
 
- (defun expand-nibbles (vec)
-   (let* ((len (length vec))
-	  (newvec (make-array (* 2 len) :element-type '(unsigned-byte 8))))
-     (dotimes (x len)
-       (multiple-value-bind (a b) (floor (aref vec x) 16)
-	 (setf (aref newvec (* 2 x)) b)
-	 (setf (aref newvec (1+ (* 2 x))) a)))
-     newvec))
+(defun nbt-open (lizz)
+  (third
+   (first
+    (third
+     lizz))))
 
- (defun nbt-open (lizz)
-   (third
-    (first
-     (third
-      lizz))))
+(defun gettag (lestring lizz)
+  (dolist (tag lizz)
+    (if (equal lestring (second tag))
+	(return-from gettag (third tag)))))
 
- (defun gettag (lestring lizz)
-   (dolist (tag lizz)
-     (if (equal lestring (second tag))
-	 (return-from gettag (third tag)))))
+(defun getmetadatalizz (lizz)
+  (expand-nibbles
+   (gettag "Data"
+	   (nbt-open lizz))))
 
- (defun getmetadatalizz (lizz)
-   (expand-nibbles
-    (gettag "Data"
-	    (nbt-open lizz))))
+(defun getskylightlizz (lizz)
+  (expand-nibbles
+   (gettag "SkyLight"
+	   (nbt-open lizz))))
 
- (defun getskylightlizz (lizz)
-   (expand-nibbles
-    (gettag "SkyLight"
-	    (nbt-open lizz))))
+(defun getlightlizz (lizz)
+  (expand-nibbles
+   (gettag "BlockLight"
+	   (nbt-open lizz))) )
 
- (defun getlightlizz (lizz)
-   (expand-nibbles
-    (gettag "BlockLight"
-	    (nbt-open lizz))) )
+(defun getblockslizz (lizz)
+  (gettag
+   "Blocks"
+   (nbt-open lizz)))
 
- (defun getblockslizz (lizz)
-   (gettag
-    "Blocks"
-    (nbt-open lizz)))
-
- (defun getheightlizz (lizz)
-   (gettag
-    "HeightMap"
-    (nbt-open lizz))))
+(defun getheightlizz (lizz)
+  (gettag
+   "HeightMap"
+   (nbt-open lizz)))
 
 
 (defun draw-sky ()
@@ -816,3 +830,5 @@
 
 (defun delete-shaders ()
   (clrhash *g/text*))
+
+

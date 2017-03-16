@@ -52,8 +52,13 @@
 			   (:file "block-light") ;;lighting
 			   (:file "block-meshing");;turn world data into a mesh to render
 			   ))
-     (:file "webglsl-generator")
-     
+     (:module webglsl
+	      :serial t
+	      :components ((:file "package")
+			   (:file "types")
+			   (:file "webglsl-grammar")
+			   (:file "webglsl-generator")))
+
      (:file "camera-matrix") ;;matrices for cameras - view, projection
      (:file "magic") ;;initial asset loading
      (:file "lovely-renderer") ;;generic rendering glue
