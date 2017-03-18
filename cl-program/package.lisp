@@ -1,3 +1,4 @@
 (defpackage #:sandbox
-  (:use #:cl #:macrology)
-  (:export #:main))
+  (:use 
+   #:cl
+   #:fuktard))

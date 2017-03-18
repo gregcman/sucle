@@ -18,37 +18,43 @@
   (when (window:mice-locked-p)
     (look-around))
   (update-matrices *camera*)
-  
-  (luse-shader :blockshader)
-   (set-overworld-fog daytime)
+    (luse-shader :solidshader)
   (bind-default-framebuffer)
   (gl:clear
    :color-buffer-bit
    :depth-buffer-bit)
   (gl:viewport 0 0 e:*width* e:*height*)
-  (gl:disable :blend)
-  (set-matrix
-   "projectionmodelview"
-   (cg-matrix:%transpose-matrix
-    *temp-matrix*
-    (camera-matrix-projection-view-player *camera*)))
-  ;;;static geometry with no translation whatsoever
- ;;; (draw-chunk-meshes)
-  (progn
-   (when fist?
-     (draw-fist *camera*))
-   
-   (gl:disable :cull-face) 
-   (luse-shader :solidshader)
-   (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
+  (draw-sky)
+  (window:update-display))
 
-   
-   (draw-framebuffer)
-   (draw-crosshair)
-   )
-  (window:update-display)
+(defun draw-sky ()
   (progn
-   (draw-hud)))
+    (set-matrix "projectionmodelview"
+		(cg-matrix:%transpose-matrix *temp-matrix* (camera-matrix-projection-view *camera*)))
+    (bind-shit :skybox)
+    ;(gl:bind-texture :texture-2d *framebuffer-texture*)
+    (ldrawlist :skybox))
+  (progn
+    (let ((time (/ (float *ticks*) 50.0)))
+      (set-matrix "projectionmodelview"
+		  (cg-matrix:%transpose-matrix
+		   *temp-matrix*
+		   (cg-matrix:matrix*
+		    (camera-matrix-projection-view *camera*)
+		    (cg-matrix:rotate-around
+		     (cg-matrix:vec -1.0 0.0 0.0)
+		     time)
+		    (cg-matrix:scale* 1.0 1.0 9.0))))
+
+      (gl:enable :blend)
+      (gl:blend-func :src-alpha :src-alpha)
+      (bind-shit :sun)
+      (ldrawlist :sun)
+      
+      (bind-shit :moon)
+     (ldrawlist :moon))
+    (gl:disable :blend)))
+
 
 
 (defparameter *crosshair-size* 20.0)
@@ -58,7 +64,7 @@
 (defun fractionalize (x)
   (clamp x 0.0 1.0))
 
- (defparameter *vec4* (make-array 4 :element-type 'single-float)) 
+(defparameter *vec4* (make-array 4 :element-type 'single-float)) 
 (defun vec4 (vec3)
   (setf (aref *vec4* 0) (aref vec3 0))
   (setf (aref *vec4* 1) (aref vec3 1))
@@ -66,9 +72,9 @@
   *vec4*)
 
 (defun set-overworld-fog (time)
-  (let ((x (fractionalize (* time 0.68)))
-	(y (fractionalize (* time 0.8)))
-	(z (fractionalize (* time 1.0))))
+  (let ((x (fractionalize (* time 0.0)))
+	(y (fractionalize (* time 0.0)))
+	(z (fractionalize (* time 0.0))))
     (gl:clear-color x y z 1.0)
     (setf (aref *avector* 0) x
 	  (aref *avector* 1) y
@@ -190,6 +196,13 @@
     
     (setf (camera-fov *camera*) defaultfov)))
 
+(defun unit-pitch-yaw (result pitch yaw)
+  (let ((cos-pitch (cos pitch)))
+    (setf (aref result 0) (* cos-pitch (cos yaw))
+	  (aref result 1) (sin pitch)
+	  (aref result 2) (* cos-pitch (sin yaw))))
+  result)
+
 (defun on-resize (w h)
   (setf *window-height* h
 	*window-width* w)
@@ -237,9 +250,19 @@
   (setf (gethash name *g/image-backup*)
 	(lambda (&optional name)
 	  (declare (ignorable name))
-	  (let ((img (imagewise:load-png src-path)))
-	    (imagewise:flip-image img)
+	  (let ((img (load-png src-path)))
+	    (flip-image img)
 	    img))))
+
+;;;;flip an image in-place - three dimensions - does not conse
+(defun flip-image (image)
+  (destructuring-bind (height width components) (array-dimensions image)
+    (dotimes (h (- height (ash height -1)))
+      (dotimes (w width)
+	(dotimes (c components)
+	  (rotatef (aref image (- height h 1) w c)
+		   (aref image h w c))))))
+  image)
 
 (defun src-text (name src-path)
   (setf (gethash name *g/text-backup*)
@@ -248,19 +271,14 @@
 	  (file-string src-path))))
 
 (defun load-some-images ()
-  (src-image "gui/gui.png" (img-path #P"gui/gui.png"))
-  (src-image "misc/grasscolor.png" (img-path #P"misc/grasscolor.png"))
   (src-image "skybox/cheap.png" (img-path #P"skybox/cheap.png"))
   (src-image "terrain/sun.png" (img-path #P"terrain/sun.png"))
-  (src-image "terrain/moon.png" (img-path #P"terrain/moon.png"))
-  (src-image "terrain.png" (img-path #P"terrain.png")))
+  (src-image "terrain/moon.png" (img-path #P"terrain/moon.png")))
 
 (defun texture-imageries ()
-  (texture-imagery :terrain "terrain.png")
   (texture-imagery :skybox "skybox/cheap.png")
   (texture-imagery :sun "terrain/sun.png")
-  (texture-imagery :moon "terrain/moon.png")
-  (texture-imagery :gui "gui/gui.png"))
+  (texture-imagery :moon "terrain/moon.png"))
 (defun name-shaders ()
   (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
 					      ("texCoord" . 2)
@@ -272,18 +290,137 @@
   (progn (name-mesh :skybox #'draw-skybox)
 	 (name-mesh :sun #'draw-sun)
 	 (name-mesh :moon #'draw-moon)
-	 (name-mesh :selected-box
-		    (l () (let ((foo 0.005))
-			    (let ((min (- 0.0 foo))
-				  (max (+ 1.0 foo)))
-			      (draw-box min min min max max max)))))
-	 (name-mesh :background #'draw-background)
-	 (name-mesh :crosshair #'mesh-crosshair)
-	 (name-mesh :gui #'draw-hotbar)
-	 (name-mesh :hotbar-selector #'draw-hotbar-selector)))
+	 (name-mesh :background #'draw-background)))
 
 (defun load-shaders ()
   (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
   (src-text :bs-frag (shader-path "blockshader/basictexcoord.frag"))
   (src-text :ss-vs (shader-path "solidshader/transforms.vs"))
   (src-text :ss-frag (shader-path "solidshader/basictexcoord.frag")))
+
+(in-package :sandbox)
+
+(defmacro vvv (darkness u v x y z)
+  `(progn (%gl:vertex-attrib-1f 8 ,darkness)
+	  (%gl:vertex-attrib-2f 2 ,u ,v)
+	  (%gl:vertex-attrib-3f 0 ,x ,y ,z)))
+
+(defun draw-background ()
+  (let ((distance 0.99999997))
+    (gl:with-primitives :quads
+      (vvv 1.0 0.0 0.0 -1.0 -1.0 distance)
+      (vvv 1.0 1.0 0.0 1.0 -1.0 distance)
+      (vvv 1.0 1.0 1.0 1.0 1.0 distance)
+      (vvv 1.0 0.0 1.0 -1.0 1.0 distance))))
+
+(defun draw-skybox ()
+  (let ((h0 0.0)
+	(h1 (/ 1.0 3.0))
+	(h2 (/ 2.0 3.0))
+	(h3 (/ 3.0 3.0))
+	(w0 0.0)
+	(w1 (/ 1.0 4.0))
+	(w2 (/ 2.0 4.0))
+	(w3 (/ 3.0 4.0))
+	(w4 (/ 4.0 4.0)))
+    (let ((neg -10.0)
+	  (pos 10.0))
+      (gl:with-primitives :quads
+	;;j+
+	(vvv 1.0 w2 h3 neg pos neg)
+	(vvv 1.0 w2 h2 pos pos neg)
+	(vvv 1.0 w1 h2 pos pos pos)
+	(vvv 1.0 w1 h3 neg pos pos)
+
+	;;j-
+	(vvv 1.0 w2 h0 neg neg neg)
+	(vvv 1.0 w1 h0 neg neg pos)
+	(vvv 1.0 w1 h1 pos neg pos)
+	(vvv 1.0 w2 h1 pos neg neg)
+
+	;;k-
+	(vvv 1.0 w3 h2 neg pos neg)
+	(vvv 1.0 w3 h1 neg neg neg)
+	(vvv 1.0 w2 h1 pos neg neg)
+	(vvv 1.0 w2 h2 pos pos neg)
+
+	;;k+
+	(vvv 1.0 w1 h1 pos neg pos)
+	(vvv 1.0 w0 h1 neg neg pos)
+	(vvv 1.0 w0 h2 neg pos pos)
+	(vvv 1.0 w1 h2 pos pos pos)
+	
+	;;i-
+	(vvv 1.0 w3 h1 neg neg neg)
+	(vvv 1.0 w3 h2 neg pos neg)
+	(vvv 1.0 w4 h2 neg pos pos)
+	(vvv 1.0 w4 h1 neg neg pos)
+
+	;;i+
+	(vvv 1.0 w2 h1 pos neg neg)
+	(vvv 1.0 w1 h1 pos neg pos)
+	(vvv 1.0 w1 h2 pos pos pos)
+	(vvv 1.0 w2 h2 pos pos neg)))))
+
+(defun draw-sun ()
+  (let ((distance 1.0))
+    (gl:with-primitives :quads
+      (vvv 1.0 1.0 1.0  1.0 -1.0 distance)
+      (vvv 1.0 1.0 0.0 -1.0 -1.0 distance)
+      (vvv 1.0 0.0 0.0 -1.0  1.0 distance)
+      (vvv 1.0 0.0 1.0  1.0  1.0 distance))))
+
+(defun draw-moon ()
+  (let ((distance -1.0))
+    (gl:with-primitives :quads
+      (vvv 1.0 1.0 1.0  -1.0 1.0 distance)
+      (vvv 1.0 1.0 0.0 -1.0 -1.0 distance)
+      (vvv 1.0 0.0 0.0 1.0  -1.0 distance)
+      (vvv 1.0 0.0 1.0  1.0  1.0 distance))))
+
+(defun draw-box (minx miny minz maxx maxy maxz)
+  (let ((h0 0.0)
+	(h1 (/ 1.0 3.0))
+	(h2 (/ 2.0 3.0))
+	(h3 (/ 3.0 3.0))
+	(w0 0.0)
+	(w1 (/ 1.0 4.0))
+	(w2 (/ 2.0 4.0))
+	(w3 (/ 3.0 4.0))
+	(w4 (/ 4.0 4.0)))
+    (gl:with-primitives :quads
+      (vvv 0.0 w2 h3 minx maxy minz)
+      (vvv 0.0 w2 h2 maxx maxy minz)
+      (vvv 0.0 w1 h2 maxx maxy maxz)
+      (vvv 0.0 w1 h3 minx maxy maxz)
+
+      ;;j-
+      (vvv 0.0 w2 h0 minx miny minz)
+      (vvv 0.0 w1 h0 minx miny maxz)
+      (vvv 0.0 w1 h1 maxx miny maxz)
+      (vvv 0.0 w2 h1 maxx miny minz)
+
+      ;;k-
+      (vvv 0.0 w3 h2 minx maxy minz)
+      (vvv 0.0 w3 h1 minx miny minz)
+      (vvv 0.0 w2 h1 maxx miny minz)
+      (vvv 0.0 w2 h2 maxx maxy minz)
+
+      ;;k+
+      (vvv 0.0 w1 h1 maxx miny maxz)
+      (vvv 0.0 w0 h1 minx miny maxz)
+      (vvv 0.0 w0 h2 minx maxy maxz)
+      (vvv 0.0 w1 h2 maxx maxy maxz)
+      
+      ;;i-
+      (vvv 0.0 w3 h1 minx miny minz)
+      (vvv 0.0 w3 h2 minx maxy minz)
+      (vvv 0.0 w4 h2 minx maxy maxz)
+      (vvv 0.0 w4 h1 minx miny maxz)
+
+      ;;i+
+      (vvv 0.0 w2 h1 maxx miny minz)
+      (vvv 0.0 w1 h1 maxx miny maxz)
+      (vvv 0.0 w1 h2 maxx maxy maxz)
+      (vvv 0.0 w2 h2 maxx maxy minz))))
+

@@ -1,49 +1,34 @@
 (in-package :sandbox)
 
-(defun complex-modulus (c)
-  (sqrt (realpart (* c (conjugate c)))))
-
-(defun averager (amount)
-  (let ((the-array (make-array amount :element-type 'fixnum))
-	(index 0)
-	(tot 0))
-    (lambda (x)
-      (let ((old (aref the-array index)))
-	(setf tot (+ tot x (- old)))
-	(setf (aref the-array index) x))
-      (setf index (mod (1+ index) amount))
-      (values (/ (coerce tot 'single-float) amount) the-array))))
-
 (defun clamp (x min max)
   (max (min x max) min))
 
-(defparameter float-pi (coerce pi 'single-float))
-(defun rad-deg (rad)
-  (* rad (/ 180.0 float-pi)))
-(defun deg-rad (deg)
-  (* deg (/ float-pi 180.0)))
+(defun byte-read (path)
+   (with-open-file (stream path :element-type '(unsigned-byte 8))
+     (let* ((len (file-length stream))
+	    (data (make-array len :element-type '(unsigned-byte 8))))
+       (dotimes (n len)
+	 (setf (aref data n) (read-byte stream)))
+       data)))
 
-(defun ease (x target fraction)
-  (+ x (* fraction (- target x))))
+(defun file-string (path)
+  (with-open-file (stream path)
+    (let ((data (make-string (file-length stream))))
+      (read-sequence data stream)
+      data)))
 
-(define-modify-macro *= (&rest args)
-  *)
+(defun spill-hash (hash)
+  (loop for key being the hash-keys of hash
+     using (hash-value value)
+     do (format t "~S ~S~%" key value)))
 
-;;return the pitch and yaw of a unit direction vector
-(defun extract-polar-coords (vec)
-  (let ((zero (aref vec 0))
-	(two (aref vec 2)))
-    (values (asin (aref vec 1))
-	    (atan two zero))))
+(defun getapixel (h w image)
+  (destructuring-bind (height width c) (array-dimensions image)
+    (declare (ignore height))
+    (make-array 4 :element-type (array-element-type image)
+		:displaced-to image
+		:displaced-index-offset (* c (+ w (* h width))))))
 
-(defun unit-pitch-yaw (result pitch yaw)
-  (let ((cos-pitch (cos pitch)))
-    (setf (aref result 0) (* cos-pitch (cos yaw))
-	  (aref result 1) (sin pitch)
-	  (aref result 2) (* cos-pitch (sin yaw))))
-  result)
-
-(defparameter *fixnum-compare*
-  #+sbcl 'eq
-  #-sbcl 'eql)
-
+;;;;load a png image from a path
+(defun load-png (filename)
+  (opticl:read-png-file filename))

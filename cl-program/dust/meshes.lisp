@@ -23,8 +23,8 @@
 	(w2 (/ 2.0 4.0))
 	(w3 (/ 3.0 4.0))
 	(w4 (/ 4.0 4.0)))
-    (let ((neg -128.0)
-	  (pos 128.0))
+    (let ((neg -10.0)
+	  (pos 10.0))
       (gl:with-primitives :quads
 	;;j+
 	(vvv 1.0 w2 h3 neg pos neg)

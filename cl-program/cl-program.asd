@@ -10,20 +10,28 @@
     :serial t
     :components
     
-    ((:file "macrology") 
-     (:file "package")
-     (:file "hook-elisp")
-     (:file "misc")
-     (:file "imagewise")
-     (:file "camera-matrix") 
-     (:file "magic")
-     (:file "lovely-renderer")
-     (:file "aabbcc")
+    ((:module "macros"
+	      :serial t
+	      :components ((:file "package")
+			    
+			   (:file "dobox")
+			   (:file "progno")
+			   (:file "toggle")))
 
-     (:file "meshes")
+     (:file "package")
+
+     (:file "camera-matrix")
+     
+     (:file "misc")
+     
+     (:file "magic")
+     
+     (:file "lovely-renderer")
+     
+     (:file "aabbcc") 
+     
      (:file "draw-environment")
-     (:file "meshing-thread")
+     
      (:file "player-controls")
-    
-     (:file "sandbox")
-     ))
+     
+     (:file "sandbox")))

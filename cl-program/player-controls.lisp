@@ -1,23 +1,13 @@
 (in-package :sandbox)
 
-;;;;150 ms delay for sprinting
-;;;;player eye height is 1.5, subtract 1/8 for sneaking
-
-;;gravity is (* -0.08 (expt tickscale 2)) 0 0
-;;falling friction is 0.98
-;;0.6 * 0.91 is walking friction
-
-;;fov::
-;;70 is normal
-;;110 is quake pro
-
+(defconstant +single-float-pi+ (coerce pi 'single-float))
 
 (defparameter *yaw* nil)
 (defparameter *pitch* nil)
 (defparameter *xpos* nil)
 (defparameter *ypos* nil)
 (defparameter *zpos* nil)
-(defparameter defaultfov (deg-rad 70))
+(defparameter defaultfov (* 70 +single-float-pi+ 1/180))
 
 (defparameter *xvel* 0)
 (defparameter *yvel* 0)
@@ -68,7 +58,7 @@
       (unless onground
 	(setf speed (* speed 0.2))))    
     (let ((dir (complex 0 0)))
-      (when (e:key-p :w) ;;w
+       (when (e:key-p :w) ;;w
 	(incf dir #C(-1 0)))
       (when (or (e:key-p :a)) ;;a
 	(incf dir #C(0 1)))
@@ -80,12 +70,10 @@
 	(let ((rot-dir (* dir (cis *yaw*))))
 	  (let ((normalized (/ rot-dir (complex-modulus rot-dir))))
 	    (incf *xvel* (* speed (realpart normalized)))
-	    (incf *zvel* (* speed (imagpart normalized)))))))
-    (progno
-     (let ((speed (* net-scroll -0.002)))
-       (incf *xvel* (* speed look-x))
-       (incf *yvel* (* speed look-y))
-       (incf *zvel* (* speed look-z))))))
+	    (incf *zvel* (* speed (imagpart normalized)))))))))
+
+(defun complex-modulus (c)
+  (sqrt (realpart (* c (conjugate c)))))
 
 (defparameter mouse-sensitivity (coerce (* 60.0 pi 1/180) 'single-float))
 (defconstant two-pi (coerce (* 2 pi) 'single-float))
@@ -137,6 +125,14 @@
 	(let ((new-dir (cg-matrix:%transform-direction *new-dir* dir rot)))
 	  (multiple-value-bind (p y) (extract-polar-coords new-dir)
 	    (values y p)))))))
+
+;;return the pitch and yaw of a unit direction vector
+(defun extract-polar-coords (vec)
+  (let ((zero (aref vec 0))
+	(two (aref vec 2)))
+    (values (asin (aref vec 1))
+	    (atan two zero))))
+
 
 (defparameter mousecapturestate nil)
 (defun remove-spurious-mouse-input ()
@@ -197,6 +193,10 @@
 	(setf air-friction 0.98))
     (controls))
   ;;;;(collide-with-world)
+
+  (incf *xpos* *xvel*)
+  (incf *ypos* *yvel*)
+  (incf *zpos* *zvel*)
   
   (if fly
       (progn
@@ -229,105 +229,4 @@
 
 (defparameter *fist-function* (constantly nil))
 
-(defun myafunc (px py pz vx vy vz)
-  (if noclip
-      (values 1 nil nil nil)
-      (blocktocontact player-aabb px py pz vx vy vz)))
 
-(defmacro with-collidable-blocks ((xvar yvar zvar) (px py pz aabb vx vy vz) &body body)
-  `(multiple-value-bind (minx miny minz maxx maxy maxz)
-       (get-blocks-around ,px ,py ,pz ,aabb ,vx ,vy ,vz)
-     (dobox ((,xvar minx maxx)
-	     (,yvar miny maxy)
-	     (,zvar minz maxz))
-	    ,@body)))
-
-
-(defun smallest (i j k)
-  (if (< i j)
-      (if (< i k) ;;i < j j is out
-	  (values i t nil nil)	  ;;; i < k and i < j
-	  (if (= i k)
-	      (values i t nil t) ;;;tied for smallest
-	      (values k nil nil t)	     ;;; k < i <j
-	      ))
-      (if (< j k) ;;i>=j
-	  (if (= i j)
-	      (values i t t nil)
-	      (values j nil t nil)) ;;j<k and i<=j k is nout
-	  (if (= i k)
-	      (values i t t t)
-	      (if (= k j)
-		  (values k nil t t)
-		  (values k nil nil t))) ;;i>=j>=k 
-	  )))
-
-(defun aux-func (x dx)
-  (if (zerop dx)
-      nil
-      (if (plusp dx)
-	  (floor (1+ x))
-	  (ceiling (1- x)))))
-
-
-(defun aabb-collect-blocks (px py pz dx dy dz aabb func)
-  (declare (ignorable aabb))
-  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
-	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz)) aabb
-    (let ((total 1))
-      (let ((pluspdx (plusp dx))
-	    (pluspdy (plusp dy))
-	    (pluspdz (plusp dz))
-	    (zeropdx (zerop dx))
-	    (zeropdy (zerop dy))
-	    (zeropdz (zerop dz)))
-	(declare (ignorable pluspdx pluspdy pluspdz zeropdx zeropdy zeropdz))
-	(let ((xoffset (if zeropdx 0 (if pluspdx maxx minx)))
-	      (yoffset (if zeropdy 0 (if pluspdy maxy miny)))
-	      (zoffset (if zeropdz 0 (if pluspdz maxz minz))))
-	  (let ((x (+ px xoffset))
-		(y (+ py yoffset))
-		(z (+ pz zoffset)))
-	    (tagbody
-	     rep
-	       (let ((i-next (aux-func x dx))
-		     (j-next (aux-func y dy))
-		     (k-next (aux-func z dz)))
-		 (mvb (ratio i? j? k?) (smallest (if i-next
-						     (/ (- i-next x) dx)
-						     most-positive-single-float)
-						 (if j-next
-						     (/ (- j-next y) dy)
-						     most-positive-single-float)
-						 (if k-next
-						     (/ (- k-next z) dz)
-						     most-positive-single-float))	 
-		      (let ((newx (if i? i-next (+ x (* dx ratio))))
-			    (newy (if j? j-next (+ y (* dy ratio))))
-			    (newz (if k? k-next (+ z (* dz ratio)))))
-			(let ((aabb-posx (- newx xoffset))
-			      (aabb-posy (- newy yoffset))
-			      (aabb-posz (- newz zoffset)))
-			  (when i?
-			    (dobox ((j (floor (+ aabb-posy miny))
-				       (ceiling (+ aabb-posy maxy)))
-				    (k (floor (+ aabb-posz minz))
-				       (ceiling (+ aabb-posz maxz))))
-				   (funcall func (if pluspdx newx (1- newx)) j k)))
-			  (when j?
-			    (dobox ((i (floor (+ aabb-posx minx))
-				       (ceiling (+ aabb-posx maxx)))
-				    (k (floor (+ aabb-posz minz))
-				       (ceiling (+ aabb-posz maxz))))
-				   (funcall func i (if pluspdy newy (1- newy)) k)))
-			  (when k?
-			    (dobox ((j (floor (+ aabb-posy miny))
-				       (ceiling (+ aabb-posy maxy)))
-				    (i (floor (+ aabb-posx minx))
-				       (ceiling (+ aabb-posx maxx))))
-				   (funcall func i j (if pluspdz newz (1- newz))))))
-			(setf x newx y newy z newz))
-		      (decf total ratio)
-		      (when (minusp total) (go end))
-		      (go rep)))
-	     end)))))))

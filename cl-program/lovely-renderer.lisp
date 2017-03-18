@@ -113,7 +113,7 @@
 	  (let ((type (case c
 			(3 :rgb)
 			(4 :rgba))))
-	    (let ((new-texture (create-texture (imagewise:array-flatten thepic) w h type)))
+	    (let ((new-texture (create-texture (array-flatten thepic) w h type)))
 	      new-texture))))
 
 (defun glActiveTexture (num)
@@ -259,3 +259,11 @@
   (gl:uniformf
    (gl:get-uniform-location *shader-program* name)
    thefloat))
+
+
+;;;turn a multidimensional array into a single dimensional array
+;;;of the same total length
+(defun array-flatten (array)
+  (make-array (array-total-size array)
+	      :displaced-to array
+	      :element-type (array-element-type array)))
