@@ -109,12 +109,15 @@
 		   (pic-texture thepic)))))
 
 (defun pic-texture (thepic)
-  (destructuring-bind (h w c) (array-dimensions thepic)
-	  (let ((type (case c
-			(3 :rgb)
-			(4 :rgba))))
-	    (let ((new-texture (create-texture (array-flatten thepic) w h type)))
-	      new-texture))))
+  (let ((dims (array-dimensions thepic)))
+    (let ((h (pop dims))
+	  (w (pop dims))) 
+      (let ((type (case (car dims)
+		    ((nil) :luminance)
+		    (3 :rgb)
+		    (4 :rgba))))
+	(let ((new-texture (create-texture (array-flatten thepic) w h type)))
+	  new-texture)))))
 
 (defun glActiveTexture (num)
   "sets the active texture"

@@ -7,6 +7,7 @@
 
 (defparameter *camera* nil) ;;global camera
 (defparameter *fog-ratio* 0.75)
+(defparameter vsync? t)
 
 (defun render ()
   (declare (optimize (safety 3) (debug 3)))
@@ -18,43 +19,19 @@
   (when (window:mice-locked-p)
     (look-around))
   (update-matrices *camera*)
-    (luse-shader :solidshader)
+  (luse-shader :solidshader)
+  (set-matrix "projectionmodelview"
+	      (cg-matrix:%transpose-matrix *temp-matrix* (camera-matrix-projection-view-player *camera*)))
   (bind-default-framebuffer)
+  (gl:enable :depth-test)
   (gl:clear
    :color-buffer-bit
    :depth-buffer-bit)
   (gl:viewport 0 0 e:*width* e:*height*)
-  (draw-sky)
+  (bind-shit :font)
+  (ldrawlist :background)
+  (draw-skybox)
   (window:update-display))
-
-(defun draw-sky ()
-  (progn
-    (set-matrix "projectionmodelview"
-		(cg-matrix:%transpose-matrix *temp-matrix* (camera-matrix-projection-view *camera*)))
-    (bind-shit :skybox)
-    ;(gl:bind-texture :texture-2d *framebuffer-texture*)
-    (ldrawlist :skybox))
-  (progn
-    (let ((time (/ (float *ticks*) 50.0)))
-      (set-matrix "projectionmodelview"
-		  (cg-matrix:%transpose-matrix
-		   *temp-matrix*
-		   (cg-matrix:matrix*
-		    (camera-matrix-projection-view *camera*)
-		    (cg-matrix:rotate-around
-		     (cg-matrix:vec -1.0 0.0 0.0)
-		     time)
-		    (cg-matrix:scale* 1.0 1.0 9.0))))
-
-      (gl:enable :blend)
-      (gl:blend-func :src-alpha :src-alpha)
-      (bind-shit :sun)
-      (ldrawlist :sun)
-      
-      (bind-shit :moon)
-     (ldrawlist :moon))
-    (gl:disable :blend)))
-
 
 
 (defparameter *crosshair-size* 20.0)
@@ -65,43 +42,6 @@
   (clamp x 0.0 1.0))
 
 (defparameter *vec4* (make-array 4 :element-type 'single-float)) 
-(defun vec4 (vec3)
-  (setf (aref *vec4* 0) (aref vec3 0))
-  (setf (aref *vec4* 1) (aref vec3 1))
-  (setf (aref *vec4* 2) (aref vec3 2))
-  *vec4*)
-
-(defun set-overworld-fog (time)
-  (let ((x (fractionalize (* time 0.0)))
-	(y (fractionalize (* time 0.0)))
-	(z (fractionalize (* time 0.0))))
-    (gl:clear-color x y z 1.0)
-    (setf (aref *avector* 0) x
-	  (aref *avector* 1) y
-	  (aref *avector* 2) z)
-    (set-vec3 "fogcolor" *avector*)
-    (set-vec4 "cameraPos" (camera-vec-position *camera*))
-    (set-float "foglet" (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
-    (set-float "aratio" (/ 1.0 *fog-ratio*))))
-
-(defun draw-fist (camera)
-  (gl:line-width 1.0)
-  (set-matrix
-   "projectionmodelview"
-   (cg-matrix:%transpose-matrix
-    *temp-matrix*
-    (cg-matrix:%matrix*
-     *temp-matrix2*
-     (camera-matrix-projection-view-player camera)
-     (cg-matrix:%translate*
-      *temp-matrix*
-      (+ (coerce fist-side-x 'single-float))
-      (+ (coerce fist-side-y 'single-float))
-      (+ (coerce fist-side-z 'single-float))))))
-  (gl:disable :cull-face :blend)
-  (gl:polygon-mode :front-and-back :line)
-  (ldrawlist :selected-box)
-  (gl:polygon-mode :front-and-back :fill))
 
 (defun draw-framebuffer ()
   (gl:enable :blend)
@@ -109,56 +49,6 @@
   (gl:bind-texture :texture-2d *framebuffer-texture*)
   (ldrawlist :background))
 
-;;;the crosshair does not belong in the hud because the blending is
-;;;different
-(defun draw-crosshair ()
-  (bind-shit :gui)
-  (gl:blend-func :one-minus-dst-color :one-minus-src-color)
-  (ldrawlist :crosshair))
-
-(defun draw-hud ()
-  (bind-custom-framebuffer)
-  (gl:clear-color 0.0 0.0 0.0 0.0)
-;  (gl:clear :color-buffer-bit)
-  (gl:enable :blend)
-  (gl:blend-func :src-alpha :one-minus-src-alpha)
-  (bind-shit :gui)
-  (ldrawlist :gui)
-  (ldrawlist :hotbar-selector))
-
-(defun draw-chunk-meshes ()
-  (gl:enable :depth-test)  
-  (gl:depth-func :less)
-
-  (gl:enable :cull-face)
-  (gl:cull-face :back)
-  (bind-shit :terrain)
-  (name-mesh :world #'draw-world)
-  (ldrawlist :world))
-
-(defun draw-world ()
-  (maphash
-   (lambda (key display-list)
-     (when (numberp key)
-       (gl:call-list display-list)))
-   *g/chunk-call-list*))
-
-(progn
-  (defparameter *g/chunk-call-list* (make-hash-table :test 'eq));;opengl call lists
-  (defun get-chunk-display-list (name)
-    (gethash name *g/chunk-call-list*))
-  (defun set-chunk-display-list (name list-num)
-    (setf (gethash name *g/chunk-call-list*) list-num))
-  (defun remove-chunk-display-list (name)
-    (remhash name *g/chunk-call-list*)))
-
-(defun distance-to-player (x y z)
-  (let ((dx (- *xpos* x))
-	(dy (- *ypos* y))
-	(dz (- *zpos* z)))
-    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
-
-(defparameter vsync? t)
 
 (defun glinnit ()
   (setf *camera* (make-camera))
@@ -212,20 +102,14 @@
   (clean-framebuffers)
   (set-framebuffer))
 
-(defparameter ourdir
-  (make-pathname :host (pathname-host #.(or *compile-file-truename*
-					    *load-truename*))
-		 :directory (pathname-directory #.(or *compile-file-truename*
-						      *load-truename*))))
 (defparameter dir-resource (merge-pathnames #P"res/" ourdir))
 (defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
-(defparameter dir-mc-assets (merge-pathnames "moreshit/" dir-resource))
 
 (defun shader-path (name)
   (merge-pathnames name dir-shader))
 
 (defun img-path (name)
-  (merge-pathnames name dir-mc-assets))
+  (merge-pathnames name dir-resource))
 
 (defun name-mesh (display-list-name mesh-func)
   (setf (gethash display-list-name *g/call-list-backup*)
@@ -256,12 +140,20 @@
 
 ;;;;flip an image in-place - three dimensions - does not conse
 (defun flip-image (image)
-  (destructuring-bind (height width components) (array-dimensions image)
-    (dotimes (h (- height (ash height -1)))
-      (dotimes (w width)
-	(dotimes (c components)
-	  (rotatef (aref image (- height h 1) w c)
-		   (aref image h w c))))))
+  (let ((dims (array-dimensions image)))
+    (let ((height (pop dims))
+	  (width (pop dims)))
+      (if dims
+	  (let ((components (car dims)))
+	    (dobox ((h 0 (- height (ash height -1)))
+		    (w 0 width)
+		    (c 0 components))
+		   (rotatef (aref image (- height h 1) w c)
+			    (aref image h w c))))
+	  (dobox ((h 0 (- height (ash height -1)))
+		  (w 0 width))
+	      (rotatef (aref image (- height h 1) w)
+		       (aref image h w))))))
   image)
 
 (defun src-text (name src-path)
@@ -271,14 +163,10 @@
 	  (file-string src-path))))
 
 (defun load-some-images ()
-  (src-image "skybox/cheap.png" (img-path #P"skybox/cheap.png"))
-  (src-image "terrain/sun.png" (img-path #P"terrain/sun.png"))
-  (src-image "terrain/moon.png" (img-path #P"terrain/moon.png")))
+  (src-image "font/font.png" (img-path #P"font/font.png")))
 
 (defun texture-imageries ()
-  (texture-imagery :skybox "skybox/cheap.png")
-  (texture-imagery :sun "terrain/sun.png")
-  (texture-imagery :moon "terrain/moon.png"))
+  (texture-imagery :font "font/font.png"))
 (defun name-shaders ()
   (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
 					      ("texCoord" . 2)
@@ -287,10 +175,7 @@
 					      ("texCoord" . 2)
 					      ("darkness" . 8))))
 (defun name-funcs ()
-  (progn (name-mesh :skybox #'draw-skybox)
-	 (name-mesh :sun #'draw-sun)
-	 (name-mesh :moon #'draw-moon)
-	 (name-mesh :background #'draw-background)))
+  (name-mesh :background #'draw-background))
 
 (defun load-shaders ()
   (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
@@ -361,66 +246,4 @@
 	(vvv 1.0 w1 h1 pos neg pos)
 	(vvv 1.0 w1 h2 pos pos pos)
 	(vvv 1.0 w2 h2 pos pos neg)))))
-
-(defun draw-sun ()
-  (let ((distance 1.0))
-    (gl:with-primitives :quads
-      (vvv 1.0 1.0 1.0  1.0 -1.0 distance)
-      (vvv 1.0 1.0 0.0 -1.0 -1.0 distance)
-      (vvv 1.0 0.0 0.0 -1.0  1.0 distance)
-      (vvv 1.0 0.0 1.0  1.0  1.0 distance))))
-
-(defun draw-moon ()
-  (let ((distance -1.0))
-    (gl:with-primitives :quads
-      (vvv 1.0 1.0 1.0  -1.0 1.0 distance)
-      (vvv 1.0 1.0 0.0 -1.0 -1.0 distance)
-      (vvv 1.0 0.0 0.0 1.0  -1.0 distance)
-      (vvv 1.0 0.0 1.0  1.0  1.0 distance))))
-
-(defun draw-box (minx miny minz maxx maxy maxz)
-  (let ((h0 0.0)
-	(h1 (/ 1.0 3.0))
-	(h2 (/ 2.0 3.0))
-	(h3 (/ 3.0 3.0))
-	(w0 0.0)
-	(w1 (/ 1.0 4.0))
-	(w2 (/ 2.0 4.0))
-	(w3 (/ 3.0 4.0))
-	(w4 (/ 4.0 4.0)))
-    (gl:with-primitives :quads
-      (vvv 0.0 w2 h3 minx maxy minz)
-      (vvv 0.0 w2 h2 maxx maxy minz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      (vvv 0.0 w1 h3 minx maxy maxz)
-
-      ;;j-
-      (vvv 0.0 w2 h0 minx miny minz)
-      (vvv 0.0 w1 h0 minx miny maxz)
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w2 h1 maxx miny minz)
-
-      ;;k-
-      (vvv 0.0 w3 h2 minx maxy minz)
-      (vvv 0.0 w3 h1 minx miny minz)
-      (vvv 0.0 w2 h1 maxx miny minz)
-      (vvv 0.0 w2 h2 maxx maxy minz)
-
-      ;;k+
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w0 h1 minx miny maxz)
-      (vvv 0.0 w0 h2 minx maxy maxz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      
-      ;;i-
-      (vvv 0.0 w3 h1 minx miny minz)
-      (vvv 0.0 w3 h2 minx maxy minz)
-      (vvv 0.0 w4 h2 minx maxy maxz)
-      (vvv 0.0 w4 h1 minx miny maxz)
-
-      ;;i+
-      (vvv 0.0 w2 h1 maxx miny minz)
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      (vvv 0.0 w2 h2 maxx maxy minz))))
 

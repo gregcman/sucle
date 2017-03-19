@@ -19,19 +19,20 @@
 			   (:file "toggle")))
 
      (:file "package")
-
-     (:file "camera-matrix")
+     (:file "repl")
      
-     (:file "misc")
+     (:file "camera-matrix") ;;;1st person perspective vision
      
-     (:file "magic")
+     (:file "misc") ;;;everything else
      
-     (:file "lovely-renderer")
+     (:file "magic") ;;; rudimentary dependency system
      
-     (:file "aabbcc") 
+     (:file "lovely-renderer") ;;;layers over opengl
      
-     (:file "draw-environment")
+     (:file "aabbcc") ;;;box collisions
      
-     (:file "player-controls")
+     (:file "draw-environment") ;;;random rendering
      
-     (:file "sandbox")))
+     (:file "player-controls");;;layers over input
+     
+     (:file "sandbox"))) ;;;initialization and loop

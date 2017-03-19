@@ -1,5 +1,11 @@
 (in-package :sandbox)
 
+(defparameter ourdir
+  (make-pathname :host (pathname-host #.(or *compile-file-truename*
+					    *load-truename*))
+		 :directory (pathname-directory #.(or *compile-file-truename*
+						      *load-truename*))))
+
 (defun clamp (x min max)
   (max (min x max) min))
 
@@ -32,3 +38,31 @@
 ;;;;load a png image from a path
 (defun load-png (filename)
   (opticl:read-png-file filename))
+
+(defparameter *save* #P"third/")
+
+(defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
+
+(defun save (filename &rest things)
+  (let ((path (merge-pathnames filename *saves-dir*)))
+    (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
+      (dolist (thing things)
+	(prin1 thing stream)))))
+
+(defun save2 (thingfilename &rest things)
+  (apply #'save (merge-pathnames (format nil "~s" thingfilename) *save*) things))
+
+(defun myload2 (thingfilename)
+  (myload (merge-pathnames (format nil "~s" thingfilename) *save*)))
+
+(defun myload (filename)
+  (let ((path (merge-pathnames filename *saves-dir*)))
+    (let ((things nil))
+      (with-open-file (stream path :direction :input :if-does-not-exist nil)
+	(tagbody rep
+	   (let ((thing (read stream nil nil)))
+	     (when thing
+	       (push thing things)
+	       (go rep)))))
+      (nreverse things))))
+
