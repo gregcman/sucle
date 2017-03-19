@@ -25,32 +25,15 @@
    :depth-buffer-bit)
   (gl:viewport 0 0 e:*width* e:*height*)
   (bind-shit :font)
+  
   (ldrawlist :background)
   (ldrawlist :skybox)
   (window:update-display))
-
-
-(defparameter *crosshair-size* 20.0)
-(defparameter *hotbar-box-size* (* 22 4))
-(defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
-
-(defun fractionalize (x)
-  (clamp x 0.0 1.0))
-
-(defparameter *vec4* (make-array 4 :element-type 'single-float)) 
-
-(defun draw-framebuffer ()
-  (gl:enable :blend)
-  (gl:depth-func :always)
-  (gl:bind-texture :texture-2d *framebuffer-texture*)
-  (ldrawlist :background))
-
 
 (defun glinnit ()
   (setf *camera* (make-camera))
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (setf *shader-program* nil)
-  (setf mesher-thread nil)
   
   (let ((width (if t 480 854))
 	(height (if t 360 480)))

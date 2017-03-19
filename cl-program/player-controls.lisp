@@ -165,20 +165,3 @@
   (when (and gravity (not onground))
     (decf *yvel* (* 0.08 (expt tickscale 2))))
   (setf *yvel* (* *yvel* air-friction)))
-
-
-(progno
- (defun collide-with-world ()
-   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
-       (aabbcc::step-motion #'myafunc
-			    *xpos* *ypos* *zpos*
-			    *xvel* *yvel* *zvel*)
-     (setf *xpos* new-x)
-     (setf *ypos* new-y)
-     (setf *zpos* new-z)
-     (multiple-value-bind (x y z) (aabbcc::clamp-vec
-				   *xvel* *yvel* *zvel*
-				   xclamp yclamp zclamp)
-       (setf *xvel* x)
-       (setf *yvel* y)
-       (setf *zvel* z)))))

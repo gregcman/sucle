@@ -19,15 +19,12 @@
 			   (:file "toggle")))
 
      (:file "package")
-     (:file "repl")
      
      (:file "camera-matrix") ;;;1st person perspective vision
      
      (:file "misc") ;;;everything else
      
      (:file "lovely-renderer") ;;;layers over opengl
-     
-     (:file "aabbcc") ;;;box collisions
      
      (:file "draw-environment") ;;;random rendering
      
