@@ -25,8 +25,6 @@
      
      (:file "misc") ;;;everything else
      
-     (:file "magic") ;;; rudimentary dependency system
-     
      (:file "lovely-renderer") ;;;layers over opengl
      
      (:file "aabbcc") ;;;box collisions

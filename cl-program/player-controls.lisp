@@ -1,46 +1,30 @@
 (in-package :sandbox)
 
-(defconstant +single-float-pi+ (coerce pi 'single-float))
+(defparameter noclip nil)
 
-(defparameter *yaw* nil)
-(defparameter *pitch* nil)
-(defparameter *xpos* nil)
-(defparameter *ypos* nil)
-(defparameter *zpos* nil)
-(defparameter defaultfov (* 70 +single-float-pi+ 1/180))
+(defparameter *xpos* 0f0)
+(defparameter *ypos* 0f0)
+(defparameter *zpos* 0f0)
 
 (defparameter *xvel* 0)
 (defparameter *yvel* 0)
 (defparameter *zvel* 0)
 
+(defparameter fly t)
+
+(defparameter *yaw* 0f0)
+(defparameter *pitch* 0f0)
+ 
+(defparameter defaultfov (* 70 +single-float-pi+ 1/180))
+
 (defparameter air-friction 0.98)
 (defparameter walking-friction (* 0.6 0.9))
 
-(defparameter noclip nil)
 (defparameter gravity nil)
-(defparameter fly t)
 
-(defparameter *hotbar-selection* 2)
 
 (defparameter onground nil)
-
-(defparameter fist-side-x nil)
-(defparameter fist-side-y nil)
-(defparameter fist-side-z nil)
-
-(defparameter fist? nil)
-(defparameter fist-side nil)
-(defparameter fistx 0.0)
-(defparameter fisty 0.0)
-(defparameter fistz 0.0)
-
-(defparameter reach 4.0)
-
-(setf *xpos* 0.0
-      *ypos* 0.0
-      *zpos* 0.0
-      *yaw* 0.0
-      *pitch* 0.0)
+(defparameter *fist-function* (constantly nil))
 
 (defun controls ()
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
@@ -57,14 +41,14 @@
 	  (incf *yvel* (* (if t 0.49 0.42) (expt tickscale 1)))))
       (unless onground
 	(setf speed (* speed 0.2))))    
-    (let ((dir (complex 0 0)))
-       (when (e:key-p :w) ;;w
+    (let ((dir 0))
+      (when (e:key-p :w)
 	(incf dir #C(-1 0)))
-      (when (or (e:key-p :a)) ;;a
+      (when (e:key-p :a)
 	(incf dir #C(0 1)))
-      (when (e:key-p :s) ;;s
+      (when (e:key-p :s)
 	(incf dir #C(1 0)))
-      (when (or (e:key-p :d)) ;;d
+      (when (e:key-p :d)
 	(incf dir #C(0 -1)))
       (unless (zerop dir)
 	(let ((rot-dir (* dir (cis *yaw*))))
@@ -76,8 +60,6 @@
   (sqrt (realpart (* c (conjugate c)))))
 
 (defparameter mouse-sensitivity (coerce (* 60.0 pi 1/180) 'single-float))
-(defconstant two-pi (coerce (* 2 pi) 'single-float))
-(defconstant half-pi (coerce (/ pi 2) 'single-float))
 
 (defun look-around ()
   (mouse-looking))
@@ -86,10 +68,10 @@
     (let ((x (* mouse-sensitivity (/ dx 360.0)))
 	  (y (* mouse-sensitivity (/ dy 360.0))))
       (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
-	(setf *yaw* (mod (+ *yaw* dyaw) two-pi))
+	(setf *yaw* (mod (+ *yaw* dyaw) +single-float-two-pi+))
 	(setf *pitch* (clamp (+ *pitch* dpitch)
-			     (* -0.99 half-pi)
-			     (* 0.99 half-pi)))))))
+			     (* -0.99 +single-float-half-pi+)
+			     (* 0.99 +single-float-half-pi+)))))))
 
 (defparameter old-mouse-x 0)
 (defparameter old-mouse-y 0)
@@ -112,9 +94,7 @@
 	  (new-direction (coerce x 'single-float)
 			 (coerce y 'single-float)))))
 
-(defparameter *temp-matrix3* (cg-matrix:identity-matrix))
 
-(defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0))
 (defparameter *new-dir* (cg-matrix:vec 0.0 0.0 0.0))
 (defun new-direction (dx dy)
   (let ((size (sqrt (+ (* dx dx) (* dy dy)))))
@@ -145,10 +125,7 @@
 	((t)))
       (setq mousecapturestate nil)))
 
-(defun hotbar-add (num)
-  (setf *hotbar-selection* (truncate (mod (+ num *hotbar-selection*) 9))))
 
-(defparameter daytime 1.0)
 (defparameter ticks/sec nil)
 (defparameter tickscale nil)
 (defparameter tick-delay nil)
@@ -160,39 +137,17 @@
 
 (defparameter net-scroll 0)
 
-(defparameter walkblock nil)
-(defparameter foo nil)
 (defun physics ()
   ;;e to escape mouse
   (when (e:key-j-p :E) (window:toggle-mouse-capture))
-  (hotbar-add e:*scroll-y*)
-  (unless (zerop e:*scroll-y*)
-    (lcalllist-invalidate :hotbar-selector))
-  (macrolet ((k (number-key)
-	       (let ((symb (intern (write-to-string number-key) :keyword)))
-		 `(when (e:key-j-p ,symb)
-		    (setf *hotbar-selection* ,(1- number-key))
-		    (lcalllist-invalidate :hotbar-selector)))))
-    (k 1)
-    (k 2)
-    (k 3)
-    (k 4)
-    (k 5)
-    (k 6)
-    (k 7)
-    (k 8)
-    (k 9))
   (when (window:mice-locked-p)
     (when (e:key-j-p :v) (toggle noclip))
     (when (e:key-j-p :g) (toggle gravity))
     (when (e:key-j-p :f) (toggle fly))
-    (when (e:key-j-p :c) (toggle walkblock))
-    (when (e:key-j-p :h) (time (setf foo (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte))))
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
     (controls))
-  ;;;;(collide-with-world)
 
   (incf *xpos* *xvel*)
   (incf *ypos* *yvel*)
@@ -212,21 +167,18 @@
   (setf *yvel* (* *yvel* air-friction)))
 
 
-(defun collide-with-world ()
-  (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
-      (aabbcc::step-motion #'myafunc
-			   *xpos* *ypos* *zpos*
-			   *xvel* *yvel* *zvel*)
-    (setf *xpos* new-x)
-    (setf *ypos* new-y)
-    (setf *zpos* new-z)
-    (multiple-value-bind (x y z) (aabbcc::clamp-vec
-				  *xvel* *yvel* *zvel*
-				  xclamp yclamp zclamp)
-      (setf *xvel* x)
-      (setf *yvel* y)
-      (setf *zvel* z))))
-
-(defparameter *fist-function* (constantly nil))
-
-
+(progno
+ (defun collide-with-world ()
+   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
+       (aabbcc::step-motion #'myafunc
+			    *xpos* *ypos* *zpos*
+			    *xvel* *yvel* *zvel*)
+     (setf *xpos* new-x)
+     (setf *ypos* new-y)
+     (setf *zpos* new-z)
+     (multiple-value-bind (x y z) (aabbcc::clamp-vec
+				   *xvel* *yvel* *zvel*
+				   xclamp yclamp zclamp)
+       (setf *xvel* x)
+       (setf *yvel* y)
+       (setf *zvel* z)))))

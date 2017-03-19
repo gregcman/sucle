@@ -1,17 +1,13 @@
 (in-package :sandbox)
 
 ;;matrix multiplication is associative
-
-(defparameter *temp-matrix* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
-(defparameter *temp-matrix2* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
-
+ ;;;opengl stored matrices the transpose of sb-cga
 (defparameter *camera* nil) ;;global camera
 (defparameter *fog-ratio* 0.75)
 (defparameter vsync? t)
 
 (defun render ()
   (declare (optimize (safety 3) (debug 3)))
-
   (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
   (if vsync?
       (window::set-vsync t)
@@ -30,7 +26,7 @@
   (gl:viewport 0 0 e:*width* e:*height*)
   (bind-shit :font)
   (ldrawlist :background)
-  (draw-skybox)
+  (ldrawlist :skybox)
   (window:update-display))
 
 
@@ -175,7 +171,8 @@
 					      ("texCoord" . 2)
 					      ("darkness" . 8))))
 (defun name-funcs ()
-  (name-mesh :background #'draw-background))
+  (name-mesh :background #'draw-background)
+  (name-mesh :skybox #'draw-skybox))
 
 (defun load-shaders ()
   (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
