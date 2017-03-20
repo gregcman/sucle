@@ -28,7 +28,7 @@
 
 (defun controls ()
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
-  (let ((speed (* 0.4 (expt tickscale 2))))
+  (let ((speed 0.04444445))
     (when fly
       (setf speed 0.024)
       (when (e:key-p :space)
@@ -38,7 +38,7 @@
     (unless fly
       (when onground
 	(when (or (e:mice-j-p :|3|) (e:key-p :space)) ;;jumping
-	  (incf *yvel* (* (if t 0.49 0.42) (expt tickscale 1)))))
+	  (incf *yvel* 0.16333334)))
       (unless onground
 	(setf speed (* speed 0.2))))    
     (let ((dir 0))
@@ -125,21 +125,11 @@
 	((t)))
       (setq mousecapturestate nil)))
 
-
-(defparameter ticks/sec nil)
-(defparameter tickscale nil)
-(defparameter tick-delay nil)
-
-(defun physinnit ()
-  (setf ticks/sec 60.0)
-  (setf tickscale (/ 20.0 ticks/sec))
-  (setf tick-delay (/ 1000000.0 ticks/sec)))
-
 (defparameter net-scroll 0)
 
 (defun physics ()
   ;;e to escape mouse
-  (when (e:key-j-p :E) (window:toggle-mouse-capture))
+  (when (e:key-j-p :e) (window:toggle-mouse-capture))
   (when (window:mice-locked-p)
     (when (e:key-j-p :v) (toggle noclip))
     (when (e:key-j-p :g) (toggle gravity))
@@ -147,6 +137,8 @@
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
+    (remove-spurious-mouse-input)
+    (look-around)
     (controls))
 
   (incf *xpos* *xvel*)
@@ -163,5 +155,5 @@
 	    (t (setf *xvel* (* *xvel* 0.9))
 	       (setf *zvel* (* *zvel* 0.9)))))
   (when (and gravity (not onground))
-    (decf *yvel* (* 0.08 (expt tickscale 2))))
+    (decf *yvel* 0.008888889))
   (setf *yvel* (* *yvel* air-friction)))

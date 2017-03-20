@@ -3,8 +3,9 @@
 ;;matrix multiplication is associative
  ;;;opengl stored matrices the transpose of sb-cga
 (defparameter *camera* nil) ;;global camera
-(defparameter *fog-ratio* 0.75)
 (defparameter vsync? t)
+
+(defconstant +mat4-identity+ (cg-matrix:identity-matrix))
 
 (defun render ()
   (declare (optimize (safety 3) (debug 3)))
@@ -12,22 +13,25 @@
   (if vsync?
       (window::set-vsync t)
       (window::set-vsync nil))
-  (when (window:mice-locked-p)
-    (look-around))
   (update-matrices *camera*)
   (luse-shader :solidshader)
-  (set-matrix "projectionmodelview"
-	      (cg-matrix:%transpose-matrix *temp-matrix* (camera-matrix-projection-view-player *camera*)))
-  (bind-default-framebuffer)
+  (gl:uniform-matrix-4fv
+   (gl:get-uniform-location *shader-program* "projectionmodelview")
+   (camera-matrix-projection-view-player *camera*)
+   nil)
   (gl:enable :depth-test)
+  (bind-default-framebuffer)
   (gl:clear
    :color-buffer-bit
    :depth-buffer-bit)
   (gl:viewport 0 0 e:*width* e:*height*)
   (bind-shit :font)
-  
   (ldrawlist :background)
   (ldrawlist :skybox)
+  (gl:uniform-matrix-4fv
+   (gl:get-uniform-location *shader-program* "projectionmodelview")
+   +mat4-identity+)
+  (ldrawlist :background)
   (window:update-display))
 
 (defun glinnit ()
@@ -75,9 +79,6 @@
 (defun on-resize (w h)
   (setf *window-height* h
 	*window-width* w)
-  (lcalllist-invalidate :gui)
-  (lcalllist-invalidate :hotbar-selector)
-  (lcalllist-invalidate :crosshair)
   (clean-framebuffers)
   (set-framebuffer))
 
@@ -142,10 +143,10 @@
 	  (file-string src-path))))
 
 (defun load-some-images ()
-  (src-image "font/font.png" (img-path #P"font/font.png")))
+  (src-image :font-image (img-path #P"font/codepage-437-vga-9x16.png")))
 
 (defun texture-imageries ()
-  (texture-imagery :font "font/font.png"))
+  (texture-imagery :font :font-image))
 (defun name-shaders ()
   (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
 					      ("texCoord" . 2)

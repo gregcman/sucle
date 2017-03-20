@@ -237,33 +237,6 @@
       (gl:delete-shader fragmentShader)
       shaderProgram)))
 
-;;;various functions for setting uniforms 
-(defun set-matrix (name matrix)
-  (gl:uniform-matrix-4fv
-   (gl:get-uniform-location *shader-program* name)
-   matrix))
-
-(defun set-int (name thenumber)
-  (gl:uniformi
-   (gl:get-uniform-location *shader-program* name)
-   thenumber))
-
-(defun set-vec4 (name thevec4)
-  (gl:uniformfv
-   (gl:get-uniform-location *shader-program* name)
-   thevec4))
-
-(defun set-vec3 (name thevec3)
-  (gl:uniformfv
-   (gl:get-uniform-location *shader-program* name)
-   thevec3))
-
-(defun set-float (name thefloat)
-  (gl:uniformf
-   (gl:get-uniform-location *shader-program* name)
-   thefloat))
-
-
 ;;;turn a multidimensional array into a single dimensional array
 ;;;of the same total length
 (defun array-flatten (array)
