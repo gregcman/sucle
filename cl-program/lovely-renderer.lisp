@@ -64,14 +64,6 @@
 	  (when ans
 	    (set-shader name ans)))))))
 
-(defun set-framebuffer ()
-  (setf (values *framebuffer-texture* *framebuffer*)
-	(create-framebuffer e:*width* e:*height*)))
-
-(defun clean-framebuffers ()
-  (gl:delete-framebuffers-ext (list *framebuffer*))
-  (gl:delete-textures (list *framebuffer-texture*)))
-
 (defun lcalllist-invalidate (name)
   (let ((old (get-display-list name)))
     (remove-display-list name)
@@ -147,14 +139,11 @@
     (gl:generate-mipmap :texture-2d)
     the-shit))
 
-(defparameter *framebuffer* nil)
-(defparameter *framebuffer-texture* nil)
+(defun bind-custom-framebuffer (framebuffer)
+  (gl:bind-framebuffer-ext :framebuffer-ext framebuffer))
 
 (defun bind-default-framebuffer ()
   (gl:bind-framebuffer-ext :framebuffer-ext 0))
-
-(defun bind-custom-framebuffer ()
-  (gl:bind-framebuffer-ext :framebuffer-ext *framebuffer*))
 
 (defun create-framebuffer (w h)
   (let ((framebuffer (first (gl:gen-framebuffers-ext 1)))
@@ -165,7 +154,7 @@
 
     ;; setup texture and attach it to the framebuffer
     (gl:bind-texture :texture-2d texture)
-    (gl:tex-parameter :texture-2d :texture-min-filter :nearest-mipmap-nearest)
+    (gl:tex-parameter :texture-2d :texture-min-filter :nearest)
     (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
     (gl:tex-image-2d :texture-2d 0 :rgba w h 0 :rgba :unsigned-byte (cffi:null-pointer))
     (gl:generate-mipmap-ext :texture-2d)

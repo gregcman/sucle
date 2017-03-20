@@ -15,23 +15,36 @@
       (window::set-vsync nil))
   (update-matrices *camera*)
   (luse-shader :solidshader)
+
+  
+  (gl:uniform-matrix-4fv
+   (gl:get-uniform-location *shader-program* "projectionmodelview")
+   +mat4-identity+)
+  (bind-shit :font)
+  (bind-custom-framebuffer *framebuffer*)
+  (gl:viewport 0 0 *framebuffer-width* *framebuffer-height*)
+  (gl:clear-color 0f0 1f0 0f0 1f0)
+  (gl:disable :depth-test)
+  (draw-string-raster-char "hello-world" 16 9 0 0 0.5)
+  
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location *shader-program* "projectionmodelview")
    (camera-matrix-projection-view-player *camera*)
    nil)
   (gl:enable :depth-test)
+  
+  (gl:clear-color 1.0 0.0 0.0 1.0)
+  
   (bind-default-framebuffer)
-  (gl:clear
-   :color-buffer-bit
-   :depth-buffer-bit)
+  (gl:clear :depth-buffer-bit :color-buffer-bit
+	    )
   (gl:viewport 0 0 e:*width* e:*height*)
+  (gl:bind-texture :texture-2d *framebuffer-texture*)
+  (ldrawlist :background)
   (bind-shit :font)
-  (ldrawlist :background)
   (ldrawlist :skybox)
-  (gl:uniform-matrix-4fv
-   (gl:get-uniform-location *shader-program* "projectionmodelview")
-   +mat4-identity+)
-  (ldrawlist :background)
+ 
+  
   (window:update-display))
 
 (defun glinnit ()
@@ -43,7 +56,12 @@
 	(height (if t 360 480)))
     (window:push-dimensions width height))
   (setf e:*resize-hook* #'on-resize)
-  (set-framebuffer)
+  
+  (setf (values *framebuffer-texture* *framebuffer*)
+	(create-framebuffer *framebuffer-width* *framebuffer-height*))
+  (bind-custom-framebuffer *framebuffer*)
+  (gl:clear-color 0f0 1f0 0f0 1f0)
+  (gl:clear :color-buffer-bit)
 
   (name-funcs)
   (texture-imageries)
@@ -51,6 +69,15 @@
 
   (load-shaders)
   (load-some-images))
+
+(defparameter *framebuffer-width* 256)
+(defparameter *framebuffer-height* 256)
+(defparameter *framebuffer* nil)
+(defparameter *framebuffer-texture* nil)
+
+(defun clean-framebuffers ()
+  (gl:delete-framebuffers-ext (list *framebuffer*))
+  (gl:delete-textures (list *framebuffer-texture*)))
 
 (defun set-render-cam-pos (camera)
   (let ((vec (camera-vec-position camera))
@@ -78,9 +105,7 @@
 
 (defun on-resize (w h)
   (setf *window-height* h
-	*window-width* w)
-  (clean-framebuffers)
-  (set-framebuffer))
+	*window-width* w))
 
 (defparameter dir-resource (merge-pathnames #P"res/" ourdir))
 (defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
@@ -166,18 +191,21 @@
 
 (in-package :sandbox)
 
-(defmacro vvv (darkness u v x y z)
-  `(progn (%gl:vertex-attrib-1f 8 ,darkness)
-	  (%gl:vertex-attrib-2f 2 ,u ,v)
-	  (%gl:vertex-attrib-3f 0 ,x ,y ,z)))
+(declaim (inline vpc))
+(defun vpc (u v x y z)
+  (%gl:vertex-attrib-1f 8 1.0)
+  (%gl:vertex-attrib-2f 2 u v)
+  (%gl:vertex-attrib-3f 0 x y z))
+(declaim (notinline vpc))
 
 (defun draw-background ()
   (let ((distance 0.99999997))
-    (gl:with-primitives :quads
-      (vvv 1.0 0.0 0.0 -1.0 -1.0 distance)
-      (vvv 1.0 1.0 0.0 1.0 -1.0 distance)
-      (vvv 1.0 1.0 1.0 1.0 1.0 distance)
-      (vvv 1.0 0.0 1.0 -1.0 1.0 distance))))
+    (locally (declare (inline vpc))
+      (gl:with-primitives :quads
+	(vpc 0.0 0.0 -1.0 -1.0 distance)
+	(vpc 1.0 0.0 1.0 -1.0 distance)
+	(vpc 1.0 1.0 1.0 1.0 distance)
+	(vpc 0.0 1.0 -1.0 1.0 distance)))))
 
 (defun draw-skybox ()
   (let ((h0 0.0)
@@ -193,38 +221,58 @@
 	  (pos 10.0))
       (gl:with-primitives :quads
 	;;j+
-	(vvv 1.0 w2 h3 neg pos neg)
-	(vvv 1.0 w2 h2 pos pos neg)
-	(vvv 1.0 w1 h2 pos pos pos)
-	(vvv 1.0 w1 h3 neg pos pos)
+	(progn
+	  (vpc w2 h3 neg pos neg)
+	  (vpc w2 h2 pos pos neg)
+	  (vpc w1 h2 pos pos pos)
+	  (vpc w1 h3 neg pos pos))
+	(progn 	;;j-
+	  (vpc w2 h0 neg neg neg)
+	  (vpc w1 h0 neg neg pos)
+	  (vpc w1 h1 pos neg pos)
+	  (vpc w2 h1 pos neg neg))
+	(progn 	;;k-
+	  (vpc w3 h2 neg pos neg)
+	  (vpc w3 h1 neg neg neg)
+	  (vpc w2 h1 pos neg neg)
+	  (vpc w2 h2 pos pos neg))
+	(progn 	;;k+
+	  (vpc w1 h1 pos neg pos)
+	  (vpc w0 h1 neg neg pos)
+	  (vpc w0 h2 neg pos pos)
+	  (vpc w1 h2 pos pos pos))
+	(progn 	;;i-
+	  (vpc w3 h1 neg neg neg)
+	  (vpc w3 h2 neg pos neg)
+	  (vpc w4 h2 neg pos pos)
+	  (vpc w4 h1 neg neg pos))
+	(progn 	;;i+
+	  (vpc w2 h1 pos neg neg)
+	  (vpc w1 h1 pos neg pos)
+	  (vpc w1 h2 pos pos pos)
+	  (vpc w2 h2 pos pos neg))))))
 
-	;;j-
-	(vvv 1.0 w2 h0 neg neg neg)
-	(vvv 1.0 w1 h0 neg neg pos)
-	(vvv 1.0 w1 h1 pos neg pos)
-	(vvv 1.0 w2 h1 pos neg neg)
+(defconstant +single-float-one-sixteenth+ (coerce 1/16 'single-float))
 
-	;;k-
-	(vvv 1.0 w3 h2 neg pos neg)
-	(vvv 1.0 w3 h1 neg neg neg)
-	(vvv 1.0 w2 h1 pos neg neg)
-	(vvv 1.0 w2 h2 pos pos neg)
+(defun draw-raster-char-cell (code-point width height x y z)
+  (let ((width-unit (/ 8/9 width))
+	(height-unit (/ 8/9 height))
+	(xstart (/ x width))
+	(ystart (/ y height)))
+    (draw-raster-char code-point xstart ystart (+ xstart width-unit) (+ ystart height-unit) z)))
 
-	;;k+
-	(vvv 1.0 w1 h1 pos neg pos)
-	(vvv 1.0 w0 h1 neg neg pos)
-	(vvv 1.0 w0 h2 neg pos pos)
-	(vvv 1.0 w1 h2 pos pos pos)
-	
-	;;i-
-	(vvv 1.0 w3 h1 neg neg neg)
-	(vvv 1.0 w3 h2 neg pos neg)
-	(vvv 1.0 w4 h2 neg pos pos)
-	(vvv 1.0 w4 h1 neg neg pos)
+(defun draw-raster-char (code-point x1 y1 x2 y2 z)
+  (multiple-value-bind (vfoo ufoo) (floor code-point 16)
+    (let ((u (/ ufoo 16.0))
+	  (v (- 1.0 +single-float-one-sixteenth+ (/ vfoo 16.0))))
+      (let ((maxv (+ v +single-float-one-sixteenth+))
+	    (maxu (+ u +single-float-one-sixteenth+ (- (coerce (expt 2 -16) 'single-float)))))
+	(gl:with-primitives :quads
+	  (vpc u v x1 y1 z)
+	  (vpc maxu v x2 y1 z)
+	  (vpc maxu maxv x2 y2 z)
+	  (vpc u maxv x1 y2 z))))))
 
-	;;i+
-	(vvv 1.0 w2 h1 pos neg neg)
-	(vvv 1.0 w1 h1 pos neg pos)
-	(vvv 1.0 w1 h2 pos pos pos)
-	(vvv 1.0 w2 h2 pos pos neg)))))
-
+(defun draw-string-raster-char (string width height x y z)
+  (dotimes (position (length string))
+    (draw-raster-char-cell (char-code (aref string position)) width height (+ position x) y z)))
