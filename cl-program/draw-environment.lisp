@@ -16,36 +16,54 @@
   (update-matrices *camera*)
   (luse-shader :solidshader)
 
+
+  
+  (progn
+   (bind-custom-framebuffer *framebuffer*)
+   (gl:viewport 0 0 *framebuffer-width* *framebuffer-height*))
   
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location *shader-program* "projectionmodelview")
    +mat4-identity+)
   (bind-shit :font)
-  (bind-custom-framebuffer *framebuffer*)
-  (gl:viewport 0 0 *framebuffer-width* *framebuffer-height*)
   (gl:clear-color 0f0 1f0 0f0 1f0)
-  (gl:disable :depth-test)
-  (draw-string-raster-char "hello-world" 16 9 0 0 0.5)
   
-  (gl:uniform-matrix-4fv
-   (gl:get-uniform-location *shader-program* "projectionmodelview")
-   (camera-matrix-projection-view-player *camera*)
-   nil)
-  (gl:enable :depth-test)
+  (progn
+    (gl:clear :color-buffer-bit :depth-buffer-bit)
+    (gl:disable :depth-test)
+    (lcalllist-invalidate :string)
+    (name-mesh :string (lambda ()
+			 (gl:with-primitives :quads
+			   (draw-string-raster-char foo (floor 256 9) (floor 256 16) 0 12 0.5))))
+    (ldrawlist :string))
+
+  (progn
+   (gl:uniform-matrix-4fv
+    (gl:get-uniform-location *shader-program* "projectionmodelview")
+    (camera-matrix-projection-view-player *camera*)
+    nil)
+   (gl:enable :depth-test)
+   
+   (gl:clear-color 1.0 0.0 0.0 1.0)
+   
+   (bind-default-framebuffer)
+   (gl:viewport 0 0 e:*width* e:*height*)
+   (gl:clear :depth-buffer-bit :color-buffer-bit
+	     )
+   (gl:bind-texture :texture-2d *framebuffer-texture*)
+   (ldrawlist :background)
+   (bind-shit :font)
+   (ldrawlist :skybox))
   
-  (gl:clear-color 1.0 0.0 0.0 1.0)
-  
-  (bind-default-framebuffer)
-  (gl:clear :depth-buffer-bit :color-buffer-bit
-	    )
-  (gl:viewport 0 0 e:*width* e:*height*)
-  (gl:bind-texture :texture-2d *framebuffer-texture*)
-  (ldrawlist :background)
-  (bind-shit :font)
-  (ldrawlist :skybox)
- 
   
   (window:update-display))
+
+(defparameter foo
+  "
+(lambda (x) (* 2 x))
+(lambda (x) (print x))
+(lambda (x) (* x x))
+(lambda (x) (values x x x x))")
 
 (defun glinnit ()
   (setf *camera* (make-camera))
@@ -70,8 +88,8 @@
   (load-shaders)
   (load-some-images))
 
-(defparameter *framebuffer-width* 256)
-(defparameter *framebuffer-height* 256)
+(defparameter *framebuffer-width* 512)
+(defparameter *framebuffer-height* 512)
 (defparameter *framebuffer* nil)
 (defparameter *framebuffer-texture* nil)
 
@@ -195,7 +213,8 @@
 (defun vpc (u v x y z)
   (%gl:vertex-attrib-1f 8 1.0)
   (%gl:vertex-attrib-2f 2 u v)
-  (%gl:vertex-attrib-3f 0 x y z))
+  (%gl:vertex-attrib-3f 0 x y z)
+  )
 (declaim (notinline vpc))
 
 (defun draw-background ()
@@ -255,24 +274,32 @@
 (defconstant +single-float-one-sixteenth+ (coerce 1/16 'single-float))
 
 (defun draw-raster-char-cell (code-point width height x y z)
-  (let ((width-unit (/ 8/9 width))
-	(height-unit (/ 8/9 height))
-	(xstart (/ x width))
-	(ystart (/ y height)))
-    (draw-raster-char code-point xstart ystart (+ xstart width-unit) (+ ystart height-unit) z)))
+  (let ((width-unit (/ 1.0 width))
+	(height-unit (/ 1.0 height))
+	(xstart (- (/ x width) 1.0))
+	(ystart (- (/ y height) 1.0)))
+    (draw-raster-char code-point xstart	ystart (+ xstart width-unit) (+ ystart height-unit) z)))
 
 (defun draw-raster-char (code-point x1 y1 x2 y2 z)
   (multiple-value-bind (vfoo ufoo) (floor code-point 16)
     (let ((u (/ ufoo 16.0))
 	  (v (- 1.0 +single-float-one-sixteenth+ (/ vfoo 16.0))))
       (let ((maxv (+ v +single-float-one-sixteenth+))
-	    (maxu (+ u +single-float-one-sixteenth+ (- (coerce (expt 2 -16) 'single-float)))))
-	(gl:with-primitives :quads
-	  (vpc u v x1 y1 z)
-	  (vpc maxu v x2 y1 z)
-	  (vpc maxu maxv x2 y2 z)
-	  (vpc u maxv x1 y2 z))))))
+	    (maxu (+ u +single-float-one-sixteenth+)))
+	(vpc u v x1 y1 z)
+	(vpc maxu v x2 y1 z)
+	(vpc maxu maxv x2 y2 z)
+	(vpc u maxv x1 y2 z)))))
 
 (defun draw-string-raster-char (string width height x y z)
-  (dotimes (position (length string))
-    (draw-raster-char-cell (char-code (aref string position)) width height (+ position x) y z)))
+  (let ((xoffset 0)
+	(yoffset 0))
+    (dotimes (position (length string))
+      (let ((char (aref string position)))
+	(if (char= char #\Newline)
+	    (progn
+	      (setf xoffset 0)
+	      (decf yoffset))
+	    (progn
+	      (draw-raster-char-cell (char-code char) width height (+ xoffset x) (+ yoffset y) z)
+	      (incf xoffset)))))))

@@ -130,6 +130,7 @@
 (defun physics ()
   ;;e to escape mouse
   (when (e:key-j-p :e) (window:toggle-mouse-capture))
+  (remove-spurious-mouse-input)
   (when (window:mice-locked-p)
     (when (e:key-j-p :v) (toggle noclip))
     (when (e:key-j-p :g) (toggle gravity))
@@ -137,7 +138,6 @@
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
-    (remove-spurious-mouse-input)
     (look-around)
     (controls))
 
