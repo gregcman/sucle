@@ -34,7 +34,7 @@
     (lcalllist-invalidate :string)
     (name-mesh :string (lambda ()
 			 (gl:with-primitives :quads
-			   (draw-string-raster-char foo (floor 256 9) (floor 256 16) 0 12 0.5))))
+			   (draw-string-raster-char foo (floor 256 9) (floor 256 16) 0 32 0.5))))
     (ldrawlist :string))
 
   (progn
