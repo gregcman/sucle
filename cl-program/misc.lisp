@@ -213,11 +213,11 @@
 	   (if (< hashcode *scratch-float-array-size*)
 	       (let ((array (aref *scratch-float-array* hashcode)))
 		 (declare (type (or nil (simple-array single-float (*))) array))
-		 (if (null array)
-		     (go new-chunk)
+		 (if array
 		     (progn
 		       (setf (aref array chunk-index) value)
-		       (go end))))
+		       (go end))
+		     (go new-chunk)))
 	       (progn
 		 (resize-scratch-float-array (next-power-of-two hashcode))
 		 (go new-chunk)))
@@ -227,13 +227,30 @@
 	     (setf (aref *scratch-float-array* hashcode) new-chunk))
 	 end)))))
 
+(progn
+  (declaim
+   (ftype
+    (function (fixnum (function (single-float))) (values))
+    iterate-scratch-float-array))
+  (locally (declare (optimize (speed 3) (safety 0))
+		    (inline get-get-index get-index))  
+    (defun iterate-scratch-float-array (n func)
+      (let ((last (get-get-index n)))
+	(dotimes (chunk (1+ last))
+	  (let ((current-chunk-array (aref *scratch-float-array* chunk)))
+	    (declare (type (simple-array single-float (*)) current-chunk-array))
+	    (if (= last chunk)
+		(dotimes (index (get-index n))
+		  (funcall func (aref current-chunk-array index)))
+		(dotimes (index +scratch-float-array-chunk-size+)
+		  (funcall func (aref current-chunk-array index))))))))))
 
-(defun iterate-scratch-float-array (n func)
+(defun scratch-float-array-validate (n)
   (let ((last (get-get-index n)))
     (dotimes (chunk (1+ last))
       (let ((current-chunk-array (aref *scratch-float-array* chunk)))
-	(if (= last chunk)
-	    (dotimes (index (get-index n))
-	      (funcall func (aref current-chunk-array index)))
-	    (dotimes (index +scratch-float-array-chunk-size+)
-	      (funcall func (aref current-chunk-array index))))))))
+	(unless (and current-chunk-array 
+		     (= (array-total-size current-chunk-array)
+			+scratch-float-array-chunk-size+))
+	  (return-from scratch-float-array-validate nil))))
+    t))
