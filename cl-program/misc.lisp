@@ -146,8 +146,11 @@
 
 (defun create-scratch-float-array-byte ()
   (make-array +scratch-float-array-chunk-size+ :element-type '(unsigned-byte 8)))
-(defun create-scratch-float-array-float ()
-  (make-array +scratch-float-array-chunk-size+ :element-type 'single-float))
+
+(progn
+  (declaim (ftype (function () (simple-array single-float (*))) create-scratch-float-array-float))
+  (defun create-scratch-float-array-float ()
+    (make-array +scratch-float-array-chunk-size+ :element-type 'single-float)))
 
 
 (progn
@@ -188,13 +191,13 @@
 		    (inline get-index get-get-index))
     
     (defun get-scratch-float-array (n)
-      (let ((hashcode (get-index n)))
+      (let ((hashcode (get-get-index n)))
 	(if (< hashcode *scratch-float-array-size*)
 	    (let ((array (aref *scratch-float-array* hashcode)))
-	      (declare (type (or null (simple-array single-float (*))) array))
+	      (declare (type (or nil (simple-array single-float (*))) array))
 	      (if (null array)
 		  (values nil nil)
-		  (let ((chunk-index (get-get-index n)))
+		  (let ((chunk-index (get-index n)))
 		    (values (aref array chunk-index) t))))
 	    (values nil nil))))))
 
@@ -209,16 +212,28 @@
 	(tagbody
 	   (if (< hashcode *scratch-float-array-size*)
 	       (let ((array (aref *scratch-float-array* hashcode)))
-		 (declare (type (or null (simple-array single-float (*))) array))
+		 (declare (type (or nil (simple-array single-float (*))) array))
 		 (if (null array)
-		     (go new-chunk)		  
-		     (return-from set-scratch-float-array
-		       (setf (aref array chunk-index) value))))
+		     (go new-chunk)
+		     (progn
+		       (setf (aref array chunk-index) value)
+		       (go end))))
 	       (progn
 		 (resize-scratch-float-array (next-power-of-two hashcode))
 		 (go new-chunk)))
-	   new-chunk
+	 new-chunk
 	   (let ((new-chunk (create-scratch-float-array-float)))
-		   (setf (aref new-chunk chunk-index) value)
-		   (setf (aref *scratch-float-array* hashcode) new-chunk))
-	   end)))))
+	     (setf (aref new-chunk chunk-index) value)
+	     (setf (aref *scratch-float-array* hashcode) new-chunk))
+	 end)))))
+
+
+(defun iterate-scratch-float-array (n func)
+  (let ((last (get-get-index n)))
+    (dotimes (chunk (1+ last))
+      (let ((current-chunk-array (aref *scratch-float-array* chunk)))
+	(if (= last chunk)
+	    (dotimes (index (get-index n))
+	      (funcall func (aref current-chunk-array index)))
+	    (dotimes (index +scratch-float-array-chunk-size+)
+	      (funcall func (aref current-chunk-array index))))))))
