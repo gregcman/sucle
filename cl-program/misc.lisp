@@ -254,3 +254,9 @@
 			+scratch-float-array-chunk-size+))
 	  (return-from scratch-float-array-validate nil))))
     t))
+
+(defun scratch-float-array-safe-iterate (n func)
+  (if (scratch-float-array-validate n)
+      (iterate-scratch-float-array n func)
+      (print "error error")))
+
