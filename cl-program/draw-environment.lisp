@@ -31,7 +31,7 @@
   (progn
     (gl:clear :color-buffer-bit :depth-buffer-bit)
     (gl:disable :depth-test)
-    (lcalllist-invalidate :string)
+  ;  (lcalllist-invalidate :string)
     (name-mesh :string (lambda ()
 			 (gl:with-primitives :quads
 			   (draw-string-raster-char foo (floor 256 9) (floor 256 16) 0 32 0.5))))
@@ -186,7 +186,8 @@
 	  (file-string src-path))))
 
 (defun load-some-images ()
-  (src-image :font-image (img-path #P"font/codepage-437-vga-9x16.png")))
+  (src-image :font-image (img-path #P"font/codepage-437-vga-9x16.png"))
+  (src-image :cursor-image (img-path #P"cursor/windos-cursor.png")))
 
 (defun texture-imageries ()
   (texture-imagery :font :font-image))

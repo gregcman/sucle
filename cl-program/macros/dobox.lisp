@@ -24,7 +24,7 @@
   (let ((let-one nil)
 	(let-one-declarations nil))
     (let ((body (cons 'progn body)))
-      (dolist (form interval-forms)
+      (dolist (form (nreverse interval-forms))
 	(multiple-value-bind (let-len temp-length let-end temp-end bod)
 	    (apply #'dorange-generator body form)
 	  (push let-len let-one)
