@@ -192,9 +192,9 @@
 	  (setf (aref array chunk-index) sub-array))
 
 	
-	(dotimes (x (expt 10 7))
+	(dotimes (x (expt 10 6))
 	  (setf (aref sub-array index) (float x))
-	  (setf index (mod (1+ index) array-length))
+	  (setf index (1+ index))
 	  (when (= index +size+)
 	    (setf index 0)
 	    (let ((next (1+ chunk-index)))
