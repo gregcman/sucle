@@ -120,158 +120,15 @@
 (defun print-bits (n)
   (format t "~64,'0b" n))
 
-(defun %ash (n k)
-  (declare (type fixnum n)
-	   (type (unsigned-byte 8) k)
-	   (optimize (speed 3) (safety 0)))
-  (the fixnum (ash n k)))
-
-(progn
-  (declaim (type (simple-vector) *scratch-float-array*)
-	   (type fixnum *scratch-float-array-size*))
-  (defparameter *scratch-float-array* (make-array 1 :initial-element nil))
-  (defparameter *scratch-float-array-size* (array-total-size *scratch-float-array*)))
-
-
-(progn
-  (declaim (type fixnum +hash-mask+ +index-mask+))
-  (defconstant +scratch-float-array-log-size+ 10)
-  (defconstant +scratch-float-array-chunk-size+ (expt 2 +scratch-float-array-log-size+))
-  (defconstant +hash-mask+ (- +scratch-float-array-chunk-size+ 1))
-  (defparameter +index-mask+ (%ash most-positive-fixnum +scratch-float-array-log-size+)))
-
-
-(defun next-power-of-two (n)
-  (expt 2 (1+ (floor (log n 2)))))
-
-(defun create-scratch-float-array-byte ()
-  (make-array +scratch-float-array-chunk-size+ :element-type '(unsigned-byte 8)))
-
-(progn
-  (declaim (ftype (function () (simple-array single-float (*))) create-scratch-float-array-float))
-  (defun create-scratch-float-array-float ()
-    (make-array +scratch-float-array-chunk-size+ :element-type 'single-float)))
-
-
-(progn
-  (declaim (inline get-index))
-  (declaim (ftype (function (fixnum) fixnum) get-index))
-  (locally (declare (optimize (speed 3) (safety 0)))
-    
-    (defun get-index (n)
-      (logand n +hash-mask+)))
-  
-  (declaim (notinline get-index)))
-
-(progn
-  (declaim (inline get-get-index))
-  (declaim (ftype (function (fixnum) fixnum) get-get-index))
-  (locally (declare (optimize (speed 3) (safety 0)))
-    
-    (defun get-get-index (n)
-      (ash n (- +scratch-float-array-log-size+))))
-  
-  (declaim (notinline get-get-index)))
-
-(defun resize-array (array new-size initial-element)
-  (let ((type (array-element-type array)))
-    (let ((newarray (make-array new-size :element-type type :initial-element initial-element)))
-      (dotimes (x (min (array-total-size array) new-size))
-	(setf (aref newarray x) (aref array x)))
-      newarray)))
-
-(defun resize-scratch-float-array (n)
-  (setf *scratch-float-array* (resize-array *scratch-float-array* n nil)
-	*scratch-float-array-size* n))
-
-
-(progn
-  (declaim (ftype (function (fixnum) (values t (member null t))) get-scratch-float-array))
-  (locally (declare (optimize (speed 3) (safety 0))
-		    (inline get-index get-get-index))
-    
-    (defun get-scratch-float-array (n)
-      (let ((hashcode (get-get-index n)))
-	(if (< hashcode *scratch-float-array-size*)
-	    (let ((array (aref *scratch-float-array* hashcode)))
-	      (declare (type (or nil (simple-array single-float (*))) array))
-	      (if (null array)
-		  (values nil nil)
-		  (let ((chunk-index (get-index n)))
-		    (values (aref array chunk-index) t))))
-	    (values nil nil))))))
-
-
-(progn
-  (declaim (ftype (function (fixnum t) (values)) set-scratch-float-array))
-  (locally (declare (optimize (speed 3) (safety 0))
-		    (inline get-index get-get-index))
-    (defun set-scratch-float-array (n value)
-      (let ((hashcode (get-get-index n))
-	    (chunk-index (get-index n)))
-	(tagbody
-	   (if (< hashcode *scratch-float-array-size*)
-	       (let ((array (aref *scratch-float-array* hashcode)))
-		 (declare (type (or nil (simple-array single-float (*))) array))
-		 (if array
-		     (progn
-		       (setf (aref array chunk-index) value)
-		       (go end))
-		     (go new-chunk)))
-	       (progn
-		 (resize-scratch-float-array (next-power-of-two hashcode))
-		 (go new-chunk)))
-	 new-chunk
-	   (let ((new-chunk (create-scratch-float-array-float)))
-	     (setf (aref new-chunk chunk-index) value)
-	     (setf (aref *scratch-float-array* hashcode) new-chunk))
-	 end)))))
-
-(progn
-  (declaim
-   (ftype
-    (function (fixnum (function (single-float))) (values))
-    iterate-scratch-float-array))
-  (locally (declare (optimize (speed 3) (safety 0))
-		    (inline get-get-index get-index))  
-    (defun iterate-scratch-float-array (n func)
-      (let ((last (get-get-index n)))
-	(dotimes (chunk (1+ last))
-	  (let ((current-chunk-array (aref *scratch-float-array* chunk)))
-	    (declare (type (simple-array single-float (*)) current-chunk-array))
-	    (if (= last chunk)
-		(dotimes (index (get-index n))
-		  (funcall func (aref current-chunk-array index)))
-		(dotimes (index +scratch-float-array-chunk-size+)
-		  (funcall func (aref current-chunk-array index))))))))))
-
-(defun scratch-float-array-validate (n)
-  (let ((last (get-get-index n)))
-    (dotimes (chunk (1+ last))
-      (let ((current-chunk-array (aref *scratch-float-array* chunk)))
-	(unless (and current-chunk-array 
-		     (= (array-total-size current-chunk-array)
-			+scratch-float-array-chunk-size+))
-	  (return-from scratch-float-array-validate nil))))
-    t))
-
-(defun scratch-float-array-safe-iterate (n func)
-  (if (scratch-float-array-validate n)
-      (iterate-scratch-float-array n func)
-      (print "error error")))
-
-
-
-(defun totally-destroy-package (package-designator)
-  (let ((package (find-package package-designator)))
-    (do-symbols (symbol package)
-      (let ((home (symbol-package symbol)))
-	(when (eq package home)
-	  (when (fboundp symbol)
-	    (fmakunbound symbol))
-	  (when (boundp symbol)
-	    (makunbound symbol)))))
-    (delete-package package)))
+(defun totally-destroy-package (package)
+  (do-symbols (symbol package)
+    (let ((home (symbol-package symbol)))
+      (when (eq package home)
+	(when (fboundp symbol)
+	  (fmakunbound symbol))
+	(when (boundp symbol)
+	  (makunbound symbol)))))
+  (delete-package package))
 
 (defparameter shit nil)
 
@@ -279,3 +136,33 @@
   (dotimes (x (expt 10 4))
     (let ((package (make-package (gensym))))
       (push package shit))))
+
+(defun test2 (symbol)
+  (eval
+   `(progn
+      (declaim (inline ,symbol))
+      (defun ,symbol (package)
+	(do-symbols (symbol package)
+	  (let ((home (symbol-package symbol)))
+	    (when (eq package home)
+	      (when (fboundp symbol)
+		(fmakunbound symbol))
+	      (when (boundp symbol)
+		(makunbound symbol)))))
+	(print package)
+	(print package)
+	(print package)
+	(print package)
+	(print package)
+	(print package)
+	(print package)
+	(print package)
+	(print package)
+	(write package))
+      (declaim (notinline ,symbol))
+      
+      (values
+       (lambda (x)
+	 (locally (declare (inline ,symbol))
+	   (,symbol x)))
+       (quote,symbol)))))
