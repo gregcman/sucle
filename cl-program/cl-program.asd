@@ -3,10 +3,11 @@
                  #:cg-matrix
 		 #:bordeaux-threads
 		 
-		 
 		 #:opticl
 
-		 #:window-glfw3)
+		 #:window-glfw3
+
+		 #:fixed-leaf-hashed-array-tree)
     :serial t
     :components
     
