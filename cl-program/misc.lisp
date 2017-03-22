@@ -120,6 +120,11 @@
 (defun print-bits (n)
   (format t "~64,'0b" n))
 
+(defun %ash (n k)
+  (declare (type fixnum n)
+	   (type (unsigned-byte 8) k)
+	   (optimize (speed 3) (safety 0)))
+  (the fixnum (ash n k)))
 
 (progn
   (declaim (type (simple-vector) *scratch-float-array*)
@@ -133,13 +138,8 @@
   (defconstant +scratch-float-array-log-size+ 10)
   (defconstant +scratch-float-array-chunk-size+ (expt 2 +scratch-float-array-log-size+))
   (defconstant +hash-mask+ (- +scratch-float-array-chunk-size+ 1))
-  (defconstant +index-mask+ (%ash most-positive-fixnum +scratch-float-array-log-size+)))
+  (defparameter +index-mask+ (%ash most-positive-fixnum +scratch-float-array-log-size+)))
 
-(defun %ash (n k)
-  (declare (type fixnum n)
-	   (type (unsigned-byte 8) k)
-	   (optimize (speed 3) (safety 0)))
-  (the fixnum (ash n k)))
 
 (defun next-power-of-two (n)
   (expt 2 (1+ (floor (log n 2)))))
@@ -260,3 +260,22 @@
       (iterate-scratch-float-array n func)
       (print "error error")))
 
+
+
+(defun totally-destroy-package (package-designator)
+  (let ((package (find-package package-designator)))
+    (do-symbols (symbol package)
+      (let ((home (symbol-package symbol)))
+	(when (eq package home)
+	  (when (fboundp symbol)
+	    (fmakunbound symbol))
+	  (when (boundp symbol)
+	    (makunbound symbol)))))
+    (delete-package package)))
+
+(defparameter shit nil)
+
+(defun test ()
+  (dotimes (x (expt 10 4))
+    (let ((package (make-package (gensym))))
+      (push package shit))))

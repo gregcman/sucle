@@ -5,7 +5,7 @@
 (defparameter *camera* nil) ;;global camera
 (defparameter vsync? t)
 
-(defconstant +mat4-identity+ (cg-matrix:identity-matrix))
+(defparameter *mat4-identity* (cg-matrix:identity-matrix))
 
 (defun render ()
   (declare (optimize (safety 3) (debug 3)))
@@ -24,7 +24,7 @@
   
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location *shader-program* "projectionmodelview")
-   +mat4-identity+)
+   *mat4-identity*)
   (bind-shit :font)
   (gl:clear-color 0f0 1f0 0f0 1f0)
   
