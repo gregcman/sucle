@@ -95,6 +95,7 @@
 (progn
   (declaim (ftype (function (cons fixnum t))
 		  sets))
+  (declaim (inline sets))
   (locally (declare (optimize (speed 3) (safety 0))
 		    (inline offset-index
 			    chunk-index
@@ -105,14 +106,15 @@
       (let ((hashcode (chunk-index n))
 	    (array (array-array-array array-array)))
 	(let ((array-length (array-array-length array-array)))
-	  (if (< hashcode array-length)
-	      (setf (values array-length array) (fit-resize array-array hashcode))))
+	  (unless (< hashcode array-length)
+	    (setf (values array-length array) (fit-resize array-array hashcode))))
 	(let ((sub-array (get-array-or-nil array hashcode)))
 		(if sub-array
 		    (setf (aref sub-array (offset-index n)) value)
 		    (let ((new-array (create-scratch-array)))
 		      (setf (aref array hashcode) new-array)
-		      (setf (aref new-array (offset-index n)) value))))))))
+		      (setf (aref new-array (offset-index n)) value)))))))
+  (declaim (notinline sets)))
 
 (defun (setf ref) (value array-array n)
   (sets array-array n value))
