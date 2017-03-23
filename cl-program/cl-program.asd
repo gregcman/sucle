@@ -2,7 +2,8 @@
     :depends-on (#:cl-opengl
                  #:cg-matrix
 		 #:bordeaux-threads
-		 
+
+		 #:alexandria
 		 #:opticl
 
 		 #:window-glfw3
@@ -22,6 +23,7 @@
      (:file "package")
      
      (:file "camera-matrix") ;;;1st person perspective vision
+     (:file "meshing")
      
      (:file "misc") ;;;everything else
      

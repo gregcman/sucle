@@ -214,18 +214,33 @@
 (defun vpc (u v x y z)
   (%gl:vertex-attrib-1f 8 1.0)
   (%gl:vertex-attrib-2f 2 u v)
-  (%gl:vertex-attrib-3f 0 x y z)
-  )
+  (%gl:vertex-attrib-3f 0 x y z))
 (declaim (notinline vpc))
 
 (defun draw-background ()
+  (reset-all-mesh-scratches)
   (let ((distance 0.99999997))
-    (locally (declare (inline vpc))
-      (gl:with-primitives :quads
-	(vpc 0.0 0.0 -1.0 -1.0 distance)
-	(vpc 1.0 0.0 1.0 -1.0 distance)
-	(vpc 1.0 1.0 1.0 1.0 distance)
-	(vpc 0.0 1.0 -1.0 1.0 distance)))))
+    (locally (declare (inline vpc)))
+    (gl:with-primitives :quads
+      (vpc 0.0 0.0 -1.0 -1.0 distance)
+      (vpc 1.0 0.0 1.0 -1.0 distance)
+      (vpc 1.0 1.0 1.0 1.0 distance)
+      (vpc 0.0 1.0 -1.0 1.0 distance))))
+
+(defun draw-background2 ()
+  (let ((distance 0.99999997))
+    (*vertex-attrib* (2 0f0 0f0
+			1f0 0f0
+			1f0 1f0
+			0f0 1f0)
+		     (0 -1.0 -1.0 distance
+			 1.0 -1.0 distance
+			 1.0 1.0 distance
+			 -1.0 1.0 distance)
+		     (8 1f0
+			1f0
+			1f0
+			1f0))))
 
 (defun draw-skybox ()
   (let ((h0 0.0)
@@ -305,30 +320,6 @@
 	      (draw-raster-char-cell (char-code char) width height (+ xoffset x) (+ yoffset y) z)
 	      (incf xoffset)))))))
 
-(defun make-attrib-table ()
-  (let ((array (make-array 16)))
-    (map-into array #'flhat:make-array-array)
-    array))
-
-(defparameter *mesh-scratch* (flhat:make-array-array))
-(defparameter *attrib-scratch* (make-attrib-table))
-(defparameter *attrib-scratch-fill* (make-array 16 :element-type '(unsigned-byte 32) :initial-element 0))
-
-(defun zero-scratch-fill ()
-  (fill *attrib-scratch-fill* 0))
-
-(progn
-  (locally (declare (optimize (speed 3) (safety 0))
-		    (inline flhat:sets))
-    (defun vertex-attrib (attrib-table table-fill attrib-location value)
-      (declare (type (simple-array (unsigned-byte 32) (16)) table-fill)
-	       (type simple-vector attrib-table))
-      (let ((fill (aref table-fill attrib-location))
-	    (single-attrib (aref attrib-table attrib-location)))
-	(declare (type (unsigned-byte 32) fill))
-	(flhat:sets single-attrib fill value)
-	(setf (aref table-fill attrib-location) (1+ fill))))))
-
 (defparameter +gl-primitives+
   (vector
    :points
@@ -341,3 +332,5 @@
    :quads
    :quad-strip
    :polygon))
+
+
