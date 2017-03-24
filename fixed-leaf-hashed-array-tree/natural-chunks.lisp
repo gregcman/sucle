@@ -12,6 +12,7 @@
    #:offset-index ;;;index of the element in subarray
    #:chunk-index ;;;;the index of the subarray
    #:fit-resize ;;;resize flhat to the next power of two that fits the leaf amount
+   #:reverse-fit-resize 
    ))
 
 (in-package :fixed-leaf-hashed-array-tree)
@@ -222,4 +223,32 @@
   (defun fit-resize (array-array leaf-capacity)
     (let ((new-size (next-power-of-two leaf-capacity)))
       (resize-array-array array-array new-size))))
+
+
+(defun reverse-resize-array (array new-size)
+  (let ((old-size (array-total-size array)))
+    (if (= old-size new-size)
+	array
+	(let ((newarray (make-array new-size :element-type t :initial-element nil)))
+	  (let ((old-offset (1- old-size))
+		(new-offset (1- new-size)))
+	    (dotimes (x (min old-size new-size))
+	      (setf (aref newarray (- new-offset x))
+		    (aref array (- old-offset x)))))
+	  newarray))))
+(progn
+  (declaim (ftype (function (cons fixnum)
+			    (values fixnum simple-vector))
+		  reverse-resize-array-array))
+  (defun reverse-resize-array-array (array-array new-size)
+    (values (setf (array-array-length array-array) new-size)
+	    (setf (array-array-array array-array)
+		  (reverse-resize-array (array-array-array array-array) new-size)))))
+(progn
+  (declaim (ftype (function (cons fixnum)
+			    (values fixnum simple-vector))
+		  fit-resize))
+  (defun reverse-fit-resize (array-array leaf-capacity)
+    (let ((new-size (next-power-of-two leaf-capacity)))
+      (reverse-resize-array-array array-array new-size))))
 
