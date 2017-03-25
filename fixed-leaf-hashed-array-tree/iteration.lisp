@@ -1,11 +1,11 @@
 (in-package :fixed-leaf-hashed-array-tree)
 
-(declaim (ftype (function (simple-vector))
+(declaim (ftype (function (iter-ator))
 		next-index)
-	 (ftype (function (simple-vector)
+	 (ftype (function (iter-ator)
 			  (values fixnum simple-vector))
 		next-subarray)
-	 (ftype (function (simple-vector)
+	 (ftype (function (iter-ator)
 			  (values fixnum simple-vector))
 		next-flhat))
 
@@ -15,7 +15,7 @@
 
 (with-unsafe-speed
   (defun next-flhat (p)
-    (with-bound-iterator (next place (flhat cons) (meta-index)) p
+    (with-bound-iterator (next place (flhat flhat) (meta-index)) p
       (next)
       
       (if (= -1 meta-index)
@@ -49,7 +49,7 @@
 	       (setf place new))))))))
 
 (progn
-  (declaim (ftype (function (cons) (simple-vector 4)) make-flhat-iterator))
+  (declaim (ftype (function (flhat) iter-ator) make-flhat-iterator))
   (defun make-flhat-iterator (flhat)
     (let* ((flhat-iter (make-zeroed-iterator #'next-init flhat))
 	   (array-iter (make-zeroed-iterator #'next-flhat flhat-iter))
@@ -73,6 +73,7 @@
       (setf (p-index array-iter) chunk-index
 	    (p-index value-iter) offset-index)
       (let ((array (flhat-data flhat)))
+	(setf (p-array array-iter) array)
 	(setf (p-array value-iter)
 	      (let ((sub-array (aref array chunk-index)))
 		(if sub-array

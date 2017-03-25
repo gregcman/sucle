@@ -3,6 +3,8 @@
    #:cl
    #:foo-mapped-bar)
   (:export
+   #:iter-ator
+   
    #:make-iterator
    #:make-zeroed-iterator
    #:make-default-iterator
@@ -35,6 +37,10 @@
 	(declare (type fixnum ,new-index))
 	(setf ,index-var ,new-index
 	      ,array-var ,new-array)))))
+
+(deftype iter-ator ()
+  `(simple-vector 4))
+
 (progn
   (declaim (inline p-index (setf p-index)
 		   p-array (setf p-array)
@@ -60,11 +66,14 @@
 (defun basic-loop-func (x)
   (values (1- (array-total-size x)) x))
 
+
+(declaim (ftype (function (&rest t) iter-ator)
+		make-default-iterator
+		make-iterator
+		make-zeroed-iterator))
 (defun make-default-iterator ()
   (vector 0 nil (load-time-value (vector nil)) (function basic-loop-func)))
-
-(defun make-iterator (start current data func)
-  
+(defun make-iterator (start current data func) 
   (vector start current data func))
 (defun make-zeroed-iterator (func data)
   (vector 0 nil data func))

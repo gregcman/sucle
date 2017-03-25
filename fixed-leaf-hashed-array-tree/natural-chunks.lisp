@@ -5,6 +5,7 @@
 	#:iter-ator)
   (:nicknames #:flhat)
   (:export
+   #:flhat
    #:make-flhat ;;;;make the flhat
    #:flhat-length
    #:flhat-data
@@ -12,10 +13,14 @@
    
    #:xelt
 
+   #:relocate-iterator
    #:make-flhat-iterator
    #:with-flhat-iterator))
 
 (in-package :fixed-leaf-hashed-array-tree)
+
+(deftype flhat ()
+  `(cons fixnum (or null vector)))
 
 (defmacro define-construct
     ((name-one &optional (type-one t)) (name-two &optional (type-two t)))
@@ -92,7 +97,7 @@
 	      (setf (aref new-array offset-index) value)))))))
 
 (progn
-  (declaim (ftype (function (cons fixnum)
+  (declaim (ftype (function (flhat fixnum)
 			    (values fixnum simple-vector))
 		  reverse-resize-flhat))
   
@@ -101,7 +106,7 @@
 	    (setf (flhat-data flhat)
 		  (reverse-resize-array (flhat-data flhat) new-size)))))
 (progn
-  (declaim (ftype (function (cons fixnum)
+  (declaim (ftype (function (flhat fixnum)
 			    (values fixnum simple-vector))
 		  fit-resize))
   (defun reverse-fit-resize (flhat leaf-capacity)
