@@ -8,6 +8,7 @@
 
 		 #:window-glfw3
 
+		 #:iter-ator
 		 #:fixed-leaf-hashed-array-tree)
     :serial t
     :components
