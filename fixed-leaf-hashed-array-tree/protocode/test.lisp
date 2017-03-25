@@ -50,8 +50,8 @@
 				(array &optional (array-type '(or null simple-vector)))
 				(index &optional (index-type 'fixnum)))
 					 iterator &body body)
-  `(with-load-unload ((,array (p-current-array ,iterator) ,array-type)
-		      (,index (p-index ,iterator) ,index-type))
+  `(with-let-mapped-places ((,array (p-current-array ,iterator) ,array-type)
+			    (,index (p-index ,iterator) ,index-type))
      (flet ((,next ()
 	      (backwards-array-iterator3
 	       ,index ,array

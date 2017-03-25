@@ -1,7 +1,7 @@
 (asdf:defsystem #:fixed-leaf-hashed-array-tree
   :depends-on
   (#:declaration-abbreviation
-   #:declaration-generation)
+   #:foo-mapped-bar)
 
   :components    
   ((:file "natural-chunks")))
