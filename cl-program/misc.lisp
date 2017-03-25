@@ -166,3 +166,30 @@
 	 (locally (declare (inline ,symbol))
 	   (,symbol x)))
        (quote,symbol)))))
+
+(defparameter foo nil)
+
+(defun wot ()
+  (setf foo nil)
+  (do-symbols (symbol :cl)
+    (if (or (boundp symbol) (fboundp symbol))
+	(push (symbol-name symbol) foo)))
+  (setf foo (sort foo #'string<)))
+
+(defun simple-defun-p (form)
+  (and (eq (quote defun) (pop form))
+       (symbolp (pop form))))
+
+(defun fmakunbounds (symbol-list)
+  (dolist (symbol symbol-list)
+    (fmakunbound symbol)))
+
+(defun makunbounds (symbol-list)
+  (dolist (symbol symbol-list)
+    (makunbound symbol)))
+
+(defmacro xfmakunbounds (&body symbols)
+  `(fmakunbounds (quote ,symbols)))
+
+(defmacro xmakunbounds (&body symbols)
+  `(makunbounds (quote ,symbols)))

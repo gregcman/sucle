@@ -1,34 +1,5 @@
 (in-package :fixed-leaf-hashed-array-tree)
 
-(defun type-multimap-alist (type varname alist)
-  (let ((value (assoc type alist)))
-    (if value
-	(push varname (cdr value))
-	(push (list type varname) alist))
-    alist))
-
-(defmacro with-load-unload ((&rest place-pairs) &body body)
-  (let ((let-args nil)
-	(setf-args nil)
-	(type-multimap-alist nil))
-    (dolist (place-pair place-pairs)
-      (let ((reg-place (pop place-pair))
-	    (ram-place (pop place-pair))
-	    (type (pop place-pair)))
-	(push (list reg-place ram-place) let-args)
-	(push reg-place setf-args)
-	(push ram-place setf-args)
-	(if type
-	    (setf type-multimap-alist (type-multimap-alist type reg-place type-multimap-alist)))))
-    `(let ,let-args
-       ,(cons 'declare
-	      (mapcar (lambda (x)
-			(cons 'type x))
-		      type-multimap-alist))
-       (multiple-value-prog1
-	   ,(cons 'progn body)
-	 ,(cons 'setf setf-args)))))
-
 (defmacro decf-unless-zerop (index-place otherwise-form)
   (let ((new-index (gensym)))
     `(if (zerop ,index-place)
@@ -37,10 +8,20 @@
 	   (declare (type fixnum ,new-index))
 	   (setf ,index-place ,new-index)))))
 
+(defmacro backwards-array-iterator3 (index-var array-var completion-form)
+  (let ((new-index (gensym))
+	(new-array (gensym)))
+    `(decf-unless-zerop
+      ,index-var
+      (multiple-value-bind (,new-index ,new-array) ,completion-form
+	(declare (type fixnum ,new-index))
+	(setf ,index-var ,new-index
+	      ,array-var ,new-array)))))
 (progn
   (declaim (inline p-index (setf p-index)
 		   p-current-array (setf p-current-array)
-		   p-data (setf p-data)))
+		   p-data (setf p-data)
+		   p-func (setf p-func)))
   (defun p-index (p)
     (aref p 0))
   (defun (setf p-index) (n p)
@@ -53,142 +34,115 @@
     (aref p 2))
   (defun (setf p-data) (n p)
     (setf (aref p 2) n))
-  (declaim (notinline p-index (setf p-index)
-		      p-current-array (setf p-current-array)
-		      p-data (setf p-data))))
+  (defun p-func (p)
+    (aref p 3))
+  (defun (setf p-func) (n p)
+    (setf (aref p 3) n)))
 
-(defmacro backwards-array-iterator3 (index-var array-var completion-form)
-  (let ((new-index (gensym))
-	(new-array (gensym)))
-    `(decf-unless-zerop
-      ,index-var
-      (multiple-value-bind (,new-index ,new-array) ,completion-form
-	(declare (type fixnum ,new-index)
-		 (type simple-vector ,new-array))
-	(setf ,index-var ,new-index
-	      ,array-var ,new-array)))))
+(defmacro iterator-transfer (iterator return-type)
+  (let ((next-func (gensym)))
+    `(let ((,next-func (p-func ,iterator)))
+       (declare (type (function (t) ,return-type) ,next-func))
+       (funcall ,next-func (p-data ,iterator)))))
 
-(progn
-  (declaim (inline foo3 foo2 foo1 foo0))
-  (locally (declare (optimize (speed 3) (safety 0))
-		    (inline p-index (setf p-index)
-			    p-current-array (setf p-current-array)
-			    p-data (setf p-data)
-			    array-array-length array-array-array)
-		    (notinline foo3 foo2 foo1 foo0))
-    (progn
-      (declaim (ftype (function (t)
-				(values fixnum t))
-		      foo3))
-      (defun foo3 (x)
-	(values -1 x)))
-    
-    (progn
-      (declaim (ftype (function (simple-vector)
-				(values fixnum simple-vector))
-		      foo2)) 
-      (defun foo2 (p)
-	(with-load-unload ((meta-index (p-index p) fixnum)
-			   (array-array (p-current-array p)))
-	  
-	  (backwards-array-iterator3 meta-index array-array (foo3 (p-data p)))
-	  (if (= -1 meta-index)
-	      (let ((size (1- (array-array-length array-array))))
-		(declare (type fixnum size))
-		(values size (array-array-array array-array)))
-	      (let ((old-size (array-array-length array-array)))
-		(declare (type fixnum old-size))
-		(multiple-value-bind (size data)
-		    (reverse-fit-resize array-array old-size)
-		  (declare (type fixnum size))
-		  (let ((size (1- (- size old-size))))
-		    (declare (type fixnum size))
-		    (values size data))))))))
-
-    (progn
-      (declaim (ftype (function (simple-vector)
-				(values fixnum simple-vector))
-		      foo1))
-      (defun foo1 (p)
-	(with-load-unload ((chunk-index (p-index p) fixnum)
-			   (array (p-current-array p) (or null simple-vector)))
-	  
-	  (backwards-array-iterator3 chunk-index array (foo2 (p-data p)))	       
-	  (values 
-	   (1- +size+)
-	   (let ((next-array (aref array chunk-index)))
-	     (if next-array
-		 next-array
-		 (let ((newarray (create-scratch-array)))
-		   (setf (aref array chunk-index) newarray)
-		   newarray)))))))
-
-    (progn
-      (declaim (ftype (function (simple-vector t)
-				(values))
-		      foo0))	  
-      (defun foo0 (p x)
-	(with-load-unload ((sub-array (p-current-array p) (or null simple-vector))
-			   (index (p-index p) fixnum))
-	  
-	  (backwards-array-iterator3 index sub-array (foo1 (p-data p)))	       
-	  (setf (aref sub-array index) x)))))
-  
-  (declaim (notinline foo3 foo2 foo1 foo0)))
-
-(defmacro with-flhat-writer ((array-name index-name next-func-name) p &body body)
-  (let ((next-func (gensym))
-	(writer (gensym)))
-    `(let ((,writer ,p))
-       (declare (type simple-vector ,writer)) 
-       (with-load-unload ((,array-name (p-current-array ,writer) simple-vector)
-			  (,index-name (p-index ,writer) fixnum))
-	 (macrolet
-	     ((,next-func-name ()
-		'(backwards-array-iterator3 ,index-name ,array-name
-		  (let ((,next-func (aref ,writer 3)))
-		    (declare (type (function (t) (values fixnum simple-vector))
-				   ,next-func))
-		    (funcall ,next-func (p-data ,writer))))))	       
-	   ,@body)))))
-
-(defmacro with-array-iterator ((name value-place iterator) &body body)
-  (let ((array-name (gensym))
-	(index-name (gensym)))
-    `(with-flhat-writer (,array-name ,index-name ,name) ,iterator
-       (symbol-macrolet ((,value-place (aref ,array-name ,index-name)))
+(defmacro with-bound-iterator ((next
+				place
+				(array &optional (array-type '(or null simple-vector)))
+				(index &optional (index-type 'fixnum)))
+					 iterator &body body)
+  `(with-load-unload ((,array (p-current-array ,iterator) ,array-type)
+		      (,index (p-index ,iterator) ,index-type))
+     (flet ((,next ()
+	      (backwards-array-iterator3
+	       ,index ,array
+	       (iterator-transfer ,iterator (values ,index-type ,array-type)))))
+       (symbol-macrolet ((,place (aref ,array ,index)))
 	 ,@body))))
 
-(defmacro with-flhat-iterator ((name value-place flhat) &body body)
-  (let ((iterator-name (gensym)))
-    `(let ((,iterator-name (make-flhat-pointer ,flhat)))
-       (with-array-iterator (,name ,value-place ,iterator-name)
-			    ,@body))))
+(declaim (ftype (function (simple-vector))
+		next-index)
+	 (ftype (function (simple-vector)
+			  (values fixnum simple-vector))
+		next-subarray)
+	 (ftype (function (simple-vector)
+			  (values fixnum simple-vector))
+		next-flhat))
 
-(defun make-flhat-pointer (flhat)
-  (vector 0 nil
-	  (vector 0 nil
-		  (vector 0 nil flhat))
-	  #'foo1))
+(with-unsafe-speed
+  (defun next-index (p)
+    (with-bound-iterator (next place (array) (index)) p
+      (next))))
+
+
+
+
+(with-unsafe-speed
+  (defun next-init (p)
+    (values -1 p)))
+
+(with-unsafe-speed
+  (defun next-flhat (p)
+    (with-bound-iterator (next place (flhat cons) (meta-index)) p
+      (next)
+      
+      (if (= -1 meta-index)
+	  (let ((size (1- (flhat-length flhat))))
+	    (declare (type fixnum size))
+	    (values size (flhat-data flhat)))
+	  (let ((old-size (flhat-length flhat)))
+	    (declare (type fixnum old-size))
+	    (multiple-value-bind (size data) (reverse-fit-resize flhat old-size)
+	      (declare (type fixnum size))
+	      (let ((size (1- (- size old-size))))
+		(declare (type fixnum size))
+		(values size data))))))))
+
+(with-unsafe-speed
+  (defun next-subarray (p)
+    (with-bound-iterator (next place (array) (chunk-index)) p
+      (next)
+      
+      (values 
+       (1- +size+)
+       (let ((next-array place))
+	 (if next-array
+	     next-array
+	     (let ((new (create-scratch-array)))
+	       (setf place new))))))))
+
+(progn
+  (declaim (ftype (function (cons) (simple-vector 4)) make-flhat-pointer))
+  (defun make-flhat-pointer (flhat)
+    (let ((data (vector 0 nil
+			(vector 0 nil
+				(vector 0 nil flhat (function next-init))
+				(function next-flhat))
+			(function next-subarray))))
+      data)))
+
+
+(defmacro with-flhat-iterator ((name value-place flhat) &body body)
+  (let ((iterator (gensym))
+	(array (gensym))
+	(index (gensym)))
+    `(let ((,iterator (make-flhat-pointer ,flhat)))
+       (with-bound-iterator (,name ,value-place (,array) (,index)) ,iterator
+	 ,@body))))
 
 (defun testwtf ()
-  (declare (optimize (speed 3) (safety 0))
-	   (inline foo0))
-  (let ((bar (make-flhat-pointer *flhat*)))
-    (dotimes (x (expt 10 7))
-      (foo0 bar x))))
+  (declare (optimize (speed 3) (safety 0)))
+  (dotimes (x 25)
+    (let ((bar (make-flhat-pointer *flhat*)))
+      (dotimes (x (expt 10 7))
+	(next-index bar)))))
 
-(defparameter *flhat* (make-array-array))
+(defparameter *flhat* (make-flhat))
 
 (defun testwtf2 () 
-  (declare (optimize (speed 3) (safety 0))
-	   (inline p-index (setf p-index)
-		   p-current-array (setf p-current-array)
-		   p-data (setf p-data)
-		   array-array-length array-array-array))
+  (declare (optimize (speed 3) (safety 0)))
   (dotimes (x (if nil 1 25))
     (with-flhat-iterator (next place *flhat*)
       (dotimes (x (expt 10 (if nil 6 7)))
 	(next)
-	(setf place most-positive-fixnum))))
+	(setf place x))))
   (values))
