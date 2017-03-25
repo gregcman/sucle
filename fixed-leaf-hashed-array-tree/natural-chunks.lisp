@@ -1,14 +1,19 @@
 (defpackage #:fixed-leaf-hashed-array-tree
   (:use #:cl
 	#:declaration-abbreviation
-	#:foo-mapped-bar)
+	#:foo-mapped-bar
+	#:iter-ator)
   (:nicknames #:flhat)
   (:export
    #:make-flhat ;;;;make the flhat
    #:flhat-length
-   #:flhat-array
-   #:reverse-fit-resize 
-   ))
+   #:flhat-data
+   #:reverse-fit-resize
+   
+   #:xelt
+
+   #:make-flhat-iterator
+   #:with-flhat-iterator))
 
 (in-package :fixed-leaf-hashed-array-tree)
 

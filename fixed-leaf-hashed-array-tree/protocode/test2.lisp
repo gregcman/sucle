@@ -1,3 +1,23 @@
+(in-package :flhat)
+
+(defun testwtf ()
+  (declare (optimize (speed 3) (safety 0)))
+  (dotimes (x 25)
+    (let ((bar (make-flhat-pointer *flhat*)))
+      (dotimes (x (expt 10 7))
+	(next-index bar)))))
+
+(defparameter *flhat* (make-flhat))
+
+(defun testwtf2 () 
+  (declare (optimize (speed 3) (safety 0)))
+  (dotimes (x (if nil 1 25))
+    (with-flhat-iterator (next place *flhat*)
+      (dotimes (x (expt 10 (if nil 6 7)))
+	(next)
+	(setf place x))))
+  (values))
+
 (progn
   (declaim (inline offset-index))
   (declaim (ftype (function (fixnum) fixnum) offset-index))
