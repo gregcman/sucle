@@ -218,7 +218,6 @@
 (declaim (notinline vpc))
 
 (defun draw-background ()
-  (reset-all-mesh-scratches)
   (let ((distance 0.99999997))
     (locally (declare (inline vpc)))
     (gl:with-primitives :quads
@@ -226,21 +225,6 @@
       (vpc 1.0 0.0 1.0 -1.0 distance)
       (vpc 1.0 1.0 1.0 1.0 distance)
       (vpc 0.0 1.0 -1.0 1.0 distance))))
-
-(defun draw-background2 ()
-  (let ((distance 0.99999997))
-    (*vertex-attrib* (2 0f0 0f0
-			1f0 0f0
-			1f0 1f0
-			0f0 1f0)
-		     (0 -1.0 -1.0 distance
-			 1.0 -1.0 distance
-			 1.0 1.0 distance
-			 -1.0 1.0 distance)
-		     (8 1f0
-			1f0
-			1f0
-			1f0))))
 
 (defun draw-skybox ()
   (let ((h0 0.0)
