@@ -240,93 +240,140 @@
   (%gl:vertex-attrib-3f 0 x y z))
 (declaim (notinline vpc))
 
-(defun macrontinue (cont-list sub-form)
-  (if cont-list
-      (let ((cont (pop cont-list)))
-	(let ((head (car cont))
-	      (tail (cdr cont)))
-	  (let ((val (list sub-form tail head)))
-	    (if cont-list
-		(push cont-list val))
-	    (nreverse val))))
-      sub-form))
+(defun destructure-def (form)
+  (destructuring-bind (header name params &rest rest) form
+    (multiple-value-bind
+	  (declares documentation body)
+	(destructure-body rest)
+      (values header name params declares documentation body))))
 
-(defmacro mist ((&rest parms) &optional subform cont)
-  (declare (ignorable parms))
+(defun form-declare-p (form)
+  (if (consp form)
+      (eq (car form) (quote declare))))
+
+(defmacro eval-always (body)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     ,body))
+
+(eval-always
+ (defun destructure-body (body)
+   (let ((in-body nil)
+	 (documentation nil)
+	 (declares nil))
+     (let ((post-decs  (block declares-over
+			 (do ((form body (cdr form)))
+			     ((null form))
+			   (let ((aform (car form)))
+			     (if (form-declare-p aform)
+				 (push aform declares)
+				 (return-from declares-over form)))))))
+       (let ((after-decs (car post-decs)))
+	 (if (stringp after-decs)
+	     (let ((end (cdr post-decs)))
+	       (if end
+		   (progn
+		     (setf documentation after-decs)
+		     (setf in-body end))
+		   (setf in-body post-decs)))
+	     (setf in-body post-decs))))
+     (values declares documentation in-body))))
+
+(eval-always
+  (defun macrontinue (cont-list sub-form)
+    (if cont-list
+	(let ((cont (pop cont-list)))
+	  (let ((head (car cont))
+		(tail (cdr cont)))
+	    (let ((val (list sub-form tail head)))
+	      (if cont-list
+		  (push cont-list val))
+	      (nreverse val))))
+	sub-form)))
+
+(defmacro orcam ((subformvar contvar) &optional body cont)
   (macrontinue
    cont
-   (apply #'list* subform)))
+   (block orcam
+     (multiple-value-bind
+	   (def name parm decl doc bod)
+	 (destructure-def body)
+       `(,def ,name (,parm &optional ,subformvar ,contvar)
+	  ,@decl
+	  (declare (ignorable ,subformvar ,contvar))
+	  ,doc
+	  (macrontinue ,contvar
+		       ,(list* (quote block) name bod)))))))
 
-(defmacro deach (func-or-macro &rest forms)
-  (cons 'progn
-	(mapcar (lambda (x) (list func-or-macro x)) forms)))
-(defmacro peach ((func-or-macro) &optional subform cont)
-  (declare (ignorable subform cont))
-  (cons 'progn
-	(mapcar (lambda (x) (list func-or-macro x)) subform)))
+(orcam (subform cont)
+       (defmacro korc (macro &rest parms)
+	 (list macro parms)))
 
-(defmacro chain ((init-form &rest conts) &optional subform cont)
-  (declare (ignorable subform))
-  (macrontinue
-   cont
-   `(croam () ,init-form ,conts)))
+(orcam (subform cont)
+       (defmacro mist ()
+	 (apply #'list* subform)))
 
-(defmacro croam ((&rest parms) &optional subform cont)
-  (declare (ignorable parms))
-  (macrontinue cont subform))
+(orcam (subform cont)
+       (defmacro stim (&rest rest)
+	 rest))
 
-(defmacro reps ((size) &optional subform cont)
-  (declare (ignorable subform))
-  (macrontinue
-   cont
-   (make-list size :initial-element subform)))
+(orcam (subform cont)
+       (defmacro peach (func-or-macro)
+	 (mapcar (lambda (x) (list func-or-macro x)) subform)))
 
-(defmacro duaq (((x- x+ y- y+) &optional (start 1) (clockwise-winding nil))
-		&optional subform cont)
-  (declare (ignorable subform cont))
-  (macrontinue
-   cont
-   (if (member start '(1 2 3 4))
-       (let ((one `(,x+ ,y+))
-	     (two `(,x- ,y+))
-	     (three `(,x- ,y-))
-	     (four `(,x+ ,y-))
-	     (i 1)
-	     (ii 2)
-	     (iii 3)
-	     (iv 4))
-	 (when clockwise-winding
-	   (rotatef two four) (rotatef ii iv))
-	 (do ()
-	     ((= start i) `(,@one ,@two ,@three ,@four))
-	   (rotatef one two three four)
-	   (rotatef i ii iii iv)))
-       (error "~s is not a plane quadrant" start))))
+(orcam (subform cont)
+       (defmacro warp (&rest func-or-macro)
+	 (append func-or-macro subform)))
 
-(defmacro aalgnqd ((start value) &optional subform cont)
-  (macrontinue
-   cont
-   (if (member start '(0 1 2))
-       (let ((places (vector nil nil nil))
-	     (count 0))
-	 (dolist (form subform)
-	   (push form (aref places count))
-	   (setf count (- 1 count)))
-	 (setf (aref places 2) (list value value value value))
-	 (rotatef (aref places 2) (aref places start))
-	 (let (acc)
-	   (dotimes (x 4)
-	     (push (pop (aref places 2)) acc)
-	     (push (pop (aref places 1)) acc)
-	     (push (pop (aref places 0)) acc))
-	   acc))
-       (error "~s is not 0 1 or 2" start))))
+(orcam (subform cont)
+       (defmacro chain (init-form &rest conts)
+	 `(croam () ,init-form ,conts)))
 
-(defun wtf45 (-x +x -y +y j)
-  (chain nil
-	 (duaq ((-x +x -y +y) 3 t))
-	 (aalgnqd (2 j))
-	 (mist deach print)))
+(orcam (subform cont)
+       (defmacro croam ()
+	 subform))
+
+(orcam (subform cont)
+       (defmacro reps (size)
+	 (make-list size :initial-element subform)))
+
+(orcam (subform cont)
+       (defmacro duaq ((x- x+ y- y+)
+		       &optional
+			 (start 1) (clockwise-winding nil))
+	 (if (member start '(1 2 3 4))
+	     (let ((one `(,x+ ,y+))
+		   (two `(,x- ,y+))
+		   (three `(,x- ,y-))
+		   (four `(,x+ ,y-))
+		   (i 1)
+		   (ii 2)
+		   (iii 3)
+		   (iv 4))
+	       (when clockwise-winding
+		 (rotatef two four) (rotatef ii iv))
+	       (do ()
+		   ((= start i) `(,@one ,@two ,@three ,@four))
+		 (rotatef one two three four)
+		 (rotatef i ii iii iv)))
+	     (error "~s is not a plane quadrant" start))))
+
+(orcam (subform cont)
+       (defmacro aalgnqd (start value)
+	 (if (member start '(0 1 2))
+	     (let ((places (vector nil nil nil))
+		   (count 0))
+	       (dolist (form subform)
+		 (push form (aref places count))
+		 (setf count (- 1 count)))
+	       (setf (aref places 2) (list value value value value))
+	       (rotatef (aref places 2) (aref places start))
+	       (let (acc)
+		 (dotimes (x 4)
+		   (push (pop (aref places 2)) acc)
+		   (push (pop (aref places 1)) acc)
+		   (push (pop (aref places 0)) acc))
+		 acc))
+	     (error "~s is not 0 1 or 2" start))))
 
 (defun draw-background ()
   (declare (optimize (safety 0) (speed 3)))
@@ -341,12 +388,15 @@
 			   (elit lit-buf))
 	(let ((distance 0.99999997))
 	  (chain (nil (duaq (0.0 1.0 0.0 1.0) 3)
-		      (peach etex)))
+		      (peach etex)
+		      (warp progn)))
 	  (chain (nil (duaq (-1.0 1.0 -1.0 1.0) 3)
 		      (aalgnqd 2 distance)
-		      (peach epos)))
+		      (peach epos)
+		      (warp progn)))
 	  (chain (1f0 (reps 4)
-		      (peach elit)))))
+		      (peach elit)
+		      (warp progn)))))
       
       (gl:with-primitives :quads
 	(reset-attrib-buffer-iterators iter)
