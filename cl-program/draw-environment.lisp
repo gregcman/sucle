@@ -44,10 +44,7 @@
     nil)
    (gl:enable :depth-test)
 
-   (let ((r (* *daytime* (aref *sky-color* 0)))
-	 (g (* *daytime* (aref *sky-color* 1)))
-	 (b (* *daytime* (aref *sky-color* 2))))
-     (gl:clear-color r g b 1.0))
+   (set-sky-color)
    
    (bind-default-framebuffer)
    (gl:viewport 0 0 e:*width* e:*height*)
@@ -61,8 +58,13 @@
   
   (window:update-display))
 
-(defparameter *daytime* 0.0)
-(defparameter *sky-color* (vector 0.68 0.8 1.0))
+(defun set-sky-color ()
+    (let ((r (* *daytime* (aref *sky-color* 0)))
+	 (g (* *daytime* (aref *sky-color* 1)))
+	 (b (* *daytime* (aref *sky-color* 2))))
+     (gl:clear-color r g b 1.0)))
+(defparameter *daytime* 0.4)
+(defparameter *sky-color* (vector 1.0 0.8 0.68))
 (defparameter *fog-ratio* 0.75)
 (defun set-overworld-fog (time)
   (flet ((fractionalize (x)
@@ -242,7 +244,8 @@
   (declare (optimize (safety 0) (speed 3)))
   (let ((distance 0.99999997))
     (let ((iter *attrib-buffer-iterators*)
-	  (times 100))
+	  (times 5))
+      (reset-attrib-buffer-iterators iter)
       (let ((tex-buf (aref iter 2))
 	    (pos-buf (aref iter 0))
 	    (lit-buf (aref iter 8)))
@@ -263,12 +266,8 @@
 		       1.0 -1.0 val
 		       1.0 1.0 val
 		       -1.0 1.0 val))
-	      (let ((a (/ flex 100.0)))
-		(deach elit
-		       a
-		       a
-		       a
-		       a)))))
+	      (let ((a (- 1.0 (/ flex 100.0))))
+		(dotimes (x 4) (elit a))))))
 	
 	(gl:with-primitives :quads
 	  (reset-attrib-buffer-iterators iter)

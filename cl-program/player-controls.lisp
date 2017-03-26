@@ -28,7 +28,7 @@
 
 (defun controls ()
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
-  (let ((speed 0.04444445))
+  (let ((speed (if t 0.5 0.04444445)))
     (when fly
       (setf speed (* 0.024 0.1))
       (when (e:key-p :space)
