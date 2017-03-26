@@ -14,8 +14,8 @@
       (window::set-vsync t)
       (window::set-vsync nil))
   (update-matrices *camera*)
-  (luse-shader :solidshader)
-
+  (luse-shader :blockshader)
+  (set-overworld-fog *daytime*)
 
   
   (progn
@@ -43,8 +43,11 @@
     (camera-matrix-projection-view-player *camera*)
     nil)
    (gl:enable :depth-test)
-   
-   (gl:clear-color 1.0 0.0 0.0 1.0)
+
+   (let ((r (* *daytime* (aref *sky-color* 0)))
+	 (g (* *daytime* (aref *sky-color* 1)))
+	 (b (* *daytime* (aref *sky-color* 2))))
+     (gl:clear-color r g b 1.0))
    
    (bind-default-framebuffer)
    (gl:viewport 0 0 e:*width* e:*height*)
@@ -57,6 +60,24 @@
   
   
   (window:update-display))
+
+(defparameter *daytime* 0.0)
+(defparameter *sky-color* (vector 0.68 0.8 1.0))
+(defparameter *fog-ratio* 0.75)
+(defun set-overworld-fog (time)
+  (flet ((fractionalize (x)
+	   (clamp x 0.0 1.0)))
+    (let ((x (fractionalize (* (aref *sky-color* 0) time)))
+	  (y (fractionalize (* (aref *sky-color* 1) time)))
+	  (z (fractionalize (* (aref *sky-color* 2) time))))
+      (%gl:uniform-3f (gl:get-uniform-location *shader-program* "fogcolor")
+		      x y z)
+      (gl:uniformfv (gl:get-uniform-location *shader-program* "cameraPos")
+		    (camera-vec-position *camera*))
+      (%gl:uniform-1f (gl:get-uniform-location *shader-program* "foglet")
+		      (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
+      (%gl:uniform-1f (gl:get-uniform-location *shader-program* "aratio")
+		      (/ 1.0 *fog-ratio*)))))
 
 (defparameter foo
   "
@@ -218,13 +239,40 @@
 (declaim (notinline vpc))
 
 (defun draw-background ()
+  (declare (optimize (safety 0) (speed 3)))
   (let ((distance 0.99999997))
-    (locally (declare (inline vpc)))
-    (gl:with-primitives :quads
-      (vpc 0.0 0.0 -1.0 -1.0 distance)
-      (vpc 1.0 0.0 1.0 -1.0 distance)
-      (vpc 1.0 1.0 1.0 1.0 distance)
-      (vpc 0.0 1.0 -1.0 1.0 distance))))
+    (let ((iter *attrib-buffer-iterators*)
+	  (times 100))
+      (let ((tex-buf (aref iter 2))
+	    (pos-buf (aref iter 0))
+	    (lit-buf (aref iter 8)))
+	(declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
+	(iter-ator:wasabios ((etex tex-buf)
+			     (epos pos-buf)
+			     (elit lit-buf))
+	  (dotimes (x times)
+	    (let ((flex (float x)))
+	      (deach etex
+		     0.0 0.0
+		     1.0 0.0
+		     1.0 1.0
+		     0.0 1.0)
+	      (let ((val (+ distance flex)))
+		(deach epos
+		       -1.0 -1.0 val
+		       1.0 -1.0 val
+		       1.0 1.0 val
+		       -1.0 1.0 val))
+	      (let ((a (/ flex 100.0)))
+		(deach elit
+		       a
+		       a
+		       a
+		       a)))))
+	
+	(gl:with-primitives :quads
+	  (reset-attrib-buffer-iterators iter)
+	  (mesh-test42 (* times 4) lit-buf tex-buf pos-buf))))))
 
 (defun draw-skybox ()
   (let ((h0 0.0)
