@@ -13,6 +13,8 @@
    
    #:xelt
 
+   #:reset-iterator
+   #:iterator-position
    #:relocate-iterator
    #:make-flhat-iterator
    #:with-flhat-iterator))

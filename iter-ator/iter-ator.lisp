@@ -2,6 +2,8 @@
   (:use
    #:cl
    #:foo-mapped-bar)
+  (:nicknames
+   #:iateor)
   (:export
    #:iter-ator
    
@@ -16,7 +18,12 @@
    
    #:pelt
    #:pstep
-   #:with-bound-iterator))
+   #:with-bound-iterator
+   #:with-simply-bound-iterator
+   #:wasabii
+   #:wasabiis
+   #:wasabio
+   #:wasabios))
 
 (in-package :iter-ator)
 
@@ -108,3 +115,46 @@
 (defun pstep (p)
   (with-bound-iterator (next place (array) (index)) p
     (next)))
+
+
+(defmacro with-simply-bound-iterator ((next place iterator) &body body)
+  (let ((array (gensym))
+	(index (gensym)))
+    `(iter-ator:with-bound-iterator (,next ,place (,array) (,index)) ,iterator
+       ,@body)))
+
+;;;;o means output
+(defmacro wasabio ((emit iterator) &body body)
+  (let ((next (gensym))
+	(place (gensym)))
+    `(with-simply-bound-iterator (,next ,place ,iterator)
+       (flet ((,emit (value)
+		(,next)
+		(setf ,place value)))
+	 ,@body))))
+
+;;;i means input
+(defmacro wasabii ((deref iterator) &body body)
+  (let ((next (gensym))
+	(place (gensym)))
+    `(with-simply-bound-iterator (,next ,place ,iterator)
+       (flet ((,deref ()
+		(,next)
+		,place))
+	 ,@body))))
+
+(defmacro wasabiis ((&rest wasabi-pears) &body body)
+  (let ((fin (cons 'progn body)))
+    (dolist (pear wasabi-pears)
+      (setf fin (list fin))
+      (push pear fin)
+      (push 'wasabii fin))
+    fin))
+
+(defmacro wasabios ((&rest wasabi-pears) &body body)
+  (let ((fin (cons 'progn body)))
+    (dolist (pear wasabi-pears)
+      (setf fin (list fin))
+      (push pear fin)
+      (push 'wasabio fin))
+    fin))

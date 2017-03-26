@@ -71,7 +71,9 @@
 	 (flhat (p-data flhat-iter)))
     (multiple-value-bind (chunk-index offset-index) (xindex flhat n)
       (setf (p-index array-iter) chunk-index
-	    (p-index value-iter) offset-index)
+	    (p-index value-iter) offset-index
+	    (p-array flhat-iter) flhat
+	    (p-index flhat-iter) -1)
       (let ((array (flhat-data flhat)))
 	(setf (p-array array-iter) array)
 	(setf (p-array value-iter)
@@ -80,4 +82,26 @@
 		    sub-array
 		    (let ((new-array (create-scratch-array)))
 		      (setf (aref array chunk-index)
-			    new-array)))))))))
+			    new-array)))))))
+    value-iter))
+
+(defun reset-iterator (value-iter)
+  (let* ((array-iter (p-data value-iter))
+	 (flhat-iter (p-data array-iter)))
+    (setf (p-index value-iter) 0
+	  (p-array value-iter) nil
+	  (p-index array-iter) 0
+	  (p-array array-iter) nil
+	  (p-index flhat-iter) 0
+	  (p-array flhat-iter) nil)
+    value-iter))
+
+(defun iterator-position (value-iter)
+  (let* ((array-iter (p-data value-iter))
+	 (flhat-iter (p-data array-iter))
+	 (flhat (p-data flhat-iter)))
+    (let ((value-index (p-index value-iter))
+	  (array-index (p-index array-iter))
+	  (total-size (flhat-length flhat)))
+      (+ (ash (- total-size array-index 1) +log-size+)
+	 (- +size+ value-index 1)))))

@@ -2,4 +2,4 @@
   :depends-on
   (#:foo-mapped-bar)
   :components
-  ((:file "src")))
+  ((:file "iter-ator")))
