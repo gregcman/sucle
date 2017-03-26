@@ -240,62 +240,87 @@
   (%gl:vertex-attrib-3f 0 x y z))
 (declaim (notinline vpc))
 
-(defun macrontinue (sub-form cont-list)
+(defun macrontinue (cont-list sub-form)
   (if cont-list
       (let ((cont (pop cont-list)))
-	(let ((tail (if cont-list
-			(list sub-form cont-list)
-			(list sub-form))))
-	  (append cont tail)))
+	(let ((head (car cont))
+	      (tail (cdr cont)))
+	  (let ((val (list sub-form tail head)))
+	    (if cont-list
+		(push cont-list val))
+	    (nreverse val))))
       sub-form))
 
-(defmacro mist (&rest rest)
-  (apply #'list* rest))
+(defmacro mist ((&rest parms) &optional subform cont)
+  (declare (ignorable parms))
+  (macrontinue
+   cont
+   (apply #'list* subform)))
 
 (defmacro deach (func-or-macro &rest forms)
   (cons 'progn
 	(mapcar (lambda (x) (list func-or-macro x)) forms)))
-(defmacro peach (func-or-macro forms)
+(defmacro peach ((func-or-macro) &optional subform cont)
+  (declare (ignorable subform cont))
   (cons 'progn
-	(mapcar (lambda (x) (list func-or-macro x)) forms)))
+	(mapcar (lambda (x) (list func-or-macro x)) subform)))
 
-(defmacro chain (init-form &rest conts)
-  `(croam () ,init-form ,conts))
+(defmacro chain ((init-form &rest conts) &optional subform cont)
+  (declare (ignorable subform))
+  (macrontinue
+   cont
+   `(croam () ,init-form ,conts)))
 
-(defmacro croam ((&rest params-list) &optional subform cont)
-  (declare (ignore params-list))
-  (macrontinue subform cont))
+(defmacro croam ((&rest parms) &optional subform cont)
+  (declare (ignorable parms))
+  (macrontinue cont subform))
+
+(defmacro reps ((size) &optional subform cont)
+  (declare (ignorable subform))
+  (macrontinue
+   cont
+   (make-list size :initial-element subform)))
 
 (defmacro duaq (((x- x+ y- y+) &optional (start 1) (clockwise-winding nil))
-				 &optional subform cont)
-  (declare (ignore subform))
-  (if (member start '(1 2 3 4))
-      (let ((one `(,x+ ,y+))
-	    (two `(,x- ,y+))
-	    (three `(,x- ,y-))
-	    (four `(,x+ ,y-))
-	    (i 1)
-	    (ii 2)
-	    (iii 3)
-	    (iv 4))
-	(when clockwise-winding
-	  (rotatef two four) (rotatef ii iv))
-	(do ()
-	    ((= start i))
-	  (rotatef one two three four)
-	  (rotatef i ii iii iv))
-	(let ((vals `(,@one ,@two ,@three ,@four)))
-	  (macrontinue vals cont)))
-      (error "~s is not a plane quadrant" start)))
+		&optional subform cont)
+  (declare (ignorable subform cont))
+  (macrontinue
+   cont
+   (if (member start '(1 2 3 4))
+       (let ((one `(,x+ ,y+))
+	     (two `(,x- ,y+))
+	     (three `(,x- ,y-))
+	     (four `(,x+ ,y-))
+	     (i 1)
+	     (ii 2)
+	     (iii 3)
+	     (iv 4))
+	 (when clockwise-winding
+	   (rotatef two four) (rotatef ii iv))
+	 (do ()
+	     ((= start i) `(,@one ,@two ,@three ,@four))
+	   (rotatef one two three four)
+	   (rotatef i ii iii iv)))
+       (error "~s is not a plane quadrant" start))))
 
 (defmacro aalgnqd ((start value) &optional subform cont)
-  (if (member start '(0 1 2))
-      (let ((acc nil))
-	(dotimes (x 6 (macrontinue (nreverse acc) cont))
-	  (if (zerop (mod (- x start) 2))
-	      (push value acc))
-	  (push (pop subform) acc)))
-      (error "~s is not 0 1 or 2" start)))
+  (macrontinue
+   cont
+   (if (member start '(0 1 2))
+       (let ((places (vector nil nil nil))
+	     (count 0))
+	 (dolist (form subform)
+	   (push form (aref places count))
+	   (setf count (- 1 count)))
+	 (setf (aref places 2) (list value value value value))
+	 (rotatef (aref places 2) (aref places start))
+	 (let (acc)
+	   (dotimes (x 4)
+	     (push (pop (aref places 2)) acc)
+	     (push (pop (aref places 1)) acc)
+	     (push (pop (aref places 0)) acc))
+	   acc))
+       (error "~s is not 0 1 or 2" start))))
 
 (defun wtf45 (-x +x -y +y j)
   (chain nil
@@ -315,21 +340,29 @@
 			   (epos pos-buf)
 			   (elit lit-buf))
 	(let ((distance 0.99999997))
-	  (deach etex
-		 0.0 0.0
-		 1.0 0.0
-		 1.0 1.0
-		 0.0 1.0)
-	  (deach epos
-		 -1.0 -1.0 distance
-		 1.0 -1.0 distance
-		 1.0 1.0 distance
-		 -1.0 1.0 distance)
-	  (deach elit 1f0 1f0 1f0)))
+	  (chain (nil (duaq (0.0 1.0 0.0 1.0) 3)
+		      (peach etex)))
+	  (chain (nil (duaq (-1.0 1.0 -1.0 1.0) 3)
+		      (aalgnqd 2 distance)
+		      (peach epos)))
+	  (chain (1f0 (reps 4)
+		      (peach elit)))))
       
       (gl:with-primitives :quads
 	(reset-attrib-buffer-iterators iter)
 	(mesh-test42 4 lit-buf tex-buf pos-buf)))))
+
+(progno (deach etex
+	       0.0 0.0
+	       1.0 0.0
+	       1.0 1.0
+	       0.0 1.0)
+
+	(deach epos
+	       -1.0 -1.0 distance
+	       1.0 -1.0 distance
+	       1.0 1.0 distance
+	       -1.0 1.0 distance))
 
 (defun draw-skybox ()
   (let ((h0 0.0)
