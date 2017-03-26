@@ -193,7 +193,3 @@
 
 (defmacro xmakunbounds (&body symbols)
   `(makunbounds (quote ,symbols)))
-
-(defmacro deach (func-or-macro &rest forms)
-  (cons 'progn
-	(mapcar (lambda (x) (list func-or-macro x)) forms)))

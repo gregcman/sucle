@@ -240,38 +240,96 @@
   (%gl:vertex-attrib-3f 0 x y z))
 (declaim (notinline vpc))
 
+(defun macrontinue (sub-form cont-list)
+  (if cont-list
+      (let ((cont (pop cont-list)))
+	(let ((tail (if cont-list
+			(list sub-form cont-list)
+			(list sub-form))))
+	  (append cont tail)))
+      sub-form))
+
+(defmacro mist (&rest rest)
+  (apply #'list* rest))
+
+(defmacro deach (func-or-macro &rest forms)
+  (cons 'progn
+	(mapcar (lambda (x) (list func-or-macro x)) forms)))
+(defmacro peach (func-or-macro forms)
+  (cons 'progn
+	(mapcar (lambda (x) (list func-or-macro x)) forms)))
+
+(defmacro chain (init-form &rest conts)
+  `(croam () ,init-form ,conts))
+
+(defmacro croam ((&rest params-list) &optional subform cont)
+  (declare (ignore params-list))
+  (macrontinue subform cont))
+
+(defmacro duaq (((x- x+ y- y+) &optional (start 1) (clockwise-winding nil))
+				 &optional subform cont)
+  (declare (ignore subform))
+  (if (member start '(1 2 3 4))
+      (let ((one `(,x+ ,y+))
+	    (two `(,x- ,y+))
+	    (three `(,x- ,y-))
+	    (four `(,x+ ,y-))
+	    (i 1)
+	    (ii 2)
+	    (iii 3)
+	    (iv 4))
+	(when clockwise-winding
+	  (rotatef two four) (rotatef ii iv))
+	(do ()
+	    ((= start i))
+	  (rotatef one two three four)
+	  (rotatef i ii iii iv))
+	(let ((vals `(,@one ,@two ,@three ,@four)))
+	  (macrontinue vals cont)))
+      (error "~s is not a plane quadrant" start)))
+
+(defmacro aalgnqd ((start value) &optional subform cont)
+  (if (member start '(0 1 2))
+      (let ((acc nil))
+	(dotimes (x 6 (macrontinue (nreverse acc) cont))
+	  (if (zerop (mod (- x start) 2))
+	      (push value acc))
+	  (push (pop subform) acc)))
+      (error "~s is not 0 1 or 2" start)))
+
+(defun wtf45 (-x +x -y +y j)
+  (chain nil
+	 (duaq ((-x +x -y +y) 3 t))
+	 (aalgnqd (2 j))
+	 (mist deach print)))
+
 (defun draw-background ()
   (declare (optimize (safety 0) (speed 3)))
-  (let ((distance 0.99999997))
-    (let ((iter *attrib-buffer-iterators*)
-	  (times 5))
-      (reset-attrib-buffer-iterators iter)
-      (let ((tex-buf (aref iter 2))
-	    (pos-buf (aref iter 0))
-	    (lit-buf (aref iter 8)))
-	(declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
-	(iter-ator:wasabios ((etex tex-buf)
-			     (epos pos-buf)
-			     (elit lit-buf))
-	  (dotimes (x times)
-	    (let ((flex (float x)))
-	      (deach etex
-		     0.0 0.0
-		     1.0 0.0
-		     1.0 1.0
-		     0.0 1.0)
-	      (let ((val (+ distance flex)))
-		(deach epos
-		       -1.0 -1.0 val
-		       1.0 -1.0 val
-		       1.0 1.0 val
-		       -1.0 1.0 val))
-	      (let ((a (- 1.0 (/ flex 100.0))))
-		(dotimes (x 4) (elit a))))))
-	
-	(gl:with-primitives :quads
-	  (reset-attrib-buffer-iterators iter)
-	  (mesh-test42 (* times 4) lit-buf tex-buf pos-buf))))))
+  (let ((iter *attrib-buffer-iterators*))
+    (reset-attrib-buffer-iterators iter)
+    (let ((tex-buf (aref iter 2))
+	  (pos-buf (aref iter 0))
+	  (lit-buf (aref iter 8)))
+      (declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
+      (iter-ator:wasabios ((etex tex-buf)
+			   (epos pos-buf)
+			   (elit lit-buf))
+	(let ((distance 0.99999997))
+	  (deach etex
+		 0.0 0.0
+		 1.0 0.0
+		 1.0 1.0
+		 0.0 1.0)
+	  (deach epos
+		 -1.0 -1.0 distance
+		 1.0 -1.0 distance
+		 1.0 1.0 distance
+		 -1.0 1.0 distance)
+	  (deach elit 1f0 1f0 1f0)))
+      
+      (gl:with-primitives :quads
+	(reset-attrib-buffer-iterators iter)
+	(mesh-test42 4 lit-buf tex-buf pos-buf)))))
 
 (defun draw-skybox ()
   (let ((h0 0.0)
