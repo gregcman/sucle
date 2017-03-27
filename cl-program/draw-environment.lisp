@@ -52,7 +52,9 @@
 	     )
    (gl:bind-texture :texture-2d *framebuffer-texture*)
    (ldrawlist :background)
-   (bind-shit :font)
+   (bind-shit :ocean)
+   (gl:enable :cull-face)
+   (lcalllist-invalidate :skybox)
    (ldrawlist :skybox))
   
   
@@ -210,10 +212,12 @@
 
 (defun load-some-images ()
   (src-image :font-image (img-path #P"font/codepage-437-vga-9x16.png"))
-  (src-image :cursor-image (img-path #P"cursor/windos-cursor.png")))
+  (src-image :cursor-image (img-path #P"cursor/windos-cursor.png"))
+  (src-image :ocean-image (img-path #P"skybox/first-fancy-skybox.png")))
 
 (defun texture-imageries ()
-  (texture-imagery :font :font-image))
+  (texture-imagery :font :font-image)
+  (texture-imagery :ocean :ocean-image))
 (defun name-shaders ()
   (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
 					      ("texCoord" . 2)
@@ -222,8 +226,8 @@
 					      ("texCoord" . 2)
 					      ("darkness" . 8))))
 (defun name-funcs ()
-  (name-mesh :background #'draw-background)
-  (name-mesh :skybox #'draw-skybox))
+  (name-mesh :background (lambda () (draw-background)))
+  (name-mesh :skybox (lambda () (draw-skybox))))
 
 (defun load-shaders ()
   (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
@@ -278,43 +282,42 @@
 	     (setf in-body post-decs))))
      (values declares documentation in-body))))
 
-(eval-always
-  (defun macrontinue (cont-list sub-form)
-    (if cont-list
-	(let ((cont (pop cont-list)))
-	  (let ((head (car cont))
-		(tail (cdr cont)))
-	    (let ((val (list sub-form tail head)))
-	      (if cont-list
-		  (push cont-list val))
-	      (nreverse val))))
-	sub-form)))
+(defmacro macrontinue (cont-list sub-form)
+  (if cont-list
+      (let ((cont (pop cont-list)))
+	(let ((head (car cont))
+	      (tail (cdr cont)))
+	  (let ((val (list sub-form tail head)))
+	    (if cont-list
+		(push cont-list val))
+	    (nreverse val))))
+      sub-form))
 
 (defmacro orcam ((subformvar contvar) &optional body cont)
-  (macrontinue
-   cont
-   (block orcam
-     (multiple-value-bind
-	   (def name parm decl doc bod)
-	 (destructure-def body)
-       `(,def ,name (,parm &optional ,subformvar ,contvar)
-	  ,@decl
-	  (declare (ignorable ,subformvar ,contvar))
-	  ,doc
-	  (macrontinue ,contvar
-		       ,(list* (quote block) name bod)))))))
+  (list (quote macrontinue) cont
+	(let ((tail-var (gensym)))
+	  (block orcam
+	    (multiple-value-bind
+		  (def name parm decl doc bod)
+		(destructure-def body)
+	      `(,def ,name (,parm &optional ,subformvar ,contvar) 
+		 ,@decl
+		 (declare (ignorable ,subformvar ,contvar))
+		 ,doc
+		 (let ((,tail-var ,(list* (quote block) name bod)))
+		   (list (quote macrontinue)
+			 ,contvar
+			 ,tail-var))))))))
 
-(orcam (subform cont)
-       (defmacro korc (macro &rest parms)
-	 (list macro parms)))
+(defmacro chain (input &rest conts)
+  `(macrontinue ,conts ,input))
 
 (orcam (subform cont)
        (defmacro mist ()
 	 (apply #'list* subform)))
 
 (orcam (subform cont)
-       (defmacro stim (&rest rest)
-	 rest))
+       (defmacro stim (&optional form) form))
 
 (orcam (subform cont)
        (defmacro peach (func-or-macro)
@@ -325,11 +328,12 @@
 	 (append func-or-macro subform)))
 
 (orcam (subform cont)
-       (defmacro chain (init-form &rest conts)
-	 `(croam () ,init-form ,conts)))
+       (defmacro croam () subform))
 
 (orcam (subform cont)
-       (defmacro croam ()
+       (defmacro sublock (&rest conts)
+	 (dolist (x (nreverse conts))
+	   (push x cont))
 	 subform))
 
 (orcam (subform cont)
@@ -337,7 +341,21 @@
 	 (make-list size :initial-element subform)))
 
 (orcam (subform cont)
-       (defmacro duaq ((x- x+ y- y+)
+       (defmacro lave ((subvar contvar) &body body)
+	 (multiple-value-bind (dec doc bod) (destructure-body body)
+	   (declare (ignorable doc))
+	   (multiple-value-bind (sub con)
+	       (eval (let ((val-var (gensym)))
+		       `(let ((,subvar ,subform)
+			      (,contvar (quote ,cont)))
+			  ,@dec
+			  (let ((,val-var (block nil ,@bod)))
+			    (values ,val-var ,contvar)))))
+	     (setf cont con)
+	     sub))))
+
+(orcam (subform cont)
+        (defmacro duaq ((x- x+ y- y+)
 		       &optional
 			 (start 1) (clockwise-winding nil))
 	 (if (member start '(1 2 3 4))
@@ -387,77 +405,127 @@
 			   (epos pos-buf)
 			   (elit lit-buf))
 	(let ((distance 0.99999997))
-	  (chain (nil (duaq (0.0 1.0 0.0 1.0) 3)
-		      (peach etex)
-		      (warp progn)))
-	  (chain (nil (duaq (-1.0 1.0 -1.0 1.0) 3)
-		      (aalgnqd 2 distance)
-		      (peach epos)
-		      (warp progn)))
-	  (chain (1f0 (reps 4)
-		      (peach elit)
-		      (warp progn)))))
+	  (chain nil
+		 (duaq (0.0 1.0 0.0 1.0) 3)
+		 (peach etex)
+		 (warp progn))
+	  (chain nil
+		 (duaq (-1.0 1.0 -1.0 1.0) 3)
+		 (aalgnqd 2 distance)
+		 (peach epos)
+		 (warp progn))
+	  (chain 1f0
+		 (reps 4)
+		 (peach elit)
+		 (warp progn))))
       
       (gl:with-primitives :quads
 	(reset-attrib-buffer-iterators iter)
 	(mesh-test42 4 lit-buf tex-buf pos-buf)))))
 
-(progno (deach etex
-	       0.0 0.0
-	       1.0 0.0
-	       1.0 1.0
-	       0.0 1.0)
-
-	(deach epos
-	       -1.0 -1.0 distance
-	       1.0 -1.0 distance
-	       1.0 1.0 distance
-	       -1.0 1.0 distance))
+(defmacro quadi+ (emit j- j+ k- k+ i)
+  `(chain nil
+	  (duaq (,j- ,j+ ,k- ,k+) 1 t)
+	  (aalgnqd 0 ,i)
+	  (peach ,emit)
+	  (warp progn)))
+(defmacro quadi- (emit j- j+ k- k+ i)
+  `(chain nil
+	  (duaq (,j- ,j+ ,k- ,k+) 3)
+	  (aalgnqd 0 ,i)
+	  (peach ,emit)
+	  (warp progn)))
+(defmacro quadj+ (emit i- i+ k- k+ j)
+  `(chain nil
+	  (duaq (,i- ,i+ ,k- ,k+) 1 t)
+	  (aalgnqd 1 ,j)
+	  (peach ,emit)
+	  (warp progn)))
+(defmacro quadj- (emit i- i+ k- k+  j)
+  `(chain nil
+	  (duaq (,i- ,i+ ,k- ,k+) 3)
+	  (aalgnqd 1 ,j)
+	  (peach ,emit)
+	  (warp progn)))
+(defmacro quadk+ (emit j- j+ i- i+ k)
+  `(chain nil
+	  (duaq (,i- ,i+ ,j- ,j+) 1)
+	  (aalgnqd 2 ,k)
+	  (peach ,emit)
+	  (warp progn)))
+(defmacro quadk- (emit j- j+ i- i+ k)
+  `(chain nil
+	  (duaq (,i- ,i+ ,j- ,j+) 3 t)
+	  (aalgnqd 2 ,k)
+	  (peach ,emit)
+	  (warp progn)))
 
 (defun draw-skybox ()
-  (let ((h0 0.0)
-	(h1 (/ 1.0 3.0))
-	(h2 (/ 2.0 3.0))
-	(h3 (/ 3.0 3.0))
-	(w0 0.0)
-	(w1 (/ 1.0 4.0))
-	(w2 (/ 2.0 4.0))
-	(w3 (/ 3.0 4.0))
-	(w4 (/ 4.0 4.0)))
-    (let ((neg -10.0)
-	  (pos 10.0))
+  (declare (optimize (safety 0) (speed 3)))
+  (let ((iter *attrib-buffer-iterators*))
+    (reset-attrib-buffer-iterators iter)
+    (let ((tex-buf (aref iter 2))
+	  (pos-buf (aref iter 0))
+	  (lit-buf (aref iter 8)))
+      (declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
+      (iter-ator:wasabios ((etex tex-buf)
+			   (epos pos-buf)
+			   (elit lit-buf))
+	(let ((h0 0.0)
+	      (h1 (/ 1.0 3.0))
+	      (h2 (/ 2.0 3.0))
+	      (h3 1.0)
+	      (w0 0.0)
+	      (w1 0.25)
+	      (w2 0.5)
+	      (w3 0.75)
+	      (w4 1.0))
+	  (let ((neg -10.0)
+		(pos 10.0))
+
+	    (quadi+ epos neg pos neg pos neg)
+	    (quadi- epos neg pos neg pos pos)	    
+	    (quadj+ epos neg pos neg pos neg)
+	    (quadj- epos neg pos neg pos pos)
+	    (quadk+ epos neg pos neg pos neg)
+	    (quadk- epos neg pos neg pos pos)
+	    
+
+	    (chain nil
+		   (duaq (w2 w3 h1 h2) 2)
+		   (peach etex)
+		   (warp progn))
+	    (chain nil
+		   (duaq (w0 w1 h1 h2) 3)
+		   (peach etex)
+		   (warp progn))
+	    
+	    (chain nil
+		   (duaq (w1 w2 h0 h1) 2)
+		   (peach etex)
+		   (warp progn))
+	    (chain nil
+		   (duaq (w1 w2 h2 h3) 1)
+		   (peach etex)
+		   (warp progn))
+	   	    	 
+	    (chain nil
+		   (duaq (w3 w4 h1 h2) 1)
+		   (peach etex)
+		   (warp progn))
+	    (chain nil
+		   (duaq (w1 w2 h1 h2) 4)
+		   (peach etex)
+		   (warp progn))
+	    
+	    (chain 1f0
+		 (reps 24)
+		 (peach elit)
+		 (warp progn)))))
+      
       (gl:with-primitives :quads
-	;;j+
-	(progn
-	  (vpc w2 h3 neg pos neg)
-	  (vpc w2 h2 pos pos neg)
-	  (vpc w1 h2 pos pos pos)
-	  (vpc w1 h3 neg pos pos))
-	(progn 	;;j-
-	  (vpc w2 h0 neg neg neg)
-	  (vpc w1 h0 neg neg pos)
-	  (vpc w1 h1 pos neg pos)
-	  (vpc w2 h1 pos neg neg))
-	(progn 	;;k-
-	  (vpc w3 h2 neg pos neg)
-	  (vpc w3 h1 neg neg neg)
-	  (vpc w2 h1 pos neg neg)
-	  (vpc w2 h2 pos pos neg))
-	(progn 	;;k+
-	  (vpc w1 h1 pos neg pos)
-	  (vpc w0 h1 neg neg pos)
-	  (vpc w0 h2 neg pos pos)
-	  (vpc w1 h2 pos pos pos))
-	(progn 	;;i-
-	  (vpc w3 h1 neg neg neg)
-	  (vpc w3 h2 neg pos neg)
-	  (vpc w4 h2 neg pos pos)
-	  (vpc w4 h1 neg neg pos))
-	(progn 	;;i+
-	  (vpc w2 h1 pos neg neg)
-	  (vpc w1 h1 pos neg pos)
-	  (vpc w1 h2 pos pos pos)
-	  (vpc w2 h2 pos pos neg))))))
+	(reset-attrib-buffer-iterators iter)
+	(mesh-test42 24 lit-buf tex-buf pos-buf)))))
 
 (defconstant +single-float-one-sixteenth+ (coerce 1/16 'single-float))
 
