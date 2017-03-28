@@ -1,7 +1,7 @@
 (defpackage :iter-ator
   (:use
    #:cl
-   #:foo-mapped-bar)
+   #:fuktard)
   (:nicknames
    #:iateor)
   (:export

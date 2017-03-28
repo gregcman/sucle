@@ -1,7 +1,6 @@
 (defpackage #:fixed-leaf-hashed-array-tree
   (:use #:cl
-	#:declaration-abbreviation
-	#:foo-mapped-bar
+	#:fuktard
 	#:iter-ator)
   (:nicknames #:flhat)
   (:export

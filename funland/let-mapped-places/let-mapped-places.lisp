@@ -1,10 +1,11 @@
-(defpackage #:foo-mapped-bar
-  (:use :cl
-	:declaration-generation)
-  (:export
-   #:with-let-mapped-places))
+(in-package :fuktard)
 
-(in-package #:foo-mapped-bar)
+(defun type-multimap-alist (type varname alist)
+  (let ((value (assoc type alist :test 'equal)))
+    (if value
+	(push varname (cdr value))
+	(push (list type varname) alist))
+    alist))
 
 (defmacro with-let-mapped-places ((&rest place-pairs) &body body)
   (let ((let-args nil)

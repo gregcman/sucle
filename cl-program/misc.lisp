@@ -38,6 +38,9 @@
      using (hash-value value)
      do (format t "~S ~S~%" key value)))
 
+(defun print-bits (n)
+  (format t "~64,'0b" n))
+
 (defun getapixel (h w image)
   (destructuring-bind (height width c) (array-dimensions image)
     (declare (ignore height))
@@ -116,14 +119,10 @@
 	  (when ans
 	    (set-text name ans)))))))
 
-
-(defun print-bits (n)
-  (format t "~64,'0b" n))
-
 (defun totally-destroy-package (package)
   (do-symbols (symbol package)
     (let ((home (symbol-package symbol)))
-      (when (eq package home)
+      (when (eql package home)
 	(when (fboundp symbol)
 	  (fmakunbound symbol))
 	(when (boundp symbol)

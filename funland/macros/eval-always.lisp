@@ -1,0 +1,5 @@
+(in-package :fuktard)
+(export (quote eval-always))
+(defmacro eval-always (body)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     ,body))

@@ -4,24 +4,16 @@
 		 #:bordeaux-threads
 
 		 #:alexandria
-		 #:opticl
+		 #:opticl  
 
 		 #:window-glfw3
 
-		 #:declaration-abbreviation
-		 #:iter-ator
+		 #:funland
 		 #:fixed-leaf-hashed-array-tree)
     :serial t
     :components
     
-    ((:module "macros"
-	      :serial t
-	      :components ((:file "package")
-			    
-			   (:file "dobox")
-			   (:file "progno")
-			   (:file "toggle")))
-
+    (
      (:file "package")
      
      (:file "camera-matrix") ;;;1st person perspective vision
