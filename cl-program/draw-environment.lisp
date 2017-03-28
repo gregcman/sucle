@@ -301,7 +301,7 @@
 	   acc))
        (error "~s is not 0 1 or 2" start))))
 
-(defmacro lever (form)
+(defmacro etouq (form)
   (eval form))
 
 (fuktard:eval-always
@@ -327,12 +327,9 @@
    (defun raps (form times)
      (make-list times :initial-element form))))
 
-(defmacro loggin (&rest forms)
-  (list (quote lever)
-	(list (quote cons)
-	      (quote (quote progn))
-	      (cons (quote nconc)
-		    forms))))
+(defun ngorp (&rest forms)
+  (cons (quote progn)
+	(apply (function nconc) forms)))
 
 (defun draw-background (tex-buf pos-buf lit-buf)
   (declare (optimize (safety 0) (speed 3)))
@@ -341,9 +338,9 @@
 		       (epos pos-buf)
 		       (elit lit-buf))
     (let ((distance 0.99999997))
-      (loggin (preach 'etex (duaq 1 nil '(0.0 1.0 0.0 1.0)))
-	      (preach 'epos (quadk+ 'distance '(-1.0 1.0 -1.0 1.0)))
-	      (preach 'elit (raps 1f0 4)))))
+      (etouq (ngorp (preach 'etex (duaq 1 nil '(0.0 1.0 0.0 1.0)))
+		     (preach 'epos (quadk+ 'distance '(-1.0 1.0 -1.0 1.0)))
+		     (preach 'elit (raps 1f0 4))))))
   4)
 
 (let ((%skybox-pos nil)
@@ -362,15 +359,15 @@
 	      (w4 1.0))
 	  (let ((neg -10.0)
 		(pos 10.0))
-	    (values (lever (cons 'vector
-				 (let ((npnp (quote (neg pos neg pos))))
-				   (nconc (quadi+ 'neg npnp)
-					  (quadi- 'pos npnp)
-					  (quadj+ 'neg npnp)
-					  (quadj- 'pos npnp)
-					  (quadk+ 'neg npnp)
-					  (quadk- 'pos npnp)))))
-		    (lever (cons 'vector
+	    (values (etouq (cons 'vector
+				    (let ((npnp (quote (neg pos neg pos))))
+				      (nconc (quadi+ 'neg npnp)
+					     (quadi- 'pos npnp)
+					     (quadj+ 'neg npnp)
+					     (quadj- 'pos npnp)
+					     (quadk+ 'neg npnp)
+					     (quadk- 'pos npnp)))))
+		    (etouq (cons 'vector
 				 (nconc (duaq 2 nil '(w2 w3 h1 h2))
 					(duaq 3 nil '(w0 w1 h1 h2))
 					(duaq 2 nil '(w1 w2 h0 h1))
@@ -423,11 +420,11 @@
 		  (decf yoffset))
 		(progn
 		  (incf times 4)
-		  (loggin (preach 'elit '(1f0 1f0 1f0 1f0)))
+		  (etouq (ngorp (preach 'elit '(1f0 1f0 1f0 1f0))))
 		  (let ((code (char-code char)))
 		    (multiple-value-bind (x0 y0 x1 y1)
 			(sixteen-by-sixteen-texture-ref code)
-		      (loggin (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
+		      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
 		  (let ((charx (+ xoffset x))
 			(chary (+ yoffset y)))
 		    (let ((width-unit (/ 1.0 width))
@@ -436,7 +433,7 @@
 			  (ystart (- (/ chary height) 1.0)))
 		      (let ((xend (+ xstart width-unit))
 			    (yend (+ ystart height-unit)))
-			(loggin (preach 'epos (quadk+ 'z '(xstart xend ystart yend)))))))
+			(etouq (ngorp (preach 'epos (quadk+ 'z '(xstart xend ystart yend))))))))
 		  (incf xoffset))))))
       times)))
 
