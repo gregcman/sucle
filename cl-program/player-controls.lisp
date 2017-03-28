@@ -28,19 +28,11 @@
 
 (defun controls ()
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
-  (let ((speed (if t 0.5 0.04444445)))
-    (when fly
-      (setf speed (* 0.024 0.1))
-      (when (e:key-p :space)
-	(incf *yvel* speed))
-      (when (e:key-p :left-shift)
-	(decf *yvel* speed)))
-    (unless fly
-      (when onground
-	(when (or (e:mice-j-p :|3|) (e:key-p :space)) ;;jumping
-	  (incf *yvel* 0.16333334)))
-      (unless onground
-	(setf speed (* speed 0.2))))    
+  (let ((speed (if nil 0.5 0.04444445)))
+    (when (e:key-p :space)
+      (incf *yvel* speed))
+    (when (e:key-p :left-shift)
+      (decf *yvel* speed))    
     (let ((dir 0))
       (when (e:key-p :w)
 	(incf dir #C(-1 0)))
@@ -135,25 +127,17 @@
     (when (e:key-j-p :v) (toggle noclip))
     (when (e:key-j-p :g) (toggle gravity))
     (when (e:key-j-p :f) (toggle fly))
-    (if fly
-	(setf air-friction 0.9)
-	(setf air-friction 0.98))
+    
+    (setf air-friction 0.9)
+    
     (look-around)
     (controls))
 
   (incf *xpos* *xvel*)
   (incf *ypos* *yvel*)
   (incf *zpos* *zvel*)
+
   
-  (if fly
-      (progn
-	(setf *xvel* (* *xvel* air-friction))
-	(setf *zvel* (* *zvel* air-friction)))
-      (cond (onground
-	     (setf *xvel* (* *xvel* walking-friction))
-	     (setf *zvel* (* *zvel* walking-friction)))
-	    (t (setf *xvel* (* *xvel* 0.9))
-	       (setf *zvel* (* *zvel* 0.9)))))
-  (when (and gravity (not onground))
-    (decf *yvel* 0.008888889))
+  (setf *xvel* (* *xvel* air-friction))
+  (setf *zvel* (* *zvel* air-friction))    
   (setf *yvel* (* *yvel* air-friction)))
