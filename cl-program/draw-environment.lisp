@@ -7,6 +7,8 @@
 
 (defparameter *mat4-identity* (cg-matrix:identity-matrix))
 
+(defconstant +single-float-just-less-than-one+ 0.99999997)
+
 (defun render ()
   (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
   (if vsync?
@@ -16,58 +18,45 @@
   (luse-shader :blockshader)
   (set-overworld-fog *daytime*)
 
-  
-  (progn
-   (bind-custom-framebuffer *framebuffer*)
-   (gl:viewport 0 0 *framebuffer-width* *framebuffer-height*))
-  
+
+  (bind-default-framebuffer)
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location *shader-program* "projectionmodelview")
    *mat4-identity*)
+  (gl:viewport 0 0 e:*width* e:*height*)
   (bind-shit :font)
-  (gl:clear-color 0f0 1f0 0f0 1f0)
+  (gl:enable :depth-test)
+  (set-sky-color)
   
-  (progn
-    (gl:clear :color-buffer-bit :depth-buffer-bit)
-    (gl:disable :depth-test)
-;    (lcalllist-invalidate :string)
-    (name-mesh :string (lambda ()
-			 (gl-draw-quads 
-			  (lambda (tex-buf pos-buf lit-buf)
-			    (draw-string-raster-char
-			     pos-buf tex-buf lit-buf
-			     foo (floor 256 9) (floor 256 16) 0 32 0.5)))))
-    (ldrawlist :string))
+  (gl:clear :color-buffer-bit :depth-buffer-bit)
+  (lcalllist-invalidate :string)
 
-  (progn
-   (gl:uniform-matrix-4fv
-    (gl:get-uniform-location *shader-program* "projectionmodelview")
-    (camera-matrix-projection-view-player *camera*)
-    nil)
-   (gl:enable :depth-test)
+  (name-mesh :string (lambda ()
+		       (gl-draw-quads 
+			(lambda (tex-buf pos-buf lit-buf)
+			  (draw-string-raster-char
+			   pos-buf tex-buf lit-buf
+			   foo (floor e:*width* 18) (floor e:*height* 32) 0 10
+			   (- +single-float-just-less-than-one+))))))
+  (ldrawlist :string)
 
-   (set-sky-color)
-   
-   (bind-default-framebuffer)
-   (gl:viewport 0 0 e:*width* e:*height*)
-   (gl:clear :depth-buffer-bit :color-buffer-bit
-	     )
-   (gl:bind-texture :texture-2d *framebuffer-texture*)
-   (ldrawlist :background)
-   (progn
-    (bind-shit :ocean)
-    (gl:enable :cull-face)
-    (lcalllist-invalidate :skybox)
-    (ldrawlist :skybox)))
+  (gl:uniform-matrix-4fv
+   (gl:get-uniform-location *shader-program* "projectionmodelview")
+   (camera-matrix-projection-view-player *camera*)
+   nil)
+  (set-sky-color)
   
-  
+  (bind-shit :ocean)
+    
+  (ldrawlist :skybox)
+     
   (window:update-display))
 
 (defun set-sky-color ()
-    (let ((r (* *daytime* (aref *sky-color* 0)))
-	 (g (* *daytime* (aref *sky-color* 1)))
-	 (b (* *daytime* (aref *sky-color* 2))))
-     (gl:clear-color r g b 1.0)))
+  (let ((r (* *daytime* (aref *sky-color* 0)))
+	(g (* *daytime* (aref *sky-color* 1)))
+	(b (* *daytime* (aref *sky-color* 2))))
+    (gl:clear-color r g b 1.0)))
 (defparameter *daytime* 0.4)
 (defparameter *sky-color* (vector 1.0 0.8 0.68))
 (defparameter *fog-ratio* 0.75)
@@ -103,27 +92,13 @@
     (window:push-dimensions width height))
   (setf e:*resize-hook* #'on-resize)
   
-  (setf (values *framebuffer-texture* *framebuffer*)
-	(create-framebuffer *framebuffer-width* *framebuffer-height*))
-  (bind-custom-framebuffer *framebuffer*)
-  (gl:clear-color 0f0 1f0 0f0 1f0)
-  (gl:clear :color-buffer-bit)
-
+ 
   (name-funcs)
   (texture-imageries)
   (name-shaders)
 
   (load-shaders)
   (load-some-images))
-
-(defparameter *framebuffer-width* 512)
-(defparameter *framebuffer-height* 512)
-(defparameter *framebuffer* nil)
-(defparameter *framebuffer-texture* nil)
-
-(defun clean-framebuffers ()
-  (gl:delete-framebuffers-ext (list *framebuffer*))
-  (gl:delete-textures (list *framebuffer-texture*)))
 
 (defun set-render-cam-pos (camera)
   (let ((vec (camera-vec-position camera))
@@ -337,7 +312,7 @@
   (iter-ator:wasabios ((etex tex-buf)
 		       (epos pos-buf)
 		       (elit lit-buf))
-    (let ((distance 0.99999997))
+    (let ((distance +single-float-just-less-than-one+))
       (etouq (ngorp (preach 'etex (duaq 1 nil '(0.0 1.0 0.0 1.0)))
 		     (preach 'epos (quadk+ 'distance '(-1.0 1.0 -1.0 1.0)))
 		     (preach 'elit (raps 1f0 4))))))
@@ -449,5 +424,26 @@
    :quads
    :quad-strip
    :polygon))
+
+(progn
+  (defparameter *framebuffer-width* 512)
+  (defparameter *framebuffer-height* 512)
+  (defparameter *framebuffer* nil)
+  (defparameter *framebuffer-texture* nil)
+  (bind-custom-framebuffer *framebuffer*)
+  (gl:clear-color 0f0 1f0 0f0 1f0)
+  (gl:clear :color-buffer-bit)
+
+  (setf (values *framebuffer-texture* *framebuffer*)
+	(create-framebuffer *framebuffer-width* *framebuffer-height*))
+  (progno
+   (progno
+    (bind-custom-framebuffer *framebuffer*)
+    (gl:viewport 0 0 *framebuffer-width* *framebuffer-height*))
+   (progn
+     (bind-default-framebuffer)))
+  (defun clean-framebuffers ()
+    (gl:delete-framebuffers-ext (list *framebuffer*))
+    (gl:delete-textures (list *framebuffer-texture*))))
  
 
