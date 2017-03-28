@@ -8,7 +8,6 @@
 (defparameter *mat4-identity* (cg-matrix:identity-matrix))
 
 (defun render ()
-  (declare (optimize (safety 3) (debug 3)))
   (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
   (if vsync?
       (window::set-vsync t)
@@ -33,8 +32,11 @@
     (gl:disable :depth-test)
   ;  (lcalllist-invalidate :string)
     (name-mesh :string (lambda ()
-			 (gl:with-primitives :quads
-			   (draw-string-raster-char foo (floor 256 9) (floor 256 16) 0 32 0.5))))
+			 (gl-draw-quads 
+			  (lambda (tex-buf pos-buf lit-buf)
+			    (draw-string-raster-char
+			     pos-buf tex-buf lit-buf
+			     foo (floor 256 9) (floor 256 16) 0 32 0.5)))))
     (ldrawlist :string))
 
   (progn
@@ -350,37 +352,47 @@
 	      (cons (quote nconc)
 		    forms))))
 
-(defun draw-skybox (tex-buf pos-buf lit-buf)
-  (declare (optimize (safety 0) (space 3)))
-  (declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
-  (iter-ator:wasabios ((etex tex-buf)
-		       (epos pos-buf)
-		       (elit lit-buf))
-    (let ((h0 0.0)
-	  (h1 (/ 1.0 3.0))
-	  (h2 (/ 2.0 3.0))
-	  (h3 1.0)
-	  (w0 0.0)
-	  (w1 0.25)
-	  (w2 0.5)
-	  (w3 0.75)
-	  (w4 1.0))
-      (let ((neg -10.0)
-	    (pos 10.0))
-	(loggin (preach 'epos (nconc (quadi+ 'neg 'pos 'neg 'pos 'neg)
-				     (quadi- 'neg 'pos 'neg 'pos 'pos)
-				     (quadj+ 'neg 'pos 'neg 'pos 'neg)
-				     (quadj- 'neg 'pos 'neg 'pos 'pos)
-				     (quadk+ 'neg 'pos 'neg 'pos 'neg)
-				     (quadk- 'neg 'pos 'neg 'pos 'pos)))
-		(preach 'etex (nconc (duaq 'w2 'w3 'h1 'h2  2)
-				     (duaq 'w0 'w1 'h1 'h2 3)
-				     (duaq 'w1 'w2 'h0 'h1 2)
-				     (duaq 'w1 'w2 'h2 'h3 1)
-				     (duaq 'w3 'w4 'h1 'h2 1)
-				     (duaq 'w1 'w2 'h1 'h2 4)))
-		(preach 'elit (raps 1f0 24))))))
-  24)
+(let ((%skybox-pos nil)
+      (%skybox-col nil))
+  (declare (type (or null simple-vector)
+		 %skybox-pos %skybox-col))
+  (setf (values %skybox-pos %skybox-col)
+	(let ((h0 0.0)
+	      (h1 (/ 1.0 3.0))
+	      (h2 (/ 2.0 3.0))
+	      (h3 1.0)
+	      (w0 0.0)
+	      (w1 0.25)
+	      (w2 0.5)
+	      (w3 0.75)
+	      (w4 1.0))
+	  (let ((neg -10.0)
+		(pos 10.0))
+	    (values (lever (cons 'vector
+				 (nconc (quadi+ 'neg 'pos 'neg 'pos 'neg)
+					(quadi- 'neg 'pos 'neg 'pos 'pos)
+					(quadj+ 'neg 'pos 'neg 'pos 'neg)
+					(quadj- 'neg 'pos 'neg 'pos 'pos)
+					(quadk+ 'neg 'pos 'neg 'pos 'neg)
+					(quadk- 'neg 'pos 'neg 'pos 'pos))))
+		    (lever (cons 'vector
+				 (nconc (duaq 'w2 'w3 'h1 'h2  2)
+					(duaq 'w0 'w1 'h1 'h2 3)
+					(duaq 'w1 'w2 'h0 'h1 2)
+					(duaq 'w1 'w2 'h2 'h3 1)
+					(duaq 'w3 'w4 'h1 'h2 1)
+					(duaq 'w1 'w2 'h1 'h2 4))))))))
+  (defun draw-skybox (tex-buf pos-buf lit-buf)
+    (declare (optimize (safety 0) (space 3)))
+    (declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
+    (iter-ator:wasabios ((etex tex-buf)
+			 (epos pos-buf)
+			 (elit lit-buf))
+      (dotimes (x 24)
+ 	(etex (aref %skybox-col x))
+	(epos (aref %skybox-pos x))
+	(elit 1f0)))
+    24))
 
 (defconstant +single-float-one-sixteenth+ (coerce 1/16 'single-float))
 
@@ -391,18 +403,26 @@
 	(ystart (- (/ y height) 1.0)))
     (draw-raster-char code-point xstart	ystart (+ xstart width-unit) (+ ystart height-unit) z)))
 
-(defun draw-raster-char (code-point x1 y1 x2 y2 z)
-  (multiple-value-bind (vfoo ufoo) (floor code-point 16)
-    (let ((u (/ ufoo 16.0))
-	  (v (- 1.0 +single-float-one-sixteenth+ (/ vfoo 16.0))))
-      (let ((maxv (+ v +single-float-one-sixteenth+))
-	    (maxu (+ u +single-float-one-sixteenth+)))
-	(vpc u v x1 y1 z)
-	(vpc maxu v x2 y1 z)
-	(vpc maxu maxv x2 y2 z)
-	(vpc u maxv x1 y2 z)))))
+(progn
+  (declaim (ftype (function ((unsigned-byte 8))
+			    (values single-float single-float single-float single-float))
+		  sixteen-by-sixteen-texture-ref))
+  (defun sixteen-by-sixteen-texture-ref (num)
+    (multiple-value-bind (vfoo ufoo) (floor num 16)
+      (let ((u (/ ufoo 16.0))
+	    (v (- 1.0 +single-float-one-sixteenth+ (/ vfoo 16.0))))
+	(values u v
+		(+ u +single-float-one-sixteenth+)
+		(+ v +single-float-one-sixteenth+))))))
 
-(defun draw-string-raster-char (string width height x y z)
+(defun draw-raster-char (code-point x1 y1 x2 y2 z)
+  
+  (vpc u v x1 y1 z)
+  (vpc maxu v x2 y1 z)
+  (vpc maxu maxv x2 y2 z)
+  (vpc u maxv x1 y2 z))
+
+(defun draw-string-raster-char (pos-buf tex-buf lit-buf string width height x y z)
   (let ((xoffset 0)
 	(yoffset 0))
     (dotimes (position (length string))
@@ -427,5 +447,5 @@
    :quads
    :quad-strip
    :polygon))
-
+ 
 
