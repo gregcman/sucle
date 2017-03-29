@@ -21,6 +21,7 @@
 	       (:file "camera-matrix") ;;;1st person perspective vision
 	       (:file "meshing")
 	       (:file "tilemap")
+	       (:file "axis-aligned-quads")
 	       
 	       (:file "misc") ;;;everything else
 	       

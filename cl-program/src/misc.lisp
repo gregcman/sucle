@@ -4,17 +4,18 @@
   (eval form))
 
 (fuktard:eval-always
- (defun preach (value form)
-   (mapcar (lambda (x)
-	     (list value x))
-	   form))
+ (progn
+   (defun preach (value form)
+     (mapcar (lambda (x)
+	       (list value x))
+	     form))
 
- (defun raps (times form)
-   (make-list times :initial-element form))
+   (defun raps (times form)
+     (make-list times :initial-element form))
 
- (defun ngorp (&rest forms)
-   (cons (quote progn)
-	 (apply (function nconc) forms))))
+   (defun ngorp (&rest forms)
+     (cons (quote progn)
+	   (apply (function nconc) forms)))))
 
 (defparameter *something* #.(or *compile-file-truename* *load-truename*))
 
