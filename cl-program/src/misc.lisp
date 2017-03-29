@@ -1,10 +1,10 @@
 (in-package :sandbox)
 
+(defparameter *something* #.(or *compile-file-truename* *load-truename*))
+
 (defparameter ourdir
-  (make-pathname :host (pathname-host #.(or *compile-file-truename*
-					    *load-truename*))
-		 :directory (pathname-directory #.(or *compile-file-truename*
-						      *load-truename*))))
+  (make-pathname :host (pathname-host *something*)
+		 :directory (pathname-directory *something*)))
 
 
 (defconstant +single-float-pi+ (coerce pi 'single-float))
@@ -192,3 +192,120 @@
 
 (defmacro xmakunbounds (&body symbols)
   `(makunbounds (quote ,symbols)))
+
+(defun complex-modulus (c)
+  (sqrt (realpart (* c (conjugate c)))))
+
+;;;;flip an image in-place - three dimensions - does not conse
+(defun flip-image (image)
+  (let ((dims (array-dimensions image)))
+    (let ((height (pop dims))
+	  (width (pop dims)))
+      (if dims
+	  (let ((components (car dims)))
+	    (dobox ((h 0 (- height (ash height -1)))
+		    (w 0 width)
+		    (c 0 components))
+		   (rotatef (aref image (- height h 1) w c)
+			    (aref image h w c))))
+	  (dobox ((h 0 (- height (ash height -1)))
+		  (w 0 width))
+	      (rotatef (aref image (- height h 1) w)
+		       (aref image h w))))))
+  image)
+
+
+(defparameter dir-resource (merge-pathnames #P"res/" ourdir))
+(defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
+
+(defun shader-path (name)
+  (merge-pathnames name dir-shader))
+
+(defun img-path (name)
+  (merge-pathnames name dir-resource))
+
+(defun name-mesh (display-list-name mesh-func)
+  (setf (gethash display-list-name *g/call-list-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (create-call-list-from-func mesh-func))))
+
+(defun texture-imagery (texture-name image-name)
+  (setf (gethash texture-name *g/texture-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (pic-texture (get-image image-name)))))
+
+(defun name-shader (shader-name vs fs attributes)
+  (setf (gethash shader-name *g/shader-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (make-shader-program-from-strings
+	   (get-text vs) (get-text fs) attributes))))
+
+(defun src-image (name src-path)
+  (setf (gethash name *g/image-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (let ((img (load-png src-path)))
+	    (flip-image img)
+	    img))))
+
+(defun src-text (name src-path)
+  (setf (gethash name *g/text-backup*)
+	(lambda (&optional name)
+	  (declare (ignorable name))
+	  (file-string src-path))))
+
+
+(defparameter foo
+  (let ((a (write-to-string
+	    '(defun render ()
+	      (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
+	      (if vsync?
+		  (window::set-vsync t)
+		  (window::set-vsync nil))
+	      (update-matrices *camera*)
+	      (luse-shader :blockshader)
+	      (set-overworld-fog *daytime*)
+
+
+	      (bind-default-framebuffer)
+	      (gl:uniform-matrix-4fv
+	       (gl:get-uniform-location *shader-program* "projectionmodelview")
+	       *mat4-identity*)
+	      (gl:viewport 0 0 e:*width* e:*height*)
+	      (setf *aspect-ratio* (/ e:*height* e:*width*))
+	      (bind-shit :font)
+	      (gl:enable :depth-test)
+	      (set-sky-color)
+	      
+	      (gl:clear :color-buffer-bit :depth-buffer-bit)
+	      (lcalllist-invalidate :string)
+
+	      (let ((scale 32.0))
+		(name-mesh :string (lambda ()
+				     (gl-draw-quads 
+				      (lambda (tex-buf pos-buf lit-buf)
+					(draw-string-raster-char
+					 pos-buf tex-buf lit-buf
+					 foo
+					 (/ scale e:*width* 2.0)
+					 (/ scale e:*height*)
+					 -1.0 0.0
+					 (- +single-float-just-less-than-one+)))))))
+	      (ldrawlist :string)
+
+	      (gl:uniform-matrix-4fv
+	       (gl:get-uniform-location *shader-program* "projectionmodelview")
+	       (camera-matrix-projection-view-player *camera*)
+	       nil)
+	      (set-sky-color)
+	      
+	      (bind-shit :ocean)
+	      
+	      (ldrawlist :skybox)
+	      
+	      (window:update-display)))))
+    (map-into a
+	      (lambda (x) (char-downcase x)) a)))

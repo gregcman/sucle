@@ -21,7 +21,6 @@
 (defun injection ()
   (window:poll)
   (physics)
-  (set-render-cam-pos *camera*)
   (render)
   (unless window:*status* 
     (injection)))

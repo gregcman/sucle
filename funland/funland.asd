@@ -13,9 +13,6 @@
 			 (:module "defdestructure"
 				  :serial t
 				  :components ((:file "defdestructure")))
-			 (:module "macrochain"
-				  :serial t
-				  :components ((:file "macrochain")))
 			 (:module "let-mapped-places"
 				  :components ((:file "let-mapped-places")))
 			 (:file "map-home-symbols")))

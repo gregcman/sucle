@@ -1,0 +1,41 @@
+(in-package :sandbox)
+
+(progn
+  (declaim (ftype (function (fixnum fixnum fixnum)
+			    (values single-float single-float
+				    single-float single-float))
+		  sequential-index-generator))
+  (defun sequential-index-generator (width height num)
+    (let ((usize (/ 1f0 (float width)))
+	  (vsize (/ 1f0 (float height))))
+      (multiple-value-bind (vfoo ufoo) (floor num width)
+	(let ((u (* (float ufoo) usize))
+	      (v (* (- height (float vfoo) 1) vsize)))
+	  (values u v
+		  (+ u usize) 
+		  (+ v vsize)))))))
+(progn
+  (declaim (ftype (function (fixnum fixnum) simple-array)
+		  regular-enumeration))
+  (defun regular-enumeration (width height)
+    (let ((tot (* width height)))
+      (let ((ret (make-array (* tot 4))))
+	(dotimes (x 256)
+	  (multiple-value-bind (x0 y0 x1 y1) (sequential-index-generator width height x)
+	    (let ((p (* x 4)))
+	      (setf (aref ret (+ 0 p)) x0
+		    (aref ret (+ 1 p)) y0
+		    (aref ret (+ 2 p)) x1
+		    (aref ret (+ 3 p)) y1))))
+	ret))))
+(progn
+  (declaim (ftype (function (simple-vector fixnum)
+			    (values t t t t))
+		  index-quad-lookup))
+  (defun index-quad-lookup (array code)
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((p (* code 4)))
+      (values (aref array p)
+	      (aref array (1+ p))
+	      (aref array (+ 2 p))
+	      (aref array (+ 3 p))))))

@@ -13,18 +13,21 @@
     :serial t
     :components
     
-    (
-     (:file "package")
-     
-     (:file "camera-matrix") ;;;1st person perspective vision
-     (:file "meshing")
-     
-     (:file "misc") ;;;everything else
-     
-     (:file "lovely-renderer") ;;;layers over opengl
-     
-     (:file "draw-environment") ;;;random rendering
-     
-     (:file "player-controls");;;layers over input
-     
-     (:file "sandbox"))) ;;;initialization and loop
+    ((:module "src"
+	      :serial t
+	      :components
+	      ((:file "package")
+	       
+	       (:file "camera-matrix") ;;;1st person perspective vision
+	       (:file "meshing")
+	       (:file "tilemap")
+	       
+	       (:file "misc") ;;;everything else
+	       
+	       (:file "lovely-renderer") ;;;layers over opengl
+	       
+	       (:file "draw-environment") ;;;random rendering
+	       
+	       (:file "player-controls");;;layers over input
+	       
+	       (:file "sandbox"))))) ;;;initialization and loop

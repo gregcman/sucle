@@ -73,6 +73,7 @@
        24)))
 
  (progno
+  (set-sky-color)
   (defun set-sky-color ()
     (let ((r (* *daytime* (aref *sky-color* 0)))
 	  (g (* *daytime* (aref *sky-color* 1)))
@@ -165,3 +166,121 @@
 						 ("darkness" . 8)))
      (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
      (src-text :bs-frag (shader-path "blockshader/basictexcoord.frag")))
+
+(progno
+    (name-mesh :background
+	       (lambda ()
+		 (gl-draw-quads (function draw-background))))
+    (name-mesh :skybox (lambda ()
+			 (gl-draw-quads (function draw-skybox)))))x
+
+(progno
+     (texture-imagery :ocean :ocean-image)
+     (src-image :ocean-image (img-path #P"skybox/first-fancy-skybox.png")))
+
+
+(progno
+;;;;player-controls?
+ ;;;;separate physics from keyboard+ mouse and other factors
+ (defparameter noclip nil)
+
+ (defparameter *xpos* 0f0)
+ (defparameter *ypos* 0f0)
+ (defparameter *zpos* 0f0)
+
+ (defparameter *xvel* 0)
+ (defparameter *yvel* 0)
+ (defparameter *zvel* 0)
+
+ (defparameter fly t)
+
+ (defparameter *yaw* 0f0)
+ (defparameter *pitch* 0f0)
+ 
+ (defparameter defaultfov (* 70 +single-float-pi+ 1/180))
+
+ (defparameter air-friction 0.98)
+ (defparameter walking-friction (* 0.6 0.9))
+
+ (defparameter gravity nil)
+ (defparameter *speed* 0.01)
+
+ (defparameter onground nil)
+ (defparameter *fist-function* (constantly nil))
+
+ (defun controls ()
+   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
+   (when (e:key-p :space)
+     (incf *yvel* *speed*))
+   (when (e:key-p :left-shift)
+     (decf *yvel* *speed*))    
+   (let ((dir 0))
+     (when (e:key-p :w)
+       (incf dir #C(-1 0)))
+     (when (e:key-p :a)
+       (incf dir #C(0 1)))
+     (when (e:key-p :s)
+       (incf dir #C(1 0)))
+     (when (e:key-p :d)
+       (incf dir #C(0 -1)))
+     (unless (zerop dir)
+       (let ((rot-dir (* dir (cis *yaw*))))
+	 (let ((normalized (/ rot-dir (complex-modulus rot-dir))))
+	   (incf *xvel* (* *speed* (realpart normalized)))
+	   (incf *zvel* (* *speed* (imagpart normalized))))))))
+
+ (defun mouse-looking ()
+   (multiple-value-bind (dx dy) (delta)
+     (let ((x (* mouse-sensitivity (/ dx 360.0)))
+	   (y (* mouse-sensitivity (/ dy 360.0))))
+       (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
+	 (setf *yaw* (mod (+ *yaw* dyaw) +single-float-two-pi+))
+	 (setf *pitch* (clamp (+ *pitch* dpitch)
+			      (* -0.99 +single-float-half-pi+)
+			      (* 0.99 +single-float-half-pi+)))))))
+
+ (defun %sphere-mouse-help (x y)
+   (if (zerop x)
+       (if (zerop y)
+	   (values 0.0 0.0)
+	   (values 0.0 y))
+       (if (zerop y)
+	   (values x 0.0)
+	   (new-direction (coerce x 'single-float)
+			  (coerce y 'single-float)))))
+
+ (defparameter *new-dir* (cg-matrix:vec 0.0 0.0 0.0))
+ (defun new-direction (dx dy)
+   (let ((size (sqrt (+ (* dx dx) (* dy dy)))))
+     (let ((dir *x-unit*))
+       (let ((rot (cg-matrix:%rotate-around*
+		   *temp-matrix3*
+		   0.0 (/ (- dx) size) (/ dy size) size)))
+	 (let ((new-dir (cg-matrix:%transform-direction *new-dir* dir rot)))
+	   (multiple-value-bind (p y) (extract-polar-coords new-dir)
+	     (values y p)))))))
+
+ ;;return the pitch and yaw of a unit direction vector
+ (defun extract-polar-coords (vec)
+   (let ((zero (aref vec 0))
+	 (two (aref vec 2)))
+     (values (asin (aref vec 1))
+	     (atan two zero))))
+
+ (progno
+  (progno
+   (when (e:key-j-p :v) (toggle noclip))
+   (when (e:key-j-p :g) (toggle gravity))
+   (when (e:key-j-p :f) (toggle fly))
+   
+   
+   
+   (mouse-looking))
+  (setf air-friction 0.9)
+  (incf *xpos* *xvel*)
+  (incf *ypos* *yvel*)
+  (incf *zpos* *zvel*)
+
+  (setf *xvel* (* *xvel* air-friction))
+  (setf *zvel* (* *zvel* air-friction))    
+  (setf *yvel* (* *yvel* air-friction))))
