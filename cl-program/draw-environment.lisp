@@ -24,6 +24,7 @@
    (gl:get-uniform-location *shader-program* "projectionmodelview")
    *mat4-identity*)
   (gl:viewport 0 0 e:*width* e:*height*)
+  (setf *aspect-ratio* (/ e:*height* e:*width*))
   (bind-shit :font)
   (gl:enable :depth-test)
   (set-sky-color)
@@ -31,13 +32,17 @@
   (gl:clear :color-buffer-bit :depth-buffer-bit)
   (lcalllist-invalidate :string)
 
-  (name-mesh :string (lambda ()
-		       (gl-draw-quads 
-			(lambda (tex-buf pos-buf lit-buf)
-			  (draw-string-raster-char
-			   pos-buf tex-buf lit-buf
-			   foo (floor e:*width* 18) (floor e:*height* 32) 0 10
-			   (- +single-float-just-less-than-one+))))))
+  (let ((scale 32.0))
+    (name-mesh :string (lambda ()
+			 (gl-draw-quads 
+			  (lambda (tex-buf pos-buf lit-buf)
+			    (draw-string-raster-char
+			     pos-buf tex-buf lit-buf
+			     foo
+			     (/ scale e:*width* 2.0)
+			     (/ scale e:*height*)
+			     -1.0 0.0
+			     (- +single-float-just-less-than-one+)))))))
   (ldrawlist :string)
 
   (gl:uniform-matrix-4fv
@@ -75,12 +80,8 @@
       (%gl:uniform-1f (gl:get-uniform-location *shader-program* "aratio")
 		      (/ 1.0 *fog-ratio*)))))
 
-(defparameter foo
-  "
-(lambda (x) (* 2 x))
-(lambda (x) (print x))
-(lambda (x) (* x x))
-(lambda (x) (values x x x x))")
+(defparameter foo "Hello World")
+
 
 (defun glinnit ()
   (setf *camera* (make-camera))
@@ -363,7 +364,6 @@
 	(elit 1f0)))
     24))
 
-
 (progn
   (defconstant +single-float-one-sixteenth+ (coerce 1/16 'single-float))
   (progn
@@ -372,26 +372,34 @@
 		    sixteen-by-sixteen-texture-ref))
     (defun sixteen-by-sixteen-texture-ref (num)
       (multiple-value-bind (vfoo ufoo) (floor num 16)
-	(let ((u (/ ufoo 16.0))
-	      (v (- 1.0 +single-float-one-sixteenth+ (/ vfoo 16.0))))
+	(let ((u 
+		(/ ufoo 16.0))
+	      (v
+		(- 1.0 +single-float-one-sixteenth+ (/ vfoo 16.0))))
 	  (values u v
-		  (+ u +single-float-one-sixteenth+)
-		  (+ v +single-float-one-sixteenth+)))))))
+		 (+ u +single-float-one-sixteenth+) 
+		 (+ v +single-float-one-sixteenth+)))))))
 
-(defun draw-string-raster-char (pos-buf tex-buf lit-buf string width height x y z)
-  (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf))
+(defun draw-string-raster-char (pos-buf tex-buf lit-buf string
+				char-width char-height x y z)
+  (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf)
+	   (type single-float x y z char-width char-height)
+	   (optimize (speed 3) (safety 0))
+	   (type (simple-array character) string))
   (iter-ator:wasabios ((epos pos-buf)
 		       (etex tex-buf)
 		       (elit lit-buf))
-    (let ((len (length string))
+    (let ((len (array-total-size string))
 	  (times 0))
-      (let ((xoffset 0)
-	    (yoffset 0))
+      (declare (type fixnum times))
+      (let ((xoffset 0f0)
+	    (yoffset 0f0))
+	(declare (type single-float xoffset yoffset))
 	(dotimes (position len)
-	  (let ((char (aref string position)))
+	  (let ((char (row-major-aref string position)))
 	    (if (char= char #\Newline)
 		(progn
-		  (setf xoffset 0)
+		  (setf xoffset 0f0)
 		  (decf yoffset))
 		(progn
 		  (incf times 4)
@@ -400,15 +408,15 @@
 		    (multiple-value-bind (x0 y0 x1 y1)
 			(sixteen-by-sixteen-texture-ref code)
 		      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
-		  (let ((charx (+ xoffset x))
-			(chary (+ yoffset y)))
-		    (let ((width-unit (/ 1.0 width))
-			  (height-unit (/ 1.0 height))
-			  (xstart (- (/ charx width) 1.0))
-			  (ystart (- (/ chary height) 1.0)))
-		      (let ((xend (+ xstart width-unit))
-			    (yend (+ ystart height-unit)))
-			(etouq (ngorp (preach 'epos (quadk+ 'z '(xstart xend ystart yend))))))))
+		  (let ((xstart (+ x (* xoffset char-width)))
+			(ystart (+ y (* yoffset char-height))))
+		    (etouq (ngorp
+			    (preach
+			     'epos
+			     (quadk+ 'z '(xstart
+					  (+ xstart char-width)
+					  ystart
+					  (+ ystart char-height)))))))
 		  (incf xoffset))))))
       times)))
 

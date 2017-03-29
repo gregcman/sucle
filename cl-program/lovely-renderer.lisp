@@ -134,7 +134,7 @@
     (gl:tex-parameter :texture-2d :texture-wrap-s :clamp)
     (gl:tex-parameter :texture-2d :texture-wrap-t :clamp)
     (gl:tex-parameter :texture-2d :texture-border-color '(0 0 0 0))
-  ;  (gl:tex-parameter :texture-2d :generate-mipmap :true)
+   ; (gl:tex-parameter :texture-2d :generate-mipmap :true)
     (gl:tex-image-2d :texture-2d 0 type width height 0 type :unsigned-byte tex-data)
     ;(gl:generate-mipmap :texture-2d)
     the-shit))
