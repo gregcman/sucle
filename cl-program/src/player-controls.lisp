@@ -4,10 +4,9 @@
   (when (e:key-j-p :e) (window:toggle-mouse-capture))
   (remove-spurious-mouse-input)
   (when (window:mice-locked-p)
-    (delta)
     (multiple-value-bind (delx dely) (delta)
-      (incf cursor-x delx)
-      (incf cursor-y dely))))
+      (setf cursor-x (max -1f0 (min 1.0 (+ cursor-x (/ delx 400.0)))))
+      (setf cursor-y (max -1f0 (min 1.0 (+ cursor-y (/ dely -400.0))))))))
 
 (defparameter cursor-x 0.0)
 (defparameter cursor-y 0.0)

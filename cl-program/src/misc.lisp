@@ -189,53 +189,6 @@
 
 
 (defparameter foo
-  (let ((a (write-to-string
-	    '(defun render ()
-	      (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
-	      (if vsync?
-		  (window::set-vsync t)
-		  (window::set-vsync nil))
-	      (update-matrices *camera*)
-	      (luse-shader :blockshader)
-	      (set-overworld-fog *daytime*)
-
-
-	      (bind-default-framebuffer)
-	      (gl:uniform-matrix-4fv
-	       (gl:get-uniform-location *shader-program* "projectionmodelview")
-	       *mat4-identity*)
-	      (gl:viewport 0 0 e:*width* e:*height*)
-	      (setf *aspect-ratio* (/ e:*height* e:*width*))
-	      (bind-shit :font)
-	      (gl:enable :depth-test)
-	      (set-sky-color)
-	      
-	      (gl:clear :color-buffer-bit :depth-buffer-bit)
-	      (lcalllist-invalidate :string)
-
-	      (let ((scale 32.0))
-		(name-mesh :string (lambda ()
-				     (gl-draw-quads 
-				      (lambda (tex-buf pos-buf lit-buf)
-					(draw-string-raster-char
-					 pos-buf tex-buf lit-buf
-					 foo
-					 (/ scale e:*width* 2.0)
-					 (/ scale e:*height*)
-					 -1.0 0.0
-					 (- +single-float-just-less-than-one+)))))))
-	      (ldrawlist :string)
-
-	      (gl:uniform-matrix-4fv
-	       (gl:get-uniform-location *shader-program* "projectionmodelview")
-	       (camera-matrix-projection-view-player *camera*)
-	       nil)
-	      (set-sky-color)
-	      
-	      (bind-shit :ocean)
-	      
-	      (ldrawlist :skybox)
-	      
-	      (window:update-display)))))
+  (let ((a (write-to-string *4x4-tilemap*)))
     (map-into a
 	      (lambda (x) (char-downcase x)) a)))

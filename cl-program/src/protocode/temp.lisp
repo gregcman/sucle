@@ -407,3 +407,6 @@
  (defun simple-defun-p (form)
    (and (eq (quote defun) (pop form))
 	(symbolp (pop form)))))
+
+(progno
+ (defparameter *skybox-tilemap* (regular-enumeration 4 3)))

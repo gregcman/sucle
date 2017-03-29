@@ -20,7 +20,7 @@
   (defun regular-enumeration (width height)
     (let ((tot (* width height)))
       (let ((ret (make-array (* tot 4))))
-	(dotimes (x 256)
+	(dotimes (x tot)
 	  (multiple-value-bind (x0 y0 x1 y1) (sequential-index-generator width height x)
 	    (let ((p (* x 4)))
 	      (setf (aref ret (+ 0 p)) x0

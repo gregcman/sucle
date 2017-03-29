@@ -1,9 +1,5 @@
 (in-package :sandbox)
 
-(defparameter *window-height* nil)
-(defparameter *window-width* nil)
-(defparameter *aspect-ratio* nil)
-
 (progn
   (defparameter *g/call-list* (make-hash-table :test 'eq));;opengl call lists
   (defun get-display-list (name)
