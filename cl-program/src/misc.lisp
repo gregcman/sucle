@@ -1,5 +1,21 @@
 (in-package :sandbox)
 
+(defmacro etouq (form)
+  (eval form))
+
+(fuktard:eval-always
+ (defun preach (value form)
+   (mapcar (lambda (x)
+	     (list value x))
+	   form))
+
+ (defun raps (times form)
+   (make-list times :initial-element form))
+
+ (defun ngorp (&rest forms)
+   (cons (quote progn)
+	 (apply (function nconc) forms))))
+
 (defparameter *something* #.(or *compile-file-truename* *load-truename*))
 
 (defparameter ourdir
@@ -52,33 +68,6 @@
 (defun load-png (filename)
   (opticl:read-png-file filename))
 
-(defparameter *save* #P"third/")
-
-(defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
-
-(defun save (filename &rest things)
-  (let ((path (merge-pathnames filename *saves-dir*)))
-    (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
-      (dolist (thing things)
-	(prin1 thing stream)))))
-
-(defun save2 (thingfilename &rest things)
-  (apply #'save (merge-pathnames (format nil "~s" thingfilename) *save*) things))
-
-(defun myload2 (thingfilename)
-  (myload (merge-pathnames (format nil "~s" thingfilename) *save*)))
-
-(defun myload (filename)
-  (let ((path (merge-pathnames filename *saves-dir*)))
-    (let ((things nil))
-      (with-open-file (stream path :direction :input :if-does-not-exist nil)
-	(tagbody rep
-	   (let ((thing (read stream nil nil)))
-	     (when thing
-	       (push thing things)
-	       (go rep)))))
-      (nreverse things))))
-
 (progn
   (defparameter *g/image* (make-hash-table :test 'equal))		    ;;raw image arrays
   (defun get-image (name)
@@ -118,66 +107,6 @@
 	(let ((ans (funcall text-func name)))
 	  (when ans
 	    (set-text name ans)))))))
-
-(defun totally-destroy-package (package)
-  (do-symbols (symbol package)
-    (let ((home (symbol-package symbol)))
-      (when (eql package home)
-	(when (fboundp symbol)
-	  (fmakunbound symbol))
-	(when (boundp symbol)
-	  (makunbound symbol)))))
-  (delete-package package))
-
-(defparameter shit nil)
-
-(defun test ()
-  (dotimes (x (expt 10 4))
-    (let ((package (make-package (gensym))))
-      (push package shit))))
-
-(defun test2 (symbol)
-  (eval
-   `(progn
-      (declaim (inline ,symbol))
-      (defun ,symbol (package)
-	(do-symbols (symbol package)
-	  (let ((home (symbol-package symbol)))
-	    (when (eq package home)
-	      (when (fboundp symbol)
-		(fmakunbound symbol))
-	      (when (boundp symbol)
-		(makunbound symbol)))))
-	(print package)
-	(print package)
-	(print package)
-	(print package)
-	(print package)
-	(print package)
-	(print package)
-	(print package)
-	(print package)
-	(write package))
-      (declaim (notinline ,symbol))
-      
-      (values
-       (lambda (x)
-	 (locally (declare (inline ,symbol))
-	   (,symbol x)))
-       (quote,symbol)))))
-
-(defparameter foo nil)
-
-(defun wot ()
-  (setf foo nil)
-  (do-symbols (symbol :cl)
-    (if (or (boundp symbol) (fboundp symbol))
-	(push (symbol-name symbol) foo)))
-  (setf foo (sort foo #'string<)))
-
-(defun simple-defun-p (form)
-  (and (eq (quote defun) (pop form))
-       (symbolp (pop form))))
 
 (defun fmakunbounds (symbol-list)
   (dolist (symbol symbol-list)

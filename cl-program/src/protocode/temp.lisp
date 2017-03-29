@@ -284,3 +284,126 @@
   (setf *xvel* (* *xvel* air-friction))
   (setf *zvel* (* *zvel* air-friction))    
   (setf *yvel* (* *yvel* air-friction))))
+
+(progno
+ (defparameter susie (flhat:make-flhat))
+ (defparameter george (flhat:make-flhat))
+ (defparameter pauline (flhat:make-flhat))
+
+ (defun reset-susie ()
+   (setf susie (flhat:make-flhat)))
+
+ (defun test6 (times)
+   (declare (optimize (speed 3) (safety 0)))
+   (let ((spine (flhat:make-flhat-iterator susie)))
+     (declare (type iter-ator:iter-ator spine))
+     (dotimes (x 1 (flhat:iterator-position spine))
+       (flhat:reset-iterator spine)
+       (iateor:wasabios ((next spine))
+	 (dotimes (x times)
+	   (next x))))))
+
+ (defun test69 ()
+   (declare (optimize (speed 3) (safety 0)))
+   (let ((spine (flhat:make-flhat-iterator susie))
+	 (spine2 (flhat:make-flhat-iterator george))
+	 (spine3 (flhat:make-flhat-iterator pauline)))
+     (declare (type iter-ator:iter-ator spine spine2 spine3))
+     (dotimes (x 25)
+       (deach flhat:reset-iterator spine spine2 spine3)
+       (iateor:wasabios ((emit spine)
+			 (emit2 spine2)
+			 (emit3 spine3))
+	 (dotimes (x (floor (expt 10 7) 3))
+	   (emit x)
+	   (emit2 x)
+	   (emit3 x)))))))
+
+(progno
+ (defparameter *save* #P"third/")
+
+ (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
+
+ (defun save (filename &rest things)
+   (let ((path (merge-pathnames filename *saves-dir*)))
+     (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
+       (dolist (thing things)
+	 (prin1 thing stream)))))
+
+ (defun save2 (thingfilename &rest things)
+   (apply #'save (merge-pathnames (format nil "~s" thingfilename) *save*) things))
+
+ (defun myload2 (thingfilename)
+   (myload (merge-pathnames (format nil "~s" thingfilename) *save*)))
+
+ (defun myload (filename)
+   (let ((path (merge-pathnames filename *saves-dir*)))
+     (let ((things nil))
+       (with-open-file (stream path :direction :input :if-does-not-exist nil)
+	 (tagbody rep
+	    (let ((thing (read stream nil nil)))
+	      (when thing
+		(push thing things)
+		(go rep)))))
+       (nreverse things)))))
+
+(progno
+ (defun totally-destroy-package (package)
+   (do-symbols (symbol package)
+     (let ((home (symbol-package symbol)))
+       (when (eql package home)
+	 (when (fboundp symbol)
+	   (fmakunbound symbol))
+	 (when (boundp symbol)
+	   (makunbound symbol)))))
+   (delete-package package))
+
+ (defparameter shit nil)
+
+ (defun test ()
+   (dotimes (x (expt 10 4))
+     (let ((package (make-package (gensym))))
+       (push package shit))))
+
+ (defun test2 (symbol)
+   (eval
+    `(progn
+       (declaim (inline ,symbol))
+       (defun ,symbol (package)
+	 (do-symbols (symbol package)
+	   (let ((home (symbol-package symbol)))
+	     (when (eq package home)
+	       (when (fboundp symbol)
+		 (fmakunbound symbol))
+	       (when (boundp symbol)
+		 (makunbound symbol)))))
+	 (print package)
+	 (print package)
+	 (print package)
+	 (print package)
+	 (print package)
+	 (print package)
+	 (print package)
+	 (print package)
+	 (print package)
+	 (write package))
+       (declaim (notinline ,symbol))
+       
+       (values
+	(lambda (x)
+	  (locally (declare (inline ,symbol))
+	    (,symbol x)))
+	(quote,symbol)))))
+
+ (defparameter foo nil)
+
+ (defun wot ()
+   (setf foo nil)
+   (do-symbols (symbol :cl)
+     (if (or (boundp symbol) (fboundp symbol))
+	 (push (symbol-name symbol) foo)))
+   (setf foo (sort foo #'string<)))
+
+ (defun simple-defun-p (form)
+   (and (eq (quote defun) (pop form))
+	(symbolp (pop form)))))

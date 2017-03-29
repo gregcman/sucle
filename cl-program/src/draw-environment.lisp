@@ -83,6 +83,16 @@
 	  (reset-attrib-buffer-iterators iter)
 	  (mesh-test42 times lit-buf tex-buf pos-buf))))))
 
+(defun mesh-test42 (times lit tex pos)
+  (declare (type iter-ator:iter-ator tex pos))
+  (iter-ator:wasabiis ((d lit)
+		       (uv tex)
+		       (xyz pos))
+    (dotimes (x times)
+      (%gl:vertex-attrib-4f 8 (d) (d) (d) (d))
+      (%gl:vertex-attrib-2f 2 (uv) (uv))
+      (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
+
 (eval-always
  (defun duaq (start clockwise-winding form)
    (destructuring-bind (x- x+ y- y+) form
@@ -130,9 +140,6 @@
 	   acc))
        (error "~s is not 0 1 or 2" start))))
 
-(defmacro etouq (form)
-  (eval form))
-
 (fuktard:eval-always
  (progn
    (defun quadi+ (i form) ;;jk
@@ -146,19 +153,7 @@
    (defun quadk+ (k form) ;;ji
      (aalgnqd 2 k (duaq 1 nil form)))
    (defun quadk- (k form)
-     (aalgnqd 2 k (duaq 3 t form)))
-
-   (defun preach (value form)
-     (mapcar (lambda (x)
-	       (list value x))
-	     form))
-
-   (defun raps (times form)
-     (make-list times :initial-element form))
-
-   (defun ngorp (&rest forms)
-     (cons (quote progn)
-	   (apply (function nconc) forms)))))
+     (aalgnqd 2 k (duaq 3 t form)))))
 
 
 (defun draw-string-raster-char (pos-buf tex-buf lit-buf
