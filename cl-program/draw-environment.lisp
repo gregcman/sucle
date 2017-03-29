@@ -1,8 +1,6 @@
 (in-package :sandbox)
 
-;;matrix multiplication is associative
- ;;;opengl stored matrices the transpose of sb-cga
-(defparameter *camera* nil) ;;global camera
+
 (defparameter vsync? t)
 
 (defparameter *mat4-identity* (cg-matrix:identity-matrix))
@@ -10,18 +8,15 @@
 (defconstant +single-float-just-less-than-one+ 0.99999997)
 
 (defun render ()
-  (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
   (if vsync?
       (window::set-vsync t)
       (window::set-vsync nil))
-  (update-matrices *camera*)
-  (luse-shader :blockshader)
-  (set-overworld-fog *daytime*)
+  (luse-shader :solidshader)
 
 
   (bind-default-framebuffer)
   (gl:uniform-matrix-4fv
-   (gl:get-uniform-location *shader-program* "projectionmodelview")
+   (gl:get-uniform-location *shader-program* "pmv")
    *mat4-identity*)
   (gl:viewport 0 0 e:*width* e:*height*)
   (setf *aspect-ratio* (/ e:*height* e:*width*))
@@ -41,50 +36,13 @@
 			     foo
 			     (/ scale e:*width* 2.0)
 			     (/ scale e:*height*)
-			     -1.0 0.0
+			     -1.0 1.0
 			     (- +single-float-just-less-than-one+)))))))
   (ldrawlist :string)
 
-  (gl:uniform-matrix-4fv
-   (gl:get-uniform-location *shader-program* "projectionmodelview")
-   (camera-matrix-projection-view-player *camera*)
-   nil)
-  (set-sky-color)
-  
-  (bind-shit :ocean)
-    
-  (ldrawlist :skybox)
-     
   (window:update-display))
 
-(defun set-sky-color ()
-  (let ((r (* *daytime* (aref *sky-color* 0)))
-	(g (* *daytime* (aref *sky-color* 1)))
-	(b (* *daytime* (aref *sky-color* 2))))
-    (gl:clear-color r g b 1.0)))
-(defparameter *daytime* 0.4)
-(defparameter *sky-color* (vector 1.0 0.8 0.68))
-(defparameter *fog-ratio* 0.75)
-(defun set-overworld-fog (time)
-  (flet ((fractionalize (x)
-	   (clamp x 0.0 1.0)))
-    (let ((x (fractionalize (* (aref *sky-color* 0) time)))
-	  (y (fractionalize (* (aref *sky-color* 1) time)))
-	  (z (fractionalize (* (aref *sky-color* 2) time))))
-      (%gl:uniform-3f (gl:get-uniform-location *shader-program* "fogcolor")
-		      x y z)
-      (gl:uniformfv (gl:get-uniform-location *shader-program* "cameraPos")
-		    (camera-vec-position *camera*))
-      (%gl:uniform-1f (gl:get-uniform-location *shader-program* "foglet")
-		      (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
-      (%gl:uniform-1f (gl:get-uniform-location *shader-program* "aratio")
-		      (/ 1.0 *fog-ratio*)))))
-
-(defparameter foo "Hello World")
-
-
 (defun glinnit ()
-  (setf *camera* (make-camera))
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (setf *shader-program* nil)
   
@@ -93,37 +51,27 @@
     (window:push-dimensions width height))
   (setf e:*resize-hook* #'on-resize)
   
- 
-  (name-funcs)
-  (texture-imageries)
-  (name-shaders)
 
-  (load-shaders)
-  (load-some-images))
-
-(defun set-render-cam-pos (camera)
-  (let ((vec (camera-vec-position camera))
-	(cev (camera-vec-noitisop camera)))
-    (setf (aref vec 0) *xpos*)
-    (setf (aref vec 1) *ypos*)
-    (setf (aref vec 2) *zpos*)
-
-    (setf (aref cev 0) (- *xpos*))
-    (setf (aref cev 1) (- *ypos*))
-    (setf (aref cev 2) (- *zpos*))
-
-    (unit-pitch-yaw (camera-vec-forward *camera*)
-		    (coerce *pitch* 'single-float)
-		    (coerce *yaw* 'single-float))
-    
-    (setf (camera-fov *camera*) defaultfov)))
-
-(defun unit-pitch-yaw (result pitch yaw)
-  (let ((cos-pitch (cos pitch)))
-    (setf (aref result 0) (* cos-pitch (cos yaw))
-	  (aref result 1) (sin pitch)
-	  (aref result 2) (* cos-pitch (sin yaw))))
-  result)
+  (progn
+    (name-mesh :background
+	       (lambda ()
+		 (gl-draw-quads (function draw-background))))
+    (name-mesh :skybox (lambda ()
+			 (gl-draw-quads (function draw-skybox)))))
+  (progn    
+    (name-shader :solidshader :ss-vs :ss-frag '(("pos" . 0)
+						("tex" . 2)
+						("col" . 8)))
+    (src-text :ss-vs (shader-path "pos4f-col4f-tex2f.vs"))
+    (src-text :ss-frag (shader-path "fcol4f-ftex2f-no0a.frag")))
+  
+  (progn
+    (texture-imagery :font :font-image)
+    (texture-imagery :ocean :ocean-image))
+  (progn
+    (src-image :font-image (img-path #P"font/codepage-437-vga-9x16-alpha.png"))
+    (src-image :cursor-image (img-path #P"cursor/windos-cursor.png"))
+    (src-image :ocean-image (img-path #P"skybox/first-fancy-skybox.png"))))
 
 (defun on-resize (w h)
   (setf *window-height* h
@@ -189,27 +137,6 @@
 	  (declare (ignorable name))
 	  (file-string src-path))))
 
-(defun load-some-images ()
-  (src-image :font-image (img-path #P"font/codepage-437-vga-9x16.png"))
-  (src-image :cursor-image (img-path #P"cursor/windos-cursor.png"))
-  (src-image :ocean-image (img-path #P"skybox/first-fancy-skybox.png")))
-
-(defun texture-imageries ()
-  (texture-imagery :font :font-image)
-  (texture-imagery :ocean :ocean-image))
-(defun name-shaders ()
-  (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
-					      ("texCoord" . 2)
-					      ("darkness" . 8)))
-  (name-shader :solidshader :ss-vs :ss-frag '(("position" . 0)
-					      ("texCoord" . 2)
-					      ("darkness" . 8))))
-(defun name-funcs ()
-  (name-mesh :background
-	     (lambda ()
-	       (gl-draw-quads (function draw-background))))
-  (name-mesh :skybox (lambda ()
-		       (gl-draw-quads (function draw-skybox)))))
 
 (defun gl-draw-quads (func)
   (let ((iter *attrib-buffer-iterators*))
@@ -221,12 +148,6 @@
 	(gl:with-primitives :quads
 	  (reset-attrib-buffer-iterators iter)
 	  (mesh-test42 times lit-buf tex-buf pos-buf))))))
-
-(defun load-shaders ()
-  (src-text :bs-vs (shader-path "blockshader/transforms.vs"))
-  (src-text :bs-frag (shader-path "blockshader/basictexcoord.frag"))
-  (src-text :ss-vs (shader-path "solidshader/transforms.vs"))
-  (src-text :ss-frag (shader-path "solidshader/basictexcoord.frag")))
 
 (in-package :sandbox)
 
@@ -300,69 +221,12 @@
 	       (list value x))
 	     form))
 
-   (defun raps (form times)
-     (make-list times :initial-element form))))
+   (defun raps (times form)
+     (make-list times :initial-element form))
 
-(defun ngorp (&rest forms)
-  (cons (quote progn)
-	(apply (function nconc) forms)))
-
-(defun draw-background (tex-buf pos-buf lit-buf)
-  (declare (optimize (safety 0) (speed 3)))
-  (declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
-  (iter-ator:wasabios ((etex tex-buf)
-		       (epos pos-buf)
-		       (elit lit-buf))
-    (let ((distance +single-float-just-less-than-one+))
-      (etouq (ngorp (preach 'etex (duaq 1 nil '(0.0 1.0 0.0 1.0)))
-		     (preach 'epos (quadk+ 'distance '(-1.0 1.0 -1.0 1.0)))
-		     (preach 'elit (raps 1f0 4))))))
-  4)
-
-(let ((%skybox-pos nil)
-      (%skybox-tex nil))
-  (declare (type (or null simple-vector)
-		 %skybox-pos %skybox-tex))
-  (setf (values %skybox-pos %skybox-tex)
-	(let ((h0 0.0)
-	      (h1 (/ 1.0 3.0))
-	      (h2 (/ 2.0 3.0))
-	      (h3 1.0)
-	      (w0 0.0)
-	      (w1 0.25)
-	      (w2 0.5)
-	      (w3 0.75)
-	      (w4 1.0))
-	  (let ((neg -10.0)
-		(pos 10.0))
-	    (values (etouq (cons 'vector
-				    (let ((npnp (quote (neg pos neg pos))))
-				      (nconc (quadi+ 'neg npnp)
-					     (quadi- 'pos npnp)
-					     (quadj+ 'neg npnp)
-					     (quadj- 'pos npnp)
-					     (quadk+ 'neg npnp)
-					     (quadk- 'pos npnp)))))
-		    (etouq (cons 'vector
-				 (nconc (duaq 2 nil '(w2 w3 h1 h2))
-					(duaq 3 nil '(w0 w1 h1 h2))
-					(duaq 2 nil '(w1 w2 h0 h1))
-					(duaq 1 nil '(w1 w2 h2 h3))
-					(duaq 1 nil '(w3 w4 h1 h2))
-					(duaq 4 nil '(w1 w2 h1 h2)))))))))
-  (defun draw-skybox (tex-buf pos-buf lit-buf)
-    (declare (optimize (safety 0) (space 3)))
-    (declare (type iter-ator:iter-ator tex-buf pos-buf lit-buf))
-    (iter-ator:wasabios ((etex tex-buf)
-			 (epos pos-buf)
-			 (elit lit-buf))
-      (dotimes (x (length %skybox-tex))
- 	(etex (aref %skybox-tex x)))
-      (dotimes (x (length %skybox-pos))
-	(epos (aref %skybox-pos x)))
-      (dotimes (x 24)
-	(elit 1f0)))
-    24))
+   (defun ngorp (&rest forms)
+     (cons (quote progn)
+	   (apply (function nconc) forms)))))
 
 (progn
   (defconstant +single-float-one-sixteenth+ (coerce 1/16 'single-float))
@@ -392,66 +256,83 @@
     (let ((len (array-total-size string))
 	  (times 0))
       (declare (type fixnum times))
-      (let ((xoffset 0f0)
-	    (yoffset 0f0))
+      (let ((xoffset x)
+	    (yoffset y))
 	(declare (type single-float xoffset yoffset))
 	(dotimes (position len)
 	  (let ((char (row-major-aref string position)))
-	    (if (char= char #\Newline)
-		(progn
-		  (setf xoffset 0f0)
-		  (decf yoffset))
-		(progn
-		  (incf times 4)
-		  (etouq (ngorp (preach 'elit '(1f0 1f0 1f0 1f0))))
-		  (let ((code (char-code char)))
-		    (multiple-value-bind (x0 y0 x1 y1)
-			(sixteen-by-sixteen-texture-ref code)
-		      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
-		  (let ((xstart (+ x (* xoffset char-width)))
-			(ystart (+ y (* yoffset char-height))))
-		    (etouq (ngorp
-			    (preach
-			     'epos
-			     (quadk+ 'z '(xstart
-					  (+ xstart char-width)
-					  ystart
-					  (+ ystart char-height)))))))
-		  (incf xoffset))))))
+	    (let ((next-x (+ xoffset char-width))
+		  (next-y (- yoffset char-height)))
+	      (if (char= char #\Newline)
+		  (setf xoffset x
+			yoffset next-y)
+		  (progn
+		    (unless (char= #\space char)
+		      (incf times 4)
+		      (dotimes (x 4)
+			(etouq (ngorp (preach 'elit '(1f0 1f0 1f0 1f0)))))
+		      (let ((code (char-code char)))
+			(multiple-value-bind (x0 y0 x1 y1)
+			    (sixteen-by-sixteen-texture-ref code)
+			  (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
+		      (etouq (ngorp
+			      (preach
+			       'epos
+			       (quadk+ 'z '(xoffset
+					    next-x
+					    next-y
+					    yoffset))))))
+		    (setf xoffset next-x)))))))
       times)))
 
-(defparameter +gl-primitives+
-  (vector
-   :points
-   :lines
-   :line-strip
-   :line-loop
-   :triangles
-   :triangle-strip
-   :triangle-fan
-   :quads
-   :quad-strip
-   :polygon))
+(defparameter foo
+  (let ((a (write-to-string
+	    '(defun render ()
+	      (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
+	      (if vsync?
+		  (window::set-vsync t)
+		  (window::set-vsync nil))
+	      (update-matrices *camera*)
+	      (luse-shader :blockshader)
+	      (set-overworld-fog *daytime*)
 
-(progn
-  (defparameter *framebuffer-width* 512)
-  (defparameter *framebuffer-height* 512)
-  (defparameter *framebuffer* nil)
-  (defparameter *framebuffer-texture* nil)
-  (bind-custom-framebuffer *framebuffer*)
-  (gl:clear-color 0f0 1f0 0f0 1f0)
-  (gl:clear :color-buffer-bit)
 
-  (setf (values *framebuffer-texture* *framebuffer*)
-	(create-framebuffer *framebuffer-width* *framebuffer-height*))
-  (progno
-   (progno
-    (bind-custom-framebuffer *framebuffer*)
-    (gl:viewport 0 0 *framebuffer-width* *framebuffer-height*))
-   (progn
-     (bind-default-framebuffer)))
-  (defun clean-framebuffers ()
-    (gl:delete-framebuffers-ext (list *framebuffer*))
-    (gl:delete-textures (list *framebuffer-texture*))))
- 
+	      (bind-default-framebuffer)
+	      (gl:uniform-matrix-4fv
+	       (gl:get-uniform-location *shader-program* "projectionmodelview")
+	       *mat4-identity*)
+	      (gl:viewport 0 0 e:*width* e:*height*)
+	      (setf *aspect-ratio* (/ e:*height* e:*width*))
+	      (bind-shit :font)
+	      (gl:enable :depth-test)
+	      (set-sky-color)
+	      
+	      (gl:clear :color-buffer-bit :depth-buffer-bit)
+	      (lcalllist-invalidate :string)
 
+	      (let ((scale 32.0))
+		(name-mesh :string (lambda ()
+				     (gl-draw-quads 
+				      (lambda (tex-buf pos-buf lit-buf)
+					(draw-string-raster-char
+					 pos-buf tex-buf lit-buf
+					 foo
+					 (/ scale e:*width* 2.0)
+					 (/ scale e:*height*)
+					 -1.0 0.0
+					 (- +single-float-just-less-than-one+)))))))
+	      (ldrawlist :string)
+
+	      (gl:uniform-matrix-4fv
+	       (gl:get-uniform-location *shader-program* "projectionmodelview")
+	       (camera-matrix-projection-view-player *camera*)
+	       nil)
+	      (set-sky-color)
+	      
+	      (bind-shit :ocean)
+	      
+	      (ldrawlist :skybox)
+	      
+	      (window:update-display)))))
+    (map-into a
+	      (lambda (x) (char-downcase x)) a)))

@@ -33,7 +33,7 @@
 		       (uv tex)
 		       (xyz pos))
     (dotimes (x times)
-      (%gl:vertex-attrib-1f 8 (d))
+      (%gl:vertex-attrib-4f 8 (d) (d) (d) (d))
       (%gl:vertex-attrib-2f 2 (uv) (uv))
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
