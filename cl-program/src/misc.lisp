@@ -189,6 +189,6 @@
 
 
 (defparameter foo
-  (let ((a (write-to-string *4x4-tilemap*)))
+  (let ((a (write-to-string "Hello World")))
     (map-into a
 	      (lambda (x) (char-downcase x)) a)))

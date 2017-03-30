@@ -5,8 +5,10 @@
   (remove-spurious-mouse-input)
   (when (window:mice-locked-p)
     (multiple-value-bind (delx dely) (delta)
-      (setf cursor-x (max -1f0 (min 1.0 (+ cursor-x (/ delx 400.0)))))
-      (setf cursor-y (max -1f0 (min 1.0 (+ cursor-y (/ dely -400.0))))))))
+      (let ((xmax (float e:*width*))
+	    (ymax (float e:*height*)))
+	(setf cursor-x (min (- xmax 4) (max (- xmax) (+ cursor-x delx))))
+	(setf cursor-y (min (+ ymax 2) (max (- ymax) (- cursor-y dely))))))))
 
 (defparameter cursor-x 0.0)
 (defparameter cursor-y 0.0)

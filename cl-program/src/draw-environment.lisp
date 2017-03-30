@@ -10,6 +10,8 @@
 (defparameter *16x16-tilemap* (regular-enumeration 16 16))
 (defparameter *4x4-tilemap* (regular-enumeration 4 4))
 
+(defparameter *screen-scaled-matrix* (cg-matrix:identity-matrix))
+
 (defun render ()
   (if vsync?
       (window::set-vsync t)
@@ -17,17 +19,20 @@
 
   (gl:viewport 0 0 e:*width* e:*height*)
   (luse-shader :solidshader)
+  (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location *shader-program* "pmv")
-   *mat4-identity*
+   *screen-scaled-matrix*
    nil)
 
   (progn
-    (gl:enable :depth-test)
-    (gl:clear-color 0f0 0f0 0f0 0f0)
+    (gl:disable :depth-test :blend)
+    (gl:depth-func :always)
+    (gl:clear-color 0.5 0.0 0.0 0f0)
     (gl:clear
      :color-buffer-bit 
-     :depth-buffer-bit)
+     ;:depth-buffer-bit
+     )
     )
 
   (progn
@@ -40,11 +45,33 @@
 			      (draw-string-raster-char
 			       pos-buf tex-buf lit-buf
 			       *16x16-tilemap* foo
-			       (/ scale e:*width* 2.0)
-			       (/ scale e:*height*)
+			       (/ scale 2.0)
+			       (/ scale 1.0)
 			       -1.0 1.0
-			       (- +single-float-just-less-than-one+)))))))
+			       +single-float-just-less-than-one+))))))
     (ldrawlist :string))
+
+  (gl:uniform-matrix-4fv
+   (gl:get-uniform-location *shader-program* "pmv")
+   (cg-matrix:%matrix* *temp-matrix2*
+		       *screen-scaled-matrix*
+		       (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
+   nil)
+  (progn
+    (bind-shit :cursor)
+    (lcalllist-invalidate :cursor)
+    (let ((scale 64.0))
+      (name-mesh :cursor (lambda ()
+			   (gl-draw-quads 
+			    (lambda (tex-buf pos-buf lit-buf)
+			      (draw-mouse
+			       pos-buf tex-buf lit-buf
+			       *4x4-tilemap* 0
+			       scale 
+			       scale
+			       -0.0 0.0
+			       (- +single-float-just-less-than-one+)))))))
+    (ldrawlist :cursor))
 
   (window:update-display))
 
@@ -61,8 +88,8 @@
     (name-shader :solidshader :ss-vs :ss-frag '(("pos" . 0)	
 						("col" . 3)
 						("tex" . 8)))
-    (src-text :ss-vs (shader-path "pos4f-col4f-tex2f.vs"))
-    (src-text :ss-frag (shader-path "fcol4f-ftex2f-no0a.frag")))
+    (src-text :ss-vs (shader-path "pos4f-col3f-tex2f.vs"))
+    (src-text :ss-frag (shader-path "fcol3f-ftex2f-no0a.frag")))
  
   (progn
     (src-image :font-image (img-path #P"font/codepage-437-vga-9x16-alpha.png"))
@@ -95,8 +122,33 @@
 		       (xyz pos))
     (dotimes (x times)
       (%gl:vertex-attrib-2f 8 (uv) (uv))
-      (%gl:vertex-attrib-4f 3 (d) (d) (d) (d))
-      (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)) )))
+      (%gl:vertex-attrib-3f 3 (d) (d) (d))
+      (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
+
+(defun draw-mouse (pos-buf tex-buf lit-buf
+		   lookup value char-width char-height x y z)
+  (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf)
+	   (type single-float x y z char-width char-height)
+	   (type simple-vector lookup)
+	   (optimize (speed 3) (safety 0))
+	   (type fixnum value))
+  (iter-ator:wasabios ((epos pos-buf)
+		       (etex tex-buf)
+		       (elit lit-buf))
+
+    (dotimes (x 4)
+      (etouq (ngorp (preach 'elit '(1f0
+				    1f0
+				    1f0)))))
+    (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
+      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
+    (etouq (ngorp
+	    (preach
+	     'epos
+	     (quadk+ 'z '(x
+			  (+ char-width x)
+			  (- y char-height)
+			  y)))))4))
 
 (defun draw-string-raster-char (pos-buf tex-buf lit-buf
 				lookup string char-width char-height x y z)
@@ -126,11 +178,10 @@
 		      (unless (char= #\space char)
 			(incf times 4)
 			(dotimes (x 4)
-			  (etouq (ngorp (preach 'elit '(
-							(1+ xoffset)
-							(- (random 2f0) 1f0)
-							(1+ yoffset)
-							1f0)))))
+			  (etouq (ngorp (preach 'elit '((random 1f0)
+							(random 1f0)
+							(random 1f0)
+							)))))
 			(let ((code (char-code char)))
 			  (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
 			    (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
