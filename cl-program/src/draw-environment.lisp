@@ -18,11 +18,12 @@
       (window::set-vsync nil))
 
   (gl:viewport 0 0 e:*width* e:*height*)
-  (luse-shader :solidshader)
+  (use-program (get-shader :solidshader))
   (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location *shader-program* "pmv")
    *screen-scaled-matrix*
+    
    nil)
 
   (progn
@@ -36,8 +37,8 @@
     )
 
   (progn
-    (bind-shit :font)
-    (lcalllist-invalidate :string)
+    (gl:bind-texture :texture-2d (get-texture :font))
+  ;  (lcalllist-invalidate :string)
     (let ((scale 32.0))
       (name-mesh :string (lambda ()
 			   (gl-draw-quads 
@@ -49,7 +50,7 @@
 			       (/ scale 1.0)
 			       -1.0 1.0
 			       +single-float-just-less-than-one+))))))
-    (ldrawlist :string))
+    (gl:call-list (get-display-list :string)))
 
   (gl:uniform-matrix-4fv
    (gl:get-uniform-location *shader-program* "pmv")
@@ -58,8 +59,8 @@
 		       (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
    nil)
   (progn
-    (bind-shit :cursor)
-    (lcalllist-invalidate :cursor)
+    (gl:bind-texture :texture-2d (get-texture :cursor))
+ ;   (lcalllist-invalidate :cursor)
     (let ((scale 64.0))
       (name-mesh :cursor (lambda ()
 			   (gl-draw-quads 
@@ -71,7 +72,7 @@
 			       scale
 			       -0.0 0.0
 			       (- +single-float-just-less-than-one+)))))))
-    (ldrawlist :cursor))
+    (gl:call-list (get-display-list :cursor)))
 
   (window:update-display))
 

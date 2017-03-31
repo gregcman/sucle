@@ -15,7 +15,14 @@
 
    (defun ngorp (&rest forms)
      (cons (quote progn)
-	   (apply (function nconc) forms)))))
+	   (apply (function nconc) forms)))
+   (defun ensure (place otherwise)
+     (let ((value-var (gensym))
+	   (exists-var (gensym)))
+       `(or ,place
+	    (multiple-value-bind (,value-var ,exists-var) ,otherwise
+	      (if ,exists-var
+		  (values (setf ,place ,value-var) ,exists-var))))))))
 
 (defparameter *something* #.(or *compile-file-truename* *load-truename*))
 
@@ -69,46 +76,6 @@
 (defun load-png (filename)
   (opticl:read-png-file filename))
 
-(progn
-  (defparameter *g/image* (make-hash-table :test 'equal))		    ;;raw image arrays
-  (defun get-image (name)
-    (let ((img (gethash name *g/image*)))
-      (if img
-	  img
-	  (get-image-backup name))))
-  (defun set-image (name image-data)
-    (setf (gethash name *g/image*) image-data))
-  (defun remove-image (name)
-    (remhash name *g/image*)))
-(progn
-  (defparameter *g/image-backup* (make-hash-table :test 'equal))
-  (defun get-image-backup (name)
-    (let ((image-func (gethash name *g/image-backup*)))
-      (when (functionp image-func)
-	(let ((ans (funcall image-func name)))
-	  (when ans
-	    (set-image name ans)))))))
-
-(progn
-  (defparameter *g/text* (make-hash-table :test 'equal))   ;;text: sequences of bytes
-  (defun get-text (name)
-    (let ((text (gethash name *g/text*)))
-      (if text
-	  text
-	  (get-text-backup name))))
-  (defun set-text (name text-data)
-    (setf (gethash name *g/text*) text-data))
-  (defun remove-text (name)
-    (remhash name *g/text*)))
-(progn
-  (defparameter *g/text-backup* (make-hash-table :test 'equal))
-  (defun get-text-backup (name)
-    (let ((text-func (gethash name *g/text-backup*)))
-      (when (functionp text-func)
-	(let ((ans (funcall text-func name)))
-	  (when ans
-	    (set-text name ans)))))))
-
 (defun fmakunbounds (symbol-list)
   (dolist (symbol symbol-list)
     (fmakunbound symbol)))
@@ -125,6 +92,11 @@
 
 (defun complex-modulus (c)
   (sqrt (realpart (* c (conjugate c)))))
+
+(defparameter foo
+  (let ((a (write-to-string "Hello World")))
+    (map-into a
+	      (lambda (x) (char-downcase x)) a)))
 
 ;;;;flip an image in-place - three dimensions - does not conse
 (defun flip-image (image)
@@ -156,39 +128,93 @@
 
 (defun name-mesh (display-list-name mesh-func)
   (setf (gethash display-list-name *g/call-list-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
+	(lambda ()
 	  (create-call-list-from-func mesh-func))))
 
 (defun texture-imagery (texture-name image-name)
   (setf (gethash texture-name *g/texture-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
+	(lambda ()
 	  (pic-texture (get-image image-name)))))
 
 (defun name-shader (shader-name vs fs attributes)
   (setf (gethash shader-name *g/shader-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
+	(lambda ()
 	  (make-shader-program-from-strings
 	   (get-text vs) (get-text fs) attributes))))
 
 (defun src-image (name src-path)
   (setf (gethash name *g/image-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
+	(lambda ()
 	  (let ((img (load-png src-path)))
 	    (flip-image img)
 	    img))))
 
 (defun src-text (name src-path)
   (setf (gethash name *g/text-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
+	(lambda ()
 	  (file-string src-path))))
 
+(progn
+  (defparameter *g/image* (make-hash-table :test 'eq))		    ;;raw image arrays
+  (defun get-image (name)
+    (etouq
+     (ensure (quote (gethash name *g/image*))
+	     (quote (let ((image-func (gethash name *g/image-backup*)))
+		      (when (functionp image-func)
+			(values (funcall image-func) t))))))))
+(defparameter *g/image-backup* (make-hash-table :test 'equal))
 
-(defparameter foo
-  (let ((a (write-to-string "Hello World")))
-    (map-into a
-	      (lambda (x) (char-downcase x)) a)))
+(progn
+  (defparameter *g/text* (make-hash-table :test 'eq))   ;;text: sequences of bytes
+  (defun get-text (name)
+    (etouq
+     (ensure (quote (gethash name *g/text*))
+	     (quote (let ((text-func (gethash name *g/text-backup*)))
+		      (when (functionp text-func)
+			(values (funcall text-func) t))))))))
+(defparameter *g/text-backup* (make-hash-table :test 'eq))
+
+(progn
+  (defparameter *g/call-list* (make-hash-table :test 'eq));;opengl call lists
+  (defun get-display-list (name)
+    (etouq
+     (ensure (quote (gethash name *g/call-list*))
+	     (quote (let ((display-list-func (gethash name *g/call-list-backup*)))
+		      (when (functionp display-list-func)
+			(values (funcall display-list-func) t))))))))
+(defparameter *g/call-list-backup* (make-hash-table :test 'eq))
+
+(progn
+  (defparameter *g/texture* (make-hash-table :test 'eq)) ;;opengl textures
+  (defun get-texture (name)
+    (etouq
+     (ensure (quote (gethash name *g/texture*))
+	     (quote (let ((image-data-func (gethash name *g/texture-backup*)))
+		      (when (functionp image-data-func)
+			(values (funcall image-data-func) t))))))))
+(defparameter *g/texture-backup* (make-hash-table :test 'eq))
+
+(progn
+  (defparameter *g/shader* (make-hash-table :test 'eq)) ;;opengl shaders
+  (defun get-shader (name)
+    (etouq
+     (ensure
+      (quote (gethash name *g/shader*))
+      (quote (let ((shader-make-func (gethash name *g/shader-backup*)))
+	       (when (functionp shader-make-func)
+		 (values (funcall shader-make-func) t))))))))
+(defparameter *g/shader-backup* (make-hash-table :test 'eq))
+
+
+(defun lcalllist-invalidate (name)
+  (let ((old (get-display-list name)))
+    (remhash name *g/call-list*)
+    (when old (gl:delete-lists old 1))))
+
+(defun create-call-list-from-func (func)
+  (let ((the-list (gl:gen-lists 1)))
+    (gl:new-list the-list :compile)
+    (funcall func)
+    (gl:end-list)
+    the-list))
+

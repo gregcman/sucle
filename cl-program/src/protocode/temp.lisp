@@ -410,3 +410,86 @@
 
 (progno
  (defparameter *skybox-tilemap* (regular-enumeration 4 3)))
+
+(progno
+ (defun glActiveTexture (num)
+   "sets the active texture"
+   (gl:active-texture (+ num (get-gl-constant :texture0))))
+
+ (defun sizeof (type-keyword)
+   "gets the size of a foreign c type"
+   (cffi:foreign-type-size type-keyword))
+
+ (defun get-gl-constant (keyword)
+   "gets a gl-constant"
+   (cffi:foreign-enum-value '%gl:enum keyword)))
+
+(progno
+ (defun luse-shader (name)
+   (use-program (get-shader name)))
+
+ (defun bind-shit (name)
+   "bind a texture located in the texture library"
+   (let ((num (get-texture name)))
+     (if num
+	 (gl:bind-texture :texture-2d num)
+	 (print "error-tried to use NIL texture")))))
+
+(progno
+ (defun bind-custom-framebuffer (framebuffer)
+   (gl:bind-framebuffer-ext :framebuffer-ext framebuffer))
+
+ (defun bind-default-framebuffer ()
+   (gl:bind-framebuffer-ext :framebuffer-ext 0))
+
+ (defun create-framebuffer (w h)
+   (let ((framebuffer (first (gl:gen-framebuffers-ext 1)))
+	 (depthbuffer (first (gl:gen-renderbuffers-ext 1)))
+	 (texture (first (gl:gen-textures 1))))
+     ;; setup framebuffer
+     (gl:bind-framebuffer-ext :framebuffer-ext framebuffer)
+
+     ;; setup texture and attach it to the framebuffer
+     (gl:bind-texture :texture-2d texture)
+     (gl:tex-parameter :texture-2d :texture-min-filter :nearest)
+     (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
+     (gl:tex-image-2d :texture-2d 0 :rgba w h 0 :rgba :unsigned-byte (cffi:null-pointer))
+     (gl:generate-mipmap-ext :texture-2d)
+     (gl:bind-texture :texture-2d 0)
+     (gl:framebuffer-texture-2d-ext :framebuffer-ext
+				    :color-attachment0-ext
+				    :texture-2d
+				    texture
+				    0)
+
+     ;; setup depth-buffer and attach it to the framebuffer
+     (gl:bind-renderbuffer-ext :renderbuffer-ext depthbuffer)
+     (gl:renderbuffer-storage-ext :renderbuffer-ext :depth-component24 w h)
+     (gl:framebuffer-renderbuffer-ext :framebuffer-ext
+				      :depth-attachment-ext
+				      :renderbuffer-ext
+				      depthbuffer)
+
+     ;; validate framebuffer
+     (let ((framebuffer-status (gl:check-framebuffer-status-ext :framebuffer-ext)))
+       (unless (gl::enum= framebuffer-status :framebuffer-complete-ext)
+	 (error "Framebuffer not complete: ~A." framebuffer-status)))
+     
+     (gl:clear :color-buffer-bit
+	       :depth-buffer-bit)
+     (gl:enable :depth-test :multisample)
+     (values texture framebuffer))))
+
+(progno
+ (defun ldrawlist (name)
+   (let ((the-list (get-display-list name)))
+     (if the-list
+	 (gl:call-list the-list)
+	 (print "error")))))
+
+(progno
+ (defun lpic-ltexture (image-name &optional (texture-name image-name))
+   (let ((thepic (get-image image-name)))
+     (when thepic
+       (set-texture texture-name 
+		    (pic-texture thepic))))))
