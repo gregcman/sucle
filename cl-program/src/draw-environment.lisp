@@ -18,10 +18,10 @@
       (window::set-vsync nil))
 
   (gl:viewport 0 0 e:*width* e:*height*)
-  (use-program (get-shader :solidshader))
+  (gl:use-program (get-shader :solidshader))
   (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
   (gl:uniform-matrix-4fv
-   (gl:get-uniform-location *shader-program* "pmv")
+   (gl:get-uniform-location (get-shader :solidshader) "pmv")
    *screen-scaled-matrix*
     
    nil)
@@ -53,7 +53,7 @@
     (gl:call-list (get-display-list :string)))
 
   (gl:uniform-matrix-4fv
-   (gl:get-uniform-location *shader-program* "pmv")
+   (gl:get-uniform-location (get-shader :solidshader) "pmv")
    (cg-matrix:%matrix* *temp-matrix2*
 		       *screen-scaled-matrix*
 		       (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))

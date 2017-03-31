@@ -145,13 +145,11 @@
 (defun src-image (name src-path)
   (setf (gethash name *g/image-backup*)
 	(lambda ()
-	  (let ((img (load-png src-path)))
-	    (flip-image img)
-	    img))))
+	  (flip-image (load-png src-path)))))
 
 (defun src-text (name src-path)
   (setf (gethash name *g/text-backup*)
-	(lambda ()
+ 	(lambda ()
 	  (file-string src-path))))
 
 (progn

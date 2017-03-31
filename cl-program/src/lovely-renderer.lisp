@@ -35,16 +35,6 @@
     ;(gl:generate-mipmap :texture-2d)
     the-shit))
 
-;;;opengl can only use one shaderprogram at once,
-;;;so there is a global *shader-program* variable
-(defparameter *shader-program* nil)
-
-;;;check if the 
-(defun use-program (ourprog)
-  (unless (eql ourprog *shader-program*)
-    (setq *shader-program* ourprog)
-    (gl:use-program ourprog)))
-
 ;;;attribs is an alist with a string in the car representing an attribute
 ;;;and a number representing the location in the cdr
 (defun make-shader-program-from-strings
