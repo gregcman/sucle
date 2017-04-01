@@ -56,11 +56,11 @@
     (let ((data (make-string (file-length stream))))
       (read-sequence data stream)
       data)))
-
-(defun spill-hash (hash)
+ 
+(defun spill-hash (hash &optional (stream *standard-output*))
   (loop for key being the hash-keys of hash
      using (hash-value value)
-     do (format t "~S ~S~%" key value)))
+     do (format stream "~S ~S~%" key value)))
 
 (defun print-bits (n)
   (format t "~64,'0b" n))

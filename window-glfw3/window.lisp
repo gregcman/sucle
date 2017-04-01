@@ -37,6 +37,12 @@
 	  (:just-released (setf (gethash key hash) nil))
 	  ((nil) (remhash key hash)))))
 
+(defmacro def-key-callback (name (window key scancode action mod-keys) &body body)
+  `(%glfw:define-glfw-callback ,name
+       ((,window :pointer) (,key :unsigned-int) (,scancode :int)
+	(,action %glfw::key-action) (,mod-keys %glfw::mod-keys))
+     ,@body))
+
 (macrolet ((key (key)
 	     `(gethash ,key *keypress-hash*))
 	   (mice (mice)
@@ -82,7 +88,7 @@
 
 ;;;glfw callbacks which will update the hashes to contain nil t
 ;;;:just-pressed or :just-released per key [each key is a symbol]
-  (glfw:def-key-callback key-callback (window key scancode action mod-keys)
+  (def-key-callback key-callback (window key scancode action mod-keys)
     (declare (ignorable scancode mod-keys window))
     (let ((old-value (key key)))
       (setf (key key) (next-key-state old-value action))))

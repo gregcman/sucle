@@ -55,20 +55,26 @@
 
     (progn
       (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
-      (progno (let ((scale 32.0))
-		(namexpr *backup* :string
-			 (lambda ()
-			   (create-call-list-from-func
-			    (lambda ()
-			      (gl-draw-quads 
-			       (lambda (tex-buf pos-buf lit-buf)
-				 (draw-string-raster-char
-				  pos-buf tex-buf lit-buf
-				  *16x16-tilemap* foo
-				  (/ scale 2.0)
-				  (/ scale 1.0)
-				  -1.0 1.0
-				  +single-float-just-less-than-one+)))))))))
+      (progn (let ((scale 32.0))
+	       (namexpr *backup* :string
+			(lambda ()
+			  (create-call-list-from-func
+			   (lambda ()
+			     (gl-draw-quads 
+			      (lambda (tex-buf pos-buf lit-buf)
+				(draw-string-raster-char
+				 pos-buf tex-buf lit-buf
+				 *16x16-tilemap* foo
+				 (/ scale 2.0)
+				 (/ scale 1.0)
+				 -1.0 1.0
+				 +single-float-just-less-than-one+)))))))))
+      (if (or t (e:key-p :a))
+	  (let ((list (get-stuff :string *stuff* *backup*)))
+	    (gl:delete-lists list 1)
+	    (remhash :string *stuff*)))
+      (setf foo (with-output-to-string (x)
+		  (spill-hash e:*keypress-hash* x)))
       (gl:call-list (get-stuff :string *stuff* *backup*)))
 
     (gl:uniform-matrix-4fv
@@ -79,20 +85,20 @@
      nil)
     (progn
       (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-      (progno (let ((scale 64.0))
-		(namexpr *backup* :cursor-list
-			 (lambda ()
-			   (create-call-list-from-func
-			    (lambda ()
-			      (gl-draw-quads 
-			       (lambda (tex-buf pos-buf lit-buf)
-				 (draw-mouse
-				  pos-buf tex-buf lit-buf
-				  *4x4-tilemap* 0
-				  scale 
-				  scale
-				  -0.0 0.0
-				  (- +single-float-just-less-than-one+))))))))))
+      (progn (let ((scale 64.0))
+	       (namexpr *backup* :cursor-list
+			(lambda ()
+			  (create-call-list-from-func
+			   (lambda ()
+			     (gl-draw-quads 
+			      (lambda (tex-buf pos-buf lit-buf)
+				(draw-mouse
+				 pos-buf tex-buf lit-buf
+				 *4x4-tilemap* 0
+				 scale 
+				 scale
+				 -0.0 0.0
+				 (- +single-float-just-less-than-one+))))))))))
       (gl:call-list (get-stuff :cursor-list *stuff* *backup*)))))
 
 (defun glinnit ()
