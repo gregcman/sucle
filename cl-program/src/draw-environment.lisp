@@ -46,6 +46,7 @@
 
     (progn
       (gl:disable :depth-test :blend)
+      (gl:depth-mask :false)
       (gl:depth-func :always)
       (gl:clear-color 0.5 0.0 0.0 0f0)
       (gl:clear
@@ -54,7 +55,6 @@
 
     (progn
       (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
-					;  (lcalllist-invalidate :string)
       (progno (let ((scale 32.0))
 		(namexpr *backup* :string
 			 (lambda ()
@@ -79,7 +79,6 @@
      nil)
     (progn
       (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-					;   (lcalllist-invalidate :cursor)
       (progno (let ((scale 64.0))
 		(namexpr *backup* :cursor-list
 			 (lambda ()

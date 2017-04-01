@@ -136,12 +136,6 @@
 		    (when (functionp genfunc)
 		      (values (funcall genfunc) t)))))))
 
-
-(defun lcalllist-invalidate (name)
-  (let ((old (get-display-list name)))
-    (remhash name *g/call-list*)
-    (when old (gl:delete-lists old 1))))
-
 (defun create-call-list-from-func (func)
   (let ((the-list (gl:gen-lists 1)))
     (gl:new-list the-list :compile)

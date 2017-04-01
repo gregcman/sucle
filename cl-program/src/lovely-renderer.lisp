@@ -33,7 +33,6 @@
 ;;;and a number representing the location in the cdr
 (defun make-shader-program-from-strings
     (vertex-shader-string fragment-shader-string attribs)
-  "makes a shader program from strings. makes noises if something goes wrong"
   (block nil
     (let ((vertexShader (gl:create-shader :vertex-shader))
 	  (fragmentShader (gl:create-shader :fragment-shader))

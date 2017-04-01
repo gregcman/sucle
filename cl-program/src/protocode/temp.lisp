@@ -509,3 +509,9 @@
      (gl:tex-image-2d :texture-2d 0 type width height 0 type :unsigned-byte tex-data)
 					;(gl:generate-mipmap :texture-2d)
      the-shit)))
+
+(progno
+ (defun lcalllist-invalidate (name)
+   (let ((old (get-display-list name)))
+     (remhash name *g/call-list*)
+     (when old (gl:delete-lists old 1)))))
