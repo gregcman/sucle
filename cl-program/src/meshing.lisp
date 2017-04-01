@@ -19,9 +19,3 @@
   (if (iter-ator:p-array iterator)
       (1+ (flhat:iterator-position iterator))
       0))
-
-(defparameter *attrib-buffers* (fill-with-flhats (make-attrib-buffer-data)))
-(defparameter *attrib-buffer-iterators*
-  (make-iterators *attrib-buffers* (make-attrib-buffer-data)))
-(defparameter *attrib-buffer-fill-pointer*
-  (tally-buffer *attrib-buffer-iterators* (make-attrib-buffer-data)))

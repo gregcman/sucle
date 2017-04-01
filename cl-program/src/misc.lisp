@@ -126,82 +126,15 @@
 (defun img-path (name)
   (merge-pathnames name dir-resource))
 
-(defun name-mesh (display-list-name mesh-func)
-  (setf (gethash display-list-name *g/call-list-backup*)
-	(lambda ()
-	  (create-call-list-from-func mesh-func))))
+(defun namexpr (hash name func)
+  (setf (gethash name hash) func))
 
-(defun texture-imagery (texture-name image-name)
-  (setf (gethash texture-name *g/texture-backup*)
-	(lambda ()
-	  (pic-texture (get-image image-name)))))
-
-(defun name-shader (shader-name vs fs attributes)
-  (setf (gethash shader-name *g/shader-backup*)
-	(lambda ()
-	  (make-shader-program-from-strings
-	   (get-text vs) (get-text fs) attributes))))
-
-(defun src-image (name src-path)
-  (setf (gethash name *g/image-backup*)
-	(lambda ()
-	  (flip-image (load-png src-path)))))
-
-(defun src-text (name src-path)
-  (setf (gethash name *g/text-backup*)
- 	(lambda ()
-	  (file-string src-path))))
-
-(progn
-  (defparameter *g/image* (make-hash-table :test 'eq))		    ;;raw image arrays
-  (defun get-image (name)
-    (etouq
-     (ensure (quote (gethash name *g/image*))
-	     (quote (let ((image-func (gethash name *g/image-backup*)))
-		      (when (functionp image-func)
-			(values (funcall image-func) t))))))))
-(defparameter *g/image-backup* (make-hash-table :test 'equal))
-
-(progn
-  (defparameter *g/text* (make-hash-table :test 'eq))   ;;text: sequences of bytes
-  (defun get-text (name)
-    (etouq
-     (ensure (quote (gethash name *g/text*))
-	     (quote (let ((text-func (gethash name *g/text-backup*)))
-		      (when (functionp text-func)
-			(values (funcall text-func) t))))))))
-(defparameter *g/text-backup* (make-hash-table :test 'eq))
-
-(progn
-  (defparameter *g/call-list* (make-hash-table :test 'eq));;opengl call lists
-  (defun get-display-list (name)
-    (etouq
-     (ensure (quote (gethash name *g/call-list*))
-	     (quote (let ((display-list-func (gethash name *g/call-list-backup*)))
-		      (when (functionp display-list-func)
-			(values (funcall display-list-func) t))))))))
-(defparameter *g/call-list-backup* (make-hash-table :test 'eq))
-
-(progn
-  (defparameter *g/texture* (make-hash-table :test 'eq)) ;;opengl textures
-  (defun get-texture (name)
-    (etouq
-     (ensure (quote (gethash name *g/texture*))
-	     (quote (let ((image-data-func (gethash name *g/texture-backup*)))
-		      (when (functionp image-data-func)
-			(values (funcall image-data-func) t))))))))
-(defparameter *g/texture-backup* (make-hash-table :test 'eq))
-
-(progn
-  (defparameter *g/shader* (make-hash-table :test 'eq)) ;;opengl shaders
-  (defun get-shader (name)
-    (etouq
-     (ensure
-      (quote (gethash name *g/shader*))
-      (quote (let ((shader-make-func (gethash name *g/shader-backup*)))
-	       (when (functionp shader-make-func)
-		 (values (funcall shader-make-func) t))))))))
-(defparameter *g/shader-backup* (make-hash-table :test 'eq))
+(defun get-stuff (name stuff otherwise)
+  (etouq
+   (ensure (quote (gethash name stuff))
+	   (quote (let ((genfunc (gethash name otherwise)))
+		    (when (functionp genfunc)
+		      (values (funcall genfunc) t)))))))
 
 
 (defun lcalllist-invalidate (name)

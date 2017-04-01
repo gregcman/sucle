@@ -12,98 +12,142 @@
 
 (defparameter *screen-scaled-matrix* (cg-matrix:identity-matrix))
 
+
+
+(defparameter *gl-objects* (make-meta-globject))
+
+(defparameter *attrib-buffers* (fill-with-flhats (make-attrib-buffer-data)))
+(defparameter *attrib-buffer-iterators*
+  (make-iterators *attrib-buffers* (make-attrib-buffer-data)))
+(defparameter *attrib-buffer-fill-pointer*
+  (tally-buffer *attrib-buffer-iterators* (make-attrib-buffer-data)))
+
+(defparameter *backup* (make-hash-table :test (quote eq)))
+(defparameter *stuff* (make-hash-table :test (quote eq)))
+
 (defun render ()
   (if vsync?
       (window::set-vsync t)
       (window::set-vsync nil))
-
-  (gl:viewport 0 0 e:*width* e:*height*)
-  (gl:use-program (get-shader :solidshader))
-  (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
-  (gl:uniform-matrix-4fv
-   (gl:get-uniform-location (get-shader :solidshader) "pmv")
-   *screen-scaled-matrix*
-    
-   nil)
-
-  (progn
-    (gl:disable :depth-test :blend)
-    (gl:depth-func :always)
-    (gl:clear-color 0.5 0.0 0.0 0f0)
-    (gl:clear
-     :color-buffer-bit 
-     ;:depth-buffer-bit
-     )
-    )
-
-  (progn
-    (gl:bind-texture :texture-2d (get-texture :font))
-  ;  (lcalllist-invalidate :string)
-    (let ((scale 32.0))
-      (name-mesh :string (lambda ()
-			   (gl-draw-quads 
-			    (lambda (tex-buf pos-buf lit-buf)
-			      (draw-string-raster-char
-			       pos-buf tex-buf lit-buf
-			       *16x16-tilemap* foo
-			       (/ scale 2.0)
-			       (/ scale 1.0)
-			       -1.0 1.0
-			       +single-float-just-less-than-one+))))))
-    (gl:call-list (get-display-list :string)))
-
-  (gl:uniform-matrix-4fv
-   (gl:get-uniform-location (get-shader :solidshader) "pmv")
-   (cg-matrix:%matrix* *temp-matrix2*
-		       *screen-scaled-matrix*
-		       (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
-   nil)
-  (progn
-    (gl:bind-texture :texture-2d (get-texture :cursor))
- ;   (lcalllist-invalidate :cursor)
-    (let ((scale 64.0))
-      (name-mesh :cursor (lambda ()
-			   (gl-draw-quads 
-			    (lambda (tex-buf pos-buf lit-buf)
-			      (draw-mouse
-			       pos-buf tex-buf lit-buf
-			       *4x4-tilemap* 0
-			       scale 
-			       scale
-			       -0.0 0.0
-			       (- +single-float-just-less-than-one+)))))))
-    (gl:call-list (get-display-list :cursor)))
+  (draw-things)
 
   (window:update-display))
 
+(defun draw-things () 
+  (let ((solidshader (get-stuff :solidshader *stuff* *backup*)))
+    (gl:viewport 0 0 e:*width* e:*height*)
+    (gl:use-program solidshader)
+    (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
+    (gl:uniform-matrix-4fv
+     (gl:get-uniform-location solidshader "pmv")
+     *screen-scaled-matrix*
+     
+     nil)
+
+    (progn
+      (gl:disable :depth-test :blend)
+      (gl:depth-func :always)
+      (gl:clear-color 0.5 0.0 0.0 0f0)
+      (gl:clear
+       :color-buffer-bit 
+       ))
+
+    (progn
+      (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
+					;  (lcalllist-invalidate :string)
+      (progno (let ((scale 32.0))
+		(namexpr *backup* :string
+			 (lambda ()
+			   (create-call-list-from-func
+			    (lambda ()
+			      (gl-draw-quads 
+			       (lambda (tex-buf pos-buf lit-buf)
+				 (draw-string-raster-char
+				  pos-buf tex-buf lit-buf
+				  *16x16-tilemap* foo
+				  (/ scale 2.0)
+				  (/ scale 1.0)
+				  -1.0 1.0
+				  +single-float-just-less-than-one+)))))))))
+      (gl:call-list (get-stuff :string *stuff* *backup*)))
+
+    (gl:uniform-matrix-4fv
+     (gl:get-uniform-location solidshader "pmv")
+     (cg-matrix:%matrix* *temp-matrix2*
+			 *screen-scaled-matrix*
+			 (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
+     nil)
+    (progn
+      (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
+					;   (lcalllist-invalidate :cursor)
+      (progno (let ((scale 64.0))
+		(namexpr *backup* :cursor-list
+			 (lambda ()
+			   (create-call-list-from-func
+			    (lambda ()
+			      (gl-draw-quads 
+			       (lambda (tex-buf pos-buf lit-buf)
+				 (draw-mouse
+				  pos-buf tex-buf lit-buf
+				  *4x4-tilemap* 0
+				  scale 
+				  scale
+				  -0.0 0.0
+				  (- +single-float-just-less-than-one+))))))))))
+      (gl:call-list (get-stuff :cursor-list *stuff* *backup*)))))
+
 (defun glinnit ()
+  (reset *gl-objects*)
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
-  (setf *shader-program* nil)
   
   (let ((width (if t 480 854))
 	(height (if t 360 480)))
     (window:push-dimensions width height))
   (setf e:*resize-hook* #'on-resize)
- 
-  (progn    
-    (name-shader :solidshader :ss-vs :ss-frag '(("pos" . 0)	
-						("col" . 3)
-						("tex" . 8)))
-    (src-text :ss-vs (shader-path "pos4f-col3f-tex2f.vs"))
-    (src-text :ss-frag (shader-path "fcol3f-ftex2f-no0a.frag")))
- 
-  (progn
-    (src-image :font-image (img-path #P"font/codepage-437-vga-9x16-alpha.png"))
-    (texture-imagery :font :font-image))
-  
-  (progn
-    (src-image :cursor-image (img-path #P"cursor/windos-cursor.png"))
-    (texture-imagery :cursor :cursor-image)))
+
+  (let ((hash *stuff*))
+    (maphash (lambda (k v)
+	       (if (integerp v)
+		   (remhash k hash)))
+	     hash))
+  (let ((backup *backup*))
+    (progn    
+      (namexpr backup :solidshader
+	       (lambda ()
+		 (make-shader-program-from-strings
+		  (get-stuff :ss-vs *stuff* *backup*)
+		  (get-stuff :ss-frag *stuff* *backup*)
+		  '(("pos" . 0)	
+		    ("col" . 3)
+		    ("tex" . 8)))))
+      (namexpr backup :ss-vs
+	       (lambda () (file-string (shader-path "pos4f-col3f-tex2f.vs"))))
+      (namexpr backup :ss-frag
+	       (lambda () (file-string (shader-path "fcol3f-ftex2f-no0a.frag")))))
+    
+    (progn
+      (namexpr backup :font-image
+	       (lambda ()
+		 (flip-image
+		  (load-png
+		   (img-path #P"font/codepage-437-vga-9x16-alpha.png")))))
+      (namexpr backup :font
+	       (lambda ()
+		 (pic-texture (get-stuff :font-image *stuff* *backup*)))))
+    
+    (progn
+      (namexpr backup :cursor-image
+	       (lambda ()
+		 (flip-image
+		  (load-png
+		   (img-path #P"cursor/windos-cursor.png")))))
+      (namexpr backup :cursor
+	       (lambda ()
+		 (pic-texture (get-stuff :cursor-image *stuff* *backup*)))))))
 
 (defun on-resize (w h)
   (setf *window-height* h
 	*window-width* w))
-
 
 (defun gl-draw-quads (func)
   (let ((iter *attrib-buffer-iterators*))

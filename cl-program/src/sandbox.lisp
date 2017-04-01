@@ -11,10 +11,6 @@
 
 
 (defun handoff-three ()
-  (clrhash *g/call-list*)
-  (clrhash *g/texture*)
-  (clrhash *g/shader*)
-
   (glinnit)
   (injection)) 
 

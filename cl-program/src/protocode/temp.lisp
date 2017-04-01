@@ -493,3 +493,19 @@
      (when thepic
        (set-texture texture-name 
 		    (pic-texture thepic))))))
+
+(progno
+ (defun create-texture (tex-data width height &optional (type :rgba))
+   "creates an opengl texture from data"
+   (let ((the-shit (gl:gen-texture)))
+     (gl:bind-texture :texture-2d the-shit)
+     (gl:tex-parameter :texture-2d :texture-min-filter  :nearest
+		       )
+     (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
+     (gl:tex-parameter :texture-2d :texture-wrap-s :clamp)
+     (gl:tex-parameter :texture-2d :texture-wrap-t :clamp)
+     (gl:tex-parameter :texture-2d :texture-border-color '(0 0 0 0))
+					; (gl:tex-parameter :texture-2d :generate-mipmap :true)
+     (gl:tex-image-2d :texture-2d 0 type width height 0 type :unsigned-byte tex-data)
+					;(gl:generate-mipmap :texture-2d)
+     the-shit)))

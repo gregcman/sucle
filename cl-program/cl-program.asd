@@ -22,6 +22,7 @@
 	       (:file "meshing")
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
+	       (:file "globjects")
 	       
 	       (:file "misc") ;;;everything else
 	       
