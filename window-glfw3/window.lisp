@@ -20,6 +20,10 @@
     `(%glfw:define-glfw-callback ,name
 	 ((,window :pointer) (,button :int)
 	  (,action :int) (,mod-keys :unsigned-int))
+       ,@body))
+  (defmacro def-char-callback (name (window char) &body body)
+    `(%glfw:define-glfw-callback ,name
+	 ((,window :pointer) (,char :unsigned-int))
        ,@body)))
 
 ;;;release = 0 press = 1 repeat = 2
@@ -109,7 +113,10 @@
   (def-mouse-button-callback mouse-callback (window button action mod-keys)
     (declare (ignorable mod-keys window))
     (let ((old-value (mice button)))
-      (setf (mice button) (next-key-state old-value action)))))
+      (setf (mice button) (next-key-state old-value action))))
+  (def-char-callback char-callback (window char)
+    (declare (ignorable window))
+    (princ (code-char char))))
 
 
 (glfw:def-scroll-callback scroll-callback (window x y)
@@ -157,6 +164,7 @@
       (glfw:set-key-callback 'key-callback)
       (glfw:set-scroll-callback 'scroll-callback)
       (glfw:set-window-size-callback 'update-viewport)
+      (glfw:set-char-callback 'char-callback)
       (funcall func))))
 
 (defun get-mouse-out ()
