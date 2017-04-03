@@ -88,10 +88,11 @@
 	(dotimes (pos newlen)
 	  (vector-push-extend (aref e:*chars* pos) foo))
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
-	       (let ((stuff (read-from-string foo)))
-		 (print stuff)
-		 (print (eval stuff)))
-	       (setf (fill-pointer foo) 0)
+	       (multiple-value-bind (data p) (read-string foo nil)
+		 (cond (p (print data)
+			  (print (eval data))
+			  (setf (fill-pointer foo) 0))
+		       (t (vector-push-extend #\Newline foo))))
 	       (setf changed t)))
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :backspace))
 	       (setf (fill-pointer foo) (max 0 (1- (fill-pointer foo))))
@@ -278,3 +279,17 @@
 
 (defun quit ()
   (setf e:*status* t))
+
+
+(defun goo (c)
+  (declare (ignorable c))
+  (let ((restart (find-restart (quote goober))))
+    (when restart (invoke-restart restart))))
+
+(defun read-string (string otherwise)
+  (handler-bind ((end-of-file #'goo))
+    (restart-case
+	(values (read-from-string string nil otherwise) t)
+      (goober ()
+	:report "wtf"
+	(values otherwise nil)))))
