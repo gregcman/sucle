@@ -16,15 +16,15 @@
 
 
 (defun create-texture (tex-data width height type)
-  (let ((tex (gl:gen-texture)))
+  (let ((tex (car (glgentextures 1))))
     (gl:bind-texture :texture-2d tex)
     (gl:tex-image-2d :texture-2d 0 type width height 0 type :unsigned-byte tex-data)
     tex))
 
 (defun make-shader-program-from-strings (vs-string fs-string attribs)
-  (let ((vert (gl:create-shader :vertex-shader))
-	(frag (gl:create-shader :fragment-shader))
-	(program (gl:create-program)))
+  (let ((vert (glcreateshader :vertex-shader))
+	(frag (glcreateshader :fragment-shader))
+	(program (glcreateprogram)))
 
     (compile-string-into-shader frag fs-string)
     (compile-string-into-shader vert vs-string)
@@ -45,8 +45,8 @@
     (gl:detach-shader program vert)
     (gl:detach-shader program frag)
     
-    (gl:delete-shader vert)
-    (gl:delete-shader frag)
+    (gldeleteshader vert)
+    (gldeleteshader frag)
     program))
 
 (defun compile-string-into-shader (shader string)

@@ -1,19 +1,19 @@
 #version 120
-attribute vec4 pos;
-attribute vec2 tex;
-attribute vec3 col;
+attribute vec4 POS;
+attribute vec2 TEX;
+attribute vec3 COL;
 
-varying vec2 ftex;
-varying vec3 fcol;
+varying vec2 FTEX;
+varying vec3 FCOL;
 
-uniform mat4 pmv;
+uniform mat4 PMV;
 
 void main()
 {
 gl_Position = 
 
-pmv * pos;
-ftex = tex;
-fcol = col;
+PMV * POS;
+FTEX = TEX;
+FCOL = COL;
 
 } 

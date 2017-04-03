@@ -12,23 +12,25 @@
 
 (defparameter *screen-scaled-matrix* (cg-matrix:identity-matrix))
 
-
-
-(defparameter *gl-objects* (make-meta-globject))
-
 (defparameter *attrib-buffers* (fill-with-flhats (make-attrib-buffer-data)))
 (defparameter *attrib-buffer-iterators*
   (make-iterators *attrib-buffers* (make-attrib-buffer-data)))
 (defparameter *attrib-buffer-fill-pointer*
   (tally-buffer *attrib-buffer-iterators* (make-attrib-buffer-data)))
 
-(defparameter *backup* (make-hash-table :test (quote eq)))
-(defparameter *stuff* (make-hash-table :test (quote eq)))
+(defun make-eq-hash ()
+  (make-hash-table :test (quote eq)))
+
+(defparameter *backup* (make-eq-hash))
+(defparameter *stuff* (make-eq-hash))
 
 (defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
 					   (:texture-mag-filter . :nearest)
 					   (:texture-wrap-s . :repeat)
 					   (:texture-wrap-t . :repeat))))
+
+(defparameter *postex* (quote (("POS" . 0)	
+			       ("TEX" . 8))))
 
 (defun render ()
   (if vsync?
@@ -43,12 +45,13 @@
 	      :element-type (quote character)))
 
 (defun draw-things () 
-  (let ((solidshader (get-stuff :textshader *stuff* *backup*)))
+  (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
+	 (solidshader-uniforms (glget solidshader :program)))
     (gl:viewport 0 0 e:*width* e:*height*)
     (gl:use-program solidshader)
     (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
     (gl:uniform-matrix-4fv
-     (gl:get-uniform-location solidshader "pmv")
+     (getuniform solidshader-uniforms :pmv)
      (cg-matrix:%matrix* *temp-matrix2*
 			 *screen-scaled-matrix*
 			 (cg-matrix:%translate* *temp-matrix*
@@ -57,9 +60,9 @@
 						0.0))
      nil)
 
-    (gl:uniformf (gl:get-uniform-location solidshader "bg")
-		 0f0 0f0 1f0)
-    (gl:uniformf (gl:get-uniform-location solidshader "fg")
+    (gl:uniformf (getuniform solidshader-uniforms :bg)
+		 0f0 0f0 (random 1.0))
+    (gl:uniformf (getuniform solidshader-uniforms :fg)
 		 0f0 1f0 0f0)
     (progn
       (gl:disable :depth-test :blend)
@@ -132,11 +135,17 @@
     (progn    
       (namexpr backup :textshader
 	       (lambda ()
-		 (make-shader-program-from-strings
-		  (get-stuff :text-vs *stuff* *backup*)
-		  (get-stuff :text-frag *stuff* *backup*)
-		  '(("pos" . 0)	
-		    ("tex" . 8)))))
+		 (let ((program
+			(make-shader-program-from-strings
+			 (get-stuff :text-vs *stuff* *backup*)
+			 (get-stuff :text-frag *stuff* *backup*)
+			 *postex*)))
+		   (let ((table (make-eq-hash)))
+		     (register program :program table)
+		     (cache-program-uniforms program table (quote ((:pmv . "PMV")
+								   (:bg . "BG")
+								   (:fg . "FG")))))
+		   program)))
      
       (namexpr backup :text-vs
 	       (lambda () (file-string (shader-path "pos4f-tex2f.vs"))))
@@ -167,6 +176,13 @@
 		 (pic-texture (get-stuff :cursor-image *stuff* *backup*)
 			      :rgba
 			      *default-tex-params*))))))
+
+(defun cache-program-uniforms (program table args)
+  (dolist (arg args)
+    (setf (gethash (car arg) table)
+	  (gl:get-uniform-location program (cdr arg)))))
+(defun getuniform (shader-info name)
+  (gethash name shader-info))
 
 (defun on-resize (w h)
   (setf *window-height* h
@@ -213,21 +229,21 @@
 	    (let ((char (row-major-aref string position)))
 	      (let ((next-x (+ xoffset char-width wonine))
 		    (next-y (- yoffset char-height)))
-		(cond  ((char= char #\Newline)
-			(setf xoffset x
-			      yoffset next-y))
-		       (t (incf times 4)
-			  (let ((code (char-code char)))
-			    (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
-			      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
-			  (etouq (ngorp
-				  (preach
-				   'epos
-				   (quadk+ 'z '(xoffset
-						(- next-x wonine)
-						next-y
-						yoffset)))))
-		      (setf xoffset next-x))))))))
+		(cond ((char= char #\Newline)
+		       (setf xoffset x
+			     yoffset next-y))
+		      (t (incf times 4)
+			 (let ((code (char-code char)))
+			   (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
+			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
+			 (etouq (ngorp
+				 (preach
+				  'epos
+				  (quadk+ 'z '(xoffset
+					       (- next-x wonine)
+					       next-y
+					       yoffset)))))
+			 (setf xoffset next-x))))))))
       times)))
 
 (defun quit ()
