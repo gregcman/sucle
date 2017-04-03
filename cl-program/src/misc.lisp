@@ -93,11 +93,6 @@
 (defun complex-modulus (c)
   (sqrt (realpart (* c (conjugate c)))))
 
-(defparameter foo
-  (let ((a (write-to-string "Hello World")))
-    (map-into a
-	      (lambda (x) (char-downcase x)) a)))
-
 ;;;;flip an image in-place - three dimensions - does not conse
 (defun flip-image (image)
   (let ((dims (array-dimensions image)))

@@ -33,6 +33,10 @@
 
   (window:update-display))
 
+(defparameter foo
+  (make-array 0 :adjustable t :fill-pointer 0
+	      :element-type (quote character)))
+
 (defun draw-things () 
   (let ((solidshader (get-stuff :solidshader *stuff* *backup*)))
     (gl:viewport 0 0 e:*width* e:*height*)
@@ -48,7 +52,7 @@
       (gl:disable :depth-test :blend)
       (gl:depth-mask :false)
       (gl:depth-func :always)
-      (gl:clear-color 0.5 0.0 0.0 0f0)
+      (gl:clear-color 0.0 0.0 0.0 0f0)
       (gl:clear
        :color-buffer-bit 
        ))
@@ -69,11 +73,24 @@
 				 (/ scale 1.0)
 				 0.0 0.0
 				 +single-float-just-less-than-one+)))))))))
-      (cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
-	     (setf foo (get-output-stream-string e::*chars*))
-	     (let ((list (get-stuff :string *stuff* *backup*)))
-	       (gl:delete-lists list 1)
-	       (remhash :string *stuff*))))
+
+      (let ((newlen (length e:*chars*))
+	    (changed nil))
+	(dotimes (pos newlen)
+	  (vector-push-extend (aref e:*chars* pos) foo))
+	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
+	       (let ((stuff (read-from-string foo)))
+		 (print stuff)
+		 (print (eval stuff)))
+	       (setf (fill-pointer foo) 0)
+	       (setf changed t)))
+	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :backspace))
+	       (setf (fill-pointer foo) (max 0 (1- (fill-pointer foo))))
+	       (setf changed t)))
+	(when (or changed (not (zerop newlen)))
+	  (let ((list (get-stuff :string *stuff* *backup*)))
+	    (gl:delete-lists list 1)
+	    (remhash :string *stuff*))))
       (gl:call-list (get-stuff :string *stuff* *backup*)))
 
     (gl:uniform-matrix-4fv
@@ -205,11 +222,11 @@
 	   (type single-float x y z char-width char-height)
 	   (type simple-vector lookup)
 	   (optimize (speed 3) (safety 0))
-	   (type (simple-array character) string))
+	   (type (vector character) string))
   (iter-ator:wasabios ((epos pos-buf)
 		       (etex tex-buf)
 		       (elit lit-buf))
-    (let ((len (array-total-size string))
+    (let ((len (length string))
 	  (times 0))
       (declare (type fixnum times))
       (let ((xoffset x)
@@ -227,9 +244,9 @@
 		      (unless (char= #\space char)
 			(incf times 4)
 			(dotimes (x 4)
-			  (etouq (ngorp (preach 'elit '((random 1f0)
+			  (etouq (ngorp (preach 'elit '(0f0
 							(random 1f0)
-							(random 1f0)
+							0f0
 							)))))
 			(let ((code (char-code char)))
 			  (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)

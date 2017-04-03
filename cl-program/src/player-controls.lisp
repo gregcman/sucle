@@ -1,14 +1,15 @@
 (in-package :sandbox)
 
 (defun physics ()
-  (when (e:key-j-p (char-code #\E)) (window:toggle-mouse-capture))
-  (remove-spurious-mouse-input)
-  (when (window:mice-locked-p)
-    (multiple-value-bind (delx dely) (delta)
-      (let ((xmax (float e:*width*))
-	    (ymax (float e:*height*)))
-	(setf cursor-x (min (- xmax 4) (max (- xmax) (+ cursor-x delx))))
-	(setf cursor-y (min (+ ymax 2) (max (- ymax) (- cursor-y dely))))))))
+  (progno
+   (when (e:key-j-p (char-code #\E)) (window:toggle-mouse-capture))
+   (remove-spurious-mouse-input)
+   (when (window:mice-locked-p)
+     (multiple-value-bind (delx dely) (delta)
+       (let ((xmax (float e:*width*))
+	     (ymax (float e:*height*)))
+	 (setf cursor-x (min (- xmax 4) (max (- xmax) (+ cursor-x delx))))
+	 (setf cursor-y (min (+ ymax 2) (max (- ymax) (- cursor-y dely)))))))))
 
 (defparameter cursor-x 0.0)
 (defparameter cursor-y 0.0)

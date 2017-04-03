@@ -153,7 +153,6 @@
   (setq *status* (glfw:window-should-close-p))
   (step-hash *keypress-hash*)
   (step-hash *mousepress-hash*)
-  (print *chars*)
   (setf (fill-pointer *chars*) 0)
   (glfw:poll-events))
 
