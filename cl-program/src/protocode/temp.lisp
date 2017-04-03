@@ -515,3 +515,82 @@
    (let ((old (get-display-list name)))
      (remhash name *g/call-list*)
      (when old (gl:delete-lists old 1)))))
+
+(progno
+ (namexpr backup :ss-frag
+	  (lambda () (file-string (shader-path "fcol3f-ftex2f-no0a.frag"))))
+ (namexpr backup :ss-vs
+	  (lambda () (file-string (shader-path "pos4f-col3f-tex2f.vs")))))
+
+(progno
+ (defun draw-mouse (pos-buf tex-buf lit-buf
+		    lookup value char-width char-height x y z)
+   (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf)
+	    (type single-float x y z char-width char-height)
+	    (type simple-vector lookup)
+	    (optimize (speed 3) (safety 0))
+	    (type fixnum value))
+   (iter-ator:wasabios ((epos pos-buf)
+			(etex tex-buf)
+			(elit lit-buf))
+
+     (dotimes (x 4)
+       (etouq (ngorp (preach 'elit '(1f0
+				     1f0
+				     1f0)))))
+     (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
+       (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
+     (etouq (ngorp
+	     (preach
+	      'epos
+	      (quadk+ 'z '(x
+			   (+ char-width x)
+			   (- y char-height)
+			   y)))))4))
+ (defun render-mouse ()
+   (progn
+     (gl:uniform-matrix-4fv
+      (gl:get-uniform-location (get-stuff :textshader *stuff* *backup*) "pmv")
+      (cg-matrix:%matrix* *temp-matrix2*
+			  *screen-scaled-matrix*
+			  (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
+      nil)
+     (progn
+       (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
+       (progn (let ((scale 64.0))
+		(namexpr *backup* :cursor-list
+			 (lambda ()
+			   (create-call-list-from-func
+			    (lambda ()
+			      (gl-draw-quads 
+			       (lambda (tex-buf pos-buf lit-buf)
+				 (draw-mouse
+				  pos-buf tex-buf lit-buf
+				  *4x4-tilemap* 0
+				  scale 
+				  scale
+				  -0.0 0.0
+				  (- +single-float-just-less-than-one+))))))))))
+       (gl:call-list (get-stuff :cursor-list *stuff* *backup*))))))
+
+(progno
+ (defun gl-draw-quads (func)
+   (let ((iter *attrib-buffer-iterators*))
+     (reset-attrib-buffer-iterators iter)
+     (let ((pos-buf (aref iter 0))
+	   (lit-buf (aref iter 3))
+	   (tex-buf (aref iter 8)))
+       (let ((times (funcall func tex-buf pos-buf lit-buf)))
+	 (gl:with-primitives :quads
+	   (reset-attrib-buffer-iterators iter)
+	   (mesh-test42 times lit-buf tex-buf pos-buf))))))
+
+ (defun mesh-test42 (times lit tex pos)
+   (declare (type iter-ator:iter-ator tex pos))
+   (iter-ator:wasabiis ((d lit)
+			(uv tex)
+			(xyz pos))
+     (dotimes (x times)
+       (%gl:vertex-attrib-2f 8 (uv) (uv))
+       (%gl:vertex-attrib-3f 3 (d) (d) (d))
+       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))

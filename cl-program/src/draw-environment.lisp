@@ -43,7 +43,7 @@
 	      :element-type (quote character)))
 
 (defun draw-things () 
-  (let ((solidshader (get-stuff :solidshader *stuff* *backup*)))
+  (let ((solidshader (get-stuff :textshader *stuff* *backup*)))
     (gl:viewport 0 0 e:*width* e:*height*)
     (gl:use-program solidshader)
     (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
@@ -59,6 +59,8 @@
 
     (gl:uniformf (gl:get-uniform-location solidshader "bg")
 		 0f0 0f0 1f0)
+    (gl:uniformf (gl:get-uniform-location solidshader "fg")
+		 0f0 1f0 0f0)
     (progn
       (gl:disable :depth-test :blend)
       (gl:depth-mask :false)
@@ -75,9 +77,9 @@
 		 (create-call-list-from-func
 		  (lambda ()
 		    (gl-draw-quads 
-		     (lambda (tex-buf pos-buf lit-buf)
+		     (lambda (tex-buf pos-buf)
 		       (draw-string-raster-char
-			pos-buf tex-buf lit-buf
+			pos-buf tex-buf 
 			*16x16-tilemap* foo
 			18.0
 			32.0
@@ -128,18 +130,19 @@
 	     hash))
   (let ((backup *backup*))
     (progn    
-      (namexpr backup :solidshader
+      (namexpr backup :textshader
 	       (lambda ()
 		 (make-shader-program-from-strings
-		  (get-stuff :ss-vs *stuff* *backup*)
-		  (get-stuff :ss-frag *stuff* *backup*)
+		  (get-stuff :text-vs *stuff* *backup*)
+		  (get-stuff :text-frag *stuff* *backup*)
 		  '(("pos" . 0)	
-		    ("col" . 3)
 		    ("tex" . 8)))))
-      (namexpr backup :ss-vs
-	       (lambda () (file-string (shader-path "pos4f-col3f-tex2f.vs"))))
-      (namexpr backup :ss-frag
-	       (lambda () (file-string (shader-path "fcol3f-ftex2f-no0a.frag")))))
+     
+      (namexpr backup :text-vs
+	       (lambda () (file-string (shader-path "pos4f-tex2f.vs"))))
+      
+      (namexpr backup :text-frag
+	       (lambda () (file-string (shader-path "ftex2f-bg3fu-fg3fu.frag")))))
     
     (progn
       (namexpr backup :font-image
@@ -169,62 +172,36 @@
   (setf *window-height* h
 	*window-width* w))
 
+
 (defun gl-draw-quads (func)
   (let ((iter *attrib-buffer-iterators*))
     (reset-attrib-buffer-iterators iter)
     (let ((pos-buf (aref iter 0))
-	  (lit-buf (aref iter 3))
 	  (tex-buf (aref iter 8)))
-      (let ((times (funcall func tex-buf pos-buf lit-buf)))
+      (let ((times (funcall func tex-buf pos-buf)))
 	(gl:with-primitives :quads
 	  (reset-attrib-buffer-iterators iter)
-	  (mesh-test42 times lit-buf tex-buf pos-buf))))))
+	  (mesh-test42 times tex-buf pos-buf))))))
 
-(defun mesh-test42 (times lit tex pos)
+(defun mesh-test42 (times tex pos)
   (declare (type iter-ator:iter-ator tex pos))
-  (iter-ator:wasabiis ((d lit)
-		       (uv tex)
+  (iter-ator:wasabiis ((uv tex)
 		       (xyz pos))
     (dotimes (x times)
       (%gl:vertex-attrib-2f 8 (uv) (uv))
-      (%gl:vertex-attrib-3f 3 (d) (d) (d))
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
-(defun draw-mouse (pos-buf tex-buf lit-buf
-		   lookup value char-width char-height x y z)
-  (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf)
-	   (type single-float x y z char-width char-height)
-	   (type simple-vector lookup)
-	   (optimize (speed 3) (safety 0))
-	   (type fixnum value))
-  (iter-ator:wasabios ((epos pos-buf)
-		       (etex tex-buf)
-		       (elit lit-buf))
 
-    (dotimes (x 4)
-      (etouq (ngorp (preach 'elit '(1f0
-				    1f0
-				    1f0)))))
-    (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
-      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
-    (etouq (ngorp
-	    (preach
-	     'epos
-	     (quadk+ 'z '(x
-			  (+ char-width x)
-			  (- y char-height)
-			  y)))))4))
 
-(defun draw-string-raster-char (pos-buf tex-buf lit-buf
+(defun draw-string-raster-char (pos-buf tex-buf
 				lookup string char-width char-height x y z)
-  (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf)
+  (declare (type iter-ator:iter-ator pos-buf tex-buf)
 	   (type single-float x y z char-width char-height)
 	   (type simple-vector lookup)
 	   (optimize (speed 3) (safety 0))
 	   (type (vector character) string))
   (iter-ator:wasabios ((epos pos-buf)
-		       (etex tex-buf)
-		       (elit lit-buf))
+		       (etex tex-buf))
     (let ((len (length string))
 	  (times 0))
       (declare (type fixnum times))
@@ -240,11 +217,6 @@
 			(setf xoffset x
 			      yoffset next-y))
 		       (t (incf times 4)
-			  (dotimes (x 4)
-			    (etouq (ngorp (preach 'elit '(0f0
-							  1f0
-							  0f0
-							  )))))
 			  (let ((code (char-code char)))
 			    (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
 			      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
@@ -257,32 +229,6 @@
 						yoffset)))))
 		      (setf xoffset next-x))))))))
       times)))
-
-(defun render-mouse ()
-      (progn
-	(gl:uniform-matrix-4fv
-	 (gl:get-uniform-location (get-stuff :solidshader *stuff* *backup*) "pmv")
-	 (cg-matrix:%matrix* *temp-matrix2*
-			     *screen-scaled-matrix*
-			     (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
-	 nil)
-	(progn
-	  (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-	  (progn (let ((scale 64.0))
-		   (namexpr *backup* :cursor-list
-			    (lambda ()
-			      (create-call-list-from-func
-			       (lambda ()
-				 (gl-draw-quads 
-				  (lambda (tex-buf pos-buf lit-buf)
-				    (draw-mouse
-				     pos-buf tex-buf lit-buf
-				     *4x4-tilemap* 0
-				     scale 
-				     scale
-				     -0.0 0.0
-				     (- +single-float-just-less-than-one+))))))))))
-	  (gl:call-list (get-stuff :cursor-list *stuff* *backup*)))))
 
 (defun quit ()
   (setf e:*status* t))
