@@ -67,7 +67,7 @@
 				 *16x16-tilemap* foo
 				 (/ scale 2.0)
 				 (/ scale 1.0)
-				 -1.0 1.0
+				 0.0 0.0
 				 +single-float-just-less-than-one+)))))))))
       (if (or t (e:key-p :a))
 	  (let ((list (get-stuff :string *stuff* *backup*)))

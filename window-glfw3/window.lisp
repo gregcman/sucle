@@ -9,39 +9,52 @@
 (defparameter *width* nil)
 (defparameter *height* nil)
 
+(progn
+  (defmacro def-key-callback (name (window key scancode action mod-keys) &body body)
+    `(%glfw:define-glfw-callback ,name
+	 ((,window :pointer) (,key :int) (,scancode :int)
+	  (,action :int) (,mod-keys :unsigned-int))
+       ,@body))
+
+  (defmacro def-mouse-button-callback (name (window button action mod-keys) &body body)
+    `(%glfw:define-glfw-callback ,name
+	 ((,window :pointer) (,button :int)
+	  (,action :int) (,mod-keys :unsigned-int))
+       ,@body)))
+
+;;;release = 0 press = 1 repeat = 2
+
+(defconstant +release+ 0)
+(defconstant +press+ 1)
+(defconstant +repeat+ 2)
+
 ;;;when buttons can take either of two states, there are four
 ;;;ways adjacent time frames can look [repeat does not count here]
 (defun next-key-state (old new)
-  (case new
-    (:press (case old
-	      ((nil) :just-pressed)
-	      (:just-pressed t)
-	      (:just-released :just-pressed)
-	      ((t) t)))
-    (:release (case old
-		((nil) nil)
-		(:just-pressed :just-released)
-		(:just-released nil)
-		((t) :just-released)))
-    (:repeat (case old
-	       ((nil) (print "wtf?") :just-pressed)
-	       (:just-pressed t)
-	       (:just-released (print "huh?") :just-pressed)
-	       ((t) t)))))
+  (cond ((eql new +release+)
+	 (cond ((eq nil old) nil)
+	       ((eql +press+ old) +release+)
+	       ((eql +release+ old) nil)
+	       (t +release+)))
+	((eql new +press+)
+	 (cond ((eq nil old) +press+)
+	       ((eql +press+ old) t)
+	       ((eql +release+ old) +press+)
+	       (t t)))
+	((eql new +repeat+)
+	 (cond ((eq nil old) (print "wtf?") +press+)
+	       ((eql +press+ old) t)
+	       ((eql +release+ old) (print "huh?") +press+)
+	       (t t)))))
 
 (defun step-hash (hash)
-  (loop for key being the hash-keys of hash
-     using (hash-value value)
-     do (case value
-	  (:just-pressed (setf (gethash key hash) t))
-	  (:just-released (setf (gethash key hash) nil))
-	  ((nil) (remhash key hash)))))
-
-(defmacro def-key-callback (name (window key scancode action mod-keys) &body body)
-  `(%glfw:define-glfw-callback ,name
-       ((,window :pointer) (,key :unsigned-int) (,scancode :int)
-	(,action %glfw::key-action) (,mod-keys %glfw::mod-keys))
-     ,@body))
+  (with-hash-table-iterator (next hash)
+    (loop (multiple-value-bind (more key value) (next)
+	    (if more
+		(cond ((eql value +press+) (setf (gethash key hash) t))
+		      ((eql value +release+) (setf (gethash key hash) nil))
+		      ((eq value nil) (remhash key hash)))
+		(return))))))
 
 (macrolet ((key (key)
 	     `(gethash ,key *keypress-hash*))
@@ -57,42 +70,43 @@
 ;;;for the keyboard
   (defun key-p (the-key)
     (let ((value (key the-key)))
-      (case value
-	((t :just-pressed) t))))
+      (or (eq value t)
+	  (eql +press+ value))))
   (defun key-r (the-key)
     (let ((value (key the-key)))
-      (case value
-	((nil :just-released) t))))
+      (or (eq nil value)
+	  (eql value +release+))))
   (defun key-j-p (the-key)
     (let ((value (key the-key)))
-      (eq value :just-pressed)))
+      (eq value +press+)))
   (defun key-j-r (the-key)
     (let ((value (key the-key)))
-      (eq value :just-released)))
+      (eq value +release+)))
 
 ;;;for mice
   (defun mice-p (the-key)
     (let ((value (mice the-key)))
-      (case value
-	((t :just-pressed) t))))
+      (or (eq value t)
+	  (eql value +press+))))
   (defun mice-r (the-key)
     (let ((value (mice the-key)))
-      (case value
-	((nil :just-released) t))))
+      (or (eq value nil)
+	  (eql value +release+))))
   (defun mice-j-p (the-key)
     (let ((value (mice the-key)))
-      (eq value :just-pressed)))
+      (eq value +press+)))
   (defun mice-j-r (the-key)
     (let ((value (mice the-key)))
-      (eq value :just-released)))
+      (eq value +release+)))
 
 ;;;glfw callbacks which will update the hashes to contain nil t
-;;;:just-pressed or :just-released per key [each key is a symbol]
+;;;+press+ or +release+ per key [each key is a symbol]
   (def-key-callback key-callback (window key scancode action mod-keys)
     (declare (ignorable scancode mod-keys window))
+ ;   (print mod-keys)
     (let ((old-value (key key)))
       (setf (key key) (next-key-state old-value action))))
-  (glfw:def-mouse-button-callback mouse-callback (window button action mod-keys)
+  (def-mouse-button-callback mouse-callback (window button action mod-keys)
     (declare (ignorable mod-keys window))
     (let ((old-value (mice button)))
       (setf (mice button) (next-key-state old-value action)))))
@@ -104,6 +118,7 @@
 	*scroll-y* (coerce y 'single-float)))
 (defparameter *status* nil)
 (glfw:def-window-size-callback update-viewport (window w h)
+  (declare (ignorable window))
   (setf *width* w *height* h)
   (funcall *resize-hook* w h))
 

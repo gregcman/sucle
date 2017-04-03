@@ -1,7 +1,7 @@
 (in-package :sandbox)
 
 (defun physics ()
-  (when (e:key-j-p :e) (window:toggle-mouse-capture))
+  (when (e:key-j-p (char-code #\E)) (window:toggle-mouse-capture))
   (remove-spurious-mouse-input)
   (when (window:mice-locked-p)
     (multiple-value-bind (delx dely) (delta)
