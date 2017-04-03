@@ -69,12 +69,11 @@
 				 (/ scale 1.0)
 				 0.0 0.0
 				 +single-float-just-less-than-one+)))))))))
-      (if (or t (e:key-p :a))
-	  (let ((list (get-stuff :string *stuff* *backup*)))
-	    (gl:delete-lists list 1)
-	    (remhash :string *stuff*)))
-      (setf foo (with-output-to-string (x)
-		  (spill-hash e:*keypress-hash* x)))
+      (cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
+	     (setf foo (get-output-stream-string e::*chars*))
+	     (let ((list (get-stuff :string *stuff* *backup*)))
+	       (gl:delete-lists list 1)
+	       (remhash :string *stuff*))))
       (gl:call-list (get-stuff :string *stuff* *backup*)))
 
     (gl:uniform-matrix-4fv

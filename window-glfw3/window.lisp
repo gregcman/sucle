@@ -116,8 +116,12 @@
       (setf (mice button) (next-key-state old-value action))))
   (def-char-callback char-callback (window char)
     (declare (ignorable window))
-    (princ (code-char char))))
+    (vector-push-extend (code-char char) *chars*)))
 
+(defparameter *chars* (make-array 0
+				  :adjustable t
+				  :fill-pointer 0
+				  :element-type (quote character)))
 
 (glfw:def-scroll-callback scroll-callback (window x y)
   (declare (ignore window))
@@ -149,6 +153,8 @@
   (setq *status* (glfw:window-should-close-p))
   (step-hash *keypress-hash*)
   (step-hash *mousepress-hash*)
+  (print *chars*)
+  (setf (fill-pointer *chars*) 0)
   (glfw:poll-events))
 
 

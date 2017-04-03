@@ -5,7 +5,8 @@
    #:*keypress-hash*
    #:*mousepress-hash*
    #:*scroll-x*
-   #:*scroll-y*)
+   #:*scroll-y*
+   #:*chars*)
   (:export
    #:key-p
    #:key-j-p
