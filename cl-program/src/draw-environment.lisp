@@ -25,6 +25,11 @@
 (defparameter *backup* (make-hash-table :test (quote eq)))
 (defparameter *stuff* (make-hash-table :test (quote eq)))
 
+(defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
+					   (:texture-mag-filter . :nearest)
+					   (:texture-wrap-s . :repeat)
+					   (:texture-wrap-t . :repeat))))
+
 (defun render ()
   (if vsync?
       (window::set-vsync t)
@@ -49,9 +54,7 @@
 			 (cg-matrix:%translate* *temp-matrix*
 						(float (- e:*width*))
 						(float e:*height*)
-						0.0)
-			)
-     
+						0.0))
      nil)
 
     (progn
@@ -97,31 +100,7 @@
 	  (let ((list (get-stuff :string *stuff* *backup*)))
 	    (gl:delete-lists list 1)
 	    (remhash :string *stuff*))))
-      (gl:call-list (get-stuff :string *stuff* *backup*)))
-
-    (gl:uniform-matrix-4fv
-     (gl:get-uniform-location solidshader "pmv")
-     (cg-matrix:%matrix* *temp-matrix2*
-			 *screen-scaled-matrix*
-			 (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
-     nil)
-    (progn
-      (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-      (progn (let ((scale 64.0))
-	       (namexpr *backup* :cursor-list
-			(lambda ()
-			  (create-call-list-from-func
-			   (lambda ()
-			     (gl-draw-quads 
-			      (lambda (tex-buf pos-buf lit-buf)
-				(draw-mouse
-				 pos-buf tex-buf lit-buf
-				 *4x4-tilemap* 0
-				 scale 
-				 scale
-				 -0.0 0.0
-				 (- +single-float-just-less-than-one+))))))))))
-      (gl:call-list (get-stuff :cursor-list *stuff* *backup*)))))
+      (gl:call-list (get-stuff :string *stuff* *backup*)))))
 
 (defun glinnit ()
   (reset *gl-objects*)
@@ -160,7 +139,9 @@
 		   (img-path #P"font/codepage-437-vga-9x16-alpha.png")))))
       (namexpr backup :font
 	       (lambda ()
-		 (pic-texture (get-stuff :font-image *stuff* *backup*)))))
+		 (pic-texture (get-stuff :font-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*))))
     
     (progn
       (namexpr backup :cursor-image
@@ -170,7 +151,9 @@
 		   (img-path #P"cursor/windos-cursor.png")))))
       (namexpr backup :cursor
 	       (lambda ()
-		 (pic-texture (get-stuff :cursor-image *stuff* *backup*)))))))
+		 (pic-texture (get-stuff :cursor-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*))))))
 
 (defun on-resize (w h)
   (setf *window-height* h
@@ -266,3 +249,32 @@
 					      yoffset))))))
 		      (setf xoffset next-x))))))))
       times)))
+
+(defun render-mouse ()
+      (progn
+	(gl:uniform-matrix-4fv
+	 (gl:get-uniform-location (get-stuff :solidshader *stuff* *backup*) "pmv")
+	 (cg-matrix:%matrix* *temp-matrix2*
+			     *screen-scaled-matrix*
+			     (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
+	 nil)
+	(progn
+	  (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
+	  (progn (let ((scale 64.0))
+		   (namexpr *backup* :cursor-list
+			    (lambda ()
+			      (create-call-list-from-func
+			       (lambda ()
+				 (gl-draw-quads 
+				  (lambda (tex-buf pos-buf lit-buf)
+				    (draw-mouse
+				     pos-buf tex-buf lit-buf
+				     *4x4-tilemap* 0
+				     scale 
+				     scale
+				     -0.0 0.0
+				     (- +single-float-just-less-than-one+))))))))))
+	  (gl:call-list (get-stuff :cursor-list *stuff* *backup*)))))
+
+(defun quit ()
+  (setf e:*status* t))
