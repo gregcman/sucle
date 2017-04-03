@@ -61,7 +61,7 @@
      nil)
 
     (gl:uniformf (getuniform solidshader-uniforms :bg)
-		 0f0 0f0 (random 1.0))
+		 0f0 0f0 1f0)
     (gl:uniformf (getuniform solidshader-uniforms :fg)
 		 0f0 1f0 0f0)
     (progn
@@ -96,16 +96,18 @@
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
 	       (multiple-value-bind (data p) (read-string foo nil)
 		 (cond (p (print data)
-			  (print
-			   (multiple-value-list
-			    (handler-bind ((condition (lambda (c)
-							(declare (ignorable c))
-							(invoke-restart
-							 (find-restart (quote continue))))))
-			      (restart-case
-				  (eval data)
-				(continue () data)))))
-			  (setf (fill-pointer foo) 0))
+			  (setf (fill-pointer foo) 0)
+			  (with-output-to-string (var foo)
+			    (prin1
+			     (handler-bind ((condition (lambda (c)
+							 (declare (ignorable c))
+							 (invoke-restart
+							  (find-restart (quote continue))))))
+			       (restart-case
+				   (eval data)
+				 (continue () data)))
+			     var))
+			  )
 		       (t (vector-push-extend #\Newline foo))))
 	       (setf changed t)))
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :backspace))
