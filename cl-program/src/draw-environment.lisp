@@ -90,14 +90,15 @@
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
 	       (multiple-value-bind (data p) (read-string foo nil)
 		 (cond (p (print data)
-			  (multiple-value-list
-			   (handler-bind ((condition (lambda (c)
-						       (declare (ignorable c))
-						       (invoke-restart
-							(find-restart (quote continue))))))
-			       (restart-case
-				   (eval data)
-				 (continue () data))))
+			  (print
+			   (multiple-value-list
+			    (handler-bind ((condition (lambda (c)
+							(declare (ignorable c))
+							(invoke-restart
+							 (find-restart (quote continue))))))
+			      (restart-case
+				  (eval data)
+				(continue () data)))))
 			  (setf (fill-pointer foo) 0))
 		       (t (vector-push-extend #\Newline foo))))
 	       (setf changed t)))
