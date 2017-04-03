@@ -90,14 +90,21 @@
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
 	       (multiple-value-bind (data p) (read-string foo nil)
 		 (cond (p (print data)
-			  (print (eval data))
+			  (multiple-value-list
+			   (handler-bind ((condition (lambda (c)
+						       (declare (ignorable c))
+						       (invoke-restart
+							(find-restart (quote continue))))))
+			       (restart-case
+				   (eval data)
+				 (continue () data))))
 			  (setf (fill-pointer foo) 0))
 		       (t (vector-push-extend #\Newline foo))))
 	       (setf changed t)))
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :backspace))
 	       (setf (fill-pointer foo) (max 0 (1- (fill-pointer foo))))
 	       (setf changed t)))
-	(when (or t changed (not (zerop newlen)))
+	(when (or changed (not (zerop newlen)))
 	  (let ((list (get-stuff :string *stuff* *backup*)))
 	    (gl:delete-lists list 1)
 	    (remhash :string *stuff*))))
@@ -235,7 +242,7 @@
 			(incf times 4)
 			(dotimes (x 4)
 			  (etouq (ngorp (preach 'elit '(0f0
-							(random 1f0)
+							1f0
 							0f0
 							)))))
 			(let ((code (char-code char)))
