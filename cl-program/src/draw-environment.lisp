@@ -44,7 +44,13 @@
     (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
     (gl:uniform-matrix-4fv
      (gl:get-uniform-location solidshader "pmv")
-     *screen-scaled-matrix*
+     (cg-matrix:%matrix* *temp-matrix2*
+			 *screen-scaled-matrix*
+			 (cg-matrix:%translate* *temp-matrix*
+						(float (- e:*width*))
+						(float e:*height*)
+						0.0)
+			)
      
      nil)
 
@@ -87,7 +93,7 @@
 	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :backspace))
 	       (setf (fill-pointer foo) (max 0 (1- (fill-pointer foo))))
 	       (setf changed t)))
-	(when (or changed (not (zerop newlen)))
+	(when (or t changed (not (zerop newlen)))
 	  (let ((list (get-stuff :string *stuff* *backup*)))
 	    (gl:delete-lists list 1)
 	    (remhash :string *stuff*))))
