@@ -30,7 +30,9 @@
 					   (:texture-wrap-t . :repeat))))
 
 (defparameter *postex* (quote (("POS" . 0)	
-			       ("TEX" . 8))))
+			       ("TEX" . 8)
+			       ("FGCOL" . 9)
+			       ("BGCOL" . 10))))
 
 (defun render ()
   (if vsync?
@@ -60,10 +62,6 @@
 						0.0))
      nil)
 
-    (gl:uniformf (getuniform solidshader-uniforms :bg)
-		 0f0 0f0 1f0)
-    (gl:uniformf (getuniform solidshader-uniforms :fg)
-		 0f0 1f0 0f0)
     (progn
       (gl:disable :depth-test :blend)
       (gl:depth-mask :false)
@@ -80,14 +78,15 @@
 		 (create-call-list-from-func
 		  (lambda ()
 		    (gl-draw-quads 
-		     (lambda (tex-buf pos-buf)
+		     (lambda (tex-buf pos-buf fg-buf bg-buf)
 		       (draw-string-raster-char
-			pos-buf tex-buf 
+			pos-buf tex-buf fg-buf bg-buf
 			*16x16-tilemap* foo
 			18.0
 			32.0
-			0.0 0.0
-			+single-float-just-less-than-one+)))))))
+			0f0 1f0 0f0
+			0f0 0f0 1f0
+			0.0 0.0 +single-float-just-less-than-one+)))))))
 
       (let ((newlen (length e:*chars*))
 	    (changed nil))
@@ -144,16 +143,14 @@
 			 *postex*)))
 		   (let ((table (make-eq-hash)))
 		     (register program :program table)
-		     (cache-program-uniforms program table (quote ((:pmv . "PMV")
-								   (:bg . "BG")
-								   (:fg . "FG")))))
+		     (cache-program-uniforms program table (quote ((:pmv . "PMV")))))
 		   program)))
      
       (namexpr backup :text-vs
-	       (lambda () (file-string (shader-path "pos4f-tex2f.vs"))))
+	       (lambda () (file-string (shader-path "pos4f-tex2f-bgcol3f-fgcol3f.vs"))))
       
       (namexpr backup :text-frag
-	       (lambda () (file-string (shader-path "ftex2f-bg3fu-fg3fu.frag")))))
+	       (lambda () (file-string (shader-path "ftex2f-bg3f-fg3f.frag")))))
     
     (progn
       (namexpr backup :font-image
@@ -195,31 +192,42 @@
   (let ((iter *attrib-buffer-iterators*))
     (reset-attrib-buffer-iterators iter)
     (let ((pos-buf (aref iter 0))
-	  (tex-buf (aref iter 8)))
-      (let ((times (funcall func tex-buf pos-buf)))
+	  (tex-buf (aref iter 8))
+	  (fg-buf (aref iter 9))
+	  (bg-buf (aref iter 10)))
+      (let ((times (funcall func tex-buf pos-buf fg-buf bg-buf)))
 	(gl:with-primitives :quads
 	  (reset-attrib-buffer-iterators iter)
-	  (mesh-test42 times tex-buf pos-buf))))))
+	  (mesh-test42 times tex-buf pos-buf fg-buf bg-buf))))))
 
-(defun mesh-test42 (times tex pos)
+(defun mesh-test42 (times tex pos fg bg)
   (declare (type iter-ator:iter-ator tex pos))
   (iter-ator:wasabiis ((uv tex)
-		       (xyz pos))
+		       (xyz pos)
+		       (eft fg)
+		       (ebg bg))
     (dotimes (x times)
       (%gl:vertex-attrib-2f 8 (uv) (uv))
+      (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
+      (%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
 
 
-(defun draw-string-raster-char (pos-buf tex-buf
-				lookup string char-width char-height x y z)
+(defun draw-string-raster-char (pos-buf tex-buf fg-buf bg-buf
+				lookup string char-width char-height
+				fgr fgg fgb
+				bgr bgg bgb
+				x y z)
   (declare (type iter-ator:iter-ator pos-buf tex-buf)
 	   (type single-float x y z char-width char-height)
 	   (type simple-vector lookup)
 	   (optimize (speed 3) (safety 0))
 	   (type (vector character) string))
   (iter-ator:wasabios ((epos pos-buf)
-		       (etex tex-buf))
+		       (etex tex-buf)
+		       (efg fg-buf)
+		       (ebg bg-buf))
     (let ((len (length string))
 	  (times 0))
       (declare (type fixnum times))
@@ -235,6 +243,8 @@
 		       (setf xoffset x
 			     yoffset next-y))
 		      (t (incf times 4)
+			 (etouq (ngorp (preach 'efg (apply #'append (raps 4 '(fgr fgg fgb))))))
+			 (etouq (ngorp (preach 'ebg (apply #'append (raps 4 '(bgr bgg bgb))))))
 			 (let ((code (char-code char)))
 			   (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
 			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))

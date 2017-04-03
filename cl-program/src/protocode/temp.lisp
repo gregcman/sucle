@@ -594,3 +594,9 @@
        (%gl:vertex-attrib-2f 8 (uv) (uv))
        (%gl:vertex-attrib-3f 3 (d) (d) (d))
        (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
+
+(progno
+     (gl:uniformf (getuniform solidshader-uniforms :bg)
+		  0f0 0f0 1f0)
+     (gl:uniformf (getuniform solidshader-uniforms :fg)
+		  0f0 1f0 0f0))
