@@ -57,6 +57,8 @@
 						0.0))
      nil)
 
+    (gl:uniformf (gl:get-uniform-location solidshader "bg")
+		 0f0 0f0 1f0)
     (progn
       (gl:disable :depth-test :blend)
       (gl:depth-mask :false)
@@ -68,20 +70,19 @@
 
     (progn
       (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
-      (progn (let ((scale 32.0))
-	       (namexpr *backup* :string
-			(lambda ()
-			  (create-call-list-from-func
-			   (lambda ()
-			     (gl-draw-quads 
-			      (lambda (tex-buf pos-buf lit-buf)
-				(draw-string-raster-char
-				 pos-buf tex-buf lit-buf
-				 *16x16-tilemap* foo
-				 (/ scale 2.0)
-				 (/ scale 1.0)
-				 0.0 0.0
-				 +single-float-just-less-than-one+)))))))))
+      (namexpr *backup* :string
+	       (lambda ()
+		 (create-call-list-from-func
+		  (lambda ()
+		    (gl-draw-quads 
+		     (lambda (tex-buf pos-buf lit-buf)
+		       (draw-string-raster-char
+			pos-buf tex-buf lit-buf
+			*16x16-tilemap* foo
+			18.0
+			32.0
+			0.0 0.0
+			+single-float-just-less-than-one+)))))))
 
       (let ((newlen (length e:*chars*))
 	    (changed nil))
@@ -145,7 +146,7 @@
 	       (lambda ()
 		 (flip-image
 		  (load-png
-		   (img-path #P"font/codepage-437-vga-9x16-alpha.png")))))
+		   (img-path #P"font/font.png")))))
       (namexpr backup :font
 	       (lambda ()
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
@@ -230,32 +231,30 @@
       (let ((xoffset x)
 	    (yoffset y))
 	(declare (type single-float xoffset yoffset))
-	(let ((wonine (if nil 0.0 (/ char-width 8.0))))
+	(let ((wonine (if t 0.0 (/ char-width 8.0))))
 	  (dotimes (position len)
 	    (let ((char (row-major-aref string position)))
 	      (let ((next-x (+ xoffset char-width wonine))
 		    (next-y (- yoffset char-height)))
-		(if (char= char #\Newline)
-		    (setf xoffset x
-			  yoffset next-y)
-		    (progn
-		      (unless (char= #\space char)
-			(incf times 4)
-			(dotimes (x 4)
-			  (etouq (ngorp (preach 'elit '(0f0
-							1f0
-							0f0
-							)))))
-			(let ((code (char-code char)))
-			  (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
-			    (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
-			(etouq (ngorp
-				(preach
-				 'epos
-				 (quadk+ 'z '(xoffset
-					      (- next-x wonine)
-					      next-y
-					      yoffset))))))
+		(cond  ((char= char #\Newline)
+			(setf xoffset x
+			      yoffset next-y))
+		       (t (incf times 4)
+			  (dotimes (x 4)
+			    (etouq (ngorp (preach 'elit '(0f0
+							  1f0
+							  0f0
+							  )))))
+			  (let ((code (char-code char)))
+			    (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
+			      (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
+			  (etouq (ngorp
+				  (preach
+				   'epos
+				   (quadk+ 'z '(xoffset
+						(- next-x wonine)
+						next-y
+						yoffset)))))
 		      (setf xoffset next-x))))))))
       times)))
 
