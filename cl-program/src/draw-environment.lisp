@@ -79,14 +79,18 @@
 		  (lambda ()
 		    (gl-draw-quads 
 		     (lambda (tex-buf pos-buf fg-buf bg-buf)
-		       (draw-string-raster-char
-			pos-buf tex-buf fg-buf bg-buf
-			*16x16-tilemap* foo
-			18.0
-			32.0
-			0f0 1f0 0f0
-			0f0 0f0 1f0
-			0.0 0.0 +single-float-just-less-than-one+)))))))
+		       (let ((times (draw-string-raster-char
+				     pos-buf tex-buf
+				     *16x16-tilemap* foo
+				     18.0
+				     32.0
+				     0.0 0.0 +single-float-just-less-than-one+)))
+			 (iter-ator:wasabios ((efg fg-buf)
+					      (ebg bg-buf))
+			   (dotimes (x times)
+			     (etouq (ngorp (preach 'efg '(0f0 1f0 0f0))))
+			     (etouq (ngorp (preach 'ebg '(0f0 0f0 1f0))))))
+			 times)))))))
 
       (let ((newlen (length e:*chars*))
 	    (changed nil))
@@ -214,10 +218,8 @@
 
 
 
-(defun draw-string-raster-char (pos-buf tex-buf fg-buf bg-buf
+(defun draw-string-raster-char (pos-buf tex-buf
 				lookup string char-width char-height
-				fgr fgg fgb
-				bgr bgg bgb
 				x y z)
   (declare (type iter-ator:iter-ator pos-buf tex-buf)
 	   (type single-float x y z char-width char-height)
@@ -225,9 +227,7 @@
 	   (optimize (speed 3) (safety 0))
 	   (type (vector character) string))
   (iter-ator:wasabios ((epos pos-buf)
-		       (etex tex-buf)
-		       (efg fg-buf)
-		       (ebg bg-buf))
+		       (etex tex-buf))
     (let ((len (length string))
 	  (times 0))
       (declare (type fixnum times))
@@ -243,8 +243,6 @@
 		       (setf xoffset x
 			     yoffset next-y))
 		      (t (incf times 4)
-			 (etouq (ngorp (preach 'efg (apply #'append (raps 4 '(fgr fgg fgb))))))
-			 (etouq (ngorp (preach 'ebg (apply #'append (raps 4 '(bgr bgg bgb))))))
 			 (let ((code (char-code char)))
 			   (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
 			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
