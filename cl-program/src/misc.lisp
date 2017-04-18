@@ -138,3 +138,72 @@
     (gl:end-list)
     the-list))
 
+
+(defconstant +available-bits+ (logcount most-positive-fixnum))
+(defconstant +x-bits-start+ (floor +available-bits+ 2))
+(defconstant +x-chunk-bits+ 5)
+(defconstant +x-chunk-size+ (ash 1 +x-chunk-bits+))
+(defconstant +x-bitmask+ (1- +x-chunk-size+))
+(defconstant +y-chunk-bits+ 5)
+(defconstant +y-chunk-size+ (ash 1 +y-chunk-bits+))
+(defconstant +y-bitmask+ (1- +y-chunk-size+))
+(defconstant +xy-bitmask+ (1- (* +y-chunk-size+ +x-chunk-size+)))
+(defconstant +index-mask+ (logior (ash +x-bitmask+ +x-bits-start+)
+				  +y-bitmask+))
+(defconstant +hash-mask+ (logxor +index-mask+ most-positive-fixnum))
+(defconstant +right-shift+ (- +y-chunk-bits+ +x-bits-start+))
+
+(defun make-chunk ()
+  (make-array (ash 1 (+ +chunk-size-x+ +chunk-size-y+))
+	      :element-type t
+	      :initial-element nil))
+(defparameter *chunks* (make-hash-table :test (quote eq)))
+
+(progn
+  (declaim (inline (setf get-obj)))
+  (defun (setf get-obj) (value place hash-table)
+    (set-obj place value hash-table)))
+
+(progn
+  (declaim (ftype (function (fixnum t hash-table) t)
+		  set-obj)
+	   (inline set-obj))
+  (defun set-obj (place value hash)
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((hash-id (logand place +hash-mask+)))
+      (let ((chunk (gethash hash-id hash)))
+	(declare (type (or null simple-vector) chunk))
+	(unless chunk
+	  (let ((new-chunk (make-chunk)))
+	    (setf (gethash hash-id hash) new-chunk)
+	    (setf chunk new-chunk)))
+	(let* ((num (logand place +index-mask+))
+	       (num2 (ash num +right-shift+))
+	       (num3 (logand +xy-bitmask+ (logior num num2))))
+	  (declare (type fixnum num num2 num3))
+	  (setf (aref chunk num3) value))))))
+(progn
+  (declaim (ftype (function (fixnum hash-table) t)
+		  get-obj)
+	   (inline get-obj))
+  (defun get-obj (place hash)
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((hash-id (logand place +hash-mask+)))
+      (let ((chunk (gethash hash-id hash)))
+	(declare (type (or null simple-vector) chunk))
+	(if chunk
+	    (let* ((num (logand place +index-mask+))
+		   (num2 (ash num +right-shift+))
+		   (num3 (logand +xy-bitmask+ (logior num num2))))
+	      (declare (type fixnum num num2 num3))
+	      (aref chunk num3)))))))
+
+(progn
+  (declaim (ftype (function (fixnum fixnum) fixnum)
+		  xy-index)
+	   (inline xy-index))
+  (defun xy-index (x y)
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((fnum (ash x +x-bits-start+)))
+      (declare (type fixnum fnum))
+      (logior y fnum))))

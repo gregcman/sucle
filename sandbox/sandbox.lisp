@@ -435,7 +435,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* #P"third/")
+(defparameter *save* #P"world/")
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -678,6 +678,15 @@ e	 (let ((blockid (world:getblock x y z)))
 
 (in-package :sandbox)
 
+(defun setatest (x)
+  (prog2 (setf atest
+	       (case x
+		 (0 (byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr"))
+		 (1 (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))
+		 (2 cl-mc-shit::testchunk)
+		 ))
+      x))
+
 (defparameter atest nil)
 (setatest 0)
 
@@ -731,15 +740,6 @@ e	 (let ((blockid (world:getblock x y z)))
     (dotimes (i 16)
       (funcall setfunc (+ xoffset i) (+ yoffset j)
 	       (elt data (+ i (+ (* 16 j))))))))
-
-(defun setatest (x)
-  (prog2 (setf atest
-	       (case x
-		 (0 (byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr"))
-		 (1 (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))
-		 (2 cl-mc-shit::testchunk)
-		 ))
-      x))
 
 (defun helpchunk (x y)
   (let ((thechunk  (cl-mc-shit:mcr-chunk atest x y)))

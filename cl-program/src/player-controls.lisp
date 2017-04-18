@@ -27,10 +27,9 @@
 (defparameter mousecapturestate nil)
 (defun remove-spurious-mouse-input ()
   (if (window:mice-locked-p)
-      (case mousecapturestate
-	((nil) 
-	 (delta) ;;toss spurious mouse movement 
-	 (setf mousecapturestate :justcaptured))
-	(:justcaptured (setq mousecapturestate t))
-	((t)))
+      (cond ((eq nil mousecapturestate)
+	     (delta) ;;toss spurious mouse movement
+	     (setf mousecapturestate :justcaptured))
+	    ((eq mousecapturestate :justcaptured)
+	     (setq mousecapturestate t)))
       (setq mousecapturestate nil)))

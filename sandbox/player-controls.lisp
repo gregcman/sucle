@@ -52,29 +52,38 @@
       *yaw* 0.0
       *pitch* 0.0)
 
+(defun skey-p (enum)
+  (e:key-p (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
+(defun skey-j-r (enum)
+  (e:key-j-r (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
+(defun skey-j-p (enum)
+  (e:key-j-p (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
+(defun smice-j-p (enum)
+  (e:mice-j-p (cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))))
+
 (defun controls ()
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
   (let ((speed (* 0.4 (expt tickscale 2))))
     (when fly
       (setf speed 0.024)
-      (when (e:key-p :space)
+      (when (skey-p :space)
 	(incf *yvel* speed))
-      (when (e:key-p :left-shift)
+      (when (skey-p :left-shift)
 	(decf *yvel* speed)))
     (unless fly
       (when onground
-	(when (or (e:mice-j-p :|3|) (e:key-p :space)) ;;jumping
+	(when (or (e:mice-j-p :|3|) (skey-p :space)) ;;jumping
 	  (incf *yvel* (* (if t 0.49 0.42) (expt tickscale 1)))))
       (unless onground
 	(setf speed (* speed 0.2))))    
     (let ((dir (complex 0 0)))
-      (when (e:key-p :w) ;;w
+      (when (skey-p :w) ;;w
 	(incf dir #C(-1 0)))
-      (when (or (e:key-p :a)) ;;a
+      (when (or (skey-p :a)) ;;a
 	(incf dir #C(0 1)))
-      (when (e:key-p :s) ;;s
+      (when (skey-p :s) ;;s
 	(incf dir #C(1 0)))
-      (when (or (e:key-p :d)) ;;d
+      (when (or (skey-p :d)) ;;d
 	(incf dir #C(0 -1)))
       (unless (zerop dir)
 	(let ((rot-dir (* dir (cis *yaw*))))
@@ -171,13 +180,13 @@
 (defparameter foo nil)
 (defun physics ()
   ;;e to escape mouse
-  (when (e:key-j-p :E) (window:toggle-mouse-capture))
+  (when (skey-j-p :E) (window:toggle-mouse-capture))
   (hotbar-add e:*scroll-y*)
   (unless (zerop e:*scroll-y*)
     (lcalllist-invalidate :hotbar-selector))
   (macrolet ((k (number-key)
 	       (let ((symb (intern (write-to-string number-key) :keyword)))
-		 `(when (e:key-j-p ,symb)
+		 `(when (skey-j-p ,symb)
 		    (setf *hotbar-selection* ,(1- number-key))
 		    (lcalllist-invalidate :hotbar-selector)))))
     (k 1)
@@ -190,32 +199,32 @@
     (k 8)
     (k 9))
   (when (window:mice-locked-p)
-    (when (e:key-j-p :v) (toggle noclip))
-    (when (e:key-j-p :g) (toggle gravity))
-    (when (e:key-j-p :t) (update-world-vao))
-    (when (e:key-j-p :f) (toggle fly))
-    (when (e:key-j-p :c) (toggle walkblock))
+    (when (skey-j-p :v) (toggle noclip))
+    (when (skey-j-p :g) (toggle gravity))
+    (when (skey-j-p :t) (update-world-vao))
+    (when (skey-j-p :f) (toggle fly))
+    (when (skey-j-p :c) (toggle walkblock))
     (when walkblock (setblock-with-update
 			(truncate *xpos*)
 			(- (truncate *ypos*) 2)
 			(- (truncate *zpos*) 1)
 			*hotbar-selection*
 			0))
-    (when (e:key-j-p :h) (time (setf foo (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte))))
+    (when (skey-j-p :h) (time (setf foo (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte))))
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
     (controls)
-    (let ((blockval (+ 8 *hotbar-selection*)))
+    (let ((blockval (+ 0 *hotbar-selection*)))
       (progn
 	(when fist?
-	  (when (e:mice-j-p :left)
+	  (when (smice-j-p :left)
 	    (setblock-with-update fist-side-x
 				  fist-side-y
 				  fist-side-z
 				  0
 				  0))
-	  (when (e:mice-j-p :right)
+	  (when (smice-j-p :right)
 	    (setblock-with-update (floor fistx)
 				  (floor fisty)
 				  (floor fistz)
@@ -272,7 +281,7 @@
 (defparameter *fist-function* (constantly nil))
 
 (defun big-swing-fist (vx vy vz)
-  (when (and (window:mice-locked-p) (e:key-p :q))
+  (when (and (window:mice-locked-p) (skey-p :q))
     (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 10 vx) (* 10 vy) (* 10 vz)
 			 block-aabb
 			 (lambda (x y z)
