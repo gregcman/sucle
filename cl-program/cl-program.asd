@@ -23,6 +23,7 @@
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
 	       (:file "globjects")
+	       (:file "pix")
 	       
 	       (:file "misc") ;;;everything else
 	       
