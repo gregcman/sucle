@@ -35,7 +35,7 @@
 			       ("BGCOL" . 10)
 			       )))
 
-(defparameter *clear-display-buffer* t)
+(defparameter *clear-display-buffer* nil)
 
 (defun render ()
   (if vsync?
@@ -85,26 +85,27 @@
 		  (declare (ignorable exists))
 		  (if value
 		      (gl:call-list value)
-		      (let ((mesh (funcall
-				   (quad-mesh 
-				    (lambda (tex-buf pos-buf fg-buf bg-buf)
-				      (let ((times 
-					     (draw-box-char
-					      pos-buf tex-buf
-					      *16x16-tilemap* *chunks*
-					      xstart (+ xstart *chunk-width*)
-					      ystart (+ ystart *chunk-height*)
-					      *block-width*
-					      *block-height*
-					      +single-float-just-less-than-one+)))
-					
-					(attrib-repeat fg-buf times
-						       (map-into *vec3-scratch* (lambda () (random 1f0))))
-					(attrib-repeat bg-buf times
-						       (map-into *vec3-scratch* (lambda () (random 1f0))))
-					times))))))
-			(setf (gethash index *chunk-call-lists*) mesh)
-			(gl:call-list mesh))))))))))
+		      (if (gethash index *chunks*)
+			  (let ((mesh (funcall
+				       (quad-mesh 
+					(lambda (tex-buf pos-buf fg-buf bg-buf)
+					  (let ((times 
+						 (draw-box-char
+						  pos-buf tex-buf
+						  *16x16-tilemap* *chunks*
+						  xstart (+ xstart *chunk-width*)
+						  ystart (+ ystart *chunk-height*)
+						  *block-width*
+						  *block-height*
+						  +single-float-just-less-than-one+)))
+					    
+					    (attrib-repeat fg-buf times
+							   (map-into *vec3-scratch* (lambda () (random 1f0))))
+					    (attrib-repeat bg-buf times
+							   (map-into *vec3-scratch* (lambda () (random 1f0))))
+					    times))))))
+			    (setf (gethash index *chunk-call-lists*) mesh)
+			    (gl:call-list mesh)))))))))))
 
 (defparameter *vec3-scratch* (vector 1f0 1f0 1f0))
 

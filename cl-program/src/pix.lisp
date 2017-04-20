@@ -55,7 +55,8 @@
 	  (let ((new-chunk (make-chunk)))
 	    (setf (gethash hash-id world) new-chunk)
 	    (setf chunk new-chunk)))
-	(setf (aref chunk (chunk-ref place)) value)))
+	(setf (aref chunk (chunk-ref place)) value)
+	hash-id))
     (defun get-obj (place world)
       (with-chunk-or-null (chunk) (place world)
 	(if chunk

@@ -88,11 +88,11 @@
       (setf cursor-y (- cursor-y dely))))
   
 
-  (progno
-   (setf *achar* (mod  (+ *achar* (ceiling e:*scroll-y*)) 256))
-   (dobox ((x 0 16)
-	   (y 0 16))
-	  (setf (pix:get-obj (pix:xy-index x y) *chunks*) (code-char (random 256)))))
+  ;(progno)
+  (setf *achar* (mod  (+ *achar* (ceiling e:*scroll-y*)) 256))
+  (let ((x (random 160))
+	(y (random 160)))
+    (set-char-with-update (pix:xy-index x y) (code-char (random 256))))
   (progn
     (let ((list (get-stuff :chunks *stuff* *backup*)))
       (when list
@@ -101,3 +101,11 @@
 
 (defun quit ()
   (setf e:*status* t))
+
+(defun set-char-with-update (place value)
+  (let ((chunk-id
+	 (setf (pix:get-obj place *chunks*) value)))
+    (let ((chunk (gethash chunk-id *chunk-call-lists*)))
+      (when chunk
+	(gl:delete-lists chunk 1)
+	(remhash chunk-id *chunk-call-lists*)))))
