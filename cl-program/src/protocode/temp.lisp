@@ -726,3 +726,21 @@
 	    (pic-texture (get-stuff :cursor-image *stuff* *backup*)
 			 :rgba
 			 *default-tex-params*))))
+
+
+(progno
+    (namexpr *backup* :chunks
+	     (quad-mesh 
+	      (lambda (tex-buf pos-buf fg-buf bg-buf)
+		(let ((times (draw-box-char
+			      pos-buf tex-buf
+			      *16x16-tilemap* *chunks*
+			      0 *chunk-width* 0 *chunk-height*
+			      *block-width*
+			      *block-height*
+			      +single-float-just-less-than-one+)))
+		  
+		  (attrib-repeat fg-buf times (map-into *vec3-scratch* (lambda () (random 1f0))))
+		  (attrib-repeat bg-buf times (map-into *vec3-scratch* (lambda () (random 1f0))))
+		  times))))
+    (gl:call-list (get-stuff :chunks *stuff* *backup*)))x

@@ -19,7 +19,7 @@
 				    +y-bitmask+))
   (defconstant +hash-mask+ (logxor +index-mask+ most-positive-fixnum))
   (defconstant +right-shift+ (- +y-chunk-bits+ +x-bits-start+))
-  (defconstant +x-mask+ (1- (ash 1 +x-bits-start+)))
+  (defconstant +y-mask+ (1- (ash 1 +x-bits-start+)))
 
   (defun make-chunk ()
     (make-array (* +x-chunk-size+ +y-chunk-size+)
@@ -63,10 +63,10 @@
     (defun xy-index (x y)
       (let ((fnum (ash x +x-bits-start+)))
 	(declare (type fixnum fnum))
-	(logior y fnum)))
+	(logior fnum (logand +y-mask+ y))))
     (defun index-xy (index)
       (values (ash index (- +x-bits-start+))
-	      (logand index +x-mask+))))
+	      (logand index +y-mask+))))
   (progn
     (declaim (inline (setf get-obj)))
     (defun (setf get-obj) (value place hash-table)

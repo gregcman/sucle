@@ -29,11 +29,30 @@
 	     (setq mousecapturestate t)))
       (setq mousecapturestate nil)))
 
+(defparameter *block-height* (/ 32.0 1.0))
+(defparameter *block-width* (/ 18.0 1.0))
 
 (defparameter cursor-x 0.0)
 (defparameter cursor-y 0.0)
 
+(defparameter *camera-x* 0.0)
+(defparameter *camera-y* 0.0)
+
 (defparameter *chunks* (pix:make-world))
+(defparameter *chunk-call-lists* (make-eq-hash))
+(defparameter *dirty-chunks* nil)
+(defparameter *chunk-width* 16)
+(defparameter *chunk-height* 16)
+
+(defparameter *window-min-x* 0.0)
+(defparameter *window-max-x* 0.0)
+(defparameter *window-min-y* 0.0)
+(defparameter *window-max-y* 0.0)
+
+(defparameter *window-min-x-block* 0)
+(defparameter *window-max-x-block* 0)
+(defparameter *window-min-y-block* 0)
+(defparameter *window-max-y-block* 0)
 
 (defparameter *achar* 0)
 
@@ -41,12 +60,27 @@
   (make-array 0 :adjustable t :fill-pointer 0
 	      :element-type (quote character)))
 
+(defun floor-chunk (x y)
+  (* y (floor x y)))
+
 (defun physics ()
+  (let ((half-height (/ e:*height* 1.0))
+	(half-width (/ e:*width* 1.0)))
+    (setf *window-min-x* (- *camera-x* half-width)
+	  *window-max-x* (+ *camera-x* half-width)
+	  *window-min-y* (- *camera-y* half-height)
+	  *window-max-y* (+ *camera-y* half-height))
+    (setf *window-min-x-block* (/ *window-min-x* *block-width*)
+	  *window-max-x-block* (/ *window-max-x* *block-width*)
+	  *window-min-y-block* (/ *window-min-y* *block-height*)
+	  *window-max-y-block* (/ *window-max-y* *block-height*)))
+  
   (when (skey-j-p :escape) (window:toggle-mouse-capture))
-  (when (skey-p :up) (incf cursor-y 32.0))
-  (when (skey-p :down) (incf cursor-y -32.0))
-  (when (skey-p :left) (incf cursor-x -18.0))
-  (when (skey-p :right) (incf cursor-x 18.0))
+  (progn
+    (when (skey-p :up) (incf *camera-y* 32.0))
+    (when (skey-p :down) (incf *camera-y* -32.0))
+    (when (skey-p :left) (incf *camera-x* -18.0))
+    (when (skey-p :right) (incf *camera-x* 18.0)))
   (remove-spurious-mouse-input)
   (when (window:mice-locked-p)
     (multiple-value-bind (delx dely) (delta)
@@ -54,10 +88,11 @@
       (setf cursor-y (- cursor-y dely))))
   
 
-  (setf *achar* (mod  (+ *achar* (ceiling e:*scroll-y*)) 256))
-  (dobox ((x 0 16)
-	  (y 0 16))
-	 (setf (pix:get-obj (pix:xy-index x y) *chunks*) (code-char *achar*)))
+  (progno
+   (setf *achar* (mod  (+ *achar* (ceiling e:*scroll-y*)) 256))
+   (dobox ((x 0 16)
+	   (y 0 16))
+	  (setf (pix:get-obj (pix:xy-index x y) *chunks*) (code-char (random 256)))))
   (progn
     (let ((list (get-stuff :chunks *stuff* *backup*)))
       (when list
