@@ -35,7 +35,7 @@
 			       ("BGCOL" . 10)
 			       )))
 
-(defparameter *clear-display-buffer* nil)
+(defparameter *clear-display-buffer* t)
 
 (defun render ()
   (if vsync?
@@ -91,18 +91,13 @@
 					(lambda (tex-buf pos-buf fg-buf bg-buf)
 					  (let ((times 
 						 (draw-box-char
-						  pos-buf tex-buf
+						  pos-buf tex-buf fg-buf bg-buf
 						  *16x16-tilemap* *chunks*
 						  xstart (+ xstart *chunk-width*)
 						  ystart (+ ystart *chunk-height*)
 						  *block-width*
 						  *block-height*
 						  +single-float-just-less-than-one+)))
-					    
-					    (attrib-repeat fg-buf times
-							   (map-into *vec3-scratch* (lambda () (random 1f0))))
-					    (attrib-repeat bg-buf times
-							   (map-into *vec3-scratch* (lambda () (random 1f0))))
 					    times))))))
 			    (setf (gethash index *chunk-call-lists*) mesh)
 			    (gl:call-list mesh)))))))))))
@@ -213,6 +208,7 @@
 
 (progn
   (declaim (ftype (function (iter-ator:iter-ator iter-ator:iter-ator
+						 iter-ator:iter-ator iter-ator:iter-ator
 						 simple-vector
 						 pix:pix-world
 						 fixnum fixnum fixnum fixnum
@@ -220,19 +216,29 @@
 			    fixnum)
 		  draw-box-char))
   (with-unsafe-speed
-    (defun draw-box-char (pos-buf tex-buf
+    (defun draw-box-char (pos-buf tex-buf fg-buf bg-buf
 			  lookup world
 			  bx0 bx1 by0 by1
 			  char-width char-height
 			  z)
       (iter-ator:wasabios ((epos pos-buf)
-			   (etex tex-buf))
+			   (etex tex-buf)
+			   (efg fg-buf)
+			   (ebg bg-buf))
 	(dobox ((ix bx0 bx1)
 		(iy by0 by1))
-	       (let ((char (pix:get-obj (pix:xy-index ix iy) world)))
-		 (let ((code (if char
-				 (char-code char)
-				 0)))
+	       (let ((value (pix:get-obj (pix:xy-index ix iy) world)))
+		 (declare (type fixnum value))
+		 (let ((code (ldb (byte 8 0) value))
+		       (fg-r (/ (float (ldb (byte 8 8) value)) 256.0))
+		       (fg-g (/ (float (ldb (byte 8 16) value)) 256.0))
+		       (fg-b (/ (float (ldb (byte 8 24) value)) 256.0))
+		       (bg-r (/ (float (ldb (byte 8 32) value)) 256.0))
+		       (bg-g (/ (float (ldb (byte 8 40) value)) 256.0))
+		       (bg-b (/ (float (ldb (byte 8 48) value)) 256.0)))
+		   (dotimes (x 4)
+		     (etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
+		     (etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b)))))
 		   (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
 		     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
 		 (let ((foox0 (* (float ix) char-width))

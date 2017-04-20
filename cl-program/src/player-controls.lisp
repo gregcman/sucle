@@ -40,7 +40,6 @@
 
 (defparameter *chunks* (pix:make-world))
 (defparameter *chunk-call-lists* (make-eq-hash))
-(defparameter *dirty-chunks* nil)
 (defparameter *chunk-width* 16)
 (defparameter *chunk-height* 16)
 
@@ -90,9 +89,11 @@
 
   ;(progno)
   (setf *achar* (mod  (+ *achar* (ceiling e:*scroll-y*)) 256))
-  (let ((x (random 160))
-	(y (random 160)))
-    (set-char-with-update (pix:xy-index x y) (code-char (random 256))))
+  (when (skey-p :space)
+    (dotimes (x 16)
+      (let ((x (random 128))
+	    (y (random 128)))
+	(set-char-with-update (pix:xy-index x y) (random most-positive-fixnum)))))
   (progn
     (let ((list (get-stuff :chunks *stuff* *backup*)))
       (when list
