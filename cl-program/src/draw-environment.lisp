@@ -32,7 +32,10 @@
 (defparameter *postex* (quote (("POS" . 0)	
 			       ("TEX" . 8)
 			       ("FGCOL" . 9)
-			       ("BGCOL" . 10))))
+			       ("BGCOL" . 10)
+			       )))
+
+(defparameter *clear-display-buffer* nil)
 
 (defun render ()
   (if vsync?
@@ -42,14 +45,18 @@
 
   (window:update-display))
 
-(defparameter foo
-  (make-array 0 :adjustable t :fill-pointer 0
-	      :element-type (quote character)))
-
-(defun draw-things () 
+(defun draw-things ()
+  (gl:disable :depth-test :blend)
+  (gl:depth-mask :false)
+  (gl:depth-func :always)
+  (gl:clear-color 0.0 0.0 0.0 0f0)
+  (when *clear-display-buffer*
+    (gl:clear :color-buffer-bit))
+  
+  (gl:viewport 0 0 e:*width* e:*height*)
+  
   (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
 	 (solidshader-uniforms (glget solidshader :program)))
-    (gl:viewport 0 0 e:*width* e:*height*)
     (gl:use-program solidshader)
     (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
     (gl:uniform-matrix-4fv
@@ -57,70 +64,47 @@
      (cg-matrix:%matrix* *temp-matrix2*
 			 *screen-scaled-matrix*
 			 (cg-matrix:%translate* *temp-matrix*
-						(float (- e:*width*))
-						(float e:*height*)
+						(* 18.0 (floor cursor-x 18.0))
+						(* 32.0 (floor cursor-y 32.0))
 						0.0))
-     nil)
+     nil))
 
-    (progn
-      (gl:disable :depth-test :blend)
-      (gl:depth-mask :false)
-      (gl:depth-func :always)
-      (gl:clear-color 0.0 0.0 0.0 0f0)
-      (gl:clear
-       :color-buffer-bit 
-       ))
+  (progn
+    (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
+    (namexpr *backup* :chunks
+	     (quad-mesh 
+	      (lambda (tex-buf pos-buf fg-buf bg-buf)
+		(let ((times (draw-box-char
+			      pos-buf tex-buf
+			      *16x16-tilemap* *chunks*
+			      0 1 0 1
+			      18.0
+			      32.0
+			      +single-float-just-less-than-one+)))
+		  
+		  (attrib-repeat fg-buf times (map-into #(1f0 1f0 1f0) (lambda () (random 1f0))))
+		  (attrib-repeat bg-buf times (map-into #(0f0 0f0 0f0) (lambda () (random 1f0))))
+		  times))))
+    (gl:call-list (get-stuff :chunks *stuff* *backup*))))
 
-    (progn
-      (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
-      (namexpr *backup* :string
-	       (lambda ()
-		 (create-call-list-from-func
-		  (lambda ()
-		    (gl-draw-quads 
-		     (lambda (tex-buf pos-buf fg-buf bg-buf)
-		       (let ((times (draw-string-raster-char
-				     pos-buf tex-buf
-				     *16x16-tilemap* foo
-				     18.0
-				     32.0
-				     0.0 0.0 +single-float-just-less-than-one+)))
-			 (iter-ator:wasabios ((efg fg-buf)
-					      (ebg bg-buf))
-			   (dotimes (x times)
-			     (etouq (ngorp (preach 'efg '(0f0 1f0 0f0))))
-			     (etouq (ngorp (preach 'ebg '(0f0 0f0 1f0))))))
-			 times)))))))
+(progn
+  (declaim (ftype (function (iter-ator:iter-ator fixnum (simple-array t)))
+		  attrib-repeat))
+  (with-unsafe-speed
+    (defun attrib-repeat (buf times vector)
+      (iter-ator:wasabios ((ebuf buf))
+	(let ((len (length vector)))
+	  (dotimes (x times)
+	    (dotimes (index len)
+	      (let ((value (aref vector index)))
+		(ebuf value)))))))))
 
-      (let ((newlen (length e:*chars*))
-	    (changed nil))
-	(dotimes (pos newlen)
-	  (vector-push-extend (aref e:*chars* pos) foo))
-	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :enter))
-	       (multiple-value-bind (data p) (read-string foo nil)
-		 (cond (p (print data)
-			  (setf (fill-pointer foo) 0)
-			  (with-output-to-string (var foo)
-			    (prin1
-			     (handler-bind ((condition (lambda (c)
-							 (declare (ignorable c))
-							 (invoke-restart
-							  (find-restart (quote continue))))))
-			       (restart-case
-				   (eval data)
-				 (continue () data)))
-			     var))
-			  )
-		       (t (vector-push-extend #\Newline foo))))
-	       (setf changed t)))
-	(cond ((e:key-j-p (cffi:foreign-enum-value (quote %glfw::key) :backspace))
-	       (setf (fill-pointer foo) (max 0 (1- (fill-pointer foo))))
-	       (setf changed t)))
-	(when (or changed (not (zerop newlen)))
-	  (let ((list (get-stuff :string *stuff* *backup*)))
-	    (gl:delete-lists list 1)
-	    (remhash :string *stuff*))))
-      (gl:call-list (get-stuff :string *stuff* *backup*)))))
+(defun quad-mesh (func)
+  (lambda ()
+    (create-call-list-from-func
+     (lambda ()
+       (gl-draw-quads func)))))
+
 
 (defun glinnit ()
   (reset *gl-objects*)
@@ -166,18 +150,6 @@
 	       (lambda ()
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
 			      :rgba
-			      *default-tex-params*))))
-    
-    (progn
-      (namexpr backup :cursor-image
-	       (lambda ()
-		 (flip-image
-		  (load-png
-		   (img-path #P"cursor/windos-cursor.png")))))
-      (namexpr backup :cursor
-	       (lambda ()
-		 (pic-texture (get-stuff :cursor-image *stuff* *backup*)
-			      :rgba
 			      *default-tex-params*))))))
 
 (defun cache-program-uniforms (program table args)
@@ -216,59 +188,34 @@
       (%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
-
-
-(defun draw-string-raster-char (pos-buf tex-buf
-				lookup string char-width char-height
-				x y z)
+(defun draw-box-char (pos-buf tex-buf
+		      lookup world
+		      bx0 bx1 by0 by1
+		      char-width char-height
+		      z)
   (declare (type iter-ator:iter-ator pos-buf tex-buf)
-	   (type single-float x y z char-width char-height)
+	   (type single-float z char-width char-height)
 	   (type simple-vector lookup)
 	   (optimize (speed 3) (safety 0))
-	   (type (vector character) string))
+	   (type pix:pix-world world)
+	   (type fixnum bx0 bx1 by0 by1))
   (iter-ator:wasabios ((epos pos-buf)
 		       (etex tex-buf))
-    (let ((len (length string))
-	  (times 0))
-      (declare (type fixnum times))
-      (let ((xoffset x)
-	    (yoffset y))
-	(declare (type single-float xoffset yoffset))
-	(let ((wonine (if t 0.0 (/ char-width 8.0))))
-	  (dotimes (position len)
-	    (let ((char (row-major-aref string position)))
-	      (let ((next-x (+ xoffset char-width wonine))
-		    (next-y (- yoffset char-height)))
-		(cond ((char= char #\Newline)
-		       (setf xoffset x
-			     yoffset next-y))
-		      (t (incf times 4)
-			 (let ((code (char-code char)))
-			   (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
-			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
-			 (etouq (ngorp
-				 (preach
-				  'epos
-				  (quadk+ 'z '(xoffset
-					       (- next-x wonine)
-					       next-y
-					       yoffset)))))
-			 (setf xoffset next-x))))))))
-      times)))
-
-(defun quit ()
-  (setf e:*status* t))
-
-
-(defun goo (c)
-  (declare (ignorable c))
-  (let ((restart (find-restart (quote goober))))
-    (when restart (invoke-restart restart))))
-
-(defun read-string (string otherwise)
-  (handler-bind ((end-of-file #'goo))
-    (restart-case
-	(values (read-from-string string nil otherwise) t)
-      (goober ()
-	:report "wtf"
-	(values otherwise nil)))))
+    (dobox ((ix bx0 bx1)
+	    (iy by0 by1))
+	   (let ((char (pix:get-obj (pix:xy-index ix iy) world)))
+	     (let ((code (if char
+			     (char-code char)
+			     0)))
+	       (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
+		 (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
+	     (let ((foox0 (* (float ix) char-width))
+		   (fooy0 (* (float iy) char-height)))
+	       (etouq (ngorp
+		       (preach
+			'epos
+			(quadk+ 'z '(foox0
+				     (+ foox0 char-width)
+				     fooy0
+				     (+ fooy0 char-height))))))))))
+  (* 4 (- bx1 bx0) (- by1 by0)))

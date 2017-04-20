@@ -1,12 +1,17 @@
-(in-package :sandbox)
+(defpackage :pix
+  (:use #:cl #:fuktard))
+
+(in-package :pix)
 
 (progn
+  (deftype pix-world ()
+    (quote hash-table))
   (defconstant +available-bits+ (logcount most-positive-fixnum))
   (defconstant +x-bits-start+ (floor +available-bits+ 2))
-  (defconstant +x-chunk-bits+ 5)
+  (defconstant +x-chunk-bits+ 4)
   (defconstant +x-chunk-size+ (ash 1 +x-chunk-bits+))
   (defconstant +x-bitmask+ (1- +x-chunk-size+))
-  (defconstant +y-chunk-bits+ 5)
+  (defconstant +y-chunk-bits+ 4)
   (defconstant +y-chunk-size+ (ash 1 +y-chunk-bits+))
   (defconstant +y-bitmask+ (1- +y-chunk-size+))
   (defconstant +xy-bitmask+ (1- (* +y-chunk-size+ +x-chunk-size+)))
@@ -24,10 +29,6 @@
   (defun make-world ()
     (make-hash-table :test (quote eq)))
 
-  (progn
-    (declaim (inline (setf get-obj)))
-    (defun (setf get-obj) (value place hash-table)
-      (set-obj place value hash-table)))
 
   (defmacro with-chunk-or-null ((chunk &optional (hash-id (gensym))) (place hash) &body body)
     `(let* ((,hash-id (logand ,place +hash-mask+))
@@ -65,4 +66,10 @@
 	(logior y fnum)))
     (defun index-xy (index)
       (values (ash index (- +x-bits-start+))
-	      (logand index +x-mask+)))))
+	      (logand index +x-mask+))))
+  (progn
+    (declaim (inline (setf get-obj)))
+    (defun (setf get-obj) (value place hash-table)
+      (set-obj place value hash-table))))
+
+(export (quote (index-xy xy-index get-obj set-obj chunk-ref make-world make-chunk pix-world)))
