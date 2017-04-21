@@ -91,6 +91,7 @@
 (defparameter *white-black-color* (acolor 255 255 255 0 0 0))
 (defparameter *show-cursor* t)
 (defparameter *cursor-moved* 0)
+(defparameter *scroll-sideways* nil)
 
 (defun physics ()
 
@@ -115,9 +116,13 @@
     (decf *cursor-x*)
     (setf *cursor-moved* *ticks*))
 
-   (let ((scroll (ceiling e:*scroll-y*)))
+  (when (skey-r-or-p :u)
+    (toggle *scroll-sideways*))
+  (let ((scroll (ceiling e:*scroll-y*)))
     (unless (zerop scroll)
-      (incf *camera-y* (* 5 *block-height* scroll))
+      (if *scroll-sideways*
+	  (incf *camera-x* (* 5 *block-width* scroll))
+	  (incf *camera-y* (* 5 *block-height* scroll)))
       (setf *cursor-moved* *ticks*)))
   
   (let ((diff (- *ticks* *cursor-moved*)))
@@ -139,11 +144,11 @@
 
 	     ))))
   (remove-spurious-mouse-input)
-  (progn (when (skey-p :space)
-	   (dotimes (x 16)
-	     (let ((x (random 128))
-		   (y (random 128)))
-	       (set-char-with-update (pix:xy-index x y) (logandc2 (random most-positive-fixnum) 255))))))
+  (progno (when (skey-p :space)
+	    (dotimes (x 16)
+	      (let ((x (random 128))
+		    (y (random 128)))
+		(set-char-with-update (pix:xy-index x y) (random most-positive-fixnum))))))
 
   (let ((half-height (/ e:*height* 1.0))
 	(half-width (/ e:*width* 1.0)))
@@ -185,3 +190,25 @@
       (when chunk
 	(gl:delete-lists chunk 1)
 	(remhash chunk-id *chunk-call-lists2*)))))
+
+(defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
+(defparameter *save-file* (merge-pathnames #P"file" *saves-dir*))
+
+(defun asave (thing)
+  (save *save-file* thing))
+
+(defun aload ()
+  (myload *save-file*))
+
+(defun save (filename thing)
+   (let ((path (merge-pathnames filename *saves-dir*)))
+     (with-open-file (stream path
+			     :direction :output
+			     :if-does-not-exist :create
+			     :if-exists :supersede
+			     :element-type '(unsigned-byte 8))
+       (conspack:encode thing :stream stream))))
+
+(defun myload (filename)
+   (let ((path (merge-pathnames filename *saves-dir*)))
+     (conspack:decode (byte-read path))))

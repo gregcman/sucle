@@ -7,7 +7,8 @@
 		 #:opticl  
 
 		 #:window-glfw3
-
+		 #:cl-conspack
+		 
 		 #:funland
 		 #:fixed-leaf-hashed-array-tree)
     :serial t
