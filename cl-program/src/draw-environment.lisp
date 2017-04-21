@@ -49,60 +49,91 @@
   (gl:disable :depth-test :blend)
   (gl:depth-mask :false)
   (gl:depth-func :always)
-  (gl:clear-color 0.0 0.0 0.0 0f0)
+  (gl:clear-color 0f0 0.0 0.0 0f0)
   (when *clear-display-buffer*
     (gl:clear :color-buffer-bit))
-  
+
+  (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
   (gl:viewport 0 0 e:*width* e:*height*)
-  
+
+  (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
+
+  (progn
+   (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
+	  (solidshader-uniforms (glget solidshader :program)))
+     (gl:use-program solidshader)
+     (gl:uniform-matrix-4fv
+      (getuniform solidshader-uniforms :pmv)
+      (cg-matrix:%matrix* *temp-matrix2*
+			  *screen-scaled-matrix*
+			  (cg-matrix:%translate* *temp-matrix*
+						 (- *camera-x*)
+						 (- *camera-y*)
+						 0.0))
+      nil))
+   
+   (draw-ensure *chunks* *chunk-call-lists*
+		*window-min-x-block*
+		*window-max-x-block*
+		*window-min-y-block*
+		*window-max-y-block*))
+
   (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
 	 (solidshader-uniforms (glget solidshader :program)))
     (gl:use-program solidshader)
-    (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
     (gl:uniform-matrix-4fv
      (getuniform solidshader-uniforms :pmv)
      (cg-matrix:%matrix* *temp-matrix2*
 			 *screen-scaled-matrix*
 			 (cg-matrix:%translate* *temp-matrix*
-						(- *camera-x*)
-						(- *camera-y*)
+						(- (if nil 0 (* *block-width* *cursor-x*)) *camera-x*)
+						(- (if nil 0 (* *block-height* *cursor-y*)) *camera-y*)
 						0.0))
      nil))
-  (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
+  (draw-ensure *chunks2* *chunk-call-lists2*
+	       *window-min-x-block2*
+	       *window-max-x-block2*
+	       *window-min-y-block2*
+	       *window-max-y-block2*))
 
+(defun draw-ensure (world call-lists minx maxx miny maxy)
   (progn
-   (let ((x0 (floor *window-min-x-block* *chunk-width*))
-	 (x1 (floor *window-max-x-block* *chunk-width*))
-	 (y0 (floor *window-min-y-block* *chunk-height*))
-	 (y1 (floor *window-max-y-block* *chunk-height*)))
-     (dobox ((x-index x0 (1+ x1))
-	     (y-index y0 (1+ y1)))
-	    (let ((xstart (* *chunk-width* x-index))
-		  (ystart (* *chunk-height* y-index)))
-	 ;     (print (list xstart ystart))
-	      (let ((index (pix:xy-index xstart ystart)))
-		(multiple-value-bind (value exists) (gethash index *chunk-call-lists*)
-		  (declare (ignorable exists))
-		  (if value
-		      (gl:call-list value)
-		      (if (gethash index *chunks*)
-			  (let ((mesh (funcall
-				       (quad-mesh 
-					(lambda (tex-buf pos-buf fg-buf bg-buf)
-					  (let ((times 
-						 (draw-box-char
-						  pos-buf tex-buf fg-buf bg-buf
-						  *16x16-tilemap* *chunks*
-						  xstart (+ xstart *chunk-width*)
-						  ystart (+ ystart *chunk-height*)
-						  *block-width*
-						  *block-height*
-						  +single-float-just-less-than-one+)))
-					    times))))))
-			    (setf (gethash index *chunk-call-lists*) mesh)
-			    (gl:call-list mesh)))))))))))
+    (let ((x0 (floor minx *chunk-width*))
+	  (x1 (floor maxx *chunk-width*))
+	  (y0 (floor miny *chunk-height*))
+	  (y1 (floor maxy *chunk-height*)))
+      (dobox ((x-index x0 (1+ x1))
+	      (y-index y0 (1+ y1)))
+	     (let ((xstart (* *chunk-width* x-index))
+		   (ystart (* *chunk-height* y-index)))
+	       (let ((index (pix:xy-index xstart ystart)))
+		 (multiple-value-bind (value exists) (gethash index call-lists)
+		   (declare (ignorable exists))
+		   (if value
+		       (gl:call-list value)
+		       (if (gethash index world)
+			   (let ((mesh (funcall
+					(quad-mesh 
+					 (block-box xstart (+ xstart *chunk-width*)
+						    ystart (+ ystart *chunk-height*)
+						    world)))))
+			     (setf (gethash index call-lists) mesh)
+			     (gl:call-list mesh)))))))))))
 
 (defparameter *vec3-scratch* (vector 1f0 1f0 1f0))
+
+(defun block-box (x0 x1 y0 y1 world)
+  (lambda (tex-buf pos-buf fg-buf bg-buf)
+    (let ((times 
+	   (draw-box-char
+	    pos-buf tex-buf fg-buf bg-buf
+	    *16x16-tilemap* world
+	    x0 x1
+	    y0 y1
+	    *block-width*
+	    *block-height*
+	    +single-float-just-less-than-one+)))
+      times)))
 
 (progn
   (declaim (ftype (function (iter-ator:iter-ator fixnum (simple-array t)))
@@ -127,6 +158,7 @@
   (reset *gl-objects*)
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (clrhash *chunk-call-lists*)
+  (clrhash *chunk-call-lists2*)
   
   (let ((width (if t 480 854))
 	(height (if t 360 480)))
@@ -206,6 +238,24 @@
       (%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
+(defmacro with-char-colors ((code-var fg-rvar fg-gvar fg-bvar bg-rvar bg-gvar bg-bvar) value &body body)
+  `(let ((,code-var (ldb (byte 8 0) ,value))
+	 (,fg-rvar (ldb (byte 8 8) ,value))
+	 (,fg-gvar (ldb (byte 8 16) ,value))
+	 (,fg-bvar (ldb (byte 8 24) ,value))
+	 (,bg-rvar (ldb (byte 8 32) ,value))
+	 (,bg-gvar (ldb (byte 8 40) ,value))
+	 (,bg-bvar (ldb (byte 8 48) ,value)))
+     ,@body))
+
+(progn
+  (declaim (inline byte-color)
+	   (ftype (function (fixnum) single-float)
+		  byte-color))
+  (with-unsafe-speed
+    (defun byte-color (x)
+      (/ (float x) 256.0))))
+
 (progn
   (declaim (ftype (function (iter-ator:iter-ator iter-ator:iter-ator
 						 iter-ator:iter-ator iter-ator:iter-ator
@@ -221,33 +271,37 @@
 			  bx0 bx1 by0 by1
 			  char-width char-height
 			  z)
-      (iter-ator:wasabios ((epos pos-buf)
-			   (etex tex-buf)
-			   (efg fg-buf)
-			   (ebg bg-buf))
-	(dobox ((ix bx0 bx1)
-		(iy by0 by1))
-	       (let ((value (pix:get-obj (pix:xy-index ix iy) world)))
-		 (declare (type fixnum value))
-		 (let ((code (ldb (byte 8 0) value))
-		       (fg-r (/ (float (ldb (byte 8 8) value)) 256.0))
-		       (fg-g (/ (float (ldb (byte 8 16) value)) 256.0))
-		       (fg-b (/ (float (ldb (byte 8 24) value)) 256.0))
-		       (bg-r (/ (float (ldb (byte 8 32) value)) 256.0))
-		       (bg-g (/ (float (ldb (byte 8 40) value)) 256.0))
-		       (bg-b (/ (float (ldb (byte 8 48) value)) 256.0)))
-		   (dotimes (x 4)
-		     (etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
-		     (etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b)))))
-		   (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
-		     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
-		 (let ((foox0 (* (float ix) char-width))
-		       (fooy0 (* (float iy) char-height)))
-		   (etouq (ngorp
-			   (preach
-			    'epos
-			    (quadk+ 'z '(foox0
-					 (+ foox0 char-width)
-					 fooy0
-					 (+ fooy0 char-height))))))))))
-      (* 4 (- bx1 bx0) (- by1 by0)))))
+      (let ((nope 0))
+	(iter-ator:wasabios ((epos pos-buf)
+			     (etex tex-buf)
+			     (efg fg-buf)
+			     (ebg bg-buf))
+	  (dobox ((ix bx0 bx1)
+		  (iy by0 by1))
+		 (let ((value (pix:get-obj (pix:xy-index ix iy) world)))
+		   (declare (type (or null fixnum) value))
+		   (if value
+		       (progn
+			 (with-char-colors (code xfg-r xfg-g xfg-b xbg-r xbg-g xbg-b) value
+			   (let ((fg-r (byte-color xfg-r))
+				 (fg-g (byte-color xfg-g))
+				 (fg-b (byte-color xfg-b))
+				 (bg-r (byte-color xbg-r))
+				 (bg-g (byte-color xbg-g))
+				 (bg-b (byte-color xbg-b)))
+			     (dotimes (x 4)
+			       (etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
+			       (etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b))))))
+			   (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup code)
+			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
+			 (let ((foox0 (* (float ix) char-width))
+			       (fooy0 (* (float iy) char-height)))
+			   (etouq (ngorp
+				   (preach
+				    'epos
+				    (quadk+ 'z '(foox0
+						 (+ foox0 char-width)
+						 fooy0
+						 (+ fooy0 char-height))))))))
+		       (incf nope)))))
+	(* 4 (- (* (- bx1 bx0) (- by1 by0)) nope))))))

@@ -9,10 +9,12 @@
    #:*chars*)
   (:export
    #:key-p
+   #:key-r-or-p
    #:key-j-p
    #:key-r
    #:key-j-r
    #:mice-p
+   #:mice-r-or-p
    #:mice-j-p
    #:mice-r
    #:mice-j-r)

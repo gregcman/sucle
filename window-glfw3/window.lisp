@@ -35,21 +35,11 @@
 ;;;when buttons can take either of two states, there are four
 ;;;ways adjacent time frames can look [repeat does not count here]
 (defun next-key-state (old new)
-  (cond ((eql new +release+)
-	 (cond ((eq nil old) nil)
-	       ((eql +press+ old) +release+)
-	       ((eql +release+ old) nil)
-	       (t +release+)))
-	((eql new +press+)
-	 (cond ((eq nil old) +press+)
-	       ((eql +press+ old) t)
-	       ((eql +release+ old) +press+)
-	       (t t)))
-	((eql new +repeat+)
-	 (cond ((eq nil old) (print "wtf?") +press+)
-	       ((eql +press+ old) t)
-	       ((eql +release+ old) (print "huh?") +press+)
-	       (t t)))))
+  (cond ((eq nil old)
+	 (if (eql new +press+) +press+))
+	((eq t old)
+	 (cond ((eql new +release+) +release+)
+	       ((eql new +repeat+) +repeat+)))))
 
 (defun step-hash (hash)
   (with-hash-table-iterator (next hash)
@@ -57,6 +47,7 @@
 	    (if more
 		(cond ((eql value +press+) (setf (gethash key hash) t))
 		      ((eql value +release+) (setf (gethash key hash) nil))
+		      ((eql value +repeat+) (setf (gethash key hash) t))
 		      ((eq value nil) (remhash key hash)))
 		(return))))))
 
@@ -67,7 +58,7 @@
 ;;;;various functions to test the state of the keyboard
 
 ;;;"-p" stands for "press" or predicate
-;;;"-r" stands for "release"
+;;;"-r" stands for "repeat"
 ;;;"-j" stands for "just" as in "it was not pressed just a moment ago,
 ;;;now it is"
 
@@ -75,11 +66,15 @@
   (defun key-p (the-key)
     (let ((value (key the-key)))
       (or (eq value t)
-	  (eql +press+ value))))
+	  (eql +press+ value)
+	  (eql +repeat+ value))))
+  (defun key-r-or-p (the-key)
+    (let ((value (key the-key)))
+      (or (eql +press+ value)
+	  (eql +repeat+ value))))
   (defun key-r (the-key)
     (let ((value (key the-key)))
-      (or (eq nil value)
-	  (eql value +release+))))
+      (eql value +repeat+)))
   (defun key-j-p (the-key)
     (let ((value (key the-key)))
       (eq value +press+)))
@@ -91,11 +86,15 @@
   (defun mice-p (the-key)
     (let ((value (mice the-key)))
       (or (eq value t)
-	  (eql value +press+))))
+	  (eql value +press+)
+	  (eql value +repeat+))))
+  (defun mice-r-or-p (the-key)
+    (let ((value (mice the-key)))
+      (or (eql value +press+)
+	  (eql value +repeat+))))
   (defun mice-r (the-key)
     (let ((value (mice the-key)))
-      (or (eq value nil)
-	  (eql value +release+))))
+      (eql value +repeat+)))
   (defun mice-j-p (the-key)
     (let ((value (mice the-key)))
       (eq value +press+)))
