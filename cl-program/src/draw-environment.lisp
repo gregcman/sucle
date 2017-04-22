@@ -45,6 +45,10 @@
 
   (window:update-display))
 
+(defparameter *one-over-window-width* 0.0)
+(defparameter *one-over-window-height* 0.0)
+
+
 (defun draw-things ()
   (gl:disable :depth-test :blend)
   (gl:depth-mask :false)
@@ -53,73 +57,54 @@
   (when *clear-display-buffer*
     (gl:clear :color-buffer-bit))
 
-  (cg-matrix:%scale* *screen-scaled-matrix* (/ 1.0 e:*width*) (/ 1.0 e:*height*) 1.0) 
+  (setf *one-over-window-width* (/ 1.0 e:*width*)
+	*one-over-window-height* (/ 1.0 e:*height*))
+  (cg-matrix:%scale* *screen-scaled-matrix*
+		     *one-over-window-width*
+		     *one-over-window-height*
+		     1.0) 
   (gl:viewport 0 0 e:*width* e:*height*)
 
   (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
 
-  (progn
-   (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
-	  (solidshader-uniforms (glget solidshader :program)))
-     (gl:use-program solidshader)
-     (gl:uniform-matrix-4fv
-      (getuniform solidshader-uniforms :pmv)
-      (cg-matrix:%matrix* *temp-matrix2*
-			  *screen-scaled-matrix*
-			  (cg-matrix:%translate* *temp-matrix*
-						 (- (* *block-width* *camera-x*))
-						 (- (* *block-height* *camera-y*))
-						 0.0))
-      nil))
-   
-   (draw-ensure *chunks* *chunk-call-lists*
-		*window-min-x-block*
-		*window-max-x-block*
-		*window-min-y-block*
-		*window-max-y-block*))
+  (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
+	 (solidshader-uniforms (glget solidshader :program))
+	 (pmv (getuniform solidshader-uniforms :pmv)))
+    (gl:use-program solidshader)
+    (let ((auxvarw (* *block-width* *one-over-window-width* -1.0))
+	  (auxvarh (* *block-height* *one-over-window-height* -1.0)))
+      (flet ((draw-window (rectangle world call-lists chunk-width chunk-height xoffset yoffset)
+	       (setf (cg-matrix:mref *screen-scaled-matrix* 0 3)
+		     (* auxvarw xoffset)
+		     (cg-matrix:mref *screen-scaled-matrix* 1 3)
+		     (* auxvarh yoffset))
+	       (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil)
+	       (draw-ensure world call-lists
+			    (aref rectangle 0)
+			    (aref rectangle 2)
+			    (aref rectangle 1)
+			    (aref rectangle 3)
+			    (floor chunk-width)
+			    (floor chunk-height))))
+	(draw-window *cam-rectangle* *chunks* *chunk-call-lists* 16 16 *camera-x* *camera-y*)
+	(draw-window *hud-rectangle* *chunks* *chunk-call-lists* 16 16 *hud-x* *hud-y*)))))
 
-  (when *show-cursor*
-    (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
-	   (solidshader-uniforms (glget solidshader :program)))
-      (gl:use-program solidshader)
-      (gl:uniform-matrix-4fv
-       (getuniform solidshader-uniforms :pmv)
-       (cg-matrix:%matrix* *temp-matrix2*
-			   *screen-scaled-matrix*
-			   (cg-matrix:%translate* *temp-matrix*
-						  (- (* *block-width* *hud-x*))
-						  (- (* *block-height* *hud-y*))
-						  0.0))
-       nil))
-    (draw-ensure *chunks* *chunk-call-lists*
-		 *window-min-x-block2*
-		 *window-max-x-block2*
-		 *window-min-y-block2*
-		 *window-max-y-block2*)))
-
-(defun draw-ensure (world call-lists minx maxx miny maxy)
-  (progn
-    (let ((x0 (floor minx *chunk-width*))
-	  (x1 (floor maxx *chunk-width*))
-	  (y0 (floor miny *chunk-height*))
-	  (y1 (floor maxy *chunk-height*)))
-      (dobox ((x-index x0 (1+ x1))
-	      (y-index y0 (1+ y1)))
-	     (let ((xstart (* *chunk-width* x-index))
-		   (ystart (* *chunk-height* y-index)))
-	       (let ((index (pix:xy-index xstart ystart)))
-		 (multiple-value-bind (value exists) (gethash index call-lists)
-		   (declare (ignorable exists))
-		   (if value
-		       (gl:call-list value)
-		       (if (gethash index world)
-			   (let ((mesh (funcall
-					(quad-mesh 
-					 (block-box xstart (+ xstart *chunk-width*)
-						    ystart (+ ystart *chunk-height*)
-						    world)))))
-			     (setf (gethash index call-lists) mesh)
-			     (gl:call-list mesh)))))))))))
+(defun draw-ensure (world call-lists minx maxx miny maxy chunk-width chunk-height)
+  (dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
+	  (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
+	 (let ((index (pix:xy-index xstart ystart)))
+	   (multiple-value-bind (value exists) (gethash index call-lists)
+	     (declare (ignorable exists))
+	     (if value
+		 (gl:call-list value)
+		 (if (gethash index world)
+		     (let ((mesh (funcall
+				  (quad-mesh 
+				   (block-box xstart (+ xstart chunk-width)
+					      ystart (+ ystart chunk-height)
+					      world)))))
+		       (setf (gethash index call-lists) mesh)
+		       (gl:call-list mesh))))))))
 
 (defparameter *vec3-scratch* (vector 1f0 1f0 1f0))
 

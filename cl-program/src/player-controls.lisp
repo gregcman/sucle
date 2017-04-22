@@ -59,16 +59,6 @@
 (defparameter *window-block-height* 0.0)
 (defparameter *window-block-width* 0.0)
 
-(defparameter *window-min-x-block* 0)
-(defparameter *window-max-x-block* 0)
-(defparameter *window-min-y-block* 0)
-(defparameter *window-max-y-block* 0)
-
-(defparameter *window-min-x-block2* 0)
-(defparameter *window-max-x-block2* 0)
-(defparameter *window-min-y-block2* 0)
-(defparameter *window-max-y-block2* 0)
-
 (defparameter *achar* 0)
 
 (defparameter *ticks* 0)
@@ -140,37 +130,48 @@
 					(+ *hud-y* *old-cursor-y*))
 			  nil))
   (let ((diff (- *ticks* *cursor-moved*)))
-    (flet ((set-hightlight ()
-	     (let ((char (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*) *chunks*)))
-	       (unless char
-		 (setf char 0))
+    (labels ((set-cursor (x)
 	       (set-char-with-update (pix:xy-index (+ *hud-x* *hud-cursor-x*)
 						   (+ *hud-y* *hud-cursor-y*)) 
-				     (logior (logandc2 (lognot char) 255) (mod char 256))))))
+				     x))
+	     (set-hightlight ()
+	       (let ((char (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*) *chunks*)))
+		 (unless char
+		   (setf char 0))
+		 (set-cursor (logior (logandc2 (lognot char) 255) (mod char 256))))))
       (cond ((zerop diff)
 	     (set-hightlight)
 	     (setf *show-cursor* t))
 	    ((< 615 diff))
 	    ((= 0 (mod diff 30))
 	     (if *show-cursor*
-		 (setf *show-cursor* nil)
-		 (setf *show-cursor* t))))))
+		 (progn
+		   (set-cursor nil)
+		   (setf *show-cursor* nil))
+		 (progn
+		   (set-hightlight)
+		   (setf *show-cursor* t)))))))
   (remove-spurious-mouse-input)
   (progno (when (skey-p :space)
 	    (dotimes (x 16)
 	      (let ((x (random 128))
 		    (y (random 128)))
 		(set-char-with-update (pix:xy-index x y) (random most-positive-fixnum))))))
-  
-  (setf *window-min-x-block* (- *camera-x* *window-block-width*) 
-	*window-max-x-block* (+ *camera-x* *window-block-width*)
-	*window-min-y-block* (- *camera-y* *window-block-height*)
-	*window-max-y-block* (+ *camera-y* *window-block-height*))
-  
-  (setf *window-min-x-block2* (- *hud-x* *window-block-width*)
-	*window-max-x-block2* (+ *hud-x* *window-block-width*)
-	*window-min-y-block2* (- *hud-y* *window-block-height*)
-	*window-max-y-block2* (+ *hud-y* *window-block-height*)))
+
+  (let ((rectangle *cam-rectangle*))
+    (setf (aref rectangle 0) (- *camera-x* *window-block-width*)
+	  (aref rectangle 1) (- *camera-y* *window-block-height*)
+	  (aref rectangle 2) (+ *camera-x* *window-block-width*)
+	  (aref rectangle 3) (+ *camera-y* *window-block-height*)))
+
+  (let ((rectangle *hud-rectangle*))
+    (setf (aref rectangle 0) (- *hud-x* *window-block-width*)
+	  (aref rectangle 1) (- *hud-y* *window-block-height*)
+	  (aref rectangle 2) (+ *hud-x* *window-block-width*)
+	  (aref rectangle 3) (+ *hud-y* *window-block-height*))))
+
+(defparameter *hud-rectangle* (vector 0 0 0 0))
+(defparameter *cam-rectangle* (vector 0 0 0 0))
 
 (defun quit ()
   (setf e:*status* t))

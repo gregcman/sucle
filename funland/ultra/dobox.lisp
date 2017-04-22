@@ -1,6 +1,6 @@
-(in-package fuktard)
+(in-package :fuktard)
 
-(defun dorange-generator (body var start-form end-form)
+(defun dorange-generator (body var start-form end-form &key (test '<) (jmp 'if) (inc 1))
   (let ((temp (gensym))
 	(temp2 (gensym))
 	(start (gensym))
@@ -15,15 +15,15 @@
 	   (go ,temp2)
 	   ,temp
 	   ,body
-	   (setq ,var (1+ ,var))
+	   (setq ,var (+ ,inc ,var))
 	   ,temp2
-	   (if (< ,var ,end) (go ,temp)))))))
+	   (,jmp (,test ,var ,end) (go ,temp)))))))
 
 ;;;iterate through a multidimensional box 
 (defmacro dobox ((&rest interval-forms) &rest body)
   (let ((let-one nil)
 	(let-one-declarations nil))
-    (let ((body (cons 'progn body)))
+    (let ((body (cons 'tagbody body)))
       (dolist (form (nreverse interval-forms))
 	(multiple-value-bind (let-len temp-length let-end temp-end bod)
 	    (apply #'dorange-generator body form)
