@@ -39,32 +39,30 @@
 (defparameter *cursor-x* 0)
 (defparameter *cursor-y* 0)
 
-(defparameter *camera-x* 0.0)
-(defparameter *camera-y* 0.0)
+(defparameter *old-cursor-x* 0)
+(defparameter *old-cursor-y* 0)
+
+(defparameter *hud-x* 1999)
+(defparameter *hud-y* 1999)
+
+(defparameter *hud-cursor-x* 0)
+(defparameter *hud-cursor-y* 0)
+
+(defparameter *camera-x* 0)
+(defparameter *camera-y* 0)
 
 (defparameter *chunks* (pix:make-world))
-(defparameter *chunks2* (pix:make-world))
 (defparameter *chunk-call-lists* (make-eq-hash))
-(defparameter *chunk-call-lists2* (make-eq-hash))
 (defparameter *chunk-width* 16)
 (defparameter *chunk-height* 16)
 
-
-
-(defparameter *window-min-x* 0.0)
-(defparameter *window-max-x* 0.0)
-(defparameter *window-min-y* 0.0)
-(defparameter *window-max-y* 0.0)
+(defparameter *window-block-height* 0.0)
+(defparameter *window-block-width* 0.0)
 
 (defparameter *window-min-x-block* 0)
 (defparameter *window-max-x-block* 0)
 (defparameter *window-min-y-block* 0)
 (defparameter *window-max-y-block* 0)
-
-(defparameter *window-min-x2* 0.0)
-(defparameter *window-max-x2* 0.0)
-(defparameter *window-min-y2* 0.0)
-(defparameter *window-max-y2* 0.0)
 
 (defparameter *window-min-x-block2* 0)
 (defparameter *window-max-x-block2* 0)
@@ -95,6 +93,9 @@
 
 (defun physics ()
 
+  (setf *old-cursor-x* *hud-cursor-x*
+	*old-cursor-y* *hud-cursor-y*)
+  
   (incf *ticks*)
   (when (skey-j-p :escape) (window:toggle-mouse-capture))
   (progn
@@ -121,56 +122,55 @@
   (let ((scroll (ceiling e:*scroll-y*)))
     (unless (zerop scroll)
       (if *scroll-sideways*
-	  (incf *camera-x* (* 5 *block-width* scroll))
-	  (incf *camera-y* (* 5 *block-height* scroll)))
+	  (incf *camera-x* (* 1 scroll))
+	  (incf *camera-y* (* 1 scroll)))
       (setf *cursor-moved* *ticks*)))
-  
+
+  (setf *window-block-width* (/ e:*width* *block-width*)
+	*window-block-height* (/ e:*height* *block-height*))
+  (setf *hud-cursor-x* (floor (clamp (- *cursor-x* *camera-x*)
+				     (- *window-block-width*)
+				     *window-block-width*))
+	*hud-cursor-y* (floor (clamp (- *cursor-y* *camera-y*)
+				     (- *window-block-height*)
+				     *window-block-width*)))
+  (when (not (and (= *old-cursor-x* *hud-cursor-x*)
+		  (= *old-cursor-y* *hud-cursor-y*)))
+    (set-char-with-update (pix:xy-index (+ *hud-x* *old-cursor-x*)
+					(+ *hud-y* *old-cursor-y*))
+			  nil))
   (let ((diff (- *ticks* *cursor-moved*)))
     (flet ((set-hightlight ()
 	     (let ((char (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*) *chunks*)))
 	       (unless char
 		 (setf char 0))
-	       (set-char-with-update2 (pix:xy-index 0 0) 
-				      (logior (logandc2 (lognot char) 255) (mod char 256))))))
+	       (set-char-with-update (pix:xy-index (+ *hud-x* *hud-cursor-x*)
+						   (+ *hud-y* *hud-cursor-y*)) 
+				     (logior (logandc2 (lognot char) 255) (mod char 256))))))
       (cond ((zerop diff)
-	     (set-hightlight))
+	     (set-hightlight)
+	     (setf *show-cursor* t))
 	    ((< 615 diff))
-	    ((= 15 (mod diff 30))
-	     (cond (*show-cursor*
-		    (set-hightlight)
-		    (setf *show-cursor* nil))
-		   (t (set-char-with-update2 (pix:xy-index 0 0) nil)
-		      (setf *show-cursor* t)))
-
-	     ))))
+	    ((= 0 (mod diff 30))
+	     (if *show-cursor*
+		 (setf *show-cursor* nil)
+		 (setf *show-cursor* t))))))
   (remove-spurious-mouse-input)
   (progno (when (skey-p :space)
 	    (dotimes (x 16)
 	      (let ((x (random 128))
 		    (y (random 128)))
 		(set-char-with-update (pix:xy-index x y) (random most-positive-fixnum))))))
-
-  (let ((half-height (/ e:*height* 1.0))
-	(half-width (/ e:*width* 1.0)))
-    (setf *window-min-x* (- *camera-x* half-width)
-	  *window-max-x* (+ *camera-x* half-width)
-	  *window-min-y* (- *camera-y* half-height)
-	  *window-max-y* (+ *camera-y* half-height))
-    (setf *window-min-x-block* (/ *window-min-x* *block-width*)
-	  *window-max-x-block* (/ *window-max-x* *block-width*)
-	  *window-min-y-block* (/ *window-min-y* *block-height*)
-	  *window-max-y-block* (/ *window-max-y* *block-height*)))
-
-  (let ((half-height (/ e:*height* 1.0))
-	(half-width (/ e:*width* 1.0)))
-    (setf *window-min-x2* (- *camera-x* half-width)
-	  *window-max-x2* (+ *camera-x* half-width)
-	  *window-min-y2* (- *camera-y* half-height)
-	  *window-max-y2* (+ *camera-y* half-height))
-    (setf *window-min-x-block2* (- (/ *window-min-x2* *block-width*) *cursor-x*)
-	  *window-max-x-block2* (- (/ *window-max-x2* *block-width*) *cursor-x*)
-	  *window-min-y-block2* (- (/ *window-min-y2* *block-height*) *cursor-y*)
-	  *window-max-y-block2* (- (/ *window-max-y2* *block-height*) *cursor-y*))))
+  
+  (setf *window-min-x-block* (- *camera-x* *window-block-width*) 
+	*window-max-x-block* (+ *camera-x* *window-block-width*)
+	*window-min-y-block* (- *camera-y* *window-block-height*)
+	*window-max-y-block* (+ *camera-y* *window-block-height*))
+  
+  (setf *window-min-x-block2* (- *hud-x* *window-block-width*)
+	*window-max-x-block2* (+ *hud-x* *window-block-width*)
+	*window-min-y-block2* (- *hud-y* *window-block-height*)
+	*window-max-y-block2* (+ *hud-y* *window-block-height*)))
 
 (defun quit ()
   (setf e:*status* t))
@@ -182,14 +182,6 @@
       (when chunk
 	(gl:delete-lists chunk 1)
 	(remhash chunk-id *chunk-call-lists*)))))
-
-(defun set-char-with-update2 (place value)
-  (let ((chunk-id
-	 (setf (pix:get-obj place *chunks2*) value)))
-    (let ((chunk (gethash chunk-id *chunk-call-lists2*)))
-      (when chunk
-	(gl:delete-lists chunk 1)
-	(remhash chunk-id *chunk-call-lists2*)))))
 
 (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
 (defparameter *save-file* (merge-pathnames #P"file" *saves-dir*))

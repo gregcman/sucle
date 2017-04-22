@@ -67,8 +67,8 @@
       (cg-matrix:%matrix* *temp-matrix2*
 			  *screen-scaled-matrix*
 			  (cg-matrix:%translate* *temp-matrix*
-						 (- *camera-x*)
-						 (- *camera-y*)
+						 (- (* *block-width* *camera-x*))
+						 (- (* *block-height* *camera-y*))
 						 0.0))
       nil))
    
@@ -78,23 +78,24 @@
 		*window-min-y-block*
 		*window-max-y-block*))
 
-  (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
-	 (solidshader-uniforms (glget solidshader :program)))
-    (gl:use-program solidshader)
-    (gl:uniform-matrix-4fv
-     (getuniform solidshader-uniforms :pmv)
-     (cg-matrix:%matrix* *temp-matrix2*
-			 *screen-scaled-matrix*
-			 (cg-matrix:%translate* *temp-matrix*
-						(- (if nil 0 (* *block-width* *cursor-x*)) *camera-x*)
-						(- (if nil 0 (* *block-height* *cursor-y*)) *camera-y*)
-						0.0))
-     nil))
-  (draw-ensure *chunks2* *chunk-call-lists2*
-	       *window-min-x-block2*
-	       *window-max-x-block2*
-	       *window-min-y-block2*
-	       *window-max-y-block2*))
+  (when *show-cursor*
+    (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
+	   (solidshader-uniforms (glget solidshader :program)))
+      (gl:use-program solidshader)
+      (gl:uniform-matrix-4fv
+       (getuniform solidshader-uniforms :pmv)
+       (cg-matrix:%matrix* *temp-matrix2*
+			   *screen-scaled-matrix*
+			   (cg-matrix:%translate* *temp-matrix*
+						  (- (* *block-width* *hud-x*))
+						  (- (* *block-height* *hud-y*))
+						  0.0))
+       nil))
+    (draw-ensure *chunks* *chunk-call-lists*
+		 *window-min-x-block2*
+		 *window-max-x-block2*
+		 *window-min-y-block2*
+		 *window-max-y-block2*)))
 
 (defun draw-ensure (world call-lists minx maxx miny maxy)
   (progn
@@ -158,7 +159,6 @@
   (reset *gl-objects*)
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (clrhash *chunk-call-lists*)
-  (clrhash *chunk-call-lists2*)
   
   (let ((width (if t 480 854))
 	(height (if t 360 480)))
