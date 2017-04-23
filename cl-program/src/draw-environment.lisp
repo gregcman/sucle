@@ -185,7 +185,7 @@
 			 *4x4-tilemap* 0
 			 scale 
 			 scale
-			 -0.0 0.0
+			 -2.0 2.0
 			 (- +single-float-just-less-than-one+)))))))))
      (gl:call-list (get-stuff :cursor-list *stuff* *backup*)))))
 

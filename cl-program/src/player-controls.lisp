@@ -7,6 +7,8 @@
   (e:key-j-r (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
 (defun skey-j-p (enum)
   (e:key-j-p (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
+(defun smice-p (enum)
+  (e:mice-p (cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))))
 (defun smice-j-p (enum)
   (e:mice-j-p (cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))))
 (defun skey-r-or-p (enum)
@@ -97,14 +99,20 @@
 
   (setf *old-cursor-x* *hud-cursor-x*
 	*old-cursor-y* *hud-cursor-y*)
-  
   (incf *ticks*)
   (when (skey-j-p :escape) (window:toggle-mouse-capture))
   (remove-spurious-mouse-input)
   (when (e:mice-locked-p)
     (multiple-value-bind (dx dy) (delta)
-      (incf *mouse-x* (* *mouse-sensitivity* dx))
-      (decf *mouse-y* (* *mouse-sensitivity* dy))))
+      (let ((width e:*width*)
+	    (height e:*height*))
+	(setf *mouse-x* (clamp (+ *mouse-x* (* *mouse-sensitivity* dx)) (- width) (- width 2.0)))
+	(setf *mouse-y* (clamp (- *mouse-y* (* *mouse-sensitivity* dy)) (+  2.0 (- height)) height))))
+    (when (smice-p :left)
+      (setf *cursor-x* (+ *camera-x* (floor *mouse-x* *block-width*))
+	    *cursor-y* (+ *camera-y* (floor *mouse-y* *block-height*)))
+      (setf *cursor-moved* *ticks*)))
+  
   (progn
     (when (skey-r-or-p :up) (incf *cursor-y*) (setf *cursor-moved* *ticks*))
     (when (skey-r-or-p :down) (decf *cursor-y*) (setf *cursor-moved* *ticks*))
