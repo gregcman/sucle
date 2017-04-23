@@ -152,12 +152,14 @@
 		   (set-hightlight)
 		   (setf *show-cursor* t)))))))
   (remove-spurious-mouse-input)
-  (progno (when (skey-p :space)
-	    (dotimes (x 16)
-	      (let ((x (random 128))
-		    (y (random 128)))
-		(set-char-with-update (pix:xy-index x y) (random most-positive-fixnum))))))
 
+  (progno
+   (setf (fill-pointer foo) 0)
+   (with-output-to-string (var foo)
+     (print (list (get-internal-real-time)
+		  (get-internal-run-time)) var))
+   (copy-string-to-world 0 128 foo (logandc2 (random most-positive-fixnum) 255)))
+  
   (let ((rectangle *cam-rectangle*))
     (setf (aref rectangle 0) (- *camera-x* *window-block-width*)
 	  (aref rectangle 1) (- *camera-y* *window-block-height*)
@@ -205,3 +207,16 @@
 (defun myload (filename)
    (let ((path (merge-pathnames filename *saves-dir*)))
      (conspack:decode (byte-read path))))
+
+
+(defun copy-string-to-world (x y string color)
+  (let ((len (length string))
+	(xoffset 0)
+	(yoffset 0))
+    (dotimes (index len)
+      (let ((char (aref string index)))
+	(cond ((char= char #\Newline)
+	       (setf xoffset 0 yoffset (1- yoffset)))
+	      (t (set-char-with-update (pix:xy-index (+ x xoffset) (+ y yoffset))
+				       (logior (char-code char) color))
+		 (incf xoffset)))))))
