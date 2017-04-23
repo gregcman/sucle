@@ -93,17 +93,17 @@
     (when (skey-r-or-p :down) (decf *cursor-y*) (setf *cursor-moved* *ticks*))
     (when (skey-r-or-p :left) (decf *cursor-x*) (setf *cursor-moved* *ticks*))
     (when (skey-r-or-p :right) (incf *cursor-x*) (setf *cursor-moved* *ticks*)))
-  (dotimes (x (length e:*chars*))
-    (let ((char (vector-pop e:*chars*)))
-      (set-char-with-update (pix:xy-index *cursor-x* *cursor-y*)
-			    (logior
-			     (char-code char)
-			     *white-black-color*))
-      (incf *cursor-x*)
-      (setf *cursor-moved* *ticks*)))
+  (let ((len (length e:*chars*)))
+    (unless (zerop len) (setf *cursor-moved* *ticks*))
+    (dotimes (x len)
+      (let ((char (vector-pop e:*chars*)))
+	(typing-insert (logior
+			(char-code char)
+			*white-black-color*)
+		       *cursor-x* *cursor-y*)			      
+	(incf *cursor-x*))))
   (when (skey-r-or-p :backspace)
-    (set-char-with-update (pix:xy-index (1- *cursor-x*) *cursor-y*)
-			  (logior (char-code #\Space) *white-black-color*))
+    (typing-delete *cursor-x* *cursor-y*)
     (decf *cursor-x*)
     (setf *cursor-moved* *ticks*))
 
@@ -152,13 +152,6 @@
 		   (set-hightlight)
 		   (setf *show-cursor* t)))))))
   (remove-spurious-mouse-input)
-
-  (progno
-   (setf (fill-pointer foo) 0)
-   (with-output-to-string (var foo)
-     (print (list (get-internal-real-time)
-		  (get-internal-run-time)) var))
-   (copy-string-to-world 0 128 foo (logandc2 (random most-positive-fixnum) 255)))
   
   (let ((rectangle *cam-rectangle*))
     (setf (aref rectangle 0) (- *camera-x* *window-block-width*)
@@ -188,6 +181,22 @@
 
 (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
 (defparameter *save-file* (merge-pathnames #P"file" *saves-dir*))
+
+(defun typing-insert (value x y)
+  (let ((start (pix:xy-index x y)))
+    (let ((old-value (pix:get-obj start *chunks*)))
+      (set-char-with-update start value)
+      (if old-value
+	  (typing-insert old-value (1+ x) y)))))
+
+(defun typing-delete (x y)
+  (let ((start (pix:xy-index x y)))
+    (let ((old-value (pix:get-obj start *chunks*))
+	  (prev (pix:xy-index (1- x) y)))
+      (cond (old-value 
+	     (set-char-with-update prev old-value)
+	     (typing-delete (1+ x) y))
+	    (t (set-char-with-update prev nil))))))
 
 (defun asave (thing)
   (save *save-file* thing))

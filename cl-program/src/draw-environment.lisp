@@ -53,7 +53,7 @@
   (gl:disable :depth-test :blend)
   (gl:depth-mask :false)
   (gl:depth-func :always)
-  (gl:clear-color 0f0 0.0 0.0 0f0)
+  (gl:clear-color 0.0 (/ 8.0 256.0) (/ 16.0 256.0) 0f0)
   (when *clear-display-buffer*
     (gl:clear :color-buffer-bit))
 

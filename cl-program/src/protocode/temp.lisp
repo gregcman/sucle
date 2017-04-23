@@ -768,3 +768,19 @@
 	 (cond ((eql new +release+) +release+)
 	       ((eql new +press+) t)
 	       ((eql new +repeat+) +repeat+))))))
+
+(progno
+ (defun bar (d b)
+   (sqrt (* -2 d (log (- 1 b))))))
+
+(progno
+    (setf (fill-pointer foo) 0)
+    (with-output-to-string (var foo)
+      (write '(defun set-char-with-update (place value)
+	       (let ((chunk-id
+		      (setf (pix:get-obj place *chunks*) value)))
+		 (let ((chunk (gethash chunk-id *chunk-call-lists*)))
+		   (when chunk
+		     (gl:delete-lists chunk 1)
+		     (remhash chunk-id *chunk-call-lists*))))) :stream var :case :downcase))
+    (copy-string-to-world 0 128 foo *white-black-color*))
