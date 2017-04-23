@@ -35,6 +35,10 @@
 			       ("BGCOL" . 10)
 			       )))
 
+(defparameter *postexcol* (quote (("POS" . 0)	
+				  ("TEX" . 8)
+				  ("COL" . 9))))
+
 (defparameter *clear-display-buffer* t)
 
 (defun render ()
@@ -71,13 +75,12 @@
 	 (solidshader-uniforms (glget solidshader :program))
 	 (pmv (getuniform solidshader-uniforms :pmv)))
     (gl:use-program solidshader)
-    (let ((auxvarw (* *block-width* *one-over-window-width* -1.0))
-	  (auxvarh (* *block-height* *one-over-window-height* -1.0)))
+    (let ((auxvarw (* *block-width* -1.0 *one-over-window-width*))
+	  (auxvarh (* *block-height* -1.0 *one-over-window-height*)))
       (flet ((draw-window (rectangle world call-lists chunk-width chunk-height xoffset yoffset)
-	       (setf (cg-matrix:mref *screen-scaled-matrix* 0 3)
-		     (* auxvarw xoffset)
-		     (cg-matrix:mref *screen-scaled-matrix* 1 3)
-		     (* auxvarh yoffset))
+	       (rescale-screen-matrix *screen-scaled-matrix*
+				      (* auxvarw xoffset)
+				      (* auxvarh yoffset))
 	       (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil)
 	       (draw-ensure world call-lists
 			    (aref rectangle 0)
@@ -87,7 +90,17 @@
 			    (floor chunk-width)
 			    (floor chunk-height))))
 	(draw-window *cam-rectangle* *chunks* *chunk-call-lists* 16 16 *camera-x* *camera-y*)
-	(draw-window *hud-rectangle* *chunks* *chunk-call-lists* 16 16 *hud-x* *hud-y*)))))
+	(draw-window *hud-rectangle* *chunks* *chunk-call-lists* 16 16 *hud-x* *hud-y*))))
+  (render-mouse))
+
+
+
+(defun rescale-screen-matrix (result x y)
+  (setf (cg-matrix:mref result 0 3)
+	x
+	(cg-matrix:mref result 1 3)
+	y)
+  result)
 
 (defun draw-ensure (world call-lists minx maxx miny maxy chunk-width chunk-height)
   (dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
@@ -120,6 +133,62 @@
 	    *block-height*
 	    +single-float-just-less-than-one+)))
       times)))
+
+(progn
+ (defun draw-mouse (pos-buf tex-buf lit-buf
+		    lookup value char-width char-height x y z)
+   (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf)
+	    (type single-float x y z char-width char-height)
+	    (type simple-vector lookup)
+	    (optimize (speed 3) (safety 0))
+	    (type fixnum value))
+   (iter-ator:wasabios ((epos pos-buf)
+			(etex tex-buf)
+			(elit lit-buf))
+
+     (dotimes (x 4)
+       (etouq (ngorp (preach 'elit '(1f0
+				     1f0
+				     1f0)))))
+     (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
+       (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
+     (etouq (ngorp
+	     (preach
+	      'epos
+	      (quadk+ 'z '(x
+			   (+ char-width x)
+			   (- y char-height)
+			   y)))))4))
+ (defun render-mouse ()
+
+   (let* ((simpleshader (get-stuff :simpleshader *stuff* *backup*))
+	  (simpleshader-uniforms (glget simpleshader :program))
+	  (pmv (getuniform simpleshader-uniforms :pmv)))
+     (gl:use-program simpleshader)
+     (let ((auxvarw (* *one-over-window-width* 1.0))
+	   (auxvarh (* *one-over-window-height* 1.0)))       
+       (rescale-screen-matrix *screen-scaled-matrix*
+			      (* auxvarw (float *mouse-x*))
+			      (* auxvarh (float *mouse-y*)))
+       
+       (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil))
+     (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
+     (let ((scale 64.0))
+       (namexpr *backup* :cursor-list
+		(lambda ()
+		  (create-call-list-from-func
+		   (lambda ()
+		     (gl-draw-quads69 
+		      (lambda (tex-buf pos-buf lit-buf)
+			(draw-mouse
+			 pos-buf tex-buf lit-buf
+			 *4x4-tilemap* 0
+			 scale 
+			 scale
+			 -0.0 0.0
+			 (- +single-float-just-less-than-one+)))))))))
+     (gl:call-list (get-stuff :cursor-list *stuff* *backup*)))))
+
 
 (progn
   (declaim (ftype (function (iter-ator:iter-ator fixnum (simple-array t)))
@@ -156,6 +225,18 @@
 		   (remhash k hash)))
 	     hash))
   (let ((backup *backup*))
+
+    (progn
+      (namexpr backup :cursor-image
+	       (lambda ()
+		 (flip-image
+		  (load-png
+		   (img-path #P"cursor/windos-cursor.png")))))
+      (namexpr backup :cursor
+	       (lambda ()
+		 (pic-texture (get-stuff :cursor-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*))))
     (progn    
       (namexpr backup :textshader
 	       (lambda ()
@@ -168,12 +249,29 @@
 		     (register program :program table)
 		     (cache-program-uniforms program table (quote ((:pmv . "PMV")))))
 		   program)))
-     
-      (namexpr backup :text-vs
-	       (lambda () (file-string (shader-path "pos4f-tex2f-bgcol3f-fgcol3f.vs"))))
       
+      (namexpr backup :text-vs
+	       (lambda () (file-string (shader-path "pos4f-tex2f-bgcol3f-fgcol3f.vs"))))      
       (namexpr backup :text-frag
 	       (lambda () (file-string (shader-path "ftex2f-bg3f-fg3f.frag")))))
+
+    (progn
+
+      (namexpr backup :simpleshader
+	       (lambda ()
+		 (let ((program
+			(make-shader-program-from-strings
+			 (get-stuff :simple-vs *stuff* *backup*)
+			 (get-stuff :simple-frag *stuff* *backup*)
+			 *postexcol*)))
+		   (let ((table (make-eq-hash)))
+		     (register program :program table)
+		     (cache-program-uniforms program table (quote ((:pmv . "PMV")))))
+		   program)))
+      (namexpr backup :simple-vs
+	       (lambda () (file-string (shader-path "pos4f-col3f-tex2f.vs"))))
+      (namexpr backup :simple-frag
+	       (lambda () (file-string (shader-path "fcol3f-ftex2f-no0a.frag")))))
     
     (progn
       (namexpr backup :font-image
@@ -199,29 +297,52 @@
 	*window-width* w))
 
 
-(defun gl-draw-quads (func)
-  (let ((iter *attrib-buffer-iterators*))
-    (reset-attrib-buffer-iterators iter)
-    (let ((pos-buf (aref iter 0))
-	  (tex-buf (aref iter 8))
-	  (fg-buf (aref iter 9))
-	  (bg-buf (aref iter 10)))
-      (let ((times (funcall func tex-buf pos-buf fg-buf bg-buf)))
-	(gl:with-primitives :quads
-	  (reset-attrib-buffer-iterators iter)
-	  (mesh-test42 times tex-buf pos-buf fg-buf bg-buf))))))
+(progn
+  (defun gl-draw-quads69 (func)
+    (let ((iter *attrib-buffer-iterators*))
+      (reset-attrib-buffer-iterators iter)
+      (let ((pos-buf (aref iter 0))
+	    (tex-buf (aref iter 8))
+	    (col-buf (aref iter 9)))
+	(let ((times (funcall func tex-buf pos-buf col-buf)))
+	  (gl:with-primitives :quads
+	    (reset-attrib-buffer-iterators iter)
+	    (mesh-test4269 times tex-buf pos-buf col-buf))))))
 
-(defun mesh-test42 (times tex pos fg bg)
-  (declare (type iter-ator:iter-ator tex pos))
-  (iter-ator:wasabiis ((uv tex)
-		       (xyz pos)
-		       (eft fg)
-		       (ebg bg))
-    (dotimes (x times)
-      (%gl:vertex-attrib-2f 8 (uv) (uv))
-      (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
-      (%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
-      (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
+  (defun mesh-test4269 (times tex pos col)
+    (declare (type iter-ator:iter-ator tex pos col))
+    (iter-ator:wasabiis ((uv tex)
+			 (xyz pos)
+			 (eft col))
+      (dotimes (x times)
+	(%gl:vertex-attrib-2f 8 (uv) (uv))
+	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
+	(%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
+
+(progn
+  (defun gl-draw-quads (func)
+    (let ((iter *attrib-buffer-iterators*))
+      (reset-attrib-buffer-iterators iter)
+      (let ((pos-buf (aref iter 0))
+	    (tex-buf (aref iter 8))
+	    (fg-buf (aref iter 9))
+	    (bg-buf (aref iter 10)))
+	(let ((times (funcall func tex-buf pos-buf fg-buf bg-buf)))
+	  (gl:with-primitives :quads
+	    (reset-attrib-buffer-iterators iter)
+	    (mesh-test42 times tex-buf pos-buf fg-buf bg-buf))))))
+
+  (defun mesh-test42 (times tex pos fg bg)
+    (declare (type iter-ator:iter-ator tex pos))
+    (iter-ator:wasabiis ((uv tex)
+			 (xyz pos)
+			 (eft fg)
+			 (ebg bg))
+      (dotimes (x times)
+	(%gl:vertex-attrib-2f 8 (uv) (uv))
+	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
+	(%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
+	(%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
 
 (defmacro with-char-colors ((code-var fg-rvar fg-gvar fg-bvar bg-rvar bg-gvar bg-bvar) value &body body)
   `(let ((,code-var (ldb (byte 8 0) ,value))

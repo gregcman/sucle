@@ -33,6 +33,11 @@
 	     (setq mousecapturestate t)))
       (setq mousecapturestate nil)))
 
+(defparameter *mouse-x* 0.0)
+(defparameter *mouse-y* 0.0)
+(progn
+  (defparameter *mouse-sensitivity* (coerce 2.0 'single-float)))
+
 (defparameter *block-height* (/ 32.0 1.0))
 (defparameter *block-width* (/ 18.0 1.0))
 
@@ -77,9 +82,16 @@
     (logand acc most-positive-fixnum)))
 
 (defparameter *white-black-color* (acolor 255 255 255 0 0 0))
+(defparameter *color-nil* (logandc1 255 (sxhash nil)))
 (defparameter *show-cursor* t)
 (defparameter *cursor-moved* 0)
 (defparameter *scroll-sideways* nil)
+
+(defparameter *print-head-x* 0)
+(defparameter *print-head-y* 127)
+
+(defun strip-char (color)
+  (logandc1 255 color))
 
 (defun physics ()
 
@@ -88,6 +100,11 @@
   
   (incf *ticks*)
   (when (skey-j-p :escape) (window:toggle-mouse-capture))
+  (remove-spurious-mouse-input)
+  (when (e:mice-locked-p)
+    (multiple-value-bind (dx dy) (delta)
+      (incf *mouse-x* (* *mouse-sensitivity* dx))
+      (decf *mouse-y* (* *mouse-sensitivity* dy))))
   (progn
     (when (skey-r-or-p :up) (incf *cursor-y*) (setf *cursor-moved* *ticks*))
     (when (skey-r-or-p :down) (decf *cursor-y*) (setf *cursor-moved* *ticks*))
@@ -138,7 +155,7 @@
 	       (let ((char (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*) *chunks*)))
 		 (unless char
 		   (setf char 0))
-		 (set-cursor (logior (logandc2 (lognot char) 255) (mod char 256))))))
+		 (set-cursor (logior (strip-char (lognot char)) (mod char 256))))))
       (cond ((zerop diff)
 	     (set-hightlight)
 	     (setf *show-cursor* t))
@@ -152,6 +169,18 @@
 		   (set-hightlight)
 		   (setf *show-cursor* t)))))))
   (remove-spurious-mouse-input)
+
+  (progn
+   (unless (zerop (fill-pointer foo))
+     (setf (values *print-head-x* *print-head-y*)
+	   (copy-string-to-world *print-head-x* *print-head-y*
+				 0 foo
+				 (strip-char (or (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*)
+							      *chunks*)
+						 0))
+				 (lambda (x) (mod (1+ x) 64))
+				 (lambda (y) (mod (1- y) 32)))))
+   (setf (fill-pointer foo) 0))
   
   (let ((rectangle *cam-rectangle*))
     (setf (aref rectangle 0) (- *camera-x* *window-block-width*)
@@ -218,14 +247,22 @@
      (conspack:decode (byte-read path))))
 
 
-(defun copy-string-to-world (x y string color)
-  (let ((len (length string))
-	(xoffset 0)
-	(yoffset 0))
-    (dotimes (index len)
-      (let ((char (aref string index)))
-	(cond ((char= char #\Newline)
-	       (setf xoffset 0 yoffset (1- yoffset)))
-	      (t (set-char-with-update (pix:xy-index (+ x xoffset) (+ y yoffset))
+(progn
+  (declaim (ftype (function (fixnum fixnum fixnum (vector character) fixnum
+				    (function (fixnum) fixnum)
+				    (function (fixnum) fixnum))
+			    (values fixnum fixnum))
+		  copy-string-to-world))
+  (defun copy-string-to-world (x y newline-start string color next-x-func next-y-func)
+    (let ((len (length string)))
+      (dotimes (index len)
+	(let ((char (aref string index)))
+	  (cond ((char= char #\Newline)
+		 (setf x newline-start y (funcall next-y-func y)))
+		(t		     
+		 (set-char-with-update (pix:xy-index x y)
 				       (logior (char-code char) color))
-		 (incf xoffset)))))))
+		 (setf x (funcall next-x-func x))))))
+      (values x y))))
+
+

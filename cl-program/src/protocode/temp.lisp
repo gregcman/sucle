@@ -523,57 +523,6 @@
 	  (lambda () (file-string (shader-path "pos4f-col3f-tex2f.vs")))))
 
 (progno
- (defun draw-mouse (pos-buf tex-buf lit-buf
-		    lookup value char-width char-height x y z)
-   (declare (type iter-ator:iter-ator pos-buf tex-buf lit-buf)
-	    (type single-float x y z char-width char-height)
-	    (type simple-vector lookup)
-	    (optimize (speed 3) (safety 0))
-	    (type fixnum value))
-   (iter-ator:wasabios ((epos pos-buf)
-			(etex tex-buf)
-			(elit lit-buf))
-
-     (dotimes (x 4)
-       (etouq (ngorp (preach 'elit '(1f0
-				     1f0
-				     1f0)))))
-     (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
-       (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
-     (etouq (ngorp
-	     (preach
-	      'epos
-	      (quadk+ 'z '(x
-			   (+ char-width x)
-			   (- y char-height)
-			   y)))))4))
- (defun render-mouse ()
-   (progn
-     (gl:uniform-matrix-4fv
-      (gl:get-uniform-location (get-stuff :textshader *stuff* *backup*) "pmv")
-      (cg-matrix:%matrix* *temp-matrix2*
-			  *screen-scaled-matrix*
-			  (cg-matrix:%translate* *temp-matrix* cursor-x cursor-y 0.0))
-      nil)
-     (progn
-       (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-       (progn (let ((scale 64.0))
-		(namexpr *backup* :cursor-list
-			 (lambda ()
-			   (create-call-list-from-func
-			    (lambda ()
-			      (gl-draw-quads 
-			       (lambda (tex-buf pos-buf lit-buf)
-				 (draw-mouse
-				  pos-buf tex-buf lit-buf
-				  *4x4-tilemap* 0
-				  scale 
-				  scale
-				  -0.0 0.0
-				  (- +single-float-just-less-than-one+))))))))))
-       (gl:call-list (get-stuff :cursor-list *stuff* *backup*))))))
-
-(progno
  (defun gl-draw-quads (func)
    (let ((iter *attrib-buffer-iterators*))
      (reset-attrib-buffer-iterators iter)
@@ -606,8 +555,6 @@
 	      (ymax (float e:*height*)))
 	  (setf cursor-x (min (- xmax 4) (max (- xmax) (+ cursor-x delx))))
 	  (setf cursor-y (min (+ ymax 2) (max (- ymax) (- cursor-y dely))))))
-(progno
- (defparameter mouse-sensitivity (coerce (* 60.0 pi 1/180) 'single-float)))
 
 
 (progno
@@ -715,18 +662,6 @@
 	 :report "wtf"
 	 (values otherwise nil))))))
 
-(progno
- (namexpr backup :cursor-image
-	  (lambda ()
-	    (flip-image
-	     (load-png
-	      (img-path #P"cursor/windos-cursor.png")))))
- (namexpr backup :cursor
-	  (lambda ()
-	    (pic-texture (get-stuff :cursor-image *stuff* *backup*)
-			 :rgba
-			 *default-tex-params*))))
-
 
 (progno
     (namexpr *backup* :chunks
@@ -774,13 +709,6 @@
    (sqrt (* -2 d (log (- 1 b))))))
 
 (progno
-    (setf (fill-pointer foo) 0)
-    (with-output-to-string (var foo)
-      (write '(defun set-char-with-update (place value)
-	       (let ((chunk-id
-		      (setf (pix:get-obj place *chunks*) value)))
-		 (let ((chunk (gethash chunk-id *chunk-call-lists*)))
-		   (when chunk
-		     (gl:delete-lists chunk 1)
-		     (remhash chunk-id *chunk-call-lists*))))) :stream var :case :downcase))
-    (copy-string-to-world 0 128 foo *white-black-color*))
+ (with-unsafe-speed
+  (defun itsafixnum (x)
+    (+ 1 (the fixnum x)))))
