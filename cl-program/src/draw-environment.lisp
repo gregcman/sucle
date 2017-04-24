@@ -57,6 +57,7 @@
   (gl:disable :depth-test :blend)
   (gl:depth-mask :false)
   (gl:depth-func :always)
+  (gl:disable :cull-face)
   (gl:clear-color 0.0 (/ 8.0 256.0) (/ 16.0 256.0) 0f0)
   (when *clear-display-buffer*
     (gl:clear :color-buffer-bit))
@@ -76,12 +77,13 @@
     (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
     (draw-text-layers pmv))
 
-  (let* ((simpleshader (get-stuff :simpleshader *stuff* *backup*))
-	 (simpleshader-uniforms (glget simpleshader :program))
-	 (pmv (getuniform simpleshader-uniforms :pmv)))
-    (gl:use-program simpleshader)
-    (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-    (render-mouse pmv)))
+  (progn
+   (let* ((simpleshader (get-stuff :simpleshader *stuff* *backup*))
+	  (simpleshader-uniforms (glget simpleshader :program))
+	  (pmv (getuniform simpleshader-uniforms :pmv)))
+     (gl:use-program simpleshader)
+     (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
+     (render-mouse pmv))))
 
 (defun draw-text-layers (pmv)
   (let ((auxvarw (* *block-width* -1.0 *one-over-window-width*))
@@ -116,31 +118,41 @@
 		 (gl:call-list value)
 		 (if (gethash index world)
 		     (let ((mesh 
-			    (quad-mesh
-			     (lambda (buf)
-			       (draw-box-char
-				buf
-				*16x16-tilemap* world
-				xstart (+ xstart chunk-width)
-				ystart (+ ystart chunk-height)
-				*block-width*
-				*block-height*
-				+single-float-just-less-than-one+)))))
+			     (let ((iter *attrib-buffer-iterators*))
+			       (let ((buf (get-buf-param iter
+							 (etouq (vector 0 8 9 10)))))
+				 (reset-attrib-buffer-iterators iter)
+				 (let ((times (draw-box-char
+					       buf
+					       *16x16-tilemap* world
+					       xstart (+ xstart chunk-width)
+					       ystart (+ ystart chunk-height)
+					       *block-width*
+					       *block-height*
+					       +single-float-just-less-than-one+)))
+				   (reset-attrib-buffer-iterators iter)
+				   (let ((display-list (gl:gen-lists 1)))
+				     (gl:with-new-list (display-list :compile)
+				       (gl:with-primitives :quads
+					 (mesh-test42 times buf)))
+				     display-list))))))
 		       (setf (gethash index call-lists) mesh)
 		       (gl:call-list mesh))))))))
 
-(defmacro with-bufs ((&rest bufvars) buf func &body body)
+
+
+(defmacro with-vec-params ((&rest bufvars) buf func type &body body)
   (let* ((letargs nil)
 	 (counter 0)
 	 (syms (mapcar (lambda (x) (gensym (string x))) bufvars))
-	 (iter-ator-bindings nil)
-	 (decl `(declare (type iter-ator:iter-ator ,@syms))))
+	 (bindings nil)
+	 (decl `(declare (type ,type ,@syms))))
     (dolist (sym syms)
       (push `(,sym (aref ,buf ,counter)) letargs)
-      (push `(,(pop bufvars) ,sym) iter-ator-bindings)
+      (push `(,(pop bufvars) ,sym) bindings)
       (incf counter))
     `(let ,letargs ,decl
-	  (,func ,iter-ator-bindings
+	  (,func ,bindings
 		 ,@body))))
 (progn
  (defun draw-mouse (bufs
@@ -149,9 +161,7 @@
 	    (type simple-vector lookup)
 	    (optimize (speed 3) (safety 0))
 	    (type fixnum value))
-   (with-bufs (epos etex elit) bufs iter-ator:wasabios
-     (dotimes (x 4)
-       (etouq (ngorp (preach 'elit '(1f0 1f0 1f0)))))
+   (with-vec-params (epos etex) bufs iter-ator:wasabios iter-ator:iter-ator
      (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
        (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
      (let ((x1 (+ char-width x))
@@ -182,14 +192,6 @@
 	    (dotimes (index len)
 	      (let ((value (aref vector index)))
 		(ebuf value)))))))))
-
-(defun quad-mesh (func)
-  (let ((display-list (gl:gen-lists 1)))
-   (gl:with-new-list (display-list :compile)
-     (gl-draw-quads *attrib-buffer-iterators* func
-		    (etouq (vector 0 8 9 10)) (function mesh-test42)))
-   display-list))
-
 
 (defun glinnit ()
   (reset *gl-objects*)
@@ -224,18 +226,20 @@
 		 (lambda ()
 		   (create-call-list-from-func
 		    (lambda ()
-		      (gl-draw-quads
-		       *attrib-buffer-iterators*
-		       (lambda (buf)
-			 (draw-mouse
-			  buf
-			  *4x4-tilemap* 0
-			  scale 
-			  scale
-			  -2.0 2.0
-			  (- +single-float-just-less-than-one+)))
-		       (etouq (vector 0 8 9)) 
-		       (function mesh-test4269))))))))
+		      (let ((iter *attrib-buffer-iterators*))
+			(let ((buf (get-buf-param iter (etouq (vector 0 8 9)))))
+			  (reset-attrib-buffer-iterators iter)
+			  (attrib-repeat (aref buf 2) 4 (vector 1f0 1f0 1f0))
+			  (let ((times (draw-mouse
+					buf
+					*4x4-tilemap* 0
+					scale 
+					scale
+					-2.0 2.0
+					(- +single-float-just-less-than-one+))))
+			    (reset-attrib-buffer-iterators iter)
+			    (gl:with-primitives :quads
+			     (mesh-test4269 times buf)))))))))))
     (progn    
       (namexpr backup :textshader
 	       (lambda ()
@@ -297,20 +301,16 @@
 
 (defparameter *buffer-vector-scratch* (make-array 16))
 
-(progn
-  (defun gl-draw-quads (iter func attrib-order mesh-func &optional (newarray *buffer-vector-scratch*))
-    (reset-attrib-buffer-iterators iter)
-    (let ((len (length attrib-order)))
-      (dotimes (x len)
-	(setf (aref newarray x)
-	      (aref iter (aref attrib-order x))))
-      (let ((times (funcall func newarray)))
-	(reset-attrib-buffer-iterators iter)
-	(gl:with-primitives :quads
-	  (funcall mesh-func times newarray)))))
+(defun get-buf-param (iter attrib-order &optional (newarray *buffer-vector-scratch*))
+  (let ((len (length attrib-order)))
+    (dotimes (x len)
+      (setf (aref newarray x)
+	    (aref iter (aref attrib-order x)))))
+  newarray)
 
+(progn
   (defun mesh-test42 (times bufs)
-    (with-bufs (xyz uv eft ebg) bufs iter-ator:wasabiis
+    (with-vec-params (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
       (dotimes (x times)
 	(%gl:vertex-attrib-2f 8 (uv) (uv))
 	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
@@ -319,7 +319,7 @@
 
   (progn
     (defun mesh-test4269 (times bufs)
-      (with-bufs (xyz uv eft) bufs iter-ator:wasabiis
+      (with-vec-params (xyz uv eft) bufs iter-ator:wasabiis iter-ator:iter-ator
 	(dotimes (x times)
 	  (%gl:vertex-attrib-2f 8 (uv) (uv))
 	  (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
@@ -357,7 +357,7 @@
 			  char-width char-height
 			  z)
       (let ((nope 0))
-	(with-bufs (epos etex efg ebg) bufs iter-ator:wasabios
+	(with-vec-params (epos etex efg ebg) bufs iter-ator:wasabios iter-ator:iter-ator
 	  (dobox ((ix bx0 bx1)
 		  (iy by0 by1))
 		 (let ((obj (pix:get-obj (pix:xy-index ix iy) world)))
