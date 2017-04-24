@@ -179,7 +179,8 @@
 (defun quad-mesh (func)
   (let ((display-list (gl:gen-lists 1)))
    (gl:with-new-list (display-list :compile)
-     (gl-draw-quads func))
+     (gl-draw-quads *attrib-buffer-iterators* func
+		    (etouq (vector 0 8 9 10)) (function mesh-test42)))
    display-list))
 
 
@@ -216,7 +217,8 @@
 		 (lambda ()
 		   (create-call-list-from-func
 		    (lambda ()
-		      (gl-draw-quads69 
+		      (gl-draw-quads
+		       *attrib-buffer-iterators*
 		       (lambda (buf)
 			 (draw-mouse
 			  buf
@@ -224,7 +226,9 @@
 			  scale 
 			  scale
 			  -2.0 2.0
-			  (- +single-float-just-less-than-one+))))))))))
+			  (- +single-float-just-less-than-one+)))
+		       (etouq (vector 0 8 9)) 
+		       (function mesh-test4269))))))))
     (progn    
       (namexpr backup :textshader
 	       (lambda ()
@@ -284,44 +288,19 @@
   (setf *window-height* h
 	*window-width* w))
 
+(defparameter *buffer-vector-scratch* (make-array 16))
 
 (progn
-  (defun gl-draw-quads69 (func)
-    (let ((iter *attrib-buffer-iterators*))
-      (reset-attrib-buffer-iterators iter)
-      (let ((pos-buf (aref iter 0))
-	    (tex-buf (aref iter 8))
-	    (col-buf (aref iter 9)))
-	(let ((times (funcall func (vector pos-buf tex-buf col-buf))))
-	  (reset-attrib-buffer-iterators iter)
-	  (gl:with-primitives :quads
-	    (mesh-test4269 times (vector pos-buf tex-buf col-buf)))))))
-
-  (defun mesh-test4269 (times bufs)
-    (let ((pos (aref bufs 0))
-	  (tex (aref bufs 1))
-	  (col (aref bufs 2)))
-      (declare (type iter-ator:iter-ator tex pos col))
-      (iter-ator:wasabiis ((uv tex)
-			   (xyz pos)
-			   (eft col))
-	(dotimes (x times)
-	  (%gl:vertex-attrib-2f 8 (uv) (uv))
-	  (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
-	  (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))))
-
-(progn
-  (defun gl-draw-quads (func)
-    (let ((iter *attrib-buffer-iterators*))
-      (reset-attrib-buffer-iterators iter)
-      (let ((pos-buf (aref iter 0))
-	    (tex-buf (aref iter 8))
-	    (fg-buf (aref iter 9))
-	    (bg-buf (aref iter 10)))
-	(let ((times (funcall func (vector pos-buf tex-buf fg-buf bg-buf))))
-	  (reset-attrib-buffer-iterators iter)
-	  (gl:with-primitives :quads
-	    (mesh-test42 times (vector pos-buf tex-buf fg-buf bg-buf)))))))
+  (defun gl-draw-quads (iter func attrib-order mesh-func &optional (newarray *buffer-vector-scratch*))
+    (reset-attrib-buffer-iterators iter)
+    (let ((len (length attrib-order)))
+      (dotimes (x len)
+	(setf (aref newarray x)
+	      (aref iter (aref attrib-order x))))
+      (let ((times (funcall func newarray)))
+	(reset-attrib-buffer-iterators iter)
+	(gl:with-primitives :quads
+	  (funcall mesh-func times newarray)))))
 
   (defun mesh-test42 (times bufs)
     (let ((pos (aref bufs 0))
@@ -337,7 +316,21 @@
 	  (%gl:vertex-attrib-2f 8 (uv) (uv))
 	  (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
 	  (%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
-	  (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))))
+	  (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
+
+  (progn
+    (defun mesh-test4269 (times bufs)
+      (let ((pos (aref bufs 0))
+	    (tex (aref bufs 1))
+	    (col (aref bufs 2)))
+	(declare (type iter-ator:iter-ator tex pos col))
+	(iter-ator:wasabiis ((uv tex)
+			     (xyz pos)
+			     (eft col))
+	  (dotimes (x times)
+	    (%gl:vertex-attrib-2f 8 (uv) (uv))
+	    (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
+	    (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))))
 
 (defmacro with-char-colors ((fg-rvar fg-gvar fg-bvar bg-rvar bg-gvar bg-bvar) value &body body)
   `(let ((,fg-rvar (ldb (byte 8 8) ,value))
