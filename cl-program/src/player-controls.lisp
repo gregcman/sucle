@@ -160,7 +160,7 @@
 						   (+ *hud-y* *hud-cursor-y*)) 
 				     x))
 	     (set-hightlight ()
-	       (let ((char (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*) *chunks*)))
+	       (let ((char (get-char-num (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*) *chunks*))))
 		 (unless char
 		   (setf char 0))
 		 (set-cursor (logior (strip-char (lognot char)) (mod char 256))))))
@@ -215,10 +215,6 @@
       (when chunk
 	(gl:delete-lists chunk 1)
 	(remhash chunk-id *chunk-call-lists*)))))
-
-(defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
-(defparameter *save-file* (merge-pathnames #P"file" *saves-dir*))
-
 (defun typing-insert (value x y)
   (let ((start (pix:xy-index x y)))
     (let ((old-value (pix:get-obj start *chunks*)))
@@ -235,25 +231,14 @@
 	     (typing-delete (1+ x) y))
 	    (t (set-char-with-update prev nil))))))
 
-(defun asave (thing)
-  (save *save-file* thing))
-
-(defun aload ()
-  (myload *save-file*))
-
-(defun save (filename thing)
-   (let ((path (merge-pathnames filename *saves-dir*)))
-     (with-open-file (stream path
-			     :direction :output
-			     :if-does-not-exist :create
-			     :if-exists :supersede
-			     :element-type '(unsigned-byte 8))
-       (conspack:encode thing :stream stream))))
-
-(defun myload (filename)
-   (let ((path (merge-pathnames filename *saves-dir*)))
-     (conspack:decode (byte-read path))))
-
+(progn
+  (declaim (ftype (function (t) fixnum) get-char-num))
+  (with-unsafe-speed
+    (defun get-char-num (obj)
+      (typecase obj
+	(cons (car obj))
+	(fixnum obj)
+	(t (etouq (sxhash nil)))))))
 
 (progn
   (declaim (ftype (function (fixnum fixnum fixnum (vector character) fixnum

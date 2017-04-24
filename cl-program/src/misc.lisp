@@ -131,9 +131,26 @@
 		    (when (functionp genfunc)
 		      (values (funcall genfunc) t)))))))
 
-(defun create-call-list-from-func (func)
-  (let ((the-list (gl:gen-lists 1)))
-    (gl:new-list the-list :compile)
-    (funcall func)
-    (gl:end-list)
-    the-list))
+(progn
+
+  (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
+  (defparameter *save-file* (merge-pathnames #P"file" *saves-dir*))
+
+  (defun asave (thing)
+    (save *save-file* thing))
+
+  (defun aload ()
+    (myload *save-file*))
+
+  (defun save (filename thing)
+    (let ((path (merge-pathnames filename *saves-dir*)))
+      (with-open-file (stream path
+			      :direction :output
+			      :if-does-not-exist :create
+			      :if-exists :supersede
+			      :element-type '(unsigned-byte 8))
+	(conspack:encode thing :stream stream))))
+
+  (defun myload (filename)
+    (let ((path (merge-pathnames filename *saves-dir*)))
+      (conspack:decode (byte-read path)))))
