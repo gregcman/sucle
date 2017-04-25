@@ -2,17 +2,20 @@
 
 (defparameter *proc* nil)
 
+(defun run-program (command)
+  (sb-ext:run-program  (car command)
+		       (cdr command)
+		       :wait nil
+		       :output :stream
+		       :input :stream
+		       :external-format :utf-8))
+
 (defun reset-ssh ()
   (when *proc*
     (sb-ext:process-kill *proc* 9))
-  (setf *proc*
-	(sb-ext:run-program "/usr/bin/ssh"
-			    (list "-tt" "terminal256@0.0.0.0")
-			    :wait nil
-			    
-			    :output :stream
-			    :input :stream
-			    :external-format :utf-8)))
+  (let ((command (list "/usr/bin/ssh" "-tt" "terminal256@0.0.0.0")))
+    (setf *proc* (run-program command))))
+
 (defparameter *term* nil)
 
 (defun reset-term ()
@@ -21,15 +24,16 @@
   (update-terminal-stuff))
 
 (defun update-terminal-stuff (&optional (term *term*) (proc *proc*))
-  (tagbody rep
-     (let ((c (read-char-no-hang (sb-ext:process-output proc)
-				 nil :eof)))
-       (cond ((eq c :eof))
-	     ((eq c nil))
-	     (t (let ((a (load-time-value " ")))
-		  (setf (aref a 0) c)
-		  (3bst:handle-input a :term term))
-		(go rep))))))
+  (when (sb-ext:process-alive-p proc)
+    (tagbody rep
+       (let ((c (read-char-no-hang (sb-ext:process-output proc)
+				   nil :eof)))
+	 (cond ((eq c :eof))
+	       ((eq c nil))
+	       (t (let ((a (load-time-value " ")))
+		    (setf (aref a 0) c)
+		    (3bst:handle-input a :term term))
+		  (go rep)))))))
 
 (defun char-print-term (x y &optional (term *term*))
   (let ((dirty (3bst:dirty term))
@@ -51,7 +55,7 @@
      do (format t "~,' 2d~a:" row (if (plusp (aref dirty row)) "*" " "))
        (loop for col below (3bst:columns term)
 	  for glyph = (3bst:glyph-at (3bst::screen term) row col)
-	  for char = (3bst:c glyph)
+	  for char = (3bst::mode glyph)
 	  do (format t "~a" char))
        (format t "~%")))
 
