@@ -748,3 +748,56 @@
 			      (etex tex-buf)
 			      (efg fg-buf)
 			      (ebg bg-buf))))
+
+(progno
+ (sb-ext:run-program "/usr/bin/ssh"
+		     (list "-t" "terminal256@0.0.0.0")
+		     :wait nil
+		     :output :stream
+		     :input :stream
+		     :external-format :utf-8))
+
+(progno
+ (when (skey-r-or-p :up) (incf *cursor-y*) (setf *cursor-moved* *ticks*))
+ (when (skey-r-or-p :down) (decf *cursor-y*) (setf *cursor-moved* *ticks*))
+ (when (skey-r-or-p :left) (decf *cursor-x*) (setf *cursor-moved* *ticks*))
+ (when (skey-r-or-p :right) (incf *cursor-x*) (setf *cursor-moved* *ticks*))
+
+ (progno
+  (typing-insert (logior
+		  (char-code char)
+		  *white-black-color*)
+		 *cursor-x* *cursor-y*)			      
+  (incf *cursor-x*)
+
+
+  )
+
+ (progno
+  (when (skey-r-or-p :u)
+    (toggle *scroll-sideways*))
+  (let ((scroll (ceiling e:*scroll-y*)))
+    (unless (zerop scroll)
+      (if *scroll-sideways*
+	  (incf *camera-x* (* 1 scroll))
+	  (incf *camera-y* (* 1 scroll)))
+      (setf *cursor-moved* *ticks*))))
+ (progno
+  (typing-delete *cursor-x* *cursor-y*)
+  (decf *cursor-x*)
+  (setf *cursor-moved* *ticks*))
+ (progno (when (smice-p :left)
+	   (setf *cursor-x* (+ *camera-x* (floor *mouse-x* *block-width*))
+		 *cursor-y* (+ *camera-y* (floor *mouse-y* *block-height*)))
+	   (setf *cursor-moved* *ticks*))))
+(progno
+   (unless (zerop (fill-pointer foo))
+     (setf (values *print-head-x* *print-head-y*)
+	   (copy-string-to-world *print-head-x* *print-head-y*
+				 0 foo
+				 (strip-char (or (pix:get-obj (pix:xy-index *cursor-x* *cursor-y*)
+							      *chunks*)
+						 0))
+				 (lambda (x) (mod (1+ x) 64))
+				 (lambda (y) (mod (1- y) 32)))))
+   (setf (fill-pointer foo) 0))

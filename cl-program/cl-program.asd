@@ -8,6 +8,7 @@
 
 		 #:window-glfw3
 		 #:cl-conspack
+		 #:3bst
 		 
 		 #:funland
 		 #:fixed-leaf-hashed-array-tree)
@@ -25,6 +26,7 @@
 	       (:file "axis-aligned-quads")
 	       (:file "globjects")
 	       (:file "pix")
+	       (:file "terminal")
 	       
 	       (:file "misc") ;;;everything else
 	       

@@ -77,13 +77,12 @@
     (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
     (draw-text-layers pmv))
 
-  (progn
-   (let* ((simpleshader (get-stuff :simpleshader *stuff* *backup*))
-	  (simpleshader-uniforms (glget simpleshader :program))
-	  (pmv (getuniform simpleshader-uniforms :pmv)))
-     (gl:use-program simpleshader)
-     (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-     (render-mouse pmv))))
+  (let* ((simpleshader (get-stuff :simpleshader *stuff* *backup*))
+	 (simpleshader-uniforms (glget simpleshader :program))
+	 (pmv (getuniform simpleshader-uniforms :pmv)))
+    (gl:use-program simpleshader)
+    (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
+    (render-mouse pmv)))
 
 (defun draw-text-layers (pmv)
   (let ((auxvarw (* *block-width* -1.0 *one-over-window-width*))
@@ -309,6 +308,7 @@
   newarray)
 
 (progn
+
   (defun mesh-test42 (times bufs)
     (with-vec-params (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
       (dotimes (x times)
