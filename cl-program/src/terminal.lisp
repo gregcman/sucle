@@ -33,6 +33,7 @@
 	       (t (let ((a (load-time-value " ")))
 		    (setf (aref a 0) c)
 		    (3bst:handle-input a :term term))
+		  
 		  (go rep)))))))
 
 (defun char-print-term (x y &optional (term *term*))
@@ -55,14 +56,14 @@
      do (format t "~,' 2d~a:" row (if (plusp (aref dirty row)) "*" " "))
        (loop for col below (3bst:columns term)
 	  for glyph = (3bst:glyph-at (3bst::screen term) row col)
-	  for char = (3bst::mode glyph)
+	  for char = (3bst::fg glyph)
 	  do (format t "~a" char))
        (format t "~%")))
 
 (defun enter (args &optional (proc *proc*))
   (progn
     (let ((in (sb-ext:process-input proc)))
-      (format in args)
+      (write-string args in)
       (finish-output in))))
 
 (defun term-cursor-info ()

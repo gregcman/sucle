@@ -108,7 +108,7 @@
   (char-print-term *terminal-start-x*
 		   *terminal-start-y*)
   (when (skey-j-p :enter)
-    (enter "~%"))
+    (enter (etouq (string #\Newline))))
   
   (setf *old-hud-cursor-x* *hud-cursor-x*
 	*old-hud-cursor-y* *hud-cursor-y*)
