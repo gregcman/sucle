@@ -138,20 +138,6 @@
 		       (setf (gethash index call-lists) mesh)
 		       (gl:call-list mesh))))))))
 
-
-(defmacro with-vec-params ((&rest bufvars) buf &body body)
-  (let ((letargs nil)
-	(counter 0))
-    (dolist (sym bufvars)	
-      (push (if (consp sym)
-		(prog1
-		  `(,(pop sym) (aref ,buf ,(pop sym)))
-		  (incf counter))
-		`(,sym (aref ,buf ,counter))) letargs))
-    `(let ,letargs 
-       ,@body)))
-
-
 (defmacro with-iterators ((&rest bufvars) buf func type &body body)
   (let* ((letargs nil)
 	 (counter 0)

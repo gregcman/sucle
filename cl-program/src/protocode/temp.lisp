@@ -801,3 +801,24 @@
 				 (lambda (x) (mod (1+ x) 64))
 				 (lambda (y) (mod (1- y) 32)))))
    (setf (fill-pointer foo) 0))
+
+(progno
+    (when (or (skey-j-p :left-shift)
+	      (skey-j-p :right-shift))
+      (enter "[C"))
+    (when (or (skey-j-p :left-alt)
+	      (skey-j-p :right-alt))
+      (enter "[C"))
+    (when (or (skey-j-p :left-control)
+	      (skey-j-p :right-control))
+      (enter "[C"))
+    (when (or (skey-j-p :left-super)
+	      (skey-j-p :right-super))
+      (enter "[C")))
+
+   (progno
+    (let ((len (length e:*chars*)))
+      (unless (zerop len) (setf *cursor-moved* *ticks*))
+      (dotimes (x len)
+	(let ((char (vector-pop e:*chars*)))
+	  (enter (string char))))))

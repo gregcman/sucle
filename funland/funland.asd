@@ -10,6 +10,7 @@
 			 (:file "eval-always")
 			 (:file "with-unsafe-speed")
 			 (:file "with-declaim-inline")
+			 (:file "with-vec-params")
 			 (:module "defdestructure"
 				  :serial t
 				  :components ((:file "defdestructure")))

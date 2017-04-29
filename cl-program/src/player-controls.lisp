@@ -112,11 +112,9 @@
   (remove-spurious-mouse-input)
   (incf *ticks*)
   
-  (update-terminal-stuff)
-  (char-print-term *terminal-start-x*
-		   *terminal-start-y*)
-  (when (skey-j-p :enter)
-    (enter (etouq (string #\Newline))))
+  (when (update-terminal-stuff)
+    (char-print-term *terminal-start-x*
+		     *terminal-start-y*))
   
   (setf *old-hud-cursor-x* *hud-cursor-x*
 	*old-hud-cursor-y* *hud-cursor-y*)
@@ -140,13 +138,31 @@
 	      (decf *camera-y* (- (floor *mouse-y* *block-height*)
 				  (floor old-mouse-y *block-height*)))))))))
 
-  (when (skey-r-or-p :backspace)
-    (enter (string #\del)))
-  (let ((len (length e:*chars*)))
-    (unless (zerop len) (setf *cursor-moved* *ticks*))
-    (dotimes (x len)
-      (let ((char (vector-pop e:*chars*)))
-	(enter (string char)))))
+  (progn
+   (when (skey-r-or-p :enter)
+     (enter (etouq (string #\return))))
+   (when (skey-r-or-p :backspace)
+     (enter (string #\del)))
+   (when (skey-r-or-p :tab)
+     (enter (etouq (string #\Tab))))
+   (when (skey-r-or-p :up)
+     (enter "[A"))
+   (when (skey-r-or-p :down)
+     (enter "[B"))
+   (when (skey-r-or-p :left)
+     (enter "[D"))
+   (when (skey-j-p :right)
+     (enter "[C"))
+
+   (with-hash-table-iterator (next e:*keypress-hash*)
+     (loop (multiple-value-bind (more key value) (next)
+	     (if more
+		 (let ((code (gethash key *keyword-ascii*)))
+		   (when code
+		     (when (e::r-or-p (e::get-press-value value))
+		       (let ((mods (ash value (- e::+mod-key-shift+))))
+			 (convert-char code mods)))))
+		 (return))))))
 
   (multiple-value-bind (x y state other) (term-cursor-info)
     (declare (ignorable state other))
@@ -183,7 +199,7 @@
 		   (unless char
 		     (setf char 0))
 		   (set-cursor (logior (strip-char (lognot char))
-				       (char-code (3bst:c other)))))))
+				       (mod char 256))))))
 	(cond ((zerop diff)
 	       (set-hightlight)
 	       (setf *show-cursor* t))
@@ -265,4 +281,75 @@
 		 (setf x (funcall next-x-func x))))))
       (values x y))))
 
+(progn
+  (defun map-symbol-ascii (hash)
+    (dolist (x (quote ((:space 32)
+		       (:apostrophe 39)
+		       (:comma 44)
+		       (:minus 45)
+		       (:period 46)
+		       (:slash 47)
+		       (:0 48)
+		       (:1 49)
+		       (:2 50)
+		       (:3 51)
+		       (:4 52)
+		       (:5 53)
+		       (:6 54)
+		       (:7 55)
+		       (:8 56)
+		       (:9 57)
+		       (:semicolon 59)
+		       (:equal 61)
+		       (:A 97) (:B 98) (:C 99) (:D 100) (:E 101) (:F 102) (:G 103) (:H 104) (:I 105)
+		       (:J 106) (:K 107) (:L 108) (:M 109) (:N 110) (:O 111) (:P 112) (:Q 113)
+		       (:R 114) (:S 115) (:T 116) (:U 117) (:V 118) (:W 119) (:X 120) (:Y 121)
+		       (:Z 122)
+		       (:left-bracket 91)
+		       (:backslash 92)
+		       (:right-bracket 93)
+		       (:grave-accent 96))))
+      (let ((keyword (pop x))
+	    (number (pop x)))
+	(setf (gethash keyword hash) number)))
+    hash)
+  (defparameter *keyword-ascii* (map-symbol-ascii (make-hash-table :test 'eq))))
 
+(defun ascii-control (char)
+  (logxor (ash 1 6) char))
+
+(defparameter *shift-keys*
+  "`~1!2@3#4$5%6^7&8*9(0)-_=+qQwWeErRtTyYuUiIoOpP[{]}\\|aAsSdDfFgGhHjJkKlL;:'\"zZxXcCvVbBnNmM,<.>/?")
+
+(progn
+  (defparameter *shifted-keys* (make-array 128))
+  (defparameter *controlled-keys* (make-array 128))
+  (defun reset-ascii-tables ()
+    (dobox ((offset 0 (length *shift-keys*) :inc 2))
+	   (with-vec-params (down up) (*shift-keys* offset)
+	     (let ((code (char-code down)))
+	       (setf (aref *shifted-keys* code) (char-code up))
+	       (setf (aref *controlled-keys* code) (ascii-control code)))))
+    (dotimes (x 128)
+      (setf (aref *controlled-keys* x)
+	    (ascii-control x))))
+  (reset-ascii-tables)
+  )
+
+(progn
+  (defconstant +shift+ 1)
+  (defconstant +control+ 2)
+  (defconstant +alt+ 4)
+  (defconstant +super+ 8)
+  (defun convert-char (char mods)
+    (if (logtest +shift+ mods)
+	(setf char (aref *shifted-keys* char)))
+    (let ((meta (logtest +alt+ mods))
+	  (control (logtest +control+ mods)))
+      (if (or meta control)
+	  (setf char (char-code (char-upcase (code-char char)))))
+      (if meta
+	  (enter (etouq (string #\esc))))
+      (if control
+	  (setf char (aref *controlled-keys* char)))
+      (enter (string (code-char char))))))

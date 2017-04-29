@@ -19,3 +19,13 @@
 	   (def-char-callback char-callback (window char)
 	     (declare (ignorable window))
 	     (vector-push-extend (code-char char) *chars*)))
+
+(progno
+;;;when buttons can take either of two states, there are four
+;;;ways adjacent time frames can look [repeat does not count here]
+ (defun next-key-state (old new)
+   (cond ((eq nil old)
+	  (if (eql new +press+) +press+))
+	 ((eq +true+ old)
+	  (cond ((eql new +release+) +release+)
+		((eql new +repeat+) +repeat+))))))
