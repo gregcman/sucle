@@ -23,18 +23,23 @@
   (setf *term* (make-instance '3bst:term :rows 25 :columns 80))
   (update-terminal-stuff))
 
+(defparameter *text* (make-array 0 :fill-pointer t :element-type 'character))
 (defun update-terminal-stuff (&optional (term *term*) (proc *proc*))
-  (when (sb-ext:process-alive-p proc)
-    (tagbody rep
-       (let ((c (read-char-no-hang (sb-ext:process-output proc)
-				   nil :eof)))
-	 (cond ((eq c :eof))
-	       ((eq c nil))
-	       (t (let ((a (load-time-value " ")))
-		    (setf (aref a 0) c)
-		    (3bst:handle-input a :term term))
-		  
-		  (go rep)))))))
+  (let ((command *text*))
+    (when (sb-ext:process-alive-p proc)
+      (collect-all-output (sb-ext:process-output proc)
+			  command))
+    (3bst:handle-input command :term term)
+    (setf (fill-pointer command) 0)))
+
+(defun collect-all-output (stream vector)
+  (tagbody rep
+     (let ((c (read-char-no-hang stream nil :eof)))
+       (if (eq c :eof)
+	   nil
+	   (when c
+	     (vector-push-extend c vector)
+	     (go rep))))))
 
 (defun char-print-term (x y &optional (term *term*))
   (let ((dirty (3bst:dirty term))
@@ -44,9 +49,11 @@
 	   (if (zerop (aref dirty row))
 	       (dobox ((col 0 collen))
 		      (let* ((glyph (3bst:glyph-at (3bst::screen term) row col))
-			     (char (3bst:c glyph))
-			     (value (logior *white-black-color* (char-code char))))
-			(set-char-with-update (pix:xy-index (+ x col) (- y row)) value)))
+			     (char (3bst:c glyph)))
+			
+			(let ((value (logior *white-black-color*
+					     (char-code char))))
+			  (set-char-with-update (pix:xy-index (+ x col) (- y row)) value))))
 	       (setf (aref dirty row) 0)))))
 
 

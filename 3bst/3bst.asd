@@ -1,7 +1,9 @@
 (defsystem 3bst
   :description "CL port of the terminal emulation part of st (http://st.suckless.org/)"
   :depends-on (#:alexandria
-               #:split-sequence)
+               #:split-sequence
+	       
+	       #:funland)
   :license "MIT"
   :author "Bart Botta <00003b at gmail.com>"
   :serial t

@@ -37,9 +37,10 @@
   (or (controlc1-p c) (controlc0-p c)))
 
 (defmacro ensure-value (x default)
-  ;; fixme: get rid of multiple evaluation
-  `(unless (and ,x (not (zero ,x)))
-     (seft ,x ,default)))
+  (let ((symbol (gensym)))
+    `(let ((,symbol ,x))
+       (unless (and ,symbol (not (zero ,symbol)))
+	 (seft ,symbol ,default)))))
 
 (defmacro ensure-aref (array index default)
   "adjust array to hold at least INDEX elements, and set element INDEX
@@ -57,22 +58,16 @@ to DEFAULt if not already set"
       (unless (and (aref ,a ,i) (plusp (aref ,a ,i)))
         (setf (aref ,a ,i) ,default)))))
 
-#++(let ((a (make-array 6 :fill-pointer 0)))
-  (ensure-aref a 0 2)
-  (ensure-aref a 1 3)
-  a)
 (defun limit (x a b)
   (min b (max a x)))
 
 (defmacro limitf (x a b)
-  ;; fixme: get rid of repeated evaluation of X
-  `(setf ,x (limit ,x ,a ,b)))
+  (let ((symbol (gensym)))
+    `(let ((,symbol ,x))
+       (setf ,symbol (limit ,symbol ,a ,b)))))
 
-(defun attribute/= (a b)
-  ;; assuming mode is an int with flag bits for now
-  (or (/= (mode a) (mode b))
-      (/= (fg a) (fg b))
-      (/= (bg a) (bg b))))
+(defmacro etouq (form)
+  (eval form))
 
 (defvar *term*)
 (defun attribute-set-p (flag &key (term *term*)) ;; IS_SET
@@ -217,16 +212,6 @@ to DEFAULt if not already set"
    (fg :accessor fg :initform *default-foreground*)
    (bg :accessor bg :initform *default-background*)))
 
-(defmethod glyph-attributes ((g glyph))
-  (loop for mask in (list +ATTR-NULL+ +ATTR-BOLD+ +ATTR-FAINT+ +ATTR-ITALIC+
-                          +ATTR-UNDERLINE+ +ATTR-BLINK+ +ATTR-REVERSE+
-                          +ATTR-INVISIBLE+ +ATTR-STRUCK+ +ATTR-WRAP+
-                          +ATTR-WIDE+ +ATTR-WDUMMY+)
-        for key in '(:NULL :BOLD :FAINT :ITALIC :UNDERLINE :BLINK
-                     :REVERSE :INVISIBLE :STRUCK :WRAP :WIDE :WDUMMY)
-        when (logtest mask (mode g))
-          collect key))
-
 (deftype line () '(vector glyph *))
 
 (defun move-glyphs (line &key (start1 0) (start2 0)
@@ -326,12 +311,6 @@ to DEFAULt if not already set"
 (declaim (inline glyph-at))
 (defun glyph-at (screen y x)
   (aref (aref screen y) x))
-(defun map-screen (screen function)
-  (loop for line across screen
-        for y from 0
-        do (loop for glyph across line
-                 for x from 0
-                 do (funcall function glyph y x))))
 
 (defclass term ()
   ((rows :reader rows :initarg :rows :initform 25)
@@ -403,21 +382,107 @@ to DEFAULt if not already set"
           do (decf i))
     i))
 
-;;;; todo: mouse/selection stuff
-
-;;;; todo: utils for running a shell with env etc? handle child closed, etc
-;; (probably mostly let uiop deal with that)
-
-(defun handle-input-raw (octets &key (term *term*))
-  "process OCTETS as (possibly incomplete) UTF8 encoded input from
-child process"
-  (declare (ignore octets term))
-  (error "not done yet, use character input..."))
-
 (defun handle-input (characters &key (term *term*))
-  ""
   (let ((*term* term))
     (map 'nil #'tputc characters)))
+
+(defun tputc (c &key (term *term*))
+  (let ((cc (char-code c))
+	(width 1)
+	(controlp nil))
+    (when (> cc 255)
+      (setf width (wcwidth c))
+      (when (minusp width)
+        (setf c (code-char #xfffd) ;; #\REPLACEMENT_CHARACTER
+              width 1)
+        (setf controlp (controlc1-p cc))))
+    (when (logtest (mode term) +mode-print+)
+      (tprinter c :term term))
+    (setf controlp (control-p cc))
+
+    ;; STR sequence must be checked before anything else because it
+    ;; uses all following characters until it receives a ESC, a SUB, a
+    ;; ST or any other C1 control character.
+    (when (logtest +esc-str+ (escape term))
+      (cond
+        ((and (= width 1)
+              (or (member cc '(7 #o30 #o32 #o33))
+                  (controlc1-p cc)))
+         (modbit (escape term) nil (logior +esc-start+ +esc-str+))
+         (modbit (escape term) t +esc-str-end+))
+        ((< (length (buffer (str-escape term))) +str-buf-max-size+)
+         (vector-push-extend c (buffer (str-escape term)))
+	 (return-from tputc nil))
+        (t
+         ;; Here is a bug in terminals. If the user never sends some
+         ;; code to stop the str or esc command, then st will stop
+         ;; responding. But this is better than silently failing with
+         ;; unknown characters. At least then users will report back.
+
+         ;; In the case users ever get fixed, here is the code:
+         ;; (seft (escape term) 0)
+         ;; (strhandle :term term)
+         (return-from tputc nil))))
+    ;; Actions of control codes must be performed as soon they arrive
+    ;; because they can be embedded inside a control sequence, and
+    ;; they must not cause conflicts with sequences.
+    (cond
+      (controlp
+       (tcontrolcode c :term term)
+       ;; control codes are not shown ever
+       (return-from tputc nil))
+      ((logtest +esc-start+ (escape term))
+       (cond
+         ((logtest +esc-csi+ (escape term))
+          (vector-push-extend c (buffer (csi-escape term)))
+          (when (or (<= #x40 cc #x7e)
+                    (> (length (buffer (csi-escape term)))
+                       +csi-buf-max-size+))
+            (setf (escape term) 0)
+            (csiparse (csi-escape term))
+            (csihandle (csi-escape term) :term term))
+          (return-from tputc nil))
+         ((logtest +esc-altcharset+ (escape term))
+          (tdeftran c :term term))
+         ((logtest +esc-test+ (escape term))
+          (tdectest c :term term))
+         (t
+          (unless (eschandle c :term term)
+            (return-from tputc nil))
+          ;; sequence already finished
+          ))
+       (setf (escape term) 0)
+       ;; All characters which form part of a sequence are not printed
+       (return-from tputc nil)))
+    #++(format t "~c" c)
+    ;; todo:
+    ;; if(sel.ob.x != -1 && BETWEEN(term.c.y, sel.ob.y, sel.oe.y))
+    ;;   selclear(NULL);
+    (let ((glyph (glyph-at (screen term) (y (cursor term)) (x (cursor term))))
+          (line (aref (screen term) (y (cursor term)))))
+      (when (and (logtest +mode-wrap+ (mode term))
+                 (logtest +cursor-wrap-next+ (state (cursor term))))
+        (modbit (mode glyph) t +attr-wrap+)
+        (tnewline 1 :term term))
+      (when (and (logtest +mode-insert+ (mode term))
+                 (< (+ width (x (cursor term)))
+                    (columns term)))
+        (move-glyphs line :start1 (+ width (x (cursor term)))
+		     :start2 (x (cursor term))))
+      (when (> (+ width (x (cursor term))) (columns term))
+        (tnewline 1 :term term))
+      (tsetchar c (attributes (cursor term))
+                (x (cursor term)) (y (cursor term))
+                :term term)
+      (when (= width 2)
+        (modbit (mode glyph) t +attr-wide+)
+        (when (< (1+ (x (cursor term))) (columns term))
+          (let ((g1 (glyph-at (screen term) (y (cursor term)) (1+ (x (cursor term))))))
+            (setf (c g1) (code-char 0))
+            (setf (mode g1) +attr-wdummy+))))
+      (if (< (+ width (x (cursor term))) (columns term))
+          (tmoveto (+ width (x (cursor term))) (y (cursor term)))
+          (modbit (state (cursor term)) t +cursor-wrap-next+)))))
 
 
 (defun tty-write (characters &key (term *term*))
@@ -425,35 +490,11 @@ child process"
   (when *write-to-child-hook*
     (funcall *write-to-child-hook* term characters)))
 
-(defun tty-send (characters &key (term *term*))
-  (tty-write characters :term term)
-  (when (attribute-set-p +mode-echo+ :term term)
-    (techo characters :term term)))
-
-
-#++
-(defun tty-resize ()
-  ;; todo: implement some way of passing this to caller in case it has a TTY
-  ;; and wants to do ioctl(..., TIOCSWINSZ, ...) or similar
-  )
-
-(defun tattrset (attr &key (term *term*))
-  (loop for line across (screen term)
-          thereis (loop for glyph across line
-                          thereis (logtest attr (mode glyph)))))
-
 (defun tsetdirt (top bottom &key (term *term*))
-  (loop for i from (limit top 0 (1- (rows term)))
-          below (limit bottom 0 (1- (rows term)))
-        do (setf (aref (dirty term) i) 1)))
-
-(defun tsetdirtattr (attr &key (term *term*))
-  (loop for line across (screen term)
-        for i from 0
-        do (loop for glyph across line
-                 when (logtest attr (mode glyph))
-                   do (tsetdirt i i :term term)
-                   and return nil)))
+  (let ((dirty-array (dirty term)))
+    (dobox ((i (limit bottom 0 (1- (rows term)))
+	       (limit top 0 (1- (rows term)))))
+	   (setf (aref dirty-array i) 1))))
 
 (defun tfulldirt (&key (term *term*))
   (tsetdirt 0 (1- (rows term)) :term term))
@@ -1088,12 +1129,6 @@ child process"
                  do (format t "\\e")
           else do (format t "(~2,'0x)" (char-code c)))))
 
-(defun csireset (csi)
-  (setf (fill-pointer (buffer csi)) 0
-        (priv csi) nil
-        (fill-pointer (arguments csi)) 0
-        (mode csi) 0))
-
 (defun strhandle (str &key (term *term*))
   (setf (escape term) (logandc2 (escape term)
                              (logior +esc-str-end+ +esc-str+)))
@@ -1152,13 +1187,6 @@ child process"
           else do (format t "(~2,'0x)" (char-code c)))
     (format t "ESC")))
 
-(defun strreset (str)
-  ;; fixme: move this to reinitialize-instance?
-  (setf (fill-pointer (buffer str)) 0
-        (priv str) nil
-        (fill-pointer (arguments str)) 0
-        (str-type str) (code-char 0)))
-
 (defun tprinter (string &key (term *term*))
   (declare (ignore term))
   ;; todo: make output stream configurable?
@@ -1170,24 +1198,6 @@ child process"
   ;;    iofd = -1;
   ;;  }
   )
-
-;;; these are used for keybindings, possibly should return a closure instead
-;;; if still being used that way?
-(defun toggleprinter (arg &key (term *term*))
-  (declare (ignore arg))
-  (setf (mode term) (logxor (mode term) +mode-print+)))
-
-(defun printscreem (arg &key (term *term*))
-  (declare (ignore arg))
-  (tdump :term term))
-
-(defun printsel (arg &key (term *term*))
-  (declare (ignore arg term))
-  #++(tdumpsel :term term))
-
-#++
-(defun tdumpsel (&key (term *term*))
-  (tprinter (getsel :term term) :term term))
 
 (defun tdumpline (n &key (term *term*))
   (let ((line (string-right-trim " " (map 'string #'c (aref (screen term) n)))))
@@ -1415,188 +1425,12 @@ child process"
 
 (defun wcwidth (c)
   (let ((cc (char-code c)))
-    (when (zerop cc)
-      (return-from wcwidth 0))
-    (when (control-p cc)
-      (return-from wcwidth -1))
-    (when (= cc #xad) ;; soft-hyphen
-      (return-from wcwidth 1))
-    (when (member (sb-unicode:general-category c) '(:Mn :Me :Cf))
-      (return-from wcwidth 0))
-    (when (= cc #x200b) ;; zero width space
-      (return-from wcwidth 0))
-    (when (<= #x1160 cc #x11ff) ;; hangul jamo medial vowels, final consonents
-      (return-from wcwidth 0))
-    (when (member (sb-unicode:east-asian-width c) '(:w :f))
-      (return-from wcwidth 2))
-    1))
-
-(defun tputc (c &key (term *term*))
-  (let* ((cc (char-code c))
-         (width 1)
-         (controlp nil))
-    (when (> cc 255)
-      (setf width (wcwidth c))
-      (when (minusp width)
-        (setf c (code-char #xfffd) ;; #\REPLACEMENT_CHARACTER
-              width 1)
-        (setf controlp (controlc1-p cc))))
-    (when (logtest (mode term) +mode-print+)
-      (tprinter c :term term))
-    (setf controlp (control-p cc))
-
-    ;; STR sequence must be checked before anything else because it
-    ;; uses all following characters until it receives a ESC, a SUB, a
-    ;; ST or any other C1 control character.
-    (when (logtest +esc-str+ (escape term))
-      (cond
-        ((and (= width 1)
-              (or (member cc '(7 #o30 #o32 #o33))
-                  (controlc1-p cc)))
-         (modbit (escape term) nil (logior +esc-start+ +esc-str+))
-         (modbit (escape term) t +esc-str-end+))
-        ((< (length (buffer (str-escape term))) +str-buf-max-size+)
-         (vector-push-extend c (buffer (str-escape term)))
-                  (return-from tputc nil))
-        (t
-         ;; Here is a bug in terminals. If the user never sends some
-         ;; code to stop the str or esc command, then st will stop
-         ;; responding. But this is better than silently failing with
-         ;; unknown characters. At least then users will report back.
-
-         ;; In the case users ever get fixed, here is the code:
-         ;; (seft (escape term) 0)
-         ;; (strhandle :term term)
-         (return-from tputc nil))))
-    ;; Actions of control codes must be performed as soon they arrive
-    ;; because they can be embedded inside a control sequence, and
-    ;; they must not cause conflicts with sequences.
-    (cond
-      (controlp
-       (tcontrolcode c :term term)
-       ;; control codes are not shown ever
-       (return-from tputc nil))
-      ((logtest +esc-start+ (escape term))
-       (cond
-         ((logtest +esc-csi+ (escape term))
-          (vector-push-extend c (buffer (csi-escape term)))
-          (when (or (<= #x40 cc #x7e)
-                    (> (length (buffer (csi-escape term)))
-                       +csi-buf-max-size+))
-            (setf (escape term) 0)
-            (csiparse (csi-escape term))
-            (csihandle (csi-escape term) :term term))
-          (return-from tputc nil))
-         ((logtest +esc-altcharset+ (escape term))
-          (tdeftran c :term term))
-         ((logtest +esc-test+ (escape term))
-          (tdectest c :term term))
-         (t
-          (unless (eschandle c :term term)
-            (return-from tputc nil))
-          ;; sequence already finished
-          ))
-       (setf (escape term) 0)
-       ;; All characters which form part of a sequence are not printed
-       (return-from tputc nil)))
-    #++(format t "~c" c)
-    ;; todo:
-    ;; if(sel.ob.x != -1 && BETWEEN(term.c.y, sel.ob.y, sel.oe.y))
-    ;;   selclear(NULL);
-    (let ((glyph (glyph-at (screen term) (y (cursor term)) (x (cursor term))))
-          (line (aref (screen term) (y (cursor term)))))
-      (when (and (logtest +mode-wrap+ (mode term))
-                 (logtest +cursor-wrap-next+ (state (cursor term))))
-        (modbit (mode glyph) t +attr-wrap+)
-        (tnewline 1 :term term))
-      (when (and (logtest +mode-insert+ (mode term))
-                 (< (+ width (x (cursor term)))
-                    (columns term)))
-        (move-glyphs line :start1 (+ width (x (cursor term)))
-                           :start2 (x (cursor term))))
-      (when (> (+ width (x (cursor term))) (columns term))
-        (tnewline 1 :term term))
-      (tsetchar c (attributes (cursor term))
-                (x (cursor term)) (y (cursor term))
-                :term term)
-      (when (= width 2)
-        (modbit (mode glyph) t +attr-wide+)
-        (when (< (1+ (x (cursor term))) (columns term))
-          (let ((g1 (glyph-at (screen term) (y (cursor term)) (1+ (x (cursor term))))))
-            (setf (c g1) (code-char 0))
-            (setf (mode g1) +attr-wdummy+))))
-      (if (< (+ width (x (cursor term))) (columns term))
-          (tmoveto (+ width (x (cursor term))) (y (cursor term)))
-          (modbit (state (cursor term)) t +cursor-wrap-next+)))))
-
-
-(defun tresize (columns rows &key (term *term*))
-  (let ((minrow (min rows (rows term)))
-        (mincol (min columns (columns term)))
-        (slide (1+ (- (y (cursor term)) rows))))
-    (when (or (< columns 1) (< rows 1))
-      (warn "tresize: error resizing to ~ax~a" rows columns)
-      (return-from tresize nil))
-    ;; free uneeded rows
-    (when (plusp slide)
-      ;; slide screen to keep cursor where we expect it - tscrollup
-      ;; would work here, but we can optimize to memmove because we're
-      ;; freeing the earlier lines
-      (replace (screen term) (screen term) :start1 slide :start2 0)
-      (replace (alternate-screen term) (alternate-screen term)
-               :start1 slide :start2 0))
-    ;; possibly should make these adjustable arrays?
-    (setf (slot-value term 'screen) (adjust-array (screen term) rows))
-    (setf (slot-value term 'alternate-screen)
-          (adjust-array (alternate-screen term) rows))
-    ;; don't need to copy DIRTY array since we flag it all later
-    (setf (slot-value term 'dirty) (adjust-array (dirty term) rows))
-    (setf (slot-value term 'tabs ) (adjust-array (tabs term) columns
-                                                 :initial-element 0))
-
-    ;; resize each row to new width, zero-pad if needed
-    (loop for i below minrow
-          do (flet ((r (s)
-                      (setf (aref s i)
-                            (adjust-array (aref s i) columns))
-                      (loop for j from mincol below columns
-                            do (setf (aref (aref s i) j)
-                                     (make-instance 'glyph)))))
-               (r (screen term))
-               (r (alternate-screen term))))
-    ;; allocate any new rows
-    (loop for i from minrow below rows
-          do (flet ((n (s)
-                      (setf (aref s i)
-                            (make-array rows
-                                        :element-type '(vector glyph *)
-                                        :initial-contents
-                                        (coerce
-                                         (loop repeat columns
-                                               collect (make-instance 'glyph))
-                                         '(vector glyph))))))
-               (n (screen term))
-               (n (alternate-screen term))))
-    (when (> columns (columns term))
-      (loop with last-tab = (position 1 (tabs term) :from-end t)
-            for i from (+ *tab-spaces* (or last-tab 0))
-              below columns by *tab-spaces*
-            do (setf (aref (tabs term) i) 1)))
-    ;; update terminal size
-    (setf (slot-value term 'columns) columns
-          (slot-value term 'rows) rows)
-    ;; reset scrolling region
-    (tsetscroll 0 (1- rows) :term term)
-    ;; make use of the LIMIT in tmoveto
-    (tmoveto (x (cursor term)) (y (cursor term)))
-    ;; Clearing both screens (it makes dirty all lines)
-    (let ((c (cursor term)))
-      (loop repeat 2
-            do (when (and (< mincol columns) (< 0 minrow))
-                 (tclearregion mincol 0 (1- columns) (1- minrow) :term term))
-               (when (and (< 0 columns) (< minrow rows))
-                 (tclearregion 0 minrow (1- columns) (1- rows) :term term))
-               (tswapscreen :term term)
-               (tcursor :cursor-load :term term))
-      (setf (cursor term) c))))
+    (cond ((zerop cc) 0)
+	  ((control-p cc) -1)
+	  ((= cc #xad) 1) ;; soft-hyphen
+	  ((member (sb-unicode:general-category c) '(:Mn :Me :Cf)) 0)
+	  ((= cc #x200b) 0)  ;; zero width space
+	  ((<= #x1160 cc #x11ff) 0) ;; hangul jamo medial vowels, final consonents
+	  ((member (sb-unicode:east-asian-width c) '(:w :f)) 2)
+	  (t 1))))
 

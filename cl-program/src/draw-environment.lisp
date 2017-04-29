@@ -139,8 +139,20 @@
 		       (gl:call-list mesh))))))))
 
 
+(defmacro with-vec-params ((&rest bufvars) buf &body body)
+  (let ((letargs nil)
+	(counter 0))
+    (dolist (sym bufvars)	
+      (push (if (consp sym)
+		(prog1
+		  `(,(pop sym) (aref ,buf ,(pop sym)))
+		  (incf counter))
+		`(,sym (aref ,buf ,counter))) letargs))
+    `(let ,letargs 
+       ,@body)))
 
-(defmacro with-vec-params ((&rest bufvars) buf func type &body body)
+
+(defmacro with-iterators ((&rest bufvars) buf func type &body body)
   (let* ((letargs nil)
 	 (counter 0)
 	 (syms (mapcar (lambda (x) (gensym (string x))) bufvars))
@@ -160,7 +172,7 @@
 	    (type simple-vector lookup)
 	    (optimize (speed 3) (safety 0))
 	    (type fixnum value))
-   (with-vec-params (epos etex) bufs iter-ator:wasabios iter-ator:iter-ator
+   (with-iterators (epos etex) bufs iter-ator:wasabios iter-ator:iter-ator
      (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
        (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
      (let ((x1 (+ char-width x))
@@ -310,7 +322,7 @@
 (progn
 
   (defun mesh-test42 (times bufs)
-    (with-vec-params (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
+    (with-iterators (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
       (dotimes (x times)
 	(%gl:vertex-attrib-2f 8 (uv) (uv))
 	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
@@ -319,7 +331,7 @@
 
   (progn
     (defun mesh-test4269 (times bufs)
-      (with-vec-params (xyz uv eft) bufs iter-ator:wasabiis iter-ator:iter-ator
+      (with-iterators (xyz uv eft) bufs iter-ator:wasabiis iter-ator:iter-ator
 	(dotimes (x times)
 	  (%gl:vertex-attrib-2f 8 (uv) (uv))
 	  (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
@@ -357,7 +369,7 @@
 			  char-width char-height
 			  z)
       (let ((nope 0))
-	(with-vec-params (epos etex efg ebg) bufs iter-ator:wasabios iter-ator:iter-ator
+	(with-iterators (epos etex efg ebg) bufs iter-ator:wasabios iter-ator:iter-ator
 	  (dobox ((ix bx0 bx1)
 		  (iy by0 by1))
 		 (let ((obj (pix:get-obj (pix:xy-index ix iy) world)))

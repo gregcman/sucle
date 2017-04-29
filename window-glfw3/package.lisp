@@ -1,5 +1,5 @@
 (defpackage #:window
-  (:use #:cl)
+  (:use #:cl #:fuktard)
   (:nicknames #:E) ;;capital e is the egyptian glyph for "window" 
   (:export
    #:*keypress-hash*
