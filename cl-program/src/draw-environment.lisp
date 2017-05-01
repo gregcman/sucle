@@ -343,6 +343,15 @@
 	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
 	(%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
 
+(defmacro with-char-colors ((fg-rvar fg-gvar fg-bvar bg-rvar bg-gvar bg-bvar) value &body body)
+  `(let ((,fg-rvar (ldb (byte 8 8) ,value))
+	 (,fg-gvar (ldb (byte 8 16) ,value))
+	 (,fg-bvar (ldb (byte 8 24) ,value))
+	 (,bg-rvar (ldb (byte 8 32) ,value))
+	 (,bg-gvar (ldb (byte 8 40) ,value))
+	 (,bg-bvar (ldb (byte 8 48) ,value)))
+     ,@body))
+
 (progn
   (declaim (ftype (function (simple-vector
 			     simple-vector
