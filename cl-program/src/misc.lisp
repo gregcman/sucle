@@ -1,8 +1,5 @@
 (in-package :sandbox)
 
-(defmacro etouq (form)
-  (eval form))
-
 (fuktard:eval-always
  (progn
    (defun preach (value form)

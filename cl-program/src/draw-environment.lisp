@@ -128,61 +128,65 @@
   result)
 
 (defun draw-ensure (world call-lists rectangle chunk-width chunk-height)
-  (with-vec-params (minx miny maxx maxy) (rectangle)
-    (dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
-	    (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
-	   (let ((index (pix:xy-index xstart ystart)))
-	     (multiple-value-bind (value exists) (gethash index call-lists)
-	       (declare (ignorable exists))
-	       (if value
-		   (gl:call-list value)
-		   (let ((thechunk (gethash index world)))
-		     (if thechunk
-			 (let ((mesh 
-				(let ((iter *attrib-buffer-iterators*))
-				  (let ((buf (get-buf-param iter
-							    (etouq (vector 0 8 9 10)))))
-				    (reset-attrib-buffer-iterators iter)
-				    (let ((times (draw-box-char
-						  buf
-						  *16x16-tilemap* thechunk
-						  pix::+chunk-capacity+ *chunk-vertices-lookup*
-						  (* *block-width* (float xstart)) 
-						  (* *block-height* (float ystart)) 
-						  +single-float-just-less-than-one+)))
-				      (reset-attrib-buffer-iterators iter)
-				      (let ((display-list (gl:gen-lists 1)))
-					(gl:with-new-list (display-list :compile)
-					  (gl:with-primitives :quads
-					    (mesh-test42 times buf)))
-					display-list))))))
-			   (setf (gethash index call-lists) mesh)
-			   (gl:call-list mesh))))))))))
+  (etouq
+   (with-vec-params (vec-slots :rectangle '((minx :x0) (miny :y0) (maxx :x1) (maxy :y1)))
+       '(rectangle)
+     '(dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
+	      (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
+       (let ((index (pix:xy-index xstart ystart)))
+	 (multiple-value-bind (value exists) (gethash index call-lists)
+	   (declare (ignorable exists))
+	   (if value
+	       (gl:call-list value)
+	       (let ((thechunk (gethash index world)))
+		 (if thechunk
+		     (let ((mesh 
+			    (let ((iter *attrib-buffer-iterators*))
+			      (let ((buf (get-buf-param iter
+							(etouq (vector 0 8 9 10)))))
+				(reset-attrib-buffer-iterators iter)
+				(let ((times (draw-box-char
+					      buf
+					      *16x16-tilemap* thechunk
+					      pix::+chunk-capacity+ *chunk-vertices-lookup*
+					      (* *block-width* (float xstart)) 
+					      (* *block-height* (float ystart)) 
+					      +single-float-just-less-than-one+)))
+				  (reset-attrib-buffer-iterators iter)
+				  (let ((display-list (gl:gen-lists 1)))
+				    (gl:with-new-list (display-list :compile)
+				      (gl:with-primitives :quads
+					(mesh-test42 times buf)))
+				    display-list))))))
+		       (setf (gethash index call-lists) mesh)
+		       (gl:call-list mesh)))))))))))
 
 (defmacro with-iterators ((&rest bufvars) buf func type &body body)
   (let* ((syms (mapcar (lambda (x) (gensym (string x))) bufvars))
 	 (bindings (mapcar (lambda (x y) (list x y))
 			   bufvars syms))
 	 (decl `(declare (type ,type ,@syms))))
-    `(with-vec-params ,syms (,buf)
-       ,decl
-       (,func ,bindings
+    (with-vec-params syms `(,buf)
+      decl
+      `(,func ,bindings
 	      ,@body))))
 (progn
- (defun draw-mouse (bufs
-		    lookup value char-width char-height x y z)
-   (declare (type single-float x y z char-width char-height)
-	    (type simple-vector lookup)
-	    (optimize (speed 3) (safety 0))
-	    (type fixnum value))
-   (with-iterators (epos etex) bufs iter-ator:wasabios iter-ator:iter-ator
-     (let ((offset (* value 4)))
-       (with-vec-params ((offset x0 y0 x1 y1)) (lookup)
-	 (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
-     (let ((x1 (+ char-width x))
-	   (y0 (- y char-height)))
-       (etouq (ngorp (preach 'epos (quadk+ 'z '(x x1 y0 y))))))
-     4))
+  (defun draw-mouse (bufs
+		     lookup value char-width char-height x y z)
+    (declare (type single-float x y z char-width char-height)
+	     (type simple-vector lookup)
+	     (optimize (speed 3) (safety 0))
+	     (type fixnum value))
+    (with-iterators (epos etex) bufs iter-ator:wasabios iter-ator:iter-ator
+      (let ((offset (* value 4)))
+	(etouq
+	 (with-vec-params `((offset ,@(vec-slots :rectangle '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
+	     '(lookup)
+	   '(etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))))
+      (let ((x1 (+ char-width x))
+	    (y0 (- y char-height)))
+	(etouq (ngorp (preach 'epos (quadk+ 'z '(x x1 y0 y))))))
+      4))
  
  (defun render-mouse (pmv)       
    (rescale-screen-matrix *screen-scaled-matrix*
@@ -362,26 +366,36 @@
 		       (let ((value (get-char-num obj)))
 			 (declare (type fixnum value))
 			 (with-char-colors (xfg-r xfg-g xfg-b xbg-r xbg-g xbg-b) value
-			   (with-vec-params ((XFG-R FG-R)
-					     (XFG-G FG-G)
-					     (XFG-B FG-B)
-					     (XBG-R BG-R)
-					     (XBG-G BG-G)
-					     (XBG-B BG-B))
-			       (+byte-fraction-lookup+)
-			     (dotimes (x 4)
-			       (etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
-			       (etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b)))))))
+			   (etouq
+			    (with-vec-params '((XFG-R FG-R)
+					       (XFG-G FG-G)
+					       (XFG-B FG-B)
+					       (XBG-R BG-R)
+					       (XBG-G BG-G)
+					       (XBG-B BG-B))
+				'(+byte-fraction-lookup+)
+			      '(dotimes (x 4)
+				(etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
+				(etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b))))))))
 			 (let ((offset (* 4 (mod value 256))))
-			   (with-vec-params ((offset x0 y0 x1 y1)) (tilemap-lookup)
-			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
+			   (etouq
+			    (with-vec-params
+				`((offset ,@(vec-slots :rectangle
+							'((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
+				'(tilemap-lookup)
+			      '(etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))))
 			 (let ((offset (* 4 index)))
-			   (with-vec-params ((offset foox0 fooy0 x1 y1)) (mesh-lookup)
-			     (declare (type single-float foox0 fooy0 x1 y1))
-			     (incf x1 x)
-			     (incf y1 y)
-			     (incf foox0 x)
-			     (incf fooy0 y)
-			     (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1))))))))
+			   (etouq
+			    (with-vec-params
+				`((offset ,@(vec-slots :rectangle
+						       '((x1 :x1) (y1 :y1) (foox0 :x0) (fooy0 :y0)))))
+				'(mesh-lookup)
+			      '(declare (type single-float foox0 fooy0 x1 y1))
+			      '(progn
+				(incf x1 x)
+				(incf y1 y)
+				(incf foox0 x)
+				(incf fooy0 y)
+				(etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1))))))))))
 		       (incf nope)))))
 	(* 4 (- amount nope))))))

@@ -66,9 +66,6 @@ to DEFAULt if not already set"
     `(let ((,symbol ,x))
        (setf ,symbol (limit ,symbol ,a ,b)))))
 
-(defmacro etouq (form)
-  (eval form))
-
 (defvar *term*)
 (defun attribute-set-p (flag &key (term *term*)) ;; IS_SET
   ;; fixme: might be nicer to have :keywords instead of +constants+ for flags?

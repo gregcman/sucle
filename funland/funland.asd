@@ -3,7 +3,8 @@
   :components
   ((:module "ultra"
 	    :serial t
-	    :components ((:file "package")		 
+	    :components ((:file "package")
+			 (:file "etouq")
 			 (:file "dobox")
 			 (:file "progno")
 			 (:file "toggle")

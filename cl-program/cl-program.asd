@@ -19,11 +19,12 @@
 	      :serial t
 	      :components
 	      ((:file "package")
-	       
+	       (:file "vec-param-layout")
 	       (:file "camera-matrix") ;;;1st person perspective vision
 	       (:file "meshing")
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
+	       (:file "keys-ascii")
 	       (:file "globjects")
 	       (:file "pix")
 	       (:file "terminal")

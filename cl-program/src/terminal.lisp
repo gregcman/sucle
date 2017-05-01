@@ -62,7 +62,6 @@
       (setf acc (ash acc 8))
       (setf acc (logior acc value)))
     (logand acc most-positive-fixnum)))
-
 (progn
   (defparameter *color-map* (make-array 256))
   (defun truecolorp (x)
@@ -117,7 +116,6 @@
 	   (dobox ((col 0 collen))
 		  (let* ((glyph (3bst:glyph-at (3bst::screen term) row col))
 			 (char (3bst:c glyph)))
-		    
 		    (let ((value (logior (ash (color-rgb (3bst:bg glyph)) 32)
 					 (ash (color-rgb (3bst:fg glyph)) 8)
 					 (char-code char))))
