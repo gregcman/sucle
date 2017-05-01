@@ -93,8 +93,29 @@
       (setf acc (ash (logior acc value) 8)))
     (logand acc most-positive-fixnum)))
 
+(progn
+  (declaim (inline byte-color)
+	   (ftype (function (fixnum) single-float)
+		  byte-color))
+  (with-unsafe-speed
+    (defun byte-color (x)
+      (/ (float x) 255.0))))
+
+(defun strip-char (color)
+  (logandc1 255 color))
+
 (defparameter *white-black-color* (acolor 255 255 255 0 0 0))
 (defparameter *color-nil* (logandc1 255 (sxhash nil)))
+
+(defmacro with-char-colors ((fg-rvar fg-gvar fg-bvar bg-rvar bg-gvar bg-bvar) value &body body)
+  `(let ((,fg-rvar (ldb (byte 8 8) ,value))
+	 (,fg-gvar (ldb (byte 8 16) ,value))
+	 (,fg-bvar (ldb (byte 8 24) ,value))
+	 (,bg-rvar (ldb (byte 8 32) ,value))
+	 (,bg-gvar (ldb (byte 8 40) ,value))
+	 (,bg-bvar (ldb (byte 8 48) ,value)))
+     ,@body))
+
 (defparameter *show-cursor* t)
 (defparameter *cursor-moved* 0)
 (defparameter *scroll-sideways* nil)
@@ -104,9 +125,6 @@
 
 (defparameter *terminal-start-x* 0)
 (defparameter *terminal-start-y* 0)
-
-(defun strip-char (color)
-  (logandc1 255 color))
 
 (defun physics ()
   (remove-spurious-mouse-input)

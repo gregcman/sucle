@@ -822,3 +822,69 @@
       (dotimes (x len)
 	(let ((char (vector-pop e:*chars*)))
 	  (enter (string char))))))
+
+(progno
+ (with-unsafe-speed
+   (defun wow (x)
+     (declare (type (complex fixnum) x))
+     (the fixnum (+ (realpart x)
+		    (imagpart x)))))
+
+ (with-unsafe-speed
+   (defun wow2 (x)
+     (declare (type (cons fixnum fixnum) x))
+     (the fixnum (+ (car x)
+		    (cdr x))))))
+
+(progno
+  (declaim (ftype (function (vector
+			     simple-vector
+			     simple-vector
+			     fixnum fixnum fixnum fixnum
+			     single-float single-float single-float)
+			    fixnum)
+		  draw-box-char))
+  (with-unsafe-speed
+    (defun draw-box-char (bufs
+			  lookup world
+			  bx0 bx1 by0 by1
+			  char-width char-height
+			  z)
+      (let ((nope 0)
+	    (index 0))
+	(with-iterators (epos etex efg ebg) bufs iter-ator:wasabios iter-ator:iter-ator
+	  (dobox ((ix bx0 bx1)
+		  (iy by0 by1))
+		 (let ((obj (aref world index)))
+		   (if obj
+		       (let ((value (get-char-num obj)))
+			 (declare (type fixnum value))
+			 (with-char-colors (xfg-r xfg-g xfg-b xbg-r xbg-g xbg-b) value
+			   (let ((fg-r (aref +byte-fraction-lookup+ xfg-r))
+				 (fg-g (aref +byte-fraction-lookup+ xfg-g))
+				 (fg-b (aref +byte-fraction-lookup+ xfg-b))
+				 (bg-r (aref +byte-fraction-lookup+ xbg-r))
+				 (bg-g (aref +byte-fraction-lookup+ xbg-g))
+				 (bg-b (aref +byte-fraction-lookup+ xbg-b)))
+			     (dotimes (x 4)
+			       (etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
+			       (etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b)))))))
+			 (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup (mod value 256))
+			   (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
+			 (let ((foox0 (* (float ix) char-width))
+			       (fooy0 (* (float iy) char-height)))
+			   (let ((x1 (+ foox0 char-width))
+				 (y1 (+ fooy0 char-height)))
+			     (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1))))))))
+		       (incf nope)))
+		 (incf index)))
+	(* 4 (- (* (- bx1 bx0) (- by1 by0)) nope))))))
+
+(progno
+ '(if nil
+   
+   (let ((foox0 (* (float ix) char-width))
+	 (fooy0 (* (float iy) char-height)))
+     (let ((x1 (+ foox0 char-width))
+	   (y1 (+ fooy0 char-height)))
+       (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1)))))))))

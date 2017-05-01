@@ -20,9 +20,10 @@
   (defconstant +hash-mask+ (logxor +index-mask+ most-positive-fixnum))
   (defconstant +right-shift+ (- +y-chunk-bits+ +x-bits-start+))
   (defconstant +y-mask+ (1- (ash 1 +x-bits-start+)))
-
+  (defconstant +chunk-capacity+ (* +x-chunk-size+ +y-chunk-size+))
+  
   (defun make-chunk ()
-    (make-array (* +x-chunk-size+ +y-chunk-size+)
+    (make-array +chunk-capacity+
 		:element-type t
 		:initial-element nil))
 

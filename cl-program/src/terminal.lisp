@@ -12,7 +12,7 @@
 
 (defun reset-ssh ()
   (when *proc*
-    (sb-ext:process-kill *proc* 9))
+    (sb-ext:process-kill *proc* 9)) 
   (let ((command (list "/usr/bin/ssh" "-tt" "terminal256@0.0.0.0")))
     (setf *proc* (run-program command))))
 

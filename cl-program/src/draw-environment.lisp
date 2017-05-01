@@ -10,6 +10,12 @@
 (defparameter *16x16-tilemap* (regular-enumeration 16 16))
 (defparameter *4x4-tilemap* (regular-enumeration 4 4))
 
+(defconstant +byte-fraction-lookup+
+  (let ((array (make-array 256 :element-type 'single-float)))
+    (dotimes (x 256)
+      (setf (aref array x) (/ (float x) 255.0)))
+    array))
+
 (defparameter *screen-scaled-matrix* (cg-matrix:identity-matrix))
 
 (defparameter *attrib-buffers* (fill-with-flhats (make-attrib-buffer-data)))
@@ -107,6 +113,23 @@
 	(cg-matrix:mref result 1 3) y)
   result)
 
+(defparameter *chunk-vertices-lookup*
+  (let ((chunk-size-x pix::+x-chunk-size+)
+	(chunk-size-y pix::+y-chunk-size+))
+    (let ((array (make-array (* chunk-size-x chunk-size-y 4))))
+      (let ((iter (iter-ator:make-iterator (length array) array nil nil)))
+	(let ((char-width *block-width*)
+	      (char-height *block-height*))
+	  (iter-ator:wasabios ((epos iter))
+	    (dobox ((ix 0 chunk-size-x)
+		    (iy 0 chunk-size-y))
+		   (let ((foox0 (* (float ix) char-width))
+			 (fooy0 (* (float iy) char-height)))
+		     (let ((x1 (+ foox0 char-width))
+			   (y1 (+ fooy0 char-height)))
+		       (etouq (ngorp (preach 'epos '(foox0 fooy0 x1 y1))))))))))
+      (nreverse array))))
+
 (defun draw-ensure (world call-lists minx maxx miny maxy chunk-width chunk-height)
   (dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
 	  (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
@@ -117,24 +140,23 @@
 		 (gl:call-list value)
 		 (if (gethash index world)
 		     (let ((mesh 
-			     (let ((iter *attrib-buffer-iterators*))
-			       (let ((buf (get-buf-param iter
-							 (etouq (vector 0 8 9 10)))))
-				 (reset-attrib-buffer-iterators iter)
-				 (let ((times (draw-box-char
-					       buf
-					       *16x16-tilemap* world
-					       xstart (+ xstart chunk-width)
-					       ystart (+ ystart chunk-height)
-					       *block-width*
-					       *block-height*
-					       +single-float-just-less-than-one+)))
-				   (reset-attrib-buffer-iterators iter)
-				   (let ((display-list (gl:gen-lists 1)))
-				     (gl:with-new-list (display-list :compile)
-				       (gl:with-primitives :quads
-					 (mesh-test42 times buf)))
-				     display-list))))))
+			    (let ((iter *attrib-buffer-iterators*))
+			      (let ((buf (get-buf-param iter
+							(etouq (vector 0 8 9 10)))))
+				(reset-attrib-buffer-iterators iter)
+				(let ((times (draw-box-char
+					      buf
+					      *16x16-tilemap* (gethash index world)
+					      pix::+chunk-capacity+ *chunk-vertices-lookup*
+					      (* *block-width* (float xstart)) 
+					      (* *block-height* (float ystart)) 
+					      +single-float-just-less-than-one+)))
+				  (reset-attrib-buffer-iterators iter)
+				  (let ((display-list (gl:gen-lists 1)))
+				    (gl:with-new-list (display-list :compile)
+				      (gl:with-primitives :quads
+					(mesh-test42 times buf)))
+				    display-list))))))
 		       (setf (gethash index call-lists) mesh)
 		       (gl:call-list mesh))))))))
 
@@ -323,61 +345,48 @@
 	  (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
 	  (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))))
 
-(defmacro with-char-colors ((fg-rvar fg-gvar fg-bvar bg-rvar bg-gvar bg-bvar) value &body body)
-  `(let ((,fg-rvar (ldb (byte 8 8) ,value))
-	 (,fg-gvar (ldb (byte 8 16) ,value))
-	 (,fg-bvar (ldb (byte 8 24) ,value))
-	 (,bg-rvar (ldb (byte 8 32) ,value))
-	 (,bg-gvar (ldb (byte 8 40) ,value))
-	 (,bg-bvar (ldb (byte 8 48) ,value)))
-     ,@body))
-
 (progn
-  (declaim (inline byte-color)
-	   (ftype (function (fixnum) single-float)
-		  byte-color))
-  (with-unsafe-speed
-    (defun byte-color (x)
-      (/ (float x) 256.0))))
-
-(progn
-  (declaim (ftype (function (vector
+  (declaim (ftype (function (simple-vector
 			     simple-vector
-			     pix:pix-world
-			     fixnum fixnum fixnum fixnum
+			     simple-vector
+			     fixnum
+			     simple-vector
 			     single-float single-float single-float)
 			    fixnum)
 		  draw-box-char))
   (with-unsafe-speed
     (defun draw-box-char (bufs
-			  lookup world
-			  bx0 bx1 by0 by1
-			  char-width char-height
-			  z)
+			  tilemap-lookup world
+			  chunk-capacity
+			  mesh-lookup
+			  x y z)
       (let ((nope 0))
 	(with-iterators (epos etex efg ebg) bufs iter-ator:wasabios iter-ator:iter-ator
-	  (dobox ((ix bx0 bx1)
-		  (iy by0 by1))
-		 (let ((obj (pix:get-obj (pix:xy-index ix iy) world)))
+	  (dobox ((index 0 chunk-capacity))
+		 (let ((obj (aref world index)))
 		   (if obj
 		       (let ((value (get-char-num obj)))
 			 (declare (type fixnum value))
 			 (with-char-colors (xfg-r xfg-g xfg-b xbg-r xbg-g xbg-b) value
-			   (let ((fg-r (byte-color xfg-r))
-				 (fg-g (byte-color xfg-g))
-				 (fg-b (byte-color xfg-b))
-				 (bg-r (byte-color xbg-r))
-				 (bg-g (byte-color xbg-g))
-				 (bg-b (byte-color xbg-b)))
+			   (let ((fg-r (aref +byte-fraction-lookup+ xfg-r))
+				 (fg-g (aref +byte-fraction-lookup+ xfg-g))
+				 (fg-b (aref +byte-fraction-lookup+ xfg-b))
+				 (bg-r (aref +byte-fraction-lookup+ xbg-r))
+				 (bg-g (aref +byte-fraction-lookup+ xbg-g))
+				 (bg-b (aref +byte-fraction-lookup+ xbg-b)))
 			     (dotimes (x 4)
 			       (etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
 			       (etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b)))))))
-			 (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup (mod value 256))
-			   (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
-			 (let ((foox0 (* (float ix) char-width))
-			       (fooy0 (* (float iy) char-height)))
-			   (let ((x1 (+ foox0 char-width))
-				 (y1 (+ fooy0 char-height)))
+			 (let ((offset (* 4 (mod value 256))))
+			   (with-vec-params (x0 y0 x1 y1) (tilemap-lookup offset)
+			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
+			 (let ((offset (* 4 index)))
+			   (with-vec-params (foox0 fooy0 x1 y1) (mesh-lookup offset)
+			     (declare (type single-float foox0 fooy0 x1 y1))
+			     (incf x1 x)
+			     (incf y1 y)
+			     (incf foox0 x)
+			     (incf fooy0 y)
 			     (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1))))))))
 		       (incf nope)))))
-	(* 4 (- (* (- bx1 bx0) (- by1 by0)) nope))))))
+	(* 4 (- chunk-capacity nope))))))
