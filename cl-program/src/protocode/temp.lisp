@@ -888,3 +888,18 @@
      (let ((x1 (+ foox0 char-width))
 	   (y1 (+ fooy0 char-height)))
        (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1)))))))))
+
+(progno
+ (defmacro with-iterators ((&rest bufvars) buf func type &body body)
+  (let* ((letargs nil)
+	 (counter 0)
+	 (syms (mapcar (lambda (x) (gensym (string x))) bufvars))
+	 (bindings nil)
+	 (decl `(declare (type ,type ,@syms))))
+    (dolist (sym syms)
+      (push `(,sym (aref ,buf ,counter)) letargs)
+      (push `(,(pop bufvars) ,sym) bindings)
+      (incf counter))
+    `(let ,letargs ,decl
+	  (,func ,bindings
+		 ,@body)))))

@@ -344,7 +344,7 @@
   (defparameter *controlled-keys* (make-array 128))
   (defun reset-ascii-tables ()
     (dobox ((offset 0 (length *shift-keys*) :inc 2))
-	   (with-vec-params (down up) (*shift-keys* offset)
+	   (with-vec-params ((offset down up)) (*shift-keys*)
 	     (let ((code (char-code down)))
 	       (setf (aref *shifted-keys* code) (char-code up))
 	       (setf (aref *controlled-keys* code) (ascii-control code)))))

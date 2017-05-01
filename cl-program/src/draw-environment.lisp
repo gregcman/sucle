@@ -16,6 +16,23 @@
       (setf (aref array x) (/ (float x) 255.0)))
     array))
 
+(defparameter *chunk-vertices-lookup*
+  (let ((chunk-size-x pix::+x-chunk-size+)
+	(chunk-size-y pix::+y-chunk-size+))
+    (let ((array (make-array (* chunk-size-x chunk-size-y 4))))
+      (let ((iter (iter-ator:make-iterator (length array) array nil nil)))
+	(let ((char-width (if t 18.0 *block-width*))
+	      (char-height (if t 32.0 *block-height*)))
+	  (iter-ator:wasabios ((epos iter))
+	    (dobox ((ix 0 chunk-size-x)
+		    (iy 0 chunk-size-y))
+		   (let ((foox0 (* (float ix) char-width))
+			 (fooy0 (* (float iy) char-height)))
+		     (let ((x1 (+ foox0 char-width))
+			   (y1 (+ fooy0 char-height)))
+		       (etouq (ngorp (preach 'epos '(foox0 fooy0 x1 y1))))))))))
+      (nreverse array))))
+
 (defparameter *screen-scaled-matrix* (cg-matrix:identity-matrix))
 
 (defparameter *attrib-buffers* (fill-with-flhats (make-attrib-buffer-data)))
@@ -99,10 +116,7 @@
 				    (* auxvarh yoffset))
 	     (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil)
 	     (draw-ensure world call-lists
-			  (aref rectangle 0)
-			  (aref rectangle 2)
-			  (aref rectangle 1)
-			  (aref rectangle 3)
+			  rectangle
 			  (floor chunk-width)
 			  (floor chunk-height))))
       (draw-window *cam-rectangle* *chunks* *chunk-call-lists* 16 16 *camera-x* *camera-y*)
@@ -113,66 +127,47 @@
 	(cg-matrix:mref result 1 3) y)
   result)
 
-(defparameter *chunk-vertices-lookup*
-  (let ((chunk-size-x pix::+x-chunk-size+)
-	(chunk-size-y pix::+y-chunk-size+))
-    (let ((array (make-array (* chunk-size-x chunk-size-y 4))))
-      (let ((iter (iter-ator:make-iterator (length array) array nil nil)))
-	(let ((char-width *block-width*)
-	      (char-height *block-height*))
-	  (iter-ator:wasabios ((epos iter))
-	    (dobox ((ix 0 chunk-size-x)
-		    (iy 0 chunk-size-y))
-		   (let ((foox0 (* (float ix) char-width))
-			 (fooy0 (* (float iy) char-height)))
-		     (let ((x1 (+ foox0 char-width))
-			   (y1 (+ fooy0 char-height)))
-		       (etouq (ngorp (preach 'epos '(foox0 fooy0 x1 y1))))))))))
-      (nreverse array))))
-
-(defun draw-ensure (world call-lists minx maxx miny maxy chunk-width chunk-height)
-  (dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
-	  (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
-	 (let ((index (pix:xy-index xstart ystart)))
-	   (multiple-value-bind (value exists) (gethash index call-lists)
-	     (declare (ignorable exists))
-	     (if value
-		 (gl:call-list value)
-		 (if (gethash index world)
-		     (let ((mesh 
-			    (let ((iter *attrib-buffer-iterators*))
-			      (let ((buf (get-buf-param iter
-							(etouq (vector 0 8 9 10)))))
-				(reset-attrib-buffer-iterators iter)
-				(let ((times (draw-box-char
-					      buf
-					      *16x16-tilemap* (gethash index world)
-					      pix::+chunk-capacity+ *chunk-vertices-lookup*
-					      (* *block-width* (float xstart)) 
-					      (* *block-height* (float ystart)) 
-					      +single-float-just-less-than-one+)))
-				  (reset-attrib-buffer-iterators iter)
-				  (let ((display-list (gl:gen-lists 1)))
-				    (gl:with-new-list (display-list :compile)
-				      (gl:with-primitives :quads
-					(mesh-test42 times buf)))
-				    display-list))))))
-		       (setf (gethash index call-lists) mesh)
-		       (gl:call-list mesh))))))))
+(defun draw-ensure (world call-lists rectangle chunk-width chunk-height)
+  (with-vec-params (minx miny maxx maxy) (rectangle)
+    (dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
+	    (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
+	   (let ((index (pix:xy-index xstart ystart)))
+	     (multiple-value-bind (value exists) (gethash index call-lists)
+	       (declare (ignorable exists))
+	       (if value
+		   (gl:call-list value)
+		   (let ((thechunk (gethash index world)))
+		     (if thechunk
+			 (let ((mesh 
+				(let ((iter *attrib-buffer-iterators*))
+				  (let ((buf (get-buf-param iter
+							    (etouq (vector 0 8 9 10)))))
+				    (reset-attrib-buffer-iterators iter)
+				    (let ((times (draw-box-char
+						  buf
+						  *16x16-tilemap* thechunk
+						  pix::+chunk-capacity+ *chunk-vertices-lookup*
+						  (* *block-width* (float xstart)) 
+						  (* *block-height* (float ystart)) 
+						  +single-float-just-less-than-one+)))
+				      (reset-attrib-buffer-iterators iter)
+				      (let ((display-list (gl:gen-lists 1)))
+					(gl:with-new-list (display-list :compile)
+					  (gl:with-primitives :quads
+					    (mesh-test42 times buf)))
+					display-list))))))
+			   (setf (gethash index call-lists) mesh)
+			   (gl:call-list mesh))))))))))
 
 (defmacro with-iterators ((&rest bufvars) buf func type &body body)
-  (let* ((letargs nil)
-	 (counter 0)
-	 (syms (mapcar (lambda (x) (gensym (string x))) bufvars))
-	 (bindings nil)
+  (let* ((syms (mapcar (lambda (x) (gensym (string x))) bufvars))
+	 (bindings (mapcar (lambda (x y) (list x y))
+			   bufvars syms))
 	 (decl `(declare (type ,type ,@syms))))
-    (dolist (sym syms)
-      (push `(,sym (aref ,buf ,counter)) letargs)
-      (push `(,(pop bufvars) ,sym) bindings)
-      (incf counter))
-    `(let ,letargs ,decl
-	  (,func ,bindings
-		 ,@body))))
+    `(with-vec-params ,syms (,buf)
+       ,decl
+       (,func ,bindings
+	      ,@body))))
 (progn
  (defun draw-mouse (bufs
 		    lookup value char-width char-height x y z)
@@ -181,8 +176,9 @@
 	    (optimize (speed 3) (safety 0))
 	    (type fixnum value))
    (with-iterators (epos etex) bufs iter-ator:wasabios iter-ator:iter-ator
-     (multiple-value-bind (x0 y0 x1 y1) (index-quad-lookup lookup value)
-       (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))
+     (let ((offset (* value 4)))
+       (with-vec-params ((offset x0 y0 x1 y1)) (lookup)
+	 (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
      (let ((x1 (+ char-width x))
 	   (y0 (- y char-height)))
        (etouq (ngorp (preach 'epos (quadk+ 'z '(x x1 y0 y))))))
@@ -328,7 +324,6 @@
   newarray)
 
 (progn
-
   (defun mesh-test42 (times bufs)
     (with-iterators (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
       (dotimes (x times)
@@ -337,13 +332,12 @@
 	(%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
 	(%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
-  (progn
-    (defun mesh-test4269 (times bufs)
-      (with-iterators (xyz uv eft) bufs iter-ator:wasabiis iter-ator:iter-ator
-	(dotimes (x times)
-	  (%gl:vertex-attrib-2f 8 (uv) (uv))
-	  (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
-	  (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))))
+  (defun mesh-test4269 (times bufs)
+    (with-iterators (xyz uv eft) bufs iter-ator:wasabiis iter-ator:iter-ator
+      (dotimes (x times)
+	(%gl:vertex-attrib-2f 8 (uv) (uv))
+	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
+	(%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
 
 (progn
   (declaim (ftype (function (simple-vector
@@ -357,31 +351,32 @@
   (with-unsafe-speed
     (defun draw-box-char (bufs
 			  tilemap-lookup world
-			  chunk-capacity
+			  amount
 			  mesh-lookup
 			  x y z)
       (let ((nope 0))
 	(with-iterators (epos etex efg ebg) bufs iter-ator:wasabios iter-ator:iter-ator
-	  (dobox ((index 0 chunk-capacity))
+	  (dobox ((index 0 amount))
 		 (let ((obj (aref world index)))
 		   (if obj
 		       (let ((value (get-char-num obj)))
 			 (declare (type fixnum value))
 			 (with-char-colors (xfg-r xfg-g xfg-b xbg-r xbg-g xbg-b) value
-			   (let ((fg-r (aref +byte-fraction-lookup+ xfg-r))
-				 (fg-g (aref +byte-fraction-lookup+ xfg-g))
-				 (fg-b (aref +byte-fraction-lookup+ xfg-b))
-				 (bg-r (aref +byte-fraction-lookup+ xbg-r))
-				 (bg-g (aref +byte-fraction-lookup+ xbg-g))
-				 (bg-b (aref +byte-fraction-lookup+ xbg-b)))
+			   (with-vec-params ((XFG-R FG-R)
+					     (XFG-G FG-G)
+					     (XFG-B FG-B)
+					     (XBG-R BG-R)
+					     (XBG-G BG-G)
+					     (XBG-B BG-B))
+			       (+byte-fraction-lookup+)
 			     (dotimes (x 4)
 			       (etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
 			       (etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b)))))))
 			 (let ((offset (* 4 (mod value 256))))
-			   (with-vec-params (x0 y0 x1 y1) (tilemap-lookup offset)
+			   (with-vec-params ((offset x0 y0 x1 y1)) (tilemap-lookup)
 			     (etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1)))))))
 			 (let ((offset (* 4 index)))
-			   (with-vec-params (foox0 fooy0 x1 y1) (mesh-lookup offset)
+			   (with-vec-params ((offset foox0 fooy0 x1 y1)) (mesh-lookup)
 			     (declare (type single-float foox0 fooy0 x1 y1))
 			     (incf x1 x)
 			     (incf y1 y)
@@ -389,4 +384,4 @@
 			     (incf fooy0 y)
 			     (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1))))))))
 		       (incf nope)))))
-	(* 4 (- chunk-capacity nope))))))
+	(* 4 (- amount nope))))))
