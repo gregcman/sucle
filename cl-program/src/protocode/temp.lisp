@@ -903,3 +903,17 @@
     `(let ,letargs ,decl
 	  (,func ,bindings
 		 ,@body)))))
+
+(progno
+ (with-unsafe-speed
+   (defun lol (n s)
+     (declare (values fixnum)
+	      (type fixnum n s))
+     (sb-kernel:shift-towards-end n s))))
+
+(progno
+ (with-unsafe-speed
+   (defun lol (n s)
+     (declare (values fixnum)
+	      (type fixnum n s))
+     (dpb -1 (byte s 8) n))))

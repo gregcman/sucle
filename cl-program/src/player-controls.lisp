@@ -24,8 +24,9 @@
     (e:mice-r-or-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
 		   )))
 
-(defparameter old-mouse-x 0)
-(defparameter old-mouse-y 0)
+(progn
+  (defparameter old-mouse-x 0)
+  (defparameter old-mouse-y 0))
 (defun delta ()
   (multiple-value-bind (newx newy) (window:get-mouse-position)
     (multiple-value-prog1 (values
@@ -33,48 +34,48 @@
 			   (- newy old-mouse-y))
       (setf old-mouse-x newx
 	    old-mouse-y newy))))
-(defparameter mousecapturestate nil)
-(defun remove-spurious-mouse-input ()
-  (if (window:mice-locked-p)
-      (cond ((eq nil mousecapturestate)
-	     (delta) ;;toss spurious mouse movement
-	     (setf mousecapturestate :justcaptured))
-	    ((eq mousecapturestate :justcaptured)
-	     (setq mousecapturestate t)))
-      (setq mousecapturestate nil)))
 
-(defparameter *mouse-x* 0.0)
-(defparameter *mouse-y* 0.0)
+(progn
+  (defparameter *old-mouse-x* 0.0)
+  (defparameter *old-mouse-y* 0.0)
+  (defparameter *mouse-x* 0.0)
+  (defparameter *mouse-y* 0.0))
 (progn
   (defparameter *mouse-sensitivity* (coerce 2.0 'single-float)))
 
-(defparameter *block-height* (/ 32.0 1.0))
-(defparameter *block-width* (/ 18.0 1.0))
+(progn
+  (defparameter *block-height* (/ 32.0 1.0))
+  (defparameter *block-width* (/ 18.0 1.0)))
 
-(defparameter *cursor-x* 0)
-(defparameter *cursor-y* 0)
-(defparameter *old-cursor-x* 0)
-(defparameter *old-cursor-y* 0)
+(progn
+  (defparameter *cursor-x* 0)
+  (defparameter *cursor-y* 0)
+  (defparameter *old-cursor-x* 0)
+  (defparameter *old-cursor-y* 0))
 
-(defparameter *old-hud-cursor-x* 0)
-(defparameter *old-hud-cursor-y* 0)
+(progn
+  (defparameter *old-hud-cursor-x* 0)
+  (defparameter *old-hud-cursor-y* 0)
+  (defparameter *hud-cursor-x* 0)
+  (defparameter *hud-cursor-y* 0))
 
-(defparameter *hud-x* 1999)
-(defparameter *hud-y* 1999)
+(progn
+  (defparameter *hud-x* 1999)
+  (defparameter *hud-y* 1999))
 
-(defparameter *hud-cursor-x* 0)
-(defparameter *hud-cursor-y* 0)
-
-(defparameter *camera-x* 0)
-(defparameter *camera-y* 0)
+(progn
+  (defparameter *camera-x* 0)
+  (defparameter *camera-y* 0))
 
 (defparameter *chunks* (pix:make-world))
 (defparameter *chunk-call-lists* (make-eq-hash))
-(defparameter *chunk-width* 16)
-(defparameter *chunk-height* 16)
+(progn
+  (defparameter *chunk-width* 16)
+  (defparameter *chunk-height* 16))
 
-(defparameter *window-block-height* 0.0)
-(defparameter *window-block-width* 0.0)
+(progn
+  (defparameter *window-block-height* 0.0)
+  (defparameter *window-block-width* 0.0))
 
 (defparameter *achar* 0)
 
@@ -113,16 +114,17 @@
 (defparameter *cursor-moved* 0)
 (defparameter *scroll-sideways* nil)
 
-(defparameter *print-head-x* 0)
-(defparameter *print-head-y* 127)
+(progn
+  (defparameter *print-head-x* 0)
+  (defparameter *print-head-y* 127))
 
-(defparameter *terminal-start-x* 0)
-(defparameter *terminal-start-y* 0)
+(progn
+  (defparameter *terminal-start-x* 0)
+  (defparameter *terminal-start-y* 0))
 
 (defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
 
 (defun physics ()
-  (remove-spurious-mouse-input)
   (incf *ticks*)
   (when (skey-j-p :escape) (window:toggle-mouse-capture))
 
@@ -142,20 +144,20 @@
       (enter *command-buffer*))
 
     (when (e:mice-locked-p)
+      (setf *old-mouse-x* *mouse-x*
+	    *old-mouse-y* *mouse-y*)
       (multiple-value-bind (dx dy) (delta)
 	(let ((width e:*width*)
 	      (height e:*height*))
 	  (let ((deltax (* *mouse-sensitivity* dx))
 		(deltay (* *mouse-sensitivity* dy)))
-	    (let ((old-mouse-x *mouse-x*)
-		  (old-mouse-y *mouse-y*))
-	      (setf *mouse-x* (clamp (+ *mouse-x* deltax) (- width) (- width 2.0)))
-	      (setf *mouse-y* (clamp (- *mouse-y* deltay) (+  2.0 (- height)) height))
-	      (when (smice-p :left)
-		(decf *camera-x* (- (floor *mouse-x* *block-width*)
-				    (floor old-mouse-x *block-width*)))
-		(decf *camera-y* (- (floor *mouse-y* *block-height*)
-				    (floor old-mouse-y *block-height*)))))))))
+	    (setf *mouse-x* (clamp (+ *mouse-x* deltax) (- width) (- width 2.0)))
+	    (setf *mouse-y* (clamp (- *mouse-y* deltay) (+  2.0 (- height)) height))
+	    (when (smice-p :left)
+	      (decf *camera-x* (- (floor *mouse-x* *block-width*)
+				  (floor *old-mouse-x* *block-width*)))
+	      (decf *camera-y* (- (floor *mouse-y* *block-height*)
+				  (floor *old-mouse-y* *block-height*))))))))
     
     (multiple-value-bind (x y state other) (term-cursor-info)
       (declare (ignorable state other))
