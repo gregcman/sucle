@@ -1,33 +1,41 @@
 (in-package :fuktard)
 (export (quote with-vec-params))
 (defun with-vec-params (&rest args)
-  (destructuring-bind ((&rest bufvars) (buf) &body body) args 
-    (let ((letargs nil)
-	  (letargsoffset nil)
-	  (decl nil))
-      (multiple-value-bind (ans offs) (%aux-with-vec-params bufvars buf)
-	(labels ((rec-push (stuff)
-		   (dolist (x stuff)
-		     (let ((first (car x)))
-		       (if (consp first)
-			   (rec-push x)
-			   (push x letargs))))))
-	  (rec-push ans))
-	(labels ((rec-push-offs (stuff)
-		   (dolist (x stuff)
-		     (let ((first (car x)))
-		       (if (consp first)			 
-			   (rec-push-offs x)
-			   (when first (push x letargsoffset)
-				 (push (car x) decl)))))))
-	  (rec-push-offs offs)))
-      (let ((fin `(let ,letargs 
-		    ,@body)))
+  (destructuring-bind ((&rest bufvars)
+		       (buf &optional (binder 'let)) &body body) args 
+    (multiple-value-bind (letargsoffset letargs decl)
+	(%2aux-with-vec-params bufvars buf)
+      (let ((fin `(,binder ,letargs 
+			   ,@body)))
 	(if letargsoffset
 	    `(let* ,letargsoffset
 	       (declare (type fixnum ,@decl))
 	       ,fin)
 	    fin)))))
+
+(defun %2aux-with-vec-params (bufvars buf)
+  (let ((letargs nil)
+	(letargsoffset nil)
+	(decl nil))
+    (multiple-value-bind (ans offs) (%aux-with-vec-params bufvars buf)
+      (labels ((rec-push (stuff)
+		 (dolist (x stuff)
+		   (let ((first (car x)))
+		     (if (consp first)
+			 (rec-push x)
+			 (push x letargs))))))
+	(rec-push ans))
+      (labels ((rec-push-offs (stuff)
+		 (dolist (x stuff)
+		   (let ((first (car x)))
+		     (if (consp first)			 
+			 (rec-push-offs x)
+			 (when first (push x letargsoffset)
+			       (push (car x) decl)))))))
+	(rec-push-offs offs)))
+    (values letargsoffset
+	    letargs
+	    decl)))
 
 (defun %aux-with-vec-params (vars-or-offsets buf &optional (offset 0))
   (let ((counter 0)
@@ -43,7 +51,7 @@
 		 (if (eql 0 offset)
 		     suboffset
 		     (let ((newoffset (gensym)))
-		       (push `(,newoffset (the fixnum (+ ,offset ,suboffset))) offsets)
+		       (push `(,newoffset (+ ,offset ,suboffset)) offsets)
 		       newoffset)))
 	      (when bindings-list
 		(push bindings-list bindings))
@@ -52,7 +60,9 @@
 	  (progn
 	    (let ((sub (if (eql 0 counter)
 			   offset
-			   `(the fixnum (+ ,offset ,counter)))))
+			   (let ((new-offset (gensym)))
+			     (push`(,new-offset (+ ,offset ,counter)) offsets)
+			     new-offset))))
 	      (when var-or-offset
 		(push `(,var-or-offset (aref ,buf ,sub)) bindings)))
 	    (incf counter))))

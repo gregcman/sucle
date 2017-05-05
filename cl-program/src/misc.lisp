@@ -151,3 +151,78 @@
   (defun myload (filename)
     (let ((path (merge-pathnames filename *saves-dir*)))
       (conspack:decode (byte-read path)))))
+
+(defun quit ()
+  (setf e:*status* t))
+
+(progn
+  (progn
+    (defun skey-p (enum)
+      (e:key-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+	       ))
+    (defun skey-j-r (enum)
+      (e:key-j-r enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+		 ))
+    (defun skey-j-p (enum)
+      (e:key-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+		 ))
+    (defun smice-p (enum)
+      (e:mice-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
+		))
+    (defun smice-j-p (enum)
+      (e:mice-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
+		  ))
+    (defun skey-r-or-p (enum)
+      (e:key-r-or-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+		    ))
+    (defun smice-r-or-p (enum)
+      (e:mice-r-or-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
+		     )))
+
+  (progn
+    (defparameter old-mouse-x 0)
+    (defparameter old-mouse-y 0)
+    (defun delta ()
+      (multiple-value-bind (newx newy) (window:get-mouse-position)
+	(multiple-value-prog1 (values
+			       (- newx old-mouse-x)
+			       (- newy old-mouse-y))
+	  (setf old-mouse-x newx
+		old-mouse-y newy))))))
+
+(defun make-eq-hash ()
+  (make-hash-table :test (quote eq)))
+
+(progn
+  (defun floor-chunk (x y)
+    (* y (floor x y)))
+
+  (defun acolor (&rest values)
+    (setf values (nreverse values))
+    (let ((acc 0))
+      (dolist (value values)
+	(setf acc (ash (logior acc value) 8)))
+      (logand acc most-positive-fixnum)))
+
+  (progn
+    (declaim (inline byte-color)
+	     (ftype (function (fixnum) single-float)
+		    byte-color))
+    (with-unsafe-speed
+      (defun byte-color (x)
+	(/ (float x) 255.0))))
+
+  (defun strip-char (color)
+    (logandc1 255 color))
+
+  (defparameter *white-black-color* (acolor 255 255 255 0 0 0))
+  (defparameter *color-nil* (logandc1 255 (sxhash nil))))
+
+(defun next-mouse-state (x y sensitivity)
+  (multiple-value-bind (dx dy) (delta)
+    (let ((width e:*width*)
+	  (height e:*height*))
+      (let ((deltax (* sensitivity dx))
+	    (deltay (* sensitivity dy)))
+	(values (clamp (+ x deltax) (- width) (- width 2.0))
+		(clamp (- y deltay) (+  2.0 (- height)) height))))))

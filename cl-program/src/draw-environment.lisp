@@ -3,8 +3,6 @@
 
 (defparameter vsync? t)
 
-(defparameter *mat4-identity* (cg-matrix:identity-matrix))
-
 (defconstant +single-float-just-less-than-one+ 0.99999997)
 
 (defparameter *16x16-tilemap* (regular-enumeration 16 16))
@@ -40,9 +38,6 @@
   (make-iterators *attrib-buffers* (make-attrib-buffer-data)))
 (defparameter *attrib-buffer-fill-pointer*
   (tally-buffer *attrib-buffer-iterators* (make-attrib-buffer-data)))
-
-(defun make-eq-hash ()
-  (make-hash-table :test (quote eq)))
 
 (defparameter *backup* (make-eq-hash))
 (defparameter *stuff* (make-eq-hash))

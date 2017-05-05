@@ -917,3 +917,89 @@
      (declare (values fixnum)
 	      (type fixnum n s))
      (dpb -1 (byte s 8) n))))
+
+(progno
+ (progn
+  (declaim (ftype (function (fixnum fixnum simple-vector) t)
+		  get2)
+	   (inline get2))
+  (with-unsafe-speed
+    (defun get2 (x y world)
+      (let ((subarray
+	     (let ((index (multiple-value-bind (xbig ybig) (page x y 4 4)
+			    (index xbig ybig 8 8))))
+	       (aref world index))))
+	(declare (type (or null simple-vector) subarray))
+	(if subarray
+	    (aref subarray
+		  (let ((sub-index (index x y 4 4)))
+		    sub-index))))))))
+
+(progno
+ (progn
+  (declaim (ftype (function (fixnum fixnum simple-vector t) t)
+		  set2))
+  (declaim (inline set2))
+  (with-unsafe-speed
+    (defun set2 (x y world value)
+      (let ((subarray
+	     (let ((index
+		    (multiple-value-bind (xbig ybig) (page x y 4 4)
+		      (index xbig ybig 8 8))))
+	       (let ((sub (aref world index)))
+		 (if sub
+		     sub
+		     (setf (aref world index)
+			   (make-chunk)))))))
+	(declare (type simple-vector subarray))
+	(let ((sub-index (index x y 4 4)))
+	  (setf (aref subarray sub-index) value)))))))
+
+(progno
+ (defun typing-insert (value x y)
+   (let ((start (pix:xy-index x y)))
+     (let ((old-value (pix:get-obj start *chunks*)))
+       (set-char-with-update start value)
+       (if old-value
+	   (typing-insert old-value (1+ x) y)))))
+
+ (defun typing-delete (x y)
+   (let ((start (pix:xy-index x y)))
+     (let ((old-value (pix:get-obj start *chunks*))
+	   (prev (pix:xy-index (1- x) y)))
+       (cond (old-value 
+	      (set-char-with-update prev old-value)
+	      (typing-delete (1+ x) y))
+	     (t (set-char-with-update prev nil))))))
+ (progn
+   (declaim (ftype (function (fixnum fixnum fixnum (vector character) fixnum
+				     (function (fixnum) fixnum)
+				     (function (fixnum) fixnum))
+			     (values fixnum fixnum))
+		   copy-string-to-world))
+   (defun copy-string-to-world (x y newline-start string color next-x-func next-y-func)
+     (let ((len (length string)))
+       (dotimes (index len)
+	 (let ((char (aref string index)))
+	   (cond ((char= char #\Newline)
+		  (setf x newline-start y (funcall next-y-func y)))
+		 (t		     
+		  (set-char-with-update (pix:xy-index x y)
+					(logior (char-code char) color))
+		  (setf x (funcall next-x-func x))))))
+       (values x y)))))
+
+(progno (defparameter *achar* 0))
+
+(progno (defparameter foo
+	  (make-array 0 :adjustable t :fill-pointer 0
+		      :element-type (quote character))))
+
+(progno (defparameter *scroll-sideways* nil))
+
+(progno
+  (defparameter *print-head-x* 0)
+  (defparameter *print-head-y* 127))
+
+(progno
+ (defparameter *mat4-identity* (cg-matrix:identity-matrix)))

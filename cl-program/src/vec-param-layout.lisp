@@ -19,3 +19,6 @@
 				       (:y0 1)
 				       (:x1 2)
 				       (:y1 3))))
+
+(register-vec-slots :point (quote ((:x 0)
+				   (:y 1))))

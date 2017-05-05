@@ -21,7 +21,8 @@
   (defconstant +right-shift+ (- +y-chunk-bits+ +x-bits-start+))
   (defconstant +y-mask+ (1- (ash 1 +x-bits-start+)))
   (defconstant +chunk-capacity+ (* +x-chunk-size+ +y-chunk-size+))
-  
+
+  (declaim (ftype (function () (simple-vector)) make-chunk))
   (defun make-chunk ()
     (make-array +chunk-capacity+
 		:element-type t
@@ -79,16 +80,16 @@
 (defun fixnum-not (n)
   (logand most-positive-fixnum (lognot n)))
 
-(defconstant +n-bits+ (let ((array (make-array +available-bits+)))
-			(dotimes (x (length array))
-			  (setf (aref array x) (n-bits x)))
-			array))
 (progn
   (declaim (inline n-bits)
 	   (ftype (function (fixnum) fixnum)
 		  n-bits))
   (defun n-bits (n)
     (1- (ash 1 n))))
+(defconstant +n-bits+ (let ((array (make-array +available-bits+)))
+			(dotimes (x (length array))
+			  (setf (aref array x) (n-bits x)))
+			array))
 
 (progn
   (declaim (inline index)
@@ -159,6 +160,6 @@
 	    (let ((sub-index (index x y 4 4)))
 	      (if subarray
 		  (setf (aref subarray sub-index) value)
-		  (let ((newarray (make-array (* 16 16) :initial-element nil)))
+		  (let ((newarray (make-chunk)))
 		    (setf (aref world index) newarray)
 		    (setf (aref newarray sub-index) value))))))))))
