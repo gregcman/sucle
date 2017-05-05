@@ -1,12 +1,9 @@
 (in-package :sandbox)
 
 
-(defparameter vsync? t)
-
 (defconstant +single-float-just-less-than-one+ 0.99999997)
 
 (defparameter *16x16-tilemap* (regular-enumeration 16 16))
-(defparameter *4x4-tilemap* (regular-enumeration 4 4))
 
 (defconstant +byte-fraction-lookup+
   (let ((array (make-array 256 :element-type 'single-float)))
@@ -58,37 +55,19 @@
 				  ("COL" . 9))))
 
 (defparameter *clear-display-buffer* t)
+(defparameter vsync? t)
 
 (defun render ()
-  (if vsync?
-      (window::set-vsync t)
-      (window::set-vsync nil))
   (draw-things)
 
   (window:update-display))
 
-(defparameter *one-over-window-width* 0.0)
-(defparameter *one-over-window-height* 0.0)
-
+(defparameter *window-width* nil)
+(defparameter *window-height* nil)
 
 (defun draw-things ()
-  (gl:disable :depth-test :blend)
-  (gl:depth-mask :false)
-  (gl:depth-func :always)
-  (gl:disable :cull-face)
-  (gl:clear-color 0.0
-		  (aref +byte-fraction-lookup+ 8)
-		  (aref +byte-fraction-lookup+ 16) 0f0)
   (when *clear-display-buffer*
-    (gl:clear :color-buffer-bit))
-
-  (setf *one-over-window-width* (/ 1.0 e:*width*)
-	*one-over-window-height* (/ 1.0 e:*height*))
-  (cg-matrix:%scale* *screen-scaled-matrix*
-		     *one-over-window-width*
-		     *one-over-window-height*
-		     1.0) 
-  (gl:viewport 0 0 e:*width* e:*height*)
+    (gl:clear :color-buffer-bit)) 
 
   (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
 	 (solidshader-uniforms (glget solidshader :program))
@@ -97,9 +76,14 @@
     (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
     (draw-text-layers pmv)))
 
+(defun rescale-screen-matrix (result x y)
+  (setf (cg-matrix:mref result 0 3) x
+	(cg-matrix:mref result 1 3) y)
+  result)
+
 (defun draw-text-layers (pmv)
-  (let ((auxvarw (* *block-width* -1.0 *one-over-window-width*))
-	(auxvarh (* *block-height* -1.0 *one-over-window-height*)))
+  (let ((auxvarw (/ *block-width* (- *window-width*)))
+	(auxvarh (/ *block-height* (- *window-height*))))
     (flet ((draw-window (rectangle world call-lists chunk-width chunk-height xoffset yoffset)
 	     (rescale-screen-matrix *screen-scaled-matrix*
 				    (* auxvarw xoffset)
@@ -110,11 +94,6 @@
 			  (floor chunk-width)
 			  (floor chunk-height))))
       (draw-window *cam-rectangle* *chunks* *chunk-call-lists* 16 16 *camera-x* *camera-y*))))
-
-(defun rescale-screen-matrix (result x y)
-  (setf (cg-matrix:mref result 0 3) x
-	(cg-matrix:mref result 1 3) y)
-  result)
 
 (defun draw-ensure (world call-lists rectangle chunk-width chunk-height)
   (etouq
@@ -160,32 +139,28 @@
       `(,func ,bindings
 	      ,@body))))
 
-(defun create-call-list-from-func (func &optional (the-list (gl:gen-lists 1)))
-  (gl:with-new-list (the-list :compile)
-    (funcall func))
-  the-list)
-
-(progn
-  (declaim (ftype (function (iter-ator:iter-ator fixnum (simple-array t)))
-		  attrib-repeat))
-  (with-unsafe-speed
-    (defun attrib-repeat (buf times vector)
-      (iter-ator:wasabios ((ebuf buf))
-	(let ((len (length vector)))
-	  (dotimes (x times)
-	    (dotimes (index len)
-	      (let ((value (aref vector index)))
-		(ebuf value)))))))))
-
 (defun glinnit ()
   (reset *gl-objects*)
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (clrhash *chunk-call-lists*)
+
+  (if vsync?
+      (window::set-vsync t)
+      (window::set-vsync nil))
   
   (let ((width (if t 480 854))
 	(height (if t 360 480)))
     (window:push-dimensions width height))
   (setf e:*resize-hook* #'on-resize)
+
+  (progn
+    (gl:clear-color 0.0
+		    (aref +byte-fraction-lookup+ 8)
+		    (aref +byte-fraction-lookup+ 16) 0f0)
+    (gl:disable :depth-test :blend)
+    (gl:depth-mask :false)
+    (gl:depth-func :always)
+    (gl:disable :cull-face))
 
   (let ((hash *stuff*))
     (maphash (lambda (k v)
@@ -232,7 +207,12 @@
 
 (defun on-resize (w h)
   (setf *window-height* h
-	*window-width* w))
+	*window-width* w)
+  (cg-matrix:%scale* *screen-scaled-matrix*
+		     (/ 1.0 w)
+		     (/ 1.0 h)
+		     1.0)
+  (gl:viewport 0 0 w h))
 
 (defparameter *buffer-vector-scratch* (make-array 16))
 
@@ -243,21 +223,14 @@
 	    (aref iter (aref attrib-order x)))))
   newarray)
 
-(progn
-  (defun mesh-test42 (times bufs)
-    (with-iterators (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
-      (dotimes (x times)
-	(%gl:vertex-attrib-2f 8 (uv) (uv))
-	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
-	(%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
-	(%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
+(defun mesh-test42 (times bufs)
+  (with-iterators (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
+    (dotimes (x times)
+      (%gl:vertex-attrib-2f 8 (uv) (uv))
+      (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
+      (%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
+      (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
-  (defun mesh-test4269 (times bufs)
-    (with-iterators (xyz uv eft) bufs iter-ator:wasabiis iter-ator:iter-ator
-      (dotimes (x times)
-	(%gl:vertex-attrib-2f 8 (uv) (uv))
-	(%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
-	(%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
 
 (defmacro with-char-colors ((fg-rvar fg-gvar fg-bvar bg-rvar bg-gvar bg-bvar) value &body body)
   `(let ((,fg-rvar (ldb (byte 8 8) ,value))

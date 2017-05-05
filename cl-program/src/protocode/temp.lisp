@@ -1012,3 +1012,29 @@
 
 
 (progno (when (skey-j-p :escape) (window:toggle-mouse-capture)))
+
+(progno
+ (progn
+  (declaim (ftype (function (iter-ator:iter-ator fixnum (simple-array t)))
+		  attrib-repeat))
+  (with-unsafe-speed
+    (defun attrib-repeat (buf times vector)
+      (iter-ator:wasabios ((ebuf buf))
+	(let ((len (length vector)))
+	  (dotimes (x times)
+	    (dotimes (index len)
+	      (let ((value (aref vector index)))
+		(ebuf value))))))))))
+
+(progno
+ (defun create-call-list-from-func (func &optional (the-list (gl:gen-lists 1)))
+   (gl:with-new-list (the-list :compile)
+     (funcall func))
+   the-list))
+
+(progno
+ (defparameter *one-over-window-width* 0.0)
+ (defparameter *one-over-window-height* 0.0))
+
+(progno  (setf *one-over-window-width* (/ 1.0 e:*width*)
+		 *one-over-window-height* (/ 1.0 e:*height*)))

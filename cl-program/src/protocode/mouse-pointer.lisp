@@ -108,3 +108,13 @@
   (defparameter *mouse-sensitivity* (coerce 2.0 'single-float)))
 
 (progno (next-mouse-state *mouse-x* *mouse-y* *mouse-sensitivity*))
+
+(progno
+ (defun mesh-test4269 (times bufs)
+   (with-iterators (xyz uv eft) bufs iter-ator:wasabiis iter-ator:iter-ator
+     (dotimes (x times)
+       (%gl:vertex-attrib-2f 8 (uv) (uv))
+       (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
+       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))
+
+(progno (defparameter *4x4-tilemap* (regular-enumeration 4 4)))
