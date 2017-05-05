@@ -19,13 +19,6 @@
 
 (defparameter *chunks* (pix:make-world))
 (defparameter *chunk-call-lists* (make-eq-hash))
-(progn
-  (defparameter *chunk-width* 16)
-  (defparameter *chunk-height* 16))
-
-(progn
-  (defparameter *window-block-height* 0.0)
-  (defparameter *window-block-width* 0.0))
 
 (defparameter *cam-rectangle* (vector 0 0 0 0))
 
@@ -37,7 +30,8 @@
   (incf *ticks*)
 
   (progn
-    (setf (fill-pointer *command-buffer*) 0)
+    (unless (zerop (fill-pointer *command-buffer*))
+      (setf (fill-pointer *command-buffer*) 0))
     (get-control-sequence *command-buffer*))
 
   (terminal-stuff 0 0 *command-buffer* *chunks*)
@@ -52,13 +46,9 @@
 			(floor *old-mouse-x* *block-width*)))
     (decf *camera-y* (- (floor *mouse-y* *block-height*)
 			(floor *old-mouse-y* *block-height*))))
-    
-
-  (setf *window-block-width* (/ e:*width* *block-width*)
-	*window-block-height* (/ e:*height* *block-height*))
 
   (centered-rectangle *cam-rectangle* *camera-x* *camera-y*
-		      *window-block-width* *window-block-height*))
+		      (/ e:*width* *block-width*) (/ e:*height* *block-height*)))
 
 
 (defun centered-rectangle (rect x y width height)
@@ -107,12 +97,14 @@
 		    (return))))))))
 
 (defun set-char-with-update (x y value)
-  (let ((chunk-id
-	 (setf (pix:get-obj (pix:xy-index x y) *chunks*) value)))
-    (let ((chunk (gethash chunk-id *chunk-call-lists*)))
-      (when chunk
-	(gl:delete-lists chunk 1)
-	(remhash chunk-id *chunk-call-lists*)))))
+  (multiple-value-bind (chunk offset) (pix::area (pix:xy-index x y) *chunks*)
+    (setf (aref chunk offset) value)
+    (setf (aref chunk (* 16 16)) *ticks*)))
+
+(defun get-char (x y world)
+  (pix:get-obj (pix:xy-index x y) world))
+(defun set-char (value x y world)
+  (setf (pix:get-obj (pix:xy-index x y) world) value))
 
 
 (progn

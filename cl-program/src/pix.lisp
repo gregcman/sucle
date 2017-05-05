@@ -24,7 +24,7 @@
 
   (declaim (ftype (function () (simple-vector)) make-chunk))
   (defun make-chunk ()
-    (make-array +chunk-capacity+
+    (make-array (1+ +chunk-capacity+)
 		:element-type t
 		:initial-element nil))
 
@@ -64,9 +64,7 @@
 	(if chunk
 	    (aref chunk (chunk-ref place)))))
     (defun xy-index (x y)
-      (let ((fnum (ash x +x-bits-start+)))
-	(logior (logand most-positive-fixnum fnum)
-		(logand +y-mask+ y))))
+      (index y x 31 31))
     (defun index-xy (index)
       (values (ash index (- +x-bits-start+))
 	      (logand index +y-mask+))))
@@ -74,6 +72,14 @@
     (declaim (inline (setf get-obj)))
     (defun (setf get-obj) (value place hash-table)
       (set-obj place value hash-table))))
+
+(defun area (place world)
+  (with-chunk-or-null (chunk hash-id) (place world)
+    (unless chunk
+      (let ((new-chunk (make-chunk)))
+	(setf (gethash hash-id world) new-chunk)
+	(setf chunk new-chunk)))
+    (values chunk (chunk-ref place))))
 
 (export (quote (index-xy xy-index get-obj set-obj chunk-ref make-world make-chunk pix-world)))
 
@@ -124,42 +130,43 @@
 	  (declare (type fixnum yans xans))
 	  (values xans yans))))))
 
-(defparameter *world* (make-array (* 256 256) :initial-element nil))
-
 (progn
-  (declaim (ftype (function (fixnum fixnum simple-vector) t)
-		  get2)
-	   (inline get2))
-  (with-unsafe-speed
-    (defun get2 (x y world)
-      (multiple-value-bind (xbig ybig) (page x y 4 4)
-	(let ((index (index xbig ybig 8 8)))
-	  (let ((subarray (aref world index)))
-	    (declare (type (or null simple-vector) subarray))
-	    (if subarray
-		(let ((sub-index (index x y 4 4)))
-		  (aref subarray sub-index)))))))))
+  (defparameter *world* (make-array (* 256 256) :initial-element nil))
 
-(progn
-  (declaim (ftype (function (t fixnum fixnum simple-vector) t) (setf get2)))
-  (declaim (inline (setf get2)))
-  (with-unsafe-speed
-    (defun (setf get2) (value x y world)
-      (set2 x y world value))))
-
-(progn
-  (declaim (ftype (function (fixnum fixnum simple-vector t) t)
-		  set2))
-  (declaim (inline set2))
-  (with-unsafe-speed
-    (defun set2 (x y world value)
-      (multiple-value-bind (xbig ybig) (page x y 4 4)
-	(let ((index (index xbig ybig 8 8)))
-	  (let ((subarray (aref world index)))
-	    (declare (type (or null simple-vector) subarray))
-	    (let ((sub-index (index x y 4 4)))
+  (progn
+    (declaim (ftype (function (fixnum fixnum simple-vector) t)
+		    get2)
+	     (inline get2))
+    (with-unsafe-speed
+      (defun get2 (x y world)
+	(multiple-value-bind (xbig ybig) (page x y 4 4)
+	  (let ((index (index xbig ybig 8 8)))
+	    (let ((subarray (aref world index)))
+	      (declare (type (or null simple-vector) subarray))
 	      (if subarray
-		  (setf (aref subarray sub-index) value)
-		  (let ((newarray (make-chunk)))
-		    (setf (aref world index) newarray)
-		    (setf (aref newarray sub-index) value))))))))))
+		  (let ((sub-index (index x y 4 4)))
+		    (aref subarray sub-index)))))))))
+
+  (progn
+    (declaim (ftype (function (t fixnum fixnum simple-vector) t) (setf get2)))
+    (declaim (inline (setf get2)))
+    (with-unsafe-speed
+      (defun (setf get2) (value x y world)
+	(set2 x y world value))))
+
+  (progn
+    (declaim (ftype (function (fixnum fixnum simple-vector t) t)
+		    set2))
+    (declaim (inline set2))
+    (with-unsafe-speed
+      (defun set2 (x y world value)
+	(multiple-value-bind (xbig ybig) (page x y 4 4)
+	  (let ((index (index xbig ybig 8 8)))
+	    (let ((subarray (aref world index)))
+	      (declare (type (or null simple-vector) subarray))
+	      (let ((sub-index (index x y 4 4)))
+		(if subarray
+		    (setf (aref subarray sub-index) value)
+		    (let ((newarray (make-chunk)))
+		      (setf (aref world index) newarray)
+		      (setf (aref newarray sub-index) value)))))))))))

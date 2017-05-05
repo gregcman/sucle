@@ -1038,3 +1038,21 @@
 
 (progno  (setf *one-over-window-width* (/ 1.0 e:*width*)
 		 *one-over-window-height* (/ 1.0 e:*height*)))
+
+(progno
+  (defparameter *chunk-width* 16)
+  (defparameter *chunk-height* 16))
+
+(progno
+  (defparameter *window-block-height* 0.0)
+  (defparameter *window-block-width* 0.0))
+
+(progno
+   (setf *window-block-width* (/ e:*width* *block-width*)
+	*window-block-height* (/ e:*height* *block-height*)))
+
+(progno
+ (let ((chunk (gethash chunk-id *chunk-call-lists*)))
+    (when chunk
+      (gl:delete-lists chunk 1)
+      (remhash chunk-id *chunk-call-lists*))))

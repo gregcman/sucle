@@ -98,36 +98,45 @@
 (defun draw-ensure (world call-lists rectangle chunk-width chunk-height)
   (etouq
    (with-vec-params (vec-slots :rectangle '((minx :x0) (miny :y0) (maxx :x1) (maxy :y1)))
-       '(rectangle)
+     '(rectangle)
      '(dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
 	      (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
        (let ((index (pix:xy-index xstart ystart)))
-	 (multiple-value-bind (value exists) (gethash index call-lists)
-	   (declare (ignorable exists))
-	   (if value
-	       (gl:call-list value)
-	       (let ((thechunk (gethash index world)))
-		 (if thechunk
-		     (let ((mesh 
-			    (let ((iter *attrib-buffer-iterators*))
-			      (let ((buf (get-buf-param iter
-							(etouq (vector 0 8 9 10)))))
-				(reset-attrib-buffer-iterators iter)
-				(let ((times (draw-box-char
-					      buf
-					      *16x16-tilemap* thechunk
-					      pix::+chunk-capacity+ *chunk-vertices-lookup*
-					      (* *block-width* (float xstart)) 
-					      (* *block-height* (float ystart)) 
-					      +single-float-just-less-than-one+)))
-				  (reset-attrib-buffer-iterators iter)
-				  (let ((display-list (gl:gen-lists 1)))
-				    (gl:with-new-list (display-list :compile)
-				      (gl:with-primitives :quads
-					(mesh-test42 times buf)))
-				    display-list))))))
-		       (setf (gethash index call-lists) mesh)
-		       (gl:call-list mesh)))))))))))
+	 (let ((thechunk (gethash index world)))
+	   (when thechunk
+	     (gl:call-list
+	      (let ((chunk-timestamp (aref thechunk (* 16 16)))
+		    (value (gethash index call-lists)))
+		(if (eq chunk-timestamp (cdr value))
+		    (car value)
+		    (let ((mesh 
+			   (draw-16x16-page xstart ystart thechunk (or (car value)
+								       (gl:gen-lists 1)))))
+		      (let ((new-value (if value
+					   (progn (setf (car value) mesh
+							(cdr value) *ticks*)
+						  value)
+					   (cons mesh *ticks*))))
+			(setf (gethash index call-lists) new-value))
+		      mesh)))))))))))
+
+(defun draw-16x16-page (xstart ystart thechunk &optional (display-list (gl:gen-lists 1)))
+  (let ((iter *attrib-buffer-iterators*))
+    (let ((buf (get-buf-param iter
+			      (etouq (vector 0 8 9 10)))))
+      (reset-attrib-buffer-iterators iter)
+      (let ((times (draw-box-char
+		    buf
+		    *16x16-tilemap* thechunk
+		    pix::+chunk-capacity+ *chunk-vertices-lookup*
+		    (* *block-width* (float xstart)) 
+		    (* *block-height* (float ystart)) 
+		    +single-float-just-less-than-one+)))
+	(reset-attrib-buffer-iterators iter)
+	(gl:with-new-list (display-list :compile)
+	  (gl:with-primitives :quads
+	    (mesh-test42 times buf)))
+	display-list))))
 
 (defmacro with-iterators ((&rest bufvars) buf func type &body body)
   (let* ((syms (mapcar (lambda (x) (gensym (string x))) bufvars))

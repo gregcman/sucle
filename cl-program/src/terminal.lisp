@@ -141,9 +141,10 @@
 	(declare (ignorable state other))
 	(let ((newx (+ startx x))
 	      (newy (- starty y)))
-	  (let ((place (pix:xy-index newx newy)))
-	    (let ((char (pix:get-obj place world)))
-	      (when char
-		(setf (pix:get-obj place world)
-		      (logxor char (dpb -1 (byte (* 6 8) 8) 0)))))))))
+	  (let ((char (get-char newx newy world)))
+	    (when char
+	      (set-char
+	       (logxor char (dpb -1 (byte (* 6 8) 8) 0))
+	       newx newy
+	       world))))))
     (enter command)))
