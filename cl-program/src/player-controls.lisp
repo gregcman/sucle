@@ -2,10 +2,12 @@
 
 
 (progn
-  (defparameter *old-mouse-x* 0.0)
-  (defparameter *old-mouse-y* 0.0)
-  (defparameter *mouse-x* 0.0)
-  (defparameter *mouse-y* 0.0))
+  (progn
+    (defparameter *old-mouse-x* 0.0)
+    (defparameter *old-mouse-y* 0.0))
+  (progn
+    (defparameter *mouse-x* 0.0)
+    (defparameter *mouse-y* 0.0)))
 (progn
   (defparameter *mouse-sensitivity* (coerce 2.0 'single-float)))
 
@@ -14,10 +16,12 @@
   (defparameter *block-width* (/ 18.0 1.0)))
 
 (progn
-  (defparameter *cursor-x* 0)
-  (defparameter *cursor-y* 0)
-  (defparameter *old-cursor-x* 0)
-  (defparameter *old-cursor-y* 0))
+  (progn
+    (defparameter *cursor-x* 0)
+    (defparameter *cursor-y* 0))
+  (progn
+    (defparameter *old-cursor-x* 0)
+    (defparameter *old-cursor-y* 0)))
 
 (progn
   (defparameter *old-hud-cursor-x* 0)
@@ -33,6 +37,10 @@
   (defparameter *camera-x* 0)
   (defparameter *camera-y* 0))
 
+(progn
+  (defparameter *terminal-start-x* 0)
+  (defparameter *terminal-start-y* 0))
+
 (defparameter *chunks* (pix:make-world))
 (defparameter *chunk-call-lists* (make-eq-hash))
 (progn
@@ -47,10 +55,6 @@
 (defparameter *show-cursor* t)
 (defparameter *cursor-moved* 0)
 
-(progn
-  (defparameter *terminal-start-x* 0)
-  (defparameter *terminal-start-y* 0))
-
 (defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
 
 (defparameter *ticks* 0)
@@ -58,7 +62,6 @@
 (defun physics ()
   (incf *ticks*)
   (when (skey-j-p :escape) (window:toggle-mouse-capture))
-
   (progn
     (setf *old-hud-cursor-x* *hud-cursor-x*
 	  *old-hud-cursor-y* *hud-cursor-y*)
@@ -68,7 +71,7 @@
   (progn
     (setf (fill-pointer *command-buffer*) 0)
     (get-control-sequence *command-buffer*))
-  
+    
   (multiple-value-bind (newx newy)
       (terminal-stuff *terminal-start-x* *terminal-start-y* *command-buffer*)
     (setf *cursor-x* newx
@@ -85,7 +88,7 @@
 			  (floor *old-mouse-x* *block-width*)))
       (decf *camera-y* (- (floor *mouse-y* *block-height*)
 			  (floor *old-mouse-y* *block-height*)))))
-  
+    
 
   (setf *window-block-width* (/ e:*width* *block-width*)
 	*window-block-height* (/ e:*height* *block-height*))
@@ -126,20 +129,24 @@
 		     (setf *show-cursor* nil))
 		   (progn
 		     (set-hightlight)
-		    (setf *show-cursor* t))))))))
+		     (setf *show-cursor* t))))))))
 
   (centered-rectangle *cam-rectangle* *camera-x* *camera-y*
-		      *window-block-width* *window-block-height*)
-  (centered-rectangle *hud-rectangle* *hud-x* *hud-y*
 		      *window-block-width* *window-block-height*))
+(centered-rectangle *hud-rectangle* *hud-x* *hud-y*
+		    *window-block-width* *window-block-height*)
 
 (defparameter *hud-rectangle* (vector 0 0 0 0))
 (defparameter *cam-rectangle* (vector 0 0 0 0))
 
+
 (defun centered-rectangle (rect x y width height)
   (etouq
    (with-vec-params (vec-slots :rectangle
-			       (quote ((x0 :x0) (y1 :y1) (x1 :x1) (y0 :y0))))
+			       (quote ((x0 :x0)
+				       (y1 :y1)
+				       (x1 :x1)
+				       (y0 :y0))))
      (quote (rect symbol-macrolet))
      (quote
       (setf

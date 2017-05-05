@@ -4,7 +4,11 @@
   (destructuring-bind ((&rest bufvars)
 		       (buf &optional (binder 'let)) &body body) args 
     (multiple-value-bind (letargsoffset letargs decl)
-	(%2aux-with-vec-params bufvars buf)
+	(%2aux-with-vec-params bufvars)
+
+      (setf letargs (mapcar (lambda (x)
+			      `(,(pop x) (aref ,buf ,(pop x))))
+			    letargs))
       (let ((fin `(,binder ,letargs 
 			   ,@body)))
 	(if letargsoffset
@@ -13,11 +17,11 @@
 	       ,fin)
 	    fin)))))
 
-(defun %2aux-with-vec-params (bufvars buf)
+(defun %2aux-with-vec-params (bufvars)
   (let ((letargs nil)
 	(letargsoffset nil)
 	(decl nil))
-    (multiple-value-bind (ans offs) (%aux-with-vec-params bufvars buf)
+    (multiple-value-bind (ans offs) (%aux-with-vec-params bufvars)
       (labels ((rec-push (stuff)
 		 (dolist (x stuff)
 		   (let ((first (car x)))
@@ -37,7 +41,7 @@
 	    letargs
 	    decl)))
 
-(defun %aux-with-vec-params (vars-or-offsets buf &optional (offset 0))
+(defun %aux-with-vec-params (vars-or-offsets &optional (offset 0))
   (let ((counter 0)
 	(bindings nil)
 	(offsets nil))
@@ -47,7 +51,6 @@
 	    (multiple-value-bind (bindings-list offsets-list)
 		(%aux-with-vec-params
 		 (cdr var-or-offset)
-		 buf
 		 (if (eql 0 offset)
 		     suboffset
 		     (let ((newoffset (gensym)))
@@ -64,6 +67,6 @@
 			     (push`(,new-offset (+ ,offset ,counter)) offsets)
 			     new-offset))))
 	      (when var-or-offset
-		(push `(,var-or-offset (aref ,buf ,sub)) bindings)))
+		(push `(,var-or-offset ,sub) bindings)))
 	    (incf counter))))
     (values bindings offsets)))
