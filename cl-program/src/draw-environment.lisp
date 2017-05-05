@@ -95,14 +95,7 @@
 	 (pmv (getuniform solidshader-uniforms :pmv)))
     (gl:use-program solidshader)
     (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
-    (draw-text-layers pmv))
-
-  (let* ((simpleshader (get-stuff :simpleshader *stuff* *backup*))
-	 (simpleshader-uniforms (glget simpleshader :program))
-	 (pmv (getuniform simpleshader-uniforms :pmv)))
-    (gl:use-program simpleshader)
-    (gl:bind-texture :texture-2d (get-stuff :cursor *stuff* *backup*))
-    (render-mouse pmv)))
+    (draw-text-layers pmv)))
 
 (defun draw-text-layers (pmv)
   (let ((auxvarw (* *block-width* -1.0 *one-over-window-width*))
@@ -116,8 +109,7 @@
 			  rectangle
 			  (floor chunk-width)
 			  (floor chunk-height))))
-      (draw-window *cam-rectangle* *chunks* *chunk-call-lists* 16 16 *camera-x* *camera-y*)
-      (draw-window *hud-rectangle* *chunks* *chunk-call-lists* 16 16 *hud-x* *hud-y*))))
+      (draw-window *cam-rectangle* *chunks* *chunk-call-lists* 16 16 *camera-x* *camera-y*))))
 
 (defun rescale-screen-matrix (result x y)
   (setf (cg-matrix:mref result 0 3) x
@@ -167,30 +159,6 @@
       decl
       `(,func ,bindings
 	      ,@body))))
-(progn
-  (defun draw-mouse (bufs
-		     lookup value char-width char-height x y z)
-    (declare (type single-float x y z char-width char-height)
-	     (type simple-vector lookup)
-	     (optimize (speed 3) (safety 0))
-	     (type fixnum value))
-    (with-iterators (epos etex) bufs iter-ator:wasabios iter-ator:iter-ator
-      (let ((offset (* value 4)))
-	(etouq
-	 (with-vec-params `((offset ,@(vec-slots :rectangle '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
-	     '(lookup)
-	   '(etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))))
-      (let ((x1 (+ char-width x))
-	    (y0 (- y char-height)))
-	(etouq (ngorp (preach 'epos (quadk+ 'z '(x x1 y0 y))))))
-      4))
- 
- (defun render-mouse (pmv)       
-   (rescale-screen-matrix *screen-scaled-matrix*
-			  (* *one-over-window-width* *mouse-x*)
-			  (* *one-over-window-height* *mouse-y*))       
-   (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil)
-   (gl:call-list (get-stuff :cursor-list *stuff* *backup*))))
 
 (defun create-call-list-from-func (func &optional (the-list (gl:gen-lists 1)))
   (gl:with-new-list (the-list :compile)
@@ -225,37 +193,6 @@
 		   (remhash k hash)))
 	     hash))
   (let ((backup *backup*))
-
-    (progn
-      (namexpr backup :cursor-image
-	       (lambda ()
-		 (flip-image
-		  (load-png
-		   (img-path #P"cursor/windos-cursor.png")))))
-      (namexpr backup :cursor
-	       (lambda ()
-		 (pic-texture (get-stuff :cursor-image *stuff* *backup*)
-			      :rgba
-			      *default-tex-params*)))
-      (let ((scale 64.0))
-	(namexpr *backup* :cursor-list
-		 (lambda ()
-		   (create-call-list-from-func
-		    (lambda ()
-		      (let ((iter *attrib-buffer-iterators*))
-			(let ((buf (get-buf-param iter (etouq (vector 0 8 9)))))
-			  (reset-attrib-buffer-iterators iter)
-			  (attrib-repeat (aref buf 2) 4 (vector 1f0 1f0 1f0))
-			  (let ((times (draw-mouse
-					buf
-					*4x4-tilemap* 0
-					scale 
-					scale
-					-2.0 2.0
-					(- +single-float-just-less-than-one+))))
-			    (reset-attrib-buffer-iterators iter)
-			    (gl:with-primitives :quads
-			     (mesh-test4269 times buf)))))))))))
     (progn    
       (namexpr backup :textshader
 	       (lambda ()
@@ -273,24 +210,6 @@
 	       (lambda () (file-string (shader-path "pos4f-tex2f-bgcol3f-fgcol3f.vs"))))      
       (namexpr backup :text-frag
 	       (lambda () (file-string (shader-path "ftex2f-bg3f-fg3f.frag")))))
-
-    (progn
-
-      (namexpr backup :simpleshader
-	       (lambda ()
-		 (let ((program
-			(make-shader-program-from-strings
-			 (get-stuff :simple-vs *stuff* *backup*)
-			 (get-stuff :simple-frag *stuff* *backup*)
-			 *postexcol*)))
-		   (let ((table (make-eq-hash)))
-		     (register program :program table)
-		     (cache-program-uniforms program table (quote ((:pmv . "PMV")))))
-		   program)))
-      (namexpr backup :simple-vs
-	       (lambda () (file-string (shader-path "pos4f-col3f-tex2f.vs"))))
-      (namexpr backup :simple-frag
-	       (lambda () (file-string (shader-path "fcol3f-ftex2f-no0a.frag")))))
     
     (progn
       (namexpr backup :font-image

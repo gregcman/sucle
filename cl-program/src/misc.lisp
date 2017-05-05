@@ -59,8 +59,9 @@
      using (hash-value value)
      do (format stream "~S ~S~%" key value)))
 
-(defun print-bits (n)
-  (format t "~64,'0b" n))
+(defun print-bits (n &optional (stream *standard-output*))
+  (format stream "~64,'0b" n)
+  n)
 
 (defun getapixel (h w image)
   (destructuring-bind (height width c) (array-dimensions image)
@@ -177,18 +178,7 @@
 		    ))
     (defun smice-r-or-p (enum)
       (e:mice-r-or-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
-		     )))
-
-  (progn
-    (defparameter old-mouse-x 0)
-    (defparameter old-mouse-y 0)
-    (defun delta ()
-      (multiple-value-bind (newx newy) (window:get-mouse-position)
-	(multiple-value-prog1 (values
-			       (- newx old-mouse-x)
-			       (- newy old-mouse-y))
-	  (setf old-mouse-x newx
-		old-mouse-y newy))))))
+		     ))))
 
 (defun make-eq-hash ()
   (make-hash-table :test (quote eq)))
@@ -217,12 +207,3 @@
 
   (defparameter *white-black-color* (acolor 255 255 255 0 0 0))
   (defparameter *color-nil* (logandc1 255 (sxhash nil))))
-
-(defun next-mouse-state (x y sensitivity)
-  (multiple-value-bind (dx dy) (delta)
-    (let ((width e:*width*)
-	  (height e:*height*))
-      (let ((deltax (* sensitivity dx))
-	    (deltay (* sensitivity dy)))
-	(values (clamp (+ x deltax) (- width) (- width 2.0))
-		(clamp (- y deltay) (+  2.0 (- height)) height))))))

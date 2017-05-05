@@ -132,15 +132,18 @@
 	  do (format t "~a" char))
        (format t "~%"))) 
 
-(defun terminal-stuff (startx starty command)
+(defun terminal-stuff (startx starty command world)
   (progn
     (when (update-terminal-stuff)
       (char-print-term startx
-		       starty))
-    (enter command)
-    
-    (multiple-value-bind (x y state other) (term-cursor-info)
-      (declare (ignorable state other))
-      (let ((newx (+ startx x))
-	    (newy (- starty y)))
-	(values newx newy)))))
+		       starty)
+      (multiple-value-bind (x y state other) (term-cursor-info)
+	(declare (ignorable state other))
+	(let ((newx (+ startx x))
+	      (newy (- starty y)))
+	  (let ((place (pix:xy-index newx newy)))
+	    (let ((char (pix:get-obj place world)))
+	      (when char
+		(setf (pix:get-obj place world)
+		      (logxor char (dpb -1 (byte (* 6 8) 8) 0)))))))))
+    (enter command)))

@@ -1003,3 +1003,12 @@
 
 (progno
  (defparameter *mat4-identity* (cg-matrix:identity-matrix)))
+
+(progno      (draw-window *hud-rectangle* *chunks* *chunk-call-lists* 16 16 *hud-x* *hud-y*))
+
+(progno
+  (defparameter *terminal-start-x* 0)
+  (defparameter *terminal-start-y* 0))
+
+
+(progno (when (skey-j-p :escape) (window:toggle-mouse-capture)))
