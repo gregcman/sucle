@@ -11,10 +11,13 @@
 		       :external-format :utf-8))
 
 (defun reset-ssh ()
-  (when *proc*
-    (sb-ext:process-kill *proc* 9)) 
+   (kill-proc *proc*)
   (let ((command (list "/usr/bin/ssh" "-tt" "terminal256@0.0.0.0")))
     (setf *proc* (run-program command))))
+
+(defun kill-proc (proc)
+  (when proc
+    (sb-ext:process-kill proc 9)))
 
 (defparameter *term* nil)
 

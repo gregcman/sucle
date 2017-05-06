@@ -28,12 +28,13 @@
 
 (defun physics ()
   (incf *ticks*)
-  (progn
+  (progno
     (unless (zerop (fill-pointer *command-buffer*))
       (setf (fill-pointer *command-buffer*) 0))
-    (get-control-sequence *command-buffer*))
+    (get-control-sequence *command-buffer*)
 
-  (terminal-stuff 0 0 *command-buffer* *chunks*)
+    (progno
+     (terminal-stuff 0 0 *command-buffer* *chunks*)))
   (setf *old-mouse-x* *mouse-x*
 	*old-mouse-y* *mouse-y*)
   (multiple-value-bind (x y) (window:get-mouse-position)
@@ -99,6 +100,13 @@
   (multiple-value-bind (chunk offset) (pix::area x y world)
     (setf (aref chunk offset) value)
     (setf (aref chunk (* 16 16)) *ticks*)))
+
+(defun chunk-update (x y world)
+  (multiple-value-bind (chunk offset) (pix::area x y world)
+    (setf (aref chunk (* 16 16)) *ticks*)))
+
+(defun (setf get-char) (value x y world)
+  (set-char value x y world))
 
 (defun get-char (x y world)
   (multiple-value-bind (chunk offset) (pix::area x y world)

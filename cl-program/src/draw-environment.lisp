@@ -95,31 +95,40 @@
 			  (floor chunk-height))))
       (draw-window *cam-rectangle* *chunks* *chunk-call-lists* 16 16 *camera-x* *camera-y*))))
 
-(defun draw-ensure (world call-lists rectangle chunk-width chunk-height)
-  (etouq
-   (with-vec-params (vec-slots :rectangle '((minx :x0) (miny :y0) (maxx :x1) (maxy :y1)))
-     '(rectangle)
-     '(dobox ((xstart (floor minx chunk-width) (1+ (floor maxx chunk-width)))
-	      (ystart (floor miny chunk-height) (1+ (floor maxy chunk-height))))
-       (let ((index (pix:xy-index xstart ystart)))
-	 (let ((thechunk (gethash index world)))
-	   (when thechunk
-	     (gl:call-list
-	      (let ((chunk-timestamp (aref thechunk (* 16 16)))
-		    (value (gethash index call-lists)))
-		(if (eq chunk-timestamp (cdr value))
-		    (car value)
-		    (let ((mesh 
-			   (draw-16x16-page (* chunk-width xstart) (* chunk-height ystart)
-					    thechunk (or (car value)
-							 (gl:gen-lists 1)))))
-		      (let ((new-value (if value
-					   (progn (setf (car value) mesh
-							(cdr value) *ticks*)
-						  value)
-					   (cons mesh *ticks*))))
-			(setf (gethash index call-lists) new-value))
-		      mesh)))))))))))
+(progn
+  (declaim (ftype (function (hash-table hash-table simple-vector fixnum fixnum))
+		  draw-ensure))
+  (with-unsafe-speed
+    (defun draw-ensure (world call-lists rectangle chunk-width chunk-height)
+      (etouq
+       (with-vec-params (vec-slots :rectangle '((minx :x0) (miny :y0) (maxx :x1) (maxy :y1)))
+	 '(rectangle)
+	 '(declare (type single-float minx miny maxx maxy))
+	 '(let ((x0 (floor minx chunk-width))
+		(x1 (1+ (floor maxx chunk-width)))
+		(y0 (floor miny chunk-height))
+		(y1 (1+ (floor maxy chunk-height))))
+	   (declare (type fixnum x0 x1 y0 y1))
+	   (dobox ((xstart x0 x1)
+		   (ystart y0 y1))
+	    (let ((index (pix:xy-index xstart ystart)))
+	      (let ((thechunk (gethash index world)))
+		(when thechunk
+		  (let ((chunk-timestamp (aref thechunk (* 16 16)))
+			(value (gethash index call-lists)))
+		    (if (eq chunk-timestamp (cdr value))
+			(gl:call-list (car value))
+			(let ((mesh 
+			       (draw-16x16-page (* chunk-width xstart) (* chunk-height ystart)
+						thechunk (or (car value)
+							     (gl:gen-lists 1)))))
+			  (let ((new-value (if value
+					       (progn (setf (car value) mesh
+							    (cdr value) chunk-timestamp)
+						      value)
+					       (cons mesh chunk-timestamp))))
+			    (setf (gethash index call-lists) new-value))
+			  (gl:call-list mesh))))))))))))))
 
 (defun draw-16x16-page (xstart ystart thechunk &optional (display-list (gl:gen-lists 1)))
   (let ((iter *attrib-buffer-iterators*))
