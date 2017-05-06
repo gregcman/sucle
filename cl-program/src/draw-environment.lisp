@@ -99,9 +99,9 @@
   (etouq
    (with-vec-params (vec-slots :rectangle '((minx :x0) (miny :y0) (maxx :x1) (maxy :y1)))
      '(rectangle)
-     '(dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
-	      (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
-       (let ((index (pix:xy-index (ash xstart -4) (ash ystart -4))))
+     '(dobox ((xstart (floor minx chunk-width) (1+ (floor maxx chunk-width)))
+	      (ystart (floor miny chunk-height) (1+ (floor maxy chunk-height))))
+       (let ((index (pix:xy-index xstart ystart)))
 	 (let ((thechunk (gethash index world)))
 	   (when thechunk
 	     (gl:call-list
@@ -110,8 +110,9 @@
 		(if (eq chunk-timestamp (cdr value))
 		    (car value)
 		    (let ((mesh 
-			   (draw-16x16-page xstart ystart thechunk (or (car value)
-								       (gl:gen-lists 1)))))
+			   (draw-16x16-page (* chunk-width xstart) (* chunk-height ystart)
+					    thechunk (or (car value)
+							 (gl:gen-lists 1)))))
 		      (let ((new-value (if value
 					   (progn (setf (car value) mesh
 							(cdr value) *ticks*)
