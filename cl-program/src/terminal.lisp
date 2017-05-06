@@ -109,7 +109,7 @@
 
   (fill-color-map))
 
-(defun char-print-term (x y &optional (term *term*))
+(defun char-print-term (x y world term)
   (let ((rowlen (3bst:rows term))
 	(collen (3bst:columns term)))
     (dobox ((row 0 rowlen))
@@ -119,7 +119,7 @@
 		    (let ((value (logior (ash (color-rgb (3bst:bg glyph)) 32)
 					 (ash (color-rgb (3bst:fg glyph)) 8)
 					 (char-code char))))
-		      (set-char-with-update (+ x col) (- y row) value)))))))
+		      (set-char-with-update (+ x col) (- y row) value world)))))))
 
 
 (defun print-term (&optional (term *term*))
@@ -136,7 +136,7 @@
   (progn
     (when (update-terminal-stuff)
       (char-print-term startx
-		       starty)
+		       starty world *term*)
       (multiple-value-bind (x y state other) (term-cursor-info)
 	(declare (ignorable state other))
 	(let ((newx (+ startx x))

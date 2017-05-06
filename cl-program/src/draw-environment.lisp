@@ -12,15 +12,15 @@
     array))
 
 (defparameter *chunk-vertices-lookup*
-  (let ((chunk-size-x pix::+x-chunk-size+)
-	(chunk-size-y pix::+y-chunk-size+))
+  (let ((chunk-size-x 16)
+	(chunk-size-y 16))
     (let ((array (make-array (* chunk-size-x chunk-size-y 4))))
       (let ((iter (iter-ator:make-iterator (length array) array nil nil)))
 	(let ((char-width (if t 18.0 *block-width*))
 	      (char-height (if t 32.0 *block-height*)))
 	  (iter-ator:wasabios ((epos iter))
-	    (dobox ((ix 0 chunk-size-x)
-		    (iy 0 chunk-size-y))
+	    (dobox ((iy 0 chunk-size-y)
+		    (ix 0 chunk-size-x))
 		   (let ((foox0 (* (float ix) char-width))
 			 (fooy0 (* (float iy) char-height)))
 		     (let ((x1 (+ foox0 char-width))
@@ -101,7 +101,7 @@
      '(rectangle)
      '(dobox ((xstart (floor-chunk minx chunk-width) (floor (1+ maxx)) :inc chunk-width)
 	      (ystart (floor-chunk miny chunk-height) (floor (1+ maxy)) :inc chunk-height))
-       (let ((index (pix:xy-index xstart ystart)))
+       (let ((index (pix:xy-index (ash xstart -4) (ash ystart -4))))
 	 (let ((thechunk (gethash index world)))
 	   (when thechunk
 	     (gl:call-list
@@ -128,7 +128,7 @@
       (let ((times (draw-box-char
 		    buf
 		    *16x16-tilemap* thechunk
-		    pix::+chunk-capacity+ *chunk-vertices-lookup*
+		    (* 16 16) *chunk-vertices-lookup*
 		    (* *block-width* (float xstart)) 
 		    (* *block-height* (float ystart)) 
 		    +single-float-just-less-than-one+)))

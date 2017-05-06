@@ -3,85 +3,7 @@
 
 (in-package :pix)
 
-(progn
-  (deftype pix-world ()
-    (quote hash-table))
-  (defconstant +available-bits+ (logcount most-positive-fixnum))
-  (defconstant +x-bits-start+ (floor +available-bits+ 2))
-  (defconstant +x-chunk-bits+ 4)
-  (defconstant +x-chunk-size+ (ash 1 +x-chunk-bits+))
-  (defconstant +x-bitmask+ (1- +x-chunk-size+))
-  (defconstant +y-chunk-bits+ 4)
-  (defconstant +y-chunk-size+ (ash 1 +y-chunk-bits+))
-  (defconstant +y-bitmask+ (1- +y-chunk-size+))
-  (defconstant +xy-bitmask+ (1- (* +y-chunk-size+ +x-chunk-size+)))
-  (defconstant +index-mask+ (logior (ash +x-bitmask+ +x-bits-start+)
-				    +y-bitmask+))
-  (defconstant +hash-mask+ (logxor +index-mask+ most-positive-fixnum))
-  (defconstant +right-shift+ (- +y-chunk-bits+ +x-bits-start+))
-  (defconstant +y-mask+ (1- (ash 1 +x-bits-start+)))
-  (defconstant +chunk-capacity+ (* +x-chunk-size+ +y-chunk-size+))
-
-  (declaim (ftype (function () (simple-vector)) make-chunk))
-  (defun make-chunk ()
-    (make-array (1+ +chunk-capacity+)
-		:element-type t
-		:initial-element nil))
-
-  (defun make-world ()
-    (make-hash-table :test (quote eq)))
-
-
-  (defmacro with-chunk-or-null ((chunk &optional (hash-id (gensym))) (place hash) &body body)
-    `(let* ((,hash-id (logand ,place +hash-mask+))
-	    (,chunk (gethash ,hash-id ,hash)))
-       (declare (type (or null simple-vector) ,chunk))
-       ,@body))
-
-  (declaim (ftype (function (fixnum) (values fixnum fixnum)) index-xy)
-	   (ftype (function (fixnum fixnum) fixnum) xy-index)
-	   (ftype (function (fixnum hash-table) t) get-obj)
-	   (ftype (function (fixnum t hash-table) t) set-obj)
-	   (ftype (function (fixnum) fixnum) chunk-ref)
-	   (inline index-xy xy-index get-obj set-obj chunk-ref))
-
-  (with-unsafe-speed 
-    (defun chunk-ref (place)
-      (let* ((num (logand place +index-mask+))
-	     (num2 (ash num +right-shift+))
-	     (num3 (logand +xy-bitmask+ (logior num num2))))
-	num3))
-    (defun set-obj (place value world)
-      (with-chunk-or-null (chunk hash-id) (place world)
-	(unless chunk
-	  (let ((new-chunk (make-chunk)))
-	    (setf (gethash hash-id world) new-chunk)
-	    (setf chunk new-chunk)))
-	(setf (aref chunk (chunk-ref place)) value)
-	hash-id))
-    (defun get-obj (place world)
-      (with-chunk-or-null (chunk) (place world)
-	(if chunk
-	    (aref chunk (chunk-ref place)))))
-    (defun xy-index (x y)
-      (index y x 31 31))
-    (defun index-xy (index)
-      (values (ash index (- +x-bits-start+))
-	      (logand index +y-mask+))))
-  (progn
-    (declaim (inline (setf get-obj)))
-    (defun (setf get-obj) (value place hash-table)
-      (set-obj place value hash-table))))
-
-(defun area (place world)
-  (with-chunk-or-null (chunk hash-id) (place world)
-    (unless chunk
-      (let ((new-chunk (make-chunk)))
-	(setf (gethash hash-id world) new-chunk)
-	(setf chunk new-chunk)))
-    (values chunk (chunk-ref place))))
-
-(export (quote (index-xy xy-index get-obj set-obj chunk-ref make-world make-chunk pix-world)))
+(defconstant +available-bits+ (logcount most-positive-fixnum))
 
 (defun fixnum-not (n)
   (logand most-positive-fixnum (lognot n)))
@@ -96,6 +18,11 @@
 			(dotimes (x (length array))
 			  (setf (aref array x) (n-bits x)))
 			array))
+(progn
+  (deftype pix-world ()
+    (quote hash-table))
+  (defun make-world ()
+    (make-hash-table :test (quote eq))))
 
 (progn
   (declaim (inline index)
@@ -116,19 +43,49 @@
 	    ans))))))
 
 (progn
-  (declaim (inline page)
-	   (ftype (function (fixnum fixnum (unsigned-byte 6) (unsigned-byte 6))
-			    (values fixnum fixnum))
-		  page))
+  (declaim (inline page offset)
+	   (ftype (function (fixnum (unsigned-byte 6))
+			    fixnum)
+		  page offset))
   (with-unsafe-speed
-    (defun page (x y xsize ysize)
-      (let ((xshift (- xsize))
-	    (yshift (- ysize)))
-	(declare (type fixnum xshift yshift))
-	(let* ((yans (ash x xshift))
-	       (xans (ash y yshift)))
-	  (declare (type fixnum yans xans))
-	  (values xans yans))))))
+    (defun page (n size)
+      (ash n (- size)))
+    (defun offset (n size)
+      (let ((mask (aref +n-bits+ size)))
+	(declare (type fixnum mask))
+	(logand n mask)))))
+
+(progn
+  (declaim (ftype (function () (simple-vector)) make-chunk))
+  (defun make-chunk ()
+    (make-array (1+ (* 16 16))
+		:element-type t
+		:initial-element nil))
+
+  (declaim (ftype (function (fixnum) (values fixnum fixnum)) index-xy)
+	   (ftype (function (fixnum fixnum) fixnum) xy-index)	  
+	   (inline index-xy xy-index))
+
+  (with-unsafe-speed 
+    
+    (defun xy-index (x y)
+      (index x y 31 31))
+    (defun index-xy (index)
+      (values (page index 31)
+	      (offset index 31)))))
+
+(defun area (x y world)
+  (let ((xbig (page x 4))
+	(ybig (page y 4)))
+    (let ((index (xy-index xbig ybig)))
+      (let ((subarray (gethash index world)))
+	(declare (type (or null simple-vector) subarray))
+	(values (or subarray
+		    (setf (gethash index world)
+			  (make-chunk)))
+		(index x y 4 4))))))
+
+(export (quote (index-xy xy-index make-world make-chunk pix-world)))
 
 (progn
   (defparameter *world* (make-array (* 256 256) :initial-element nil))
@@ -139,7 +96,8 @@
 	     (inline get2))
     (with-unsafe-speed
       (defun get2 (x y world)
-	(multiple-value-bind (xbig ybig) (page x y 4 4)
+	(let ((xbig (page x 4))
+	      (ybig (page y 4)))
 	  (let ((index (index xbig ybig 8 8)))
 	    (let ((subarray (aref world index)))
 	      (declare (type (or null simple-vector) subarray))
@@ -160,7 +118,8 @@
     (declaim (inline set2))
     (with-unsafe-speed
       (defun set2 (x y world value)
-	(multiple-value-bind (xbig ybig) (page x y 4 4)
+	(let ((xbig (page x 4))
+	      (ybig (page y 4)))
 	  (let ((index (index xbig ybig 8 8)))
 	    (let ((subarray (aref world index)))
 	      (declare (type (or null simple-vector) subarray))

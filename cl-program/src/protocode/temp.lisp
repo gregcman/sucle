@@ -1056,3 +1056,76 @@
     (when chunk
       (gl:delete-lists chunk 1)
       (remhash chunk-id *chunk-call-lists*))))
+
+(progno
+     (declaim
+      (ftype (function (fixnum hash-table) t) get-obj)
+      (ftype (function (fixnum t hash-table) t) set-obj))
+     (defun set-obj (place value world)
+       (with-chunk-or-null (chunk hash-id) (place world)
+	 (unless chunk
+	   (let ((new-chunk (make-chunk)))
+	     (setf (gethash hash-id world) new-chunk)
+	     (setf chunk new-chunk)))
+	 (setf (aref chunk (chunk-ref place)) value)
+	 hash-id))
+     (defun get-obj (place world)
+       (with-chunk-or-null (chunk) (place world)
+	 (if chunk
+	     (aref chunk (chunk-ref place)))))
+     (progn
+       (declaim (inline (setf get-obj)))
+       (defun (setf get-obj) (value place hash-table)
+	 (set-obj place value hash-table))))
+(progno
+ (defun chunk-ref (place)
+      (let* ((num (logand place +index-mask+))
+	     (num2 (ash num +right-shift+))
+	     (num3 (logand +xy-bitmask+ (logior num num2))))
+	num3)))
+
+(progno
+   (defmacro with-chunk-or-null ((chunk &optional (hash-id (gensym))) (place hash) &body body)
+     `(let* ((,hash-id (logand ,place +hash-mask+))
+	     (,chunk (gethash ,hash-id ,hash)))
+	(declare (type (or null simple-vector) ,chunk))
+	,@body)))
+
+(progno (ftype (function (fixnum) fixnum) chunk-ref)
+	(inline get-obj set-obj chunk-ref))
+
+(progno (defconstant +not-n-bits+ (let ((array (make-array +available-bits+)))
+				    (dotimes (x (length array))
+				      (setf (aref array x) (fixnum-not
+							    (aref +n-bits+ x))))
+				    array)))
+
+(progno
+   (let ((place (xy-index x y)))
+     (let* ((hash-id (logand place +hash-mask+))
+	    (chunk (gethash hash-id world)))
+       (declare (type (or null simple-vector) chunk))  
+       (unless chunk
+	 (let ((new-chunk (make-chunk)))
+	   (setf (gethash hash-id world) new-chunk)
+	   (setf chunk new-chunk)))
+       (let* ((num (logand place +index-mask+))
+	      (num2 (ash num +right-shift+))
+	      (num3 (logand +xy-bitmask+ (logior num num2))))
+	 (values chunk num3)))))
+x
+(progno
+ (defconstant +x-bits-start+ (floor +available-bits+ 2))
+ (defconstant +x-chunk-bits+ 4)
+ (defconstant +x-chunk-size+ (ash 1 +x-chunk-bits+))
+ (defconstant +x-bitmask+ (1- +x-chunk-size+))
+ (defconstant +y-chunk-bits+ 4)
+ (defconstant +y-chunk-size+ (ash 1 +y-chunk-bits+))
+ (defconstant +y-bitmask+ (1- +y-chunk-size+))
+ (defconstant +xy-bitmask+ (1- (* +y-chunk-size+ +x-chunk-size+)))
+ (defconstant +index-mask+ (logior (ash +x-bitmask+ +x-bits-start+)
+				   +y-bitmask+))
+ (defconstant +hash-mask+ (logxor +index-mask+ most-positive-fixnum))
+ (defconstant +right-shift+ (- +y-chunk-bits+ +x-bits-start+))
+ (defconstant +y-mask+ (1- (ash 1 +x-bits-start+)))
+ (defconstant +chunk-capacity+ (* +x-chunk-size+ +y-chunk-size+)))

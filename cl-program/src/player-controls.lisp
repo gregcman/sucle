@@ -28,7 +28,6 @@
 
 (defun physics ()
   (incf *ticks*)
-
   (progn
     (unless (zerop (fill-pointer *command-buffer*))
       (setf (fill-pointer *command-buffer*) 0))
@@ -96,15 +95,18 @@
 			      (enter (string (code-char char))))))))
 		    (return))))))))
 
-(defun set-char-with-update (x y value)
-  (multiple-value-bind (chunk offset) (pix::area (pix:xy-index x y) *chunks*)
+(defun set-char-with-update (x y value world)
+  (multiple-value-bind (chunk offset) (pix::area x y world)
     (setf (aref chunk offset) value)
     (setf (aref chunk (* 16 16)) *ticks*)))
 
 (defun get-char (x y world)
-  (pix:get-obj (pix:xy-index x y) world))
+  (multiple-value-bind (chunk offset) (pix::area x y world)
+    (aref chunk offset)))
+
 (defun set-char (value x y world)
-  (setf (pix:get-obj (pix:xy-index x y) world) value))
+  (multiple-value-bind (chunk offset) (pix::area x y world)
+    (setf (aref chunk offset) value)))
 
 
 (progn
@@ -112,6 +114,25 @@
   (with-unsafe-speed
     (defun get-char-num (obj)
       (typecase obj
-	(cons (car obj))
 	(fixnum obj)
+	(cons (car obj))
+	(character (logior *white-black-color* (char-code obj)))
 	(t (etouq (sxhash nil)))))))
+
+(defun print-page (x y)
+  (let ((array (gethash (pix:xy-index x y)
+			sandbox::*chunks*)))
+    (if array
+	(let ((fin (make-array (+ 16 (* 16 16)) :element-type 'character)))
+	  (let ((counter 0))
+	    (dotimes (y 16)
+	      (progn (setf (aref fin counter) #\Newline)
+		     (incf counter))
+	      (dotimes (x 16)
+		(let ((value (aref array (+ x (ash y 4)))))
+		  (setf (aref fin counter)
+			(if value
+			    (code-char (mod (get-char-num value) 256))
+			    #\Space)))
+		(incf counter))))
+	  fin))))
