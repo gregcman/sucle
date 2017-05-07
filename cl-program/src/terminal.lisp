@@ -133,7 +133,16 @@
 	  for glyph = (3bst:glyph-at (3bst::screen term) row col)
 	  for char = (3bst::fg glyph)
 	  do (format t "~a" char))
-       (format t "~%"))) 
+       (format t "~%")))
+
+(defun terminal-stuf2 ()
+  (progn  
+    (unless (zerop (fill-pointer *command-buffer*))
+      (setf (fill-pointer *command-buffer*) 0))
+    (get-control-sequence *command-buffer*)
+
+    (progn
+      (terminal-stuff 0 0 *command-buffer* *chunks*))))
 
 (defun terminal-stuff (startx starty command world)
   (progn
@@ -151,3 +160,34 @@
 	       newx newy
 	       world))))))
     (enter command)))
+
+(defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
+(defun get-control-sequence (buffer)
+  (with-output-to-string (command buffer)
+    (flet ((enter (x)
+	     (princ x command)))
+      (etouq
+       (ngorp
+	(mapcar (lambda (x)
+		  `(when (skey-r-or-p ,(pop x))
+		     (enter ,(pop x))))
+		'((:enter (etouq (string #\return)))
+		  (:backspace (string #\del))
+		  (:tab (etouq (string #\Tab)))
+		  (:up "[A")
+		  (:down "[B")
+		  (:left "[D")
+		  (:right "[C")))))      
+
+      (with-hash-table-iterator (next e:*keypress-hash*)
+	(loop (multiple-value-bind (more key value) (next)
+		(if more
+		    (let ((code (gethash key *keyword-ascii*)))
+		      (when code
+			(when (e::r-or-p (e::get-press-value value))
+			  (let ((mods (ash value (- e::+mod-key-shift+))))
+			    (multiple-value-bind (char esc) (convert-char code mods)
+			      (when esc
+				(enter (etouq (string #\esc))))
+			      (enter (string (code-char char))))))))
+		    (return))))))))
