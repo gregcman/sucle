@@ -27,9 +27,9 @@
 	       (:file "keys-ascii")
 	       (:file "globjects")
 	       (:file "pix")
-	       (:file "terminal")
 	       
 	       (:file "misc") ;;;everything else
+	       (:file "terminal")
 	       
 	       (:file "lovely-renderer") ;;;layers over opengl
 	       

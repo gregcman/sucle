@@ -71,8 +71,8 @@
     (defun xy-index (x y)
       (index x y 31 31))
     (defun index-xy (index)
-      (values (page index 31)
-	      (offset index 31)))))
+      (values (offset index 31)
+	      (page index 31)))))
 
 (defun area (x y world)
   (let ((xbig (page x 4))

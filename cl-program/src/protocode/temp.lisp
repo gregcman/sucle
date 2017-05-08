@@ -1129,3 +1129,27 @@ x
  (defconstant +right-shift+ (- +y-chunk-bits+ +x-bits-start+))
  (defconstant +y-mask+ (1- (ash 1 +x-bits-start+)))
  (defconstant +chunk-capacity+ (* +x-chunk-size+ +y-chunk-size+)))
+
+(progno
+ (dotimes (foobar 10)
+   (let ((char (get-char x y *chunks*)))
+     (when char
+       (set-char-with-update x y (case 0
+				   (0 nil)
+				   (2 (logior *white-black-color* (logand char 255)))
+				   (1 (logior (acolor val4 val2 val1 val3 val1 val2)
+					      (if nil (char-code #\space) (random 256)))))
+			     *chunks*)))
+   (incf val1 1)
+   (incf val2 2)
+   (incf val3 3)
+   (incf val4 4)
+   (if (zerop (random 2))
+       (incf x (if (< mousex x)
+		   -1
+		   1))
+       (incf y (if (< mousey y)
+		   -1
+		   1)))
+   (progno (setf x (mod x 128)
+		 y (mod y 128)))))

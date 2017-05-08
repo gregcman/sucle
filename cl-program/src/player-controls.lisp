@@ -26,6 +26,8 @@
 
 (defparameter *ticks* 0)
 
+(defparameter *running* nil)
+
 (defun physics ()
   (incf *ticks*)
   (etouq
@@ -65,54 +67,25 @@
 			      ry0 y0 
 			      rx1 x1 
 			      ry1 y1))))))))
-  
-  (when (zerop (mod *ticks* (floor (/ 60 60))))
-    (other-stuff))
-  (etouq
-   (with-vec-params (vec-slots :rectangle
-			       (quote ((cx0 :x0)
-				       (cy1 :y1)
-				       (cx1 :x1)
-				       (cy0 :y0))))
-     (quote (*cursor-rectangle*))
-     (quote
-      (when (smice-p :left)
-	(decf *camera-x* (- cx1 cx0))
-	(decf *camera-y* (- cy1 cy0))))))
+  (when (skey-j-p :caps-lock) (toggle *running*))
+  (if *running*
+      (when (zerop (mod *ticks* (floor (/ 60 60))))
+	(other-stuff))
+      (etouq
+       (with-vec-params (vec-slots :rectangle
+				   (quote ((cx0 :x0)
+					   (cy1 :y1)
+					   (cx1 :x1)
+					   (cy0 :y0))))
+	 (quote (*cursor-rectangle*))
+	 (quote
+	  (when (smice-p :left)
+	    (decf *camera-x* (- cx1 cx0))
+	    (decf *camera-y* (- cy1 cy0)))))))
 
   (centered-rectangle *cam-rectangle* *camera-x* *camera-y*
 		      (/ e:*width* *block-width*) (/ e:*height* *block-height*)))
 
-(defun other-stuff ()
-  (let ((a (load-time-value (cons 0 0)))
-	(b (load-time-value (cons 0 0)))
-	(c (load-time-value (cons 0 0))))
-    (let ((mousex (+ *camera-x* (aref *cursor-rectangle*
-				      (etouq (caar (vec-slots :rectangle (quote ((nil :x1)))))))))
-	  (mousey (+ *camera-y* (aref *cursor-rectangle*
-				      (etouq (caar (vec-slots :rectangle (quote ((nil :y1))))))))))
-      (with-let-mapped-places ((x (car a))
-			       (y (cdr a))
-			       (val1 (car b))
-			       (val2 (cdr b))
-			       (val3 (car c))
-			       (val4 (cdr c)))
-	(dotimes (foobar 10)
-	  (set-char-with-update x y (logior (acolor val4 val2 val1 val3 val1 val2)
-					    (if nil (char-code #\space) (random 256))) *chunks*)
-	  (incf val1 1)
-	  (incf val2 2)
-	  (incf val3 3)
-	  (incf val4 4)
-	  (if (zerop (random 2))
-	      (incf x (if (< mousex x)
-			  -1
-			  1))
-	      (incf y (if (< mousey y)
-			  -1
-			  1)))
-	  (progno (setf x (mod x 128)
-			y (mod y 128))))))))
 
 (defun centered-rectangle (rect x y width height)
   (etouq
@@ -156,7 +129,7 @@
     (defun get-char-num (obj)
       (typecase obj
 	(fixnum obj)
-	(cons (car obj))
+	(cons (get-char-num (car obj)))
 	(character (logior *white-black-color* (char-code obj)))
 	(t (etouq (sxhash nil)))))))
 
@@ -177,3 +150,194 @@
 			    #\Space)))
 		(incf counter))))
 	  fin))))
+
+(progn
+  (declaim (ftype (function (fixnum fixnum (vector character) fixnum)
+			    (values fixnum fixnum))
+		  copy-string-to-world))
+  (defun copy-string-to-world (x y string color)
+    (let ((start x))
+      (let ((len (length string)))
+	(dotimes (index len)
+	  (let ((char (aref string index)))
+	    (cond ((char= char #\Newline)
+		   (setf x start y (1- y)))
+		  (t		     
+		   (set-char-with-update x y
+					 (logior (char-code char) color)
+					 *chunks*)
+		   (setf x (1+ x))))))
+	(values x y)))))
+
+(defun other-stuff ()
+  (let ((mousex (+ *camera-x* (aref *cursor-rectangle*
+				    (etouq (caar (vec-slots :rectangle (quote ((nil :x1)))))))))
+	(mousey (+ *camera-y* (aref *cursor-rectangle*
+				    (etouq (caar (vec-slots :rectangle (quote ((nil :y1))))))))))
+    (let ((a (load-time-value (cons 0 0)))
+	  (b (load-time-value (cons 0 0)))
+	  (c (load-time-value (cons 0 0)))
+	  (d (load-time-value (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character))))
+      (with-let-mapped-places ((x (car a))
+			       (y (cdr a))
+			       (val1 (car b))
+			       (val2 (cdr b))
+			       (val3 (car c))
+			       (val4 (cdr c)))
+	(when (smice-p :right)
+	  (let ((char (get-char mousex mousey *chunks*)))
+	    (setf (fill-pointer d) 0)
+	    (let ((*print-base* 36))
+	      (with-output-to-string (str d)
+		(print char str)))
+	    (copy-string-to-world mousex mousey d (if char (logandc2
+							    (GET-char-num char) 255)
+						      (logandc2 (random most-positive-fixnum) 255)))))
+	(when (skey-j-p :w)
+	  (let ((char (get-char mousex mousey *chunks*)))
+	    (set-char-with-update mousex mousey (cons char char) *chunks*)))
+	(when (smice-p :left)
+	  (delete-fill mousex mousey))))))
+
+(progn
+  (declaim (ftype (function (fixnum fixnum fixnum (function (fixnum fixnum))))
+		  map-neighbors))
+  (etouq
+   (let ((start 56))
+     `(defun map-neighbors (x y num func)
+	(when (logtest num ,(ash 1 (+ 0 start)))
+	  (funcall func (1- x) y))			   ;;left
+	(when (logtest num ,(ash 1 (+ 1 start)))
+	  (funcall func x (1- y)))			   ;;down
+	(when (logtest num ,(ash 1 (+ 2 start)))
+	  (funcall func (1+ x) y))			   ;;right
+	(when (logtest num ,(ash 1 (+ 3 start)))
+	  (funcall func x (1+ y))))))) ;;up
+
+(defun delete-fill (x y)
+  (let ((char (get-char x y *chunks*)))
+    (when (typep char (quote fixnum))
+      (set-char-with-update x y nil *chunks*)
+      (map-neighbors x y char (function delete-fill)))))
+
+(defun map-box (func)
+  (dobox ((x 0 128)
+	  (y 0 128))
+	 (funcall func x y)))
+
+(defun huh ()
+  (map-box
+   (lambda (x y)
+     (let ((char (get-char x y *chunks*)))
+       (when (typep char (quote fixnum))
+	 (set-char-with-update x y (logior char (ash (random 16) 56)) *CHUnks*))))))
+
+(defun update-elastic (xtri ytri xloc yloc)
+  (let ((squares (let ((buf (load-time-value (make-array 0 :adjustable t :fill-pointer 0))))
+		   (setf (fill-pointer buf) 0)
+		   buf))
+	(new-triangles (let ((buf (load-time-value (make-array 0 :adjustable t :fill-pointer 0))))
+			 (setf (fill-pointer buf) 0)
+			 buf)))
+    (let ((num (get-char xloc yloc *chunks*)))
+      (when num
+	(when (typep num (quote fixnum))
+	  (let ((move-p t))
+	    (flet ((neighbor (dx dy)
+		     (let ((neighborx (+ dx xloc))
+			   (neighbory (+ dy yloc))
+			   (trioffsetx (+ dx xtri))
+			   (trioffsety (+ dy ytri)))
+		       (let ((char (get-char neighborx neighbory *chunks*)))
+			 (cond ((square-p char)
+			      ;;;;reverse square unless transferring to the correct location
+				(multiple-value-bind (squarexto squareyto) (deref-square char)
+				  (if (and (= squarexto trioffsetx)
+					   (= squareyto trioffsety))
+				      ;;its transferring the correct way, make sure to notify on move
+				      (progn
+					(flet ((add-item (x)
+						 (vector-push-extend x squares)))
+					  (add-item squarexto)
+					  (add-item squareyto)
+					  (add-item neighborx)
+					  (add-item neighbory)))
+				      ;;else reverse it
+				      (progn
+					(setf move-p nil)))))
+			       ((triangle-p char)
+			      ;;;;wait for it to get out of the way, or add it to the active cell states
+				(setf move-p nil))
+			       (t
+			      ;;;; its data
+				(let ((new-pos (get-char trioffsetx trioffsety *chunks*)))
+				  (if new-pos
+				      (progn
+					(setf move-p nil)) ;;cannot transfer, data in the way
+				      (progn
+				      ;;;;space for new triangles, remember
+				      ;;;the new space and the place it points to
+				      ;;;so a new triangle can be created
+					(flet ((add-item (x)
+						 (vector-push-extend x new-triangles)))
+					  (add-item trioffsetx) 
+					  (add-item trioffsety) 
+					  (add-item neighborx)
+					  (add-item neighbory)))))
+				))))))
+	      (etouq
+	       (let ((start 56))
+		 (let ((left (ash 1 (+ 0 start)))
+		       (down (ash 1 (+ 1 start)))
+		       (right (ash 1 (+ 2 start)))
+		       (up (ash 1 (+ 3 start))))
+		   `(progn
+		      (when (logtest num ,left)
+			(neighbor -1 0))		
+		      (when (logtest num ,down)
+			(neighbor 0 -1))		
+		      (when (logtest num ,right)
+			(neighbor 1 0))		
+		      (when (logtest num ,up)
+			(neighbor 0 1)))))))
+	    (when move-p
+	      ;;;;move the item
+	      (progn (set-char-with-update xtri ytri num *chunks*))
+	      (let ((new-tri-count (fill-pointer new-triangles)))
+		(if (zerop new-tri-count)
+		    ;;;dont leave a square, because theres no one left,
+		    ;;;and update the sqaures left behind so they can be cleaned up 
+		    (progn
+		      (set-char-with-update xloc yloc nil *chunks*) ;;;don't leave anything
+		      )
+
+		    ;;;;leave a square, and create the new triangles
+		    (progn
+		      (set-char-with-update xloc yloc (make-square xloc yloc) *chunks*);;;deposit square
+		      (dobox ((offset 0 new-tri-count :inc 4))
+			     (etouq
+			      (with-vec-params '((offset ny nx ty tx))
+				'(new-triangles)
+				'(set-char-with-update tx ty
+				  (make-triangle nx ny) *chunks*)))))
+		    )))))))))
+
+(defun make-square (x y)
+  (cons :square (pix::xy-index x y)))
+
+(defun make-triangle (x y)
+  (cons :triangle (pix::xy-index x y)))
+
+(defun square-p (x)
+  (when (listp x)
+    (eq :square (car x))))
+
+(defun deref-square (x)
+  (pix::index-xy (cdr x)))
+
+(defun triangle-p (x)
+  (when (listp x)
+    (eq :triangle (car x))))
+
+(defun update-square (xsquare ysquare xlocation ylocation)
+  )
