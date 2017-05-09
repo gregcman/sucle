@@ -1153,3 +1153,19 @@ x
 		   1)))
    (progno (setf x (mod x 128)
 		 y (mod y 128)))))
+
+(progno
+ (defun lol (x)
+   (let ((buf (let ((buf (load-time-value (make-array 0 :adjustable t :fill-pointer 0))))
+		(setf (fill-pointer buf) 0)
+		buf)))
+     (dotimes (b (random x))
+       (vector-push-extend b buf))
+     (print buf))))
+(progno
+ ((square-p char)
+  (multiple-value-bind (tripointx tripointy) (deref-triangle char)
+    (if (and (= tripointx squareoffsetx)
+	     (= tripointy squareoffsety))
+	(print "a1")
+	(print "a2")))))

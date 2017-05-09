@@ -131,7 +131,7 @@
 	(fixnum obj)
 	(cons (get-char-num (car obj)))
 	(character (logior *white-black-color* (char-code obj)))
-	(t (etouq (sxhash nil)))))))
+	(t (sxhash obj))))))
 
 (defun print-page (x y)
   (let ((array (gethash (pix:xy-index x y)
@@ -193,11 +193,17 @@
 	    (copy-string-to-world mousex mousey d (if char (logandc2
 							    (GET-char-num char) 255)
 						      (logandc2 (random most-positive-fixnum) 255)))))
+
 	(when (skey-j-p :w)
 	  (let ((char (get-char mousex mousey *chunks*)))
 	    (set-char-with-update mousex mousey (cons char char) *chunks*)))
-	(when (smice-p :left)
-	  (delete-fill mousex mousey))))))
+	(when (skey-p :a)
+	  (delete-fill mousex mousey))
+	(when (smice-j-p :left)
+	  (let ((char (get-char mousex mousey *chunks*)))
+	  ;  (print char)
+	    (when (triangle-p char)
+	      (update-elastic mousex mousey char))))))))
 
 (progn
   (declaim (ftype (function (fixnum fixnum fixnum (function (fixnum fixnum))))
@@ -232,58 +238,185 @@
        (when (typep char (quote fixnum))
 	 (set-char-with-update x y (logior char (ash (random 16) 56)) *CHUnks*))))))
 
-(defun update-elastic (xtri ytri xloc yloc)
-  (let ((squares (let ((buf (load-time-value (make-array 0 :adjustable t :fill-pointer 0))))
-		   (setf (fill-pointer buf) 0)
-		   buf))
-	(new-triangles (let ((buf (load-time-value (make-array 0 :adjustable t :fill-pointer 0))))
-			 (setf (fill-pointer buf) 0)
-			 buf)))
-    (let ((num (get-char xloc yloc *chunks*)))
-      (when num
-	(when (typep num (quote fixnum))
-	  (let ((move-p t))
-	    (flet ((neighbor (dx dy)
-		     (let ((neighborx (+ dx xloc))
-			   (neighbory (+ dy yloc))
-			   (trioffsetx (+ dx xtri))
-			   (trioffsety (+ dy ytri)))
-		       (let ((char (get-char neighborx neighbory *chunks*)))
-			 (cond ((square-p char)
+(defun update-elastic (xtri ytri data)
+  (multiple-value-bind (xloc yloc) (deref-triangle data)
+    (let ((squares (let ((buf (load-time-value (make-array 0 :adjustable t :fill-pointer 0))))
+		     (setf (fill-pointer buf) 0)
+		     buf))
+	  (new-triangles (let ((buf (load-time-value (make-array 0 :adjustable t :fill-pointer 0))))
+			   (setf (fill-pointer buf) 0)
+			   buf)))
+      (let ((num (get-char xloc yloc *chunks*)))
+	(when num
+	  (when (typep num (quote fixnum))
+	    (let ((move-p t)
+		  (last-one t))
+	      (flet ((neighbor (dx dy)
+		       (let ((neighborx (+ dx xloc))
+			     (neighbory (+ dy yloc))
+			     (trioffsetx (+ dx xtri))
+			     (trioffsety (+ dy ytri)))
+			 (let ((char (get-char neighborx neighbory *chunks*)))
+			   (cond ((square-p char)
 			      ;;;;reverse square unless transferring to the correct location
-				(multiple-value-bind (squarexto squareyto) (deref-square char)
-				  (if (and (= squarexto trioffsetx)
-					   (= squareyto trioffsety))
-				      ;;its transferring the correct way, make sure to notify on move
-				      (progn
-					(flet ((add-item (x)
-						 (vector-push-extend x squares)))
-					  (add-item squarexto)
-					  (add-item squareyto)
-					  (add-item neighborx)
-					  (add-item neighbory)))
-				      ;;else reverse it
-				      (progn
-					(setf move-p nil)))))
-			       ((triangle-p char)
+				  (multiple-value-bind (squarexto squareyto) (deref-square char)
+				    (if (and (= squarexto trioffsetx)
+					     (= squareyto trioffsety))
+					;;its transferring the correct way, make sure to notify on move
+					(progn
+					  (flet ((add-item (x)
+						   (vector-push-extend x squares)))
+					    (add-item neighborx) ;;;where it is
+					    (add-item neighbory)
+					    (add-item char) ;;where it points
+					    ))
+					;;else reverse it
+					(progn
+					;;;TODO
+					  (reverse-square neighborx neighbory char)
+					  (setf move-p nil)))))
+				 ((triangle-p char)
 			      ;;;;wait for it to get out of the way, or add it to the active cell states
-				(setf move-p nil))
-			       (t
+				  (print "NOOOOO")
+				  (progno (setf (car char) :square)
+					  (chunk-update neighborx neighbory *chunks*))
+				  (setf move-p nil))
+				 (t
 			      ;;;; its data
-				(let ((new-pos (get-char trioffsetx trioffsety *chunks*)))
-				  (if new-pos
-				      (progn
-					(setf move-p nil)) ;;cannot transfer, data in the way
-				      (progn
+				  (setf last-one nil)
+				  (let ((new-pos (get-char trioffsetx trioffsety *chunks*)))
+				    (if new-pos
+					(progn
+					  (cond ((triangle-p new-pos)
+						 (multiple-value-bind (xoldtri yoldtri)
+						     (deref-triangle new-pos)
+						   (if (and (= xoldtri neighborx)
+							    (= yoldtri neighbory))
+						       (progn
+							 ;;new-pos dummy already there
+							 )
+						       (setf move-p nil))))
+						((square-p new-pos)
+					;;	 (print 34434)
+						 (multiple-value-bind (xoldsquare yoldsquare)
+						     (deref-square new-pos)
+						   (unless (and (= xoldsquare neighborx)
+								(= yoldsquare neighbory))
+						     (setf move-p nil))))
+						(t ;;(print new-pos)
+						   (setf move-p nil)))) ;;cannot transfer, data in the way
+					(progn
 				      ;;;;space for new triangles, remember
 				      ;;;the new space and the place it points to
 				      ;;;so a new triangle can be created
-					(flet ((add-item (x)
-						 (vector-push-extend x new-triangles)))
-					  (add-item trioffsetx) 
-					  (add-item trioffsety) 
-					  (add-item neighborx)
-					  (add-item neighbory)))))
+					  (flet ((add-item (x)
+						   (vector-push-extend x new-triangles)))
+					    (add-item trioffsetx) ;;where it will be
+					    (add-item trioffsety) 
+					    (add-item neighborx) ;;where it will point
+					    (add-item neighbory)))))
+				  ))))))
+		(etouq
+		 (let ((start 56))
+		   (let ((left (ash 1 (+ 0 start)))
+			 (down (ash 1 (+ 1 start)))
+			 (right (ash 1 (+ 2 start)))
+			 (up (ash 1 (+ 3 start))))
+		     `(progn
+			(when (logtest num ,left)
+			  (neighbor -1 0))		
+			(when (logtest num ,down)
+			  (neighbor 0 -1))		
+			(when (logtest num ,right)
+			  (neighbor 1 0))		
+			(when (logtest num ,up)
+			  (neighbor 0 1)))))))
+
+	   ;;   (print move-p)
+	      (when move-p
+	      ;;;;move the item
+		(progn (set-char-with-update xtri ytri num *chunks*))
+		(let ((new-tri-count (fill-pointer new-triangles)))
+		  (dobox ((offset 0 new-tri-count :inc 4))
+			 (etouq
+			  (with-vec-params '((offset tx ty nx ny))
+			    '(new-triangles)
+			    '(set-char-with-update tx ty
+			      (make-triangle nx ny) *chunks*))))
+		  (if last-one
+		    ;;;dont leave a square, because theres no one left,
+		    ;;;and update the sqaures left behind so they can be cleaned up 
+		      (progn
+			(set-char-with-update xloc yloc nil *chunks*) ;;;don't leave anything
+			)
+
+		    ;;;;leave a square, and create the new triangles
+		      (progn
+			(set-char-with-update xloc yloc (make-square xtri ytri) *chunks*);;;deposit square
+			)
+		      ))
+		(dobox ((offset 0 (fill-pointer squares) :inc 3))
+		       (etouq
+			(with-vec-params '((offset sx sy data))
+			  '(squares)
+			  '(update-square sx sy data))))))))))))
+
+(defun make-square (x y)
+  (cons :square (pix::xy-index x y)))
+
+(defun make-triangle (x y)
+  (cons :triangle (pix::xy-index x y)))
+
+(defun square-p (x)
+  (when (listp x)
+    (eq :square (car x))))
+
+(defun deref-square (x)
+  (pix::index-xy (cdr x)))
+(defun deref-triangle (x)
+  (pix::index-xy (cdr x)))
+
+(defun triangle-p (x)
+  (when (listp x)
+    (eq :triangle (car x))))
+
+(defun update-square (xsquare ysquare data)
+  (multiple-value-bind (xloc yloc) (deref-square data)
+    (let ((num (get-char xloc yloc *chunks*)))
+      (when num
+	(when (typep num (quote fixnum))
+	  (let ((in-use-p nil))
+	    (flet ((neighbor (dx dy)
+		     (let ((neighborx (+ dx xloc))
+			   (neighbory (+ dy yloc))
+			   (squareoffsetx (+ dx xsquare))
+			   (squareoffsety (+ dy ysquare)))
+		       (let ((char (get-char neighborx neighbory *chunks*)))
+			 (cond ((square-p char)
+				;;;it can be moved
+				(multiple-value-bind (quadx quady) (deref-square char)
+				  (if (and (= quadx squareoffsetx)
+					   (= quady squareoffsety))
+				      (progn (setf in-use-p t)
+					     ;;points toward, in use
+					     )
+				      (progn ;;;nothing
+					))))
+			       ((triangle-p char)
+				;;;if the triangle points back to the square, its still used
+				;;;if it points away, its not
+				(multiple-value-bind (trix triy) (deref-triangle char)
+				  (if (and (= trix squareoffsetx)
+					   (= triy squareoffsety))
+				      (progn (setf in-use-p t)
+					     ;;points toward, in use
+					     )
+				      (progn ;;;nothing
+					)))
+				)
+			       (t ;;;its connected
+			;;;	(print char)
+			;	(setf in-use-p t)
 				))))))
 	      (etouq
 	       (let ((start 56))
@@ -300,44 +433,81 @@
 			(neighbor 1 0))		
 		      (when (logtest num ,up)
 			(neighbor 0 1)))))))
-	    (when move-p
-	      ;;;;move the item
-	      (progn (set-char-with-update xtri ytri num *chunks*))
-	      (let ((new-tri-count (fill-pointer new-triangles)))
-		(if (zerop new-tri-count)
-		    ;;;dont leave a square, because theres no one left,
-		    ;;;and update the sqaures left behind so they can be cleaned up 
-		    (progn
-		      (set-char-with-update xloc yloc nil *chunks*) ;;;don't leave anything
-		      )
+	    (if in-use-p
+		(progn)
+		(set-char-with-update xsquare ysquare nil *chunks*))))))))
 
-		    ;;;;leave a square, and create the new triangles
-		    (progn
-		      (set-char-with-update xloc yloc (make-square xloc yloc) *chunks*);;;deposit square
-		      (dobox ((offset 0 new-tri-count :inc 4))
-			     (etouq
-			      (with-vec-params '((offset ny nx ty tx))
-				'(new-triangles)
-				'(set-char-with-update tx ty
-				  (make-triangle nx ny) *chunks*)))))
-		    )))))))))
+(defun reverse-square (xsquare ysquare data)
+;;;  (print (list xsquare ysquare))
+  (setf (car data) :triangle)
+  (chunk-update xsquare ysquare *chunks*)
+  (multiple-value-bind (xloc yloc) (deref-square data)
+    (let ((num (get-char xloc yloc *chunks*)))
+      (when num
+	(when (typep num (quote fixnum))
+	  (flet ((neighbor (dx dy)
+		   (let ((neighborx (+ dx xloc))
+			 (neighbory (+ dy yloc))
+			 (squareoffsetx (+ dx xsquare))
+			 (squareoffsety (+ dy ysquare)))
+		     (let ((char (get-char neighborx neighbory *chunks*)))
+		       (cond ((triangle-p char)
+			      (multiple-value-bind (tripointx tripointy) (deref-triangle char)
+				(if (and (= tripointx squareoffsetx)
+					 (= tripointy squareoffsety))
+				    (progn (setf (car char) :square)
+					   ;;(print "b2")
+					   (chunk-update neighborx neighbory *chunks*))
+				    ;;(print "b1")
+				    ))))))))
+	    (etouq
+	     (let ((start 56))
+	       (let ((left (ash 1 (+ 0 start)))
+		     (down (ash 1 (+ 1 start)))
+		     (right (ash 1 (+ 2 start)))
+		     (up (ash 1 (+ 3 start))))
+		 `(progn
+		    (when (logtest num ,left)
+		      (neighbor -1 0))		
+		    (when (logtest num ,down)
+		      (neighbor 0 -1))		
+		    (when (logtest num ,right)
+		      (neighbor 1 0))		
+		    (when (logtest num ,up)
+		      (neighbor 0 1))))))))))))
 
-(defun make-square (x y)
-  (cons :square (pix::xy-index x y)))
 
-(defun make-triangle (x y)
-  (cons :triangle (pix::xy-index x y)))
+(defun damn-test (l)
+  (let ((num 0))
+    (etouq
+     (let ((start 56))
+       (let ((left (ash 1 (+ 0 start)))
+	     (down (ash 1 (+ 1 start)))
+	     (right (ash 1 (+ 2 start)))
+	     (up (ash 1 (+ 3 start))))
+	 `(progn
+	    (when (member :left l) (setf num (logior num ,left)))
+	    (when (member :down l) (setf num (logior num ,down)))
+	    (when (member :right l) (setf num (logior num ,right)))
+	    (when (member :up l) (setf num (logior num ,up)))))))
+    num))
 
-(defun square-p (x)
-  (when (listp x)
-    (eq :square (car x))))
+(defun damn-test2 (x y)
+  (flet ((uh (dx dy value)
+	   (set-char-with-update (+ dx x) (+ dy y) (logior
+						    (damn-test value)
+						    (random (aref pix::+n-bits+ 56))) *chunks*)))
+    (uh -1 -1 '(:up :right))
+    (uh 0 -1 '(:up :left :right))
+    (uh 1 -1 '(:up :left))
+    (uh -1 0 '(:up :down :right))
+    (uh 0 0 '(:up :down :left :right))
+    (uh 1 0 '(:up :down :left))
+    (uh -1 1 '(:down :right))
+    (uh 0 1 '(:down :left :right))
+    (uh 1 1 '(:down :left))))
 
-(defun deref-square (x)
-  (pix::index-xy (cdr x)))
-
-(defun triangle-p (x)
-  (when (listp x)
-    (eq :triangle (car x))))
-
-(defun update-square (xsquare ysquare xlocation ylocation)
-  )
+(defun test3 ()
+  (damn-test2 3 3)
+  (set-char-with-update 8 3 (make-triangle 3 3) *chunks*)
+  (set-char-with-update 3 8 (make-triangle 4 4) *chunks*))
