@@ -8,7 +8,6 @@
 
 		 #:window-glfw3
 		 #:cl-conspack
-		 #:3bst
 		 
 		 #:funland
 		 #:fixed-leaf-hashed-array-tree)
@@ -24,12 +23,12 @@
 	       (:file "meshing")
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
-	       (:file "keys-ascii")
+	       (:file "list-junction.lisp")
+	       
 	       (:file "globjects")
 	       (:file "pix")
 	       
 	       (:file "misc") ;;;everything else
-	       (:file "terminal")
 	       
 	       (:file "lovely-renderer") ;;;layers over opengl
 	       
