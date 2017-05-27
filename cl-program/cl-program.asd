@@ -23,7 +23,8 @@
 	       (:file "meshing")
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
-	       (:file "list-junction.lisp")
+	       (:file "keys-ascii")
+	       (:file "list-junction")
 	       
 	       (:file "globjects")
 	       (:file "pix")

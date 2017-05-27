@@ -5,11 +5,12 @@
 
 (defparameter *16x16-tilemap* (regular-enumeration 16 16))
 
-(defconstant +byte-fraction-lookup+
-  (let ((array (make-array 256 :element-type 'single-float)))
-    (dotimes (x 256)
-      (setf (aref array x) (/ (float x) 255.0)))
-    array))
+(alexandria:define-constant +byte-fraction-lookup+
+    (load-time-value
+     (let ((array (make-array 256 :element-type 'single-float)))
+       (dotimes (x 256)
+	 (setf (aref array x) (/ (float x) 255.0)))
+       array)))
 
 (defparameter *chunk-vertices-lookup*
   (let ((chunk-size-x 16)

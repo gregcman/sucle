@@ -67,10 +67,14 @@
 			      ry0 y0 
 			      rx1 x1 
 			      ry1 y1))))))))
-  (when (skey-j-p :caps-lock) (toggle *running*))
+  (when (skey-j-p :escape)
+    (toggle *running*)
+    (if *running*
+	(copy-string-to-world 0 9 "do stuff now" *white-black-color*)
+	(copy-string-to-world 0 9 "drag to move" *white-black-color*)))
   (if *running*
       (when (zerop (mod *ticks* (floor (/ 60 60))))
-	nil)
+	(other-stuff))
       (etouq
        (with-vec-params (vec-slots :rectangle
 				   (quote ((cx0 :x0)
@@ -118,7 +122,7 @@
   (multiple-value-bind (chunk offset) (pix::area x y world)
     (aref chunk offset)))
 
-(defun set-char (value x y world)
+ (defun set-char (value x y world)
   (multiple-value-bind (chunk offset) (pix::area x y world)
     (setf (aref chunk offset) value)))
 
@@ -152,7 +156,7 @@
 	  fin))))
 
 (progn
-  (declaim (ftype (function (fixnum fixnum (vector character) fixnum)
+  (declaim (ftype (function (fixnum fixnum t fixnum)
 			    (values fixnum fixnum))
 		  copy-string-to-world))
   (defun copy-string-to-world (x y string color)
@@ -168,3 +172,111 @@
 					 *chunks*)
 		   (setf x (1+ x))))))
 	(values x y)))))
+
+(defun scwu (char x y)
+  (set-char-with-update x
+			y
+			(logior *white-black-color* (char-code char))
+			*chunks*))
+
+(defun keyword-ascii (keyword &optional (value (gethash keyword e:*keypress-hash*)))
+  (when value
+    (let ((code (gethash keyword *keyword-ascii*)))
+      (when code
+	(let ((mods (ash value (- e::+mod-key-shift+))))
+	  (multiple-value-bind (char esc) (convert-char code mods)
+	    (values char esc)))))))
+
+(defparameter node nil)
+
+(defparameter directions (alexandria:circular-list :up :left :down :right))
+(defun other-stuff ()
+  (let ((moved? nil))
+    (flet ((turnt (a b)
+	     (nthfnc (function turn-node) b
+		     (cdr
+		      (nthfnc (function turn-node) a node)))))
+      (with-hash-table-iterator (next e:*keypress-hash*)
+	(loop (multiple-value-bind (more key value) (next)
+		(if more
+		    (let ((ans (keyword-ascii key value)))
+		      (when ans
+			(when (e::r-or-p (e::get-press-value value))
+			  (setf moved? t)
+			  (node-splice
+			   (turnt 2 2)
+			    (vector-circular-node
+			     (string (code-char ans)))))))
+		    (return)))))
+      (when (skey-r-or-p :up)
+	(setf moved? t)
+	(let ((ans (turnt 1 3)))
+	  (when ans 
+	   (setf node ans))))
+      (when (skey-r-or-p :left)
+	(setf moved? t)
+	(let ((ans (turnt 2 2)))
+	  (when ans
+	    (setf node ans))))
+      (when (skey-r-or-p :down)
+	(setf moved? t)
+	(let ((ans (turnt 3 1)))
+	  (when ans
+	    (setf node ans))))
+      (when (skey-r-or-p :right)
+	(setf moved? t)
+	(let ((ans (turnt 4 0)))
+	  (when ans
+	    (setf node ans))))
+
+      (when (skey-r-or-p :backspace)
+	(setf moved? t)
+	(let ((ans (turnt 2 2)))
+	  (node-disconnect ans)))
+      (progn
+       (when (skey-r-or-p :kp-enter)
+	 (setf moved? t)
+	 (setf node (turn-node node))
+	 (pop directions)
+	 (copy-string-to-world 0 5 (symbol-name (car directions)) *white-black-color*))))
+    (when moved?
+      (copy-string-to-world 0 0 (nodes-vector node) *white-black-color*))))
+
+(setf *print-case* :downcase)
+
+(defun print-sexp (sexp)
+  (if (listp sexp)
+      (if sexp
+	  (progn
+	    (princ "(")
+	    (print-cells sexp))
+	  (princ nil))
+      (princ sexp)))
+
+(defun emit-spaces (times)
+  (dotimes (x times)
+    (princ " ")))
+
+(defun print-cells (sexp &optional (indentation 2))
+  (let ((cdr (cdr sexp))
+	(car (car sexp)))
+    (if (listp car)
+	(if car
+	    (progn
+	      (progn
+		(terpri)
+		(emit-spaces indentation))
+	      (princ "(")
+	      (print-cells car (+ 2 indentation)))
+	    (princ nil))
+	(prin1 car))
+    (if (listp cdr)
+	(if cdr
+	    (progn
+	      (princ " ")
+	      (print-cells cdr indentation))
+	    (princ ")"))
+	(progn
+	  (princ " . ")
+	  (prin1  cdr)
+	  (princ ")")))))

@@ -14,10 +14,11 @@
 		  n-bits))
   (defun n-bits (n)
     (1- (ash 1 n))))
-(defconstant +n-bits+ (let ((array (make-array +available-bits+)))
-			(dotimes (x (length array))
-			  (setf (aref array x) (n-bits x)))
-			array))
+(alexandria:define-constant
+    +n-bits+ (let ((array (make-array +available-bits+)))
+	       (dotimes (x (length array))
+		 (setf (aref array x) (n-bits x)))
+	       array))
 (progn
   (deftype pix-world ()
     (quote hash-table))
