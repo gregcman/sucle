@@ -63,9 +63,9 @@
 						   (rx1 :x1)
 						   (ry0 :y0))))
 		 (quote (*mouse-rectangle* symbol-macrolet))
-		 (quote (setf rx0 x0 
-			      ry0 y0 
-			      rx1 x1 
+		 (quote (setf rx0 x0
+			      ry0 y0
+			      rx1 x1
 			      ry1 y1))))))))
   (when (skey-j-p :escape)
     (toggle *running*)
@@ -166,7 +166,7 @@
 	  (let ((char (aref string index)))
 	    (cond ((char= char #\Newline)
 		   (setf x start y (1- y)))
-		  (t		     
+		  (t
 		   (set-char-with-update x y
 					 (logior (char-code char) color)
 					 *chunks*)
@@ -176,7 +176,7 @@
 (defun scwu (char x y)
   (set-char-with-update x
 			y
-			(logior *white-black-color* (char-code char))
+			char
 			*chunks*))
 
 (defun keyword-ascii (keyword &optional (value (gethash keyword e:*keypress-hash*)))
@@ -187,11 +187,24 @@
 	  (multiple-value-bind (char esc) (convert-char code mods)
 	    (values char esc)))))))
 
+
+(progn
+  (defparameter wombo nil)
+  (defparameter hello nil)
+  (defun test ()
+    (setf wombo (vector-circular-node "wombo "))
+    (setf hello (vector-nodes2 "hello "))
+    (node-splice
+     (nthcdr 5 hello)
+     wombo)
+    (nodes-vector hello)))
+
 (defparameter node nil)
 
 (defparameter directions (alexandria:circular-list :up :left :down :right))
 (defun other-stuff ()
-  (let ((moved? nil))
+  (let ((moved? nil)
+	(last-node node))
     (flet ((turnt (a b)
 	     (nthfnc (function turn-node) b
 		     (cdr
@@ -211,7 +224,7 @@
       (when (skey-r-or-p :up)
 	(setf moved? t)
 	(let ((ans (turnt 1 3)))
-	  (when ans 
+	  (when ans
 	   (setf node ans))))
       (when (skey-r-or-p :left)
 	(setf moved? t)
@@ -233,6 +246,9 @@
 	(setf moved? t)
 	(let ((ans (turnt 2 2)))
 	  (node-disconnect ans)))
+      (when (skey-r-or-p :enter)
+	(setf moved? t)
+	(setf (cdr (node-payload node)) -4))
       (progn
        (when (skey-r-or-p :kp-enter)
 	 (setf moved? t)
@@ -240,7 +256,79 @@
 	 (pop directions)
 	 (copy-string-to-world 0 5 (symbol-name (car directions)) *white-black-color*))))
     (when moved?
-      (copy-string-to-world 0 0 (nodes-vector node) *white-black-color*))))
+      (clear-screen)
+      (unless (eq node last-node)
+	(setf (car (node-payload node))
+	      (let ((char (car (node-payload node))))
+		(if (typep char (quote character))
+		    (setf char (char-code char)))
+		(typecase char
+		  (fixnum (let ((a (logand 255 char)))
+			    (logior a (random-color)))))))
+	(setf (car (node-payload last-node))
+	      (let ((char (car (node-payload last-node))))
+		(if (typep char (quote character))
+		    (setf char char))
+		(typecase char
+		  (fixnum (let ((a (logand 255 char)))
+			    (logior a *white-black-color*)))))))
+      (draw-nodal-text node 0 0 1 -1 nil 64)
+      (draw-nodal-text (reverse-node node) 0 0 1 -1 t 64))))
+
+(defun random-color ()
+  (logandc1 255 (random most-positive-fixnum)))
+
+(defun color-invert (color)
+  (logior (logand 255 color)
+	  (logand (logxor most-positive-fixnum 255)
+		  (lognot color))))
+
+(defun draw-nodal-text (node x y dx dy reversep &optional (count 32))
+  (block nil
+    (flet ((draw-forward ()
+	     (dotimes (counter count)
+	       (unless node
+		 (return))
+	       (let ((payload (node-payload node)))
+		 (let ((char (car payload)))
+		   (scwu char x y))
+		 (let ((linefeed (cdr payload)))
+		   (when linefeed
+		     (incf x linefeed)
+		     (incf y dy)))
+		 (pop node))
+	       (incf x dx)))
+	   (draw-backwards ()
+	     (dotimes (counter count)
+	       (unless node
+		 (return))
+	       (let ((payload (node-payload node)))
+		 (unless (zerop counter)
+		   (let ((linefeed (cdr payload)))
+		     (when linefeed
+		       (decf x linefeed)
+		       (decf y dy))))
+		 (let ((char (car payload)))
+		   (scwu char x y))
+		 (pop node))
+	       (decf x dx))))
+      (if reversep
+	  (draw-backwards)
+	  (draw-forward)))))
+
+(defun clear-screen (&optional (rect *cam-rectangle*))
+  (etouq
+   (with-vec-params (vec-slots :rectangle
+			       (quote ((x0 :x0)
+				       (y1 :y1)
+				       (x1 :x1)
+				       (y0 :y0))))
+     (quote (rect let))
+     (quote
+      (progn
+	(dobox ((x (floor x0) (ceiling x1))
+		(y (floor y0) (ceiling y1)))
+	       (scwu nil x y)))))))
 
 (setf *print-case* :downcase)
 
@@ -257,26 +345,50 @@
   (dotimes (x times)
     (princ " ")))
 
-(defun print-cells (sexp &optional (indentation 2))
-  (let ((cdr (cdr sexp))
-	(car (car sexp)))
-    (if (listp car)
-	(if car
-	    (progn
-	      (progn
-		(terpri)
-		(emit-spaces indentation))
-	      (princ "(")
-	      (print-cells car (+ 2 indentation)))
-	    (princ nil))
-	(prin1 car))
-    (if (listp cdr)
-	(if cdr
-	    (progn
-	      (princ " ")
-	      (print-cells cdr indentation))
-	    (princ ")"))
-	(progn
-	  (princ " . ")
-	  (prin1  cdr)
-	  (princ ")")))))
+(defun print-cells (sexp)
+     (let ((cdr (cdr sexp))
+	   (car (car sexp)))
+       (if (listp car)
+	   (if car
+	       (progn
+		 (princ "(")
+		 (print-cells car))
+	       (princ nil))
+	   (prin1 car))
+       (if (listp cdr)
+	   (if cdr
+	       (progn
+		 (princ " ")
+		 (print-cells cdr))
+	       (princ ")"))
+	   (progn
+	     (princ " . ")
+	     (prin1  cdr)
+	     (princ ")")))))
+
+(defparameter *test-tree*
+  (quote 
+   (defun print-cells (sexp)
+     (let ((cdr (cdr sexp))
+	   (car (car sexp)))
+       (if (listp car)
+	   (if car
+	       (progn
+		 (princ "(")
+		 (print-cells car))
+	       (princ nil))
+	   (prin1 car))
+       (if (listp cdr)
+	   (if cdr
+	       (progn
+		 (princ " ")
+		 (print-cells cdr))
+	       (princ ")"))
+	   (progn
+	     (princ " . ")
+	     (prin1  cdr)
+	     (princ ")")))))))
+
+(defun reset-test ()
+  (test)
+  (setf node hello))

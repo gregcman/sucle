@@ -86,16 +86,6 @@
   (swap-nodes prev
 	      (reverse-node next)))
 
-(defparameter wombo nil)
-(defparameter hello nil)
-(defun test ()
-  (setf wombo (vector-circular-node "wombo "))
-  (setf hello (vector-nodes2 "hello "))
-  (node-splice 	
-   (nthcdr 5 hello)
-   wombo)
-  (nodes-vector hello))
-
 (defun node-disconnect (node)
   (connect-nodes (reverse-node (cdr node))
 		 (reverse-node (cdr (reverse-node node))))
