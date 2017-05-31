@@ -63,8 +63,12 @@
     (setf (fill-pointer buffer) 0)
     (block nil
       (dolist (current-inner node)
-	(vector-push-extend (car (car current-inner))
-			    buffer)
+	(let ((value (car (car current-inner))))
+	  (vector-push-extend (typecase value
+				(character value)
+				(fixnum (code-char (logand 255 value)))
+				(symbol (aref (symbol-name value) 0)))
+			      buffer))
 ;	(princ cap)
 ;	(princ " ")
 	(when (zerop (decf cap))
@@ -96,3 +100,42 @@
   (connect-nodes (reverse-node node) nil)
   (connect-nodes (turn-cw-node node) nil)
   node)
+
+(flet ((turnt (a b node)
+	 (nthfnc (function turn-node) b
+		 (cdr
+		  (nthfnc (function turn-node) a node)))))
+  (defun node-up (node)
+    (turnt 1 3 node))
+  (defun node-down (node)
+    (turnt 3 1 node))
+  (defun node-right (node)
+    (cdr node))
+  (defun node-left (node)
+    (turnt 2 2 node)))
+
+(progn
+  (defun node-connect-up (bottom top)
+    (connect-nodes (turn-node bottom)
+		   (turn-cw-node top)))
+  (defun node-connect-down (top bottom)
+    (connect-nodes (turn-cw-node top)
+		   (turn-node bottom)))
+  (defun node-connect-left (right left)
+    (connect-nodes (reverse-node right)
+		   left))
+  (defun node-connect-right (left right)
+    (connect-nodes left (reverse-node right))))
+
+
+(progno
+ (let ((a (make-cons-node #\a))
+       (b (make-cons-node #\b))
+       (c (make-cons-node #\c))
+       (d (make-cons-node #\d))
+       (e (make-cons-node #\e)))
+   (node-connect-right a b)
+   (node-connect-up a c)
+   (node-connect-left a d)
+   (node-connect-down a e)
+   (nodes-vector (turn-node e))))
