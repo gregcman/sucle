@@ -243,29 +243,34 @@
       (let ((payload (node-payload node)))
 	(let ((newline (cdr payload)))
 	  (when Newline
-	    (decf (cdr payload))))))
+	    (decf (cdr payload))
+	    (width-prop (node-right node) -1)))))
     (when (skey-r-or-p :kp-6)
       (setf moved? t)
       (let ((payload (node-payload node)))
 	(let ((newline (cdr payload)))
 	  (when Newline
-	    (incf (cdr payload))))))
+	    (incf (cdr payload))
+	    (width-prop (node-right node) 1)))))
 
     (when (skey-r-or-p :kp-5)
       (setf moved? t)
       (let ((payload (node-payload node)))
 	(let ((newline (cdr payload)))
-	  (when Newline
-	    (setf (cdr payload) nil)))))
+	  (if Newline
+	      (progn
+		(setf (cdr payload) nil)
+		(width-prop (node-right node) (- Newline))) 
+	      (setf (cdr payload) 0)))))
 
     (when (skey-r-or-p :kp-1)
       (setf moved? t)
-      (let ((new (node-down (node-left (node-up node)))))
+      (let ((new (jump-car node)))
 	(when new
 	  (setf node new))))
     (when (skey-r-or-p :kp-3)
       (setf moved? t)
-      (let ((new (node-down (node-right (node-up node)))))
+      (let ((new (jump-cdr node)))
 	(when new
 	  (setf node new))))
 
@@ -274,8 +279,7 @@
       (let ((ans (node-left node)))
 	(node-disconnect ans)))
     (when (skey-r-or-p :enter)
-      (setf moved? t)
-      (setf (cdr (node-payload node)) -4))
+      (print (node-payload (node-up node))))
     (progn
       (when (skey-r-or-p :kp-enter)
 	(setf moved? t)
@@ -301,6 +305,11 @@
 			    (logior a *white-black-color*)))))))
       (draw-nodal-text node 0 0 1 -1 nil 256)
       (draw-nodal-text (reverse-node node) 0 0 1 -1 t 256))))
+
+(defun jump-cdr (node)
+  (node-down (node-right (node-up node))))
+(defun jump-car (node)
+  (node-down (node-left (node-up node))))
 
 (defun random-color ()
   (logandc1 255 (random most-positive-fixnum)))
@@ -364,10 +373,12 @@
 
 (defun print-cells2 (form &optional (chars *cell-character-buffer*))
   (let* ((start (make-cons-node))
-	 (end start))
+	 (end start)
+	 (counter 0))
     (labels ((attach-char-node (node)
 	       (node-connect-right end node)
-	       (setf end node))
+	       (setf end node)
+	       (incf counter))
 	     (attach-char-and-place (char node)
 	       (let ((new-node (make-cons-node char)))
 		 (node-connect-up new-node node)
@@ -387,63 +398,68 @@
 	     (rec (sexp)
 	       (let ((cdr (cdr sexp))
 		     (car (car sexp)))
-		 (let ((cell-car-node (make-cons-node (quote car) car))
-		       (cell-cdr-node (make-cons-node (quote cdr) cdr)))
-		   (node-connect-right cell-car-node cell-cdr-node)
-		   (if (listp car)
-		       (if car
-			   (progn
-			     (attach-char-and-place #\( cell-car-node)
-			     (rec car))
-			   (prin1-and-done nil cell-car-node))
-		       (prin1-and-done car cell-car-node))
-		   (if (listp cdr)
-		       (if cdr
-			   (progn
-			     (attach-char-and-place #\Space cell-cdr-node)
-			     (rec cdr))
-			   (attach-char-and-place #\) cell-cdr-node))
-		       (progn ;;;dotted list?
-			 (error "fuck you")
-			 (princ " . ")
-			 (prin1  cdr)
-			 (princ ")")))))))
+		 (let ((rightcar (cons (quote car) nil))
+		       (leftcar (cons (quote cdr) nil)))
+		   (let ((cell-car-node (make-cons-node rightcar car))
+			 (cell-cdr-node (make-cons-node leftcar cdr)))
+		     (node-connect-right cell-car-node cell-cdr-node)
+		     (let ((old-len counter))
+		       (if (listp car)
+			   (if car
+			       (progn
+				 (attach-char-and-place #\( cell-car-node)
+				 (rec car))
+			       (prin1-and-done nil cell-car-node))
+			   (prin1-and-done car cell-car-node))
+		       (let ((width (1+ (- counter old-len))))
+			 (setf (cdr rightcar) width
+			       (cdr leftcar) width))
+		       (if (listp cdr)
+			   (if cdr
+			       (progn
+				 (attach-char-and-place #\Space cell-cdr-node)
+				 (rec cdr))
+			       (attach-char-and-place #\) cell-cdr-node))
+			   (progn ;;;dotted list?
+			     (error "fuck you")
+			     (princ " . ")
+			     (prin1  cdr)
+			     (princ ")")))))))))
       (rec form))
     (values start end)))
 
-(defun print-sexp (sexp)
-  (if (listp sexp)
-      (if sexp
-	  (progn
-	    (princ "(")
-	    (print-cells sexp))
-	  (princ nil))
-      (princ sexp)))
+(defun setwidth (node width)
+  (let ((other (node-left node)))
+    (unless other
+      (setf other (node-right node)))
+    (setf (cdr (car (node-payload other))) width
+	  (cdr (car (node-payload node))) width)))
 
-(defun emit-spaces (times)
-  (dotimes (x times)
-    (princ " ")))
-
-(defun print-cells (sexp)
-     (let ((cdr (cdr sexp))
-	   (car (car sexp)))
-       (if (listp car)
-	   (if car
-	       (progn
-		 (princ "(")
-		 (print-cells car))
-	       (princ nil))
-	   (prin1 car))
-       (if (listp cdr)
-	   (if cdr
-	       (progn
-		 (princ " ")
-		 (print-cells cdr))
-	       (princ ")"))
-	   (progn
-	     (princ " . ")
-	     (prin1  cdr)
-	     (princ ")")))))
+(defun width-prop (node width)
+  (unless (zerop width)
+    (when node
+      (let ((top (node-up node))) 
+	(let ((payload (node-payload top)))
+	  (let ((type (car payload)))
+	    (case (car type)
+	      (car (let ((cdr-end (jump-cdr node)))
+		     (let ((payload (node-payload cdr-end)))
+		       (let ((newline (cdr payload)))
+			 (if (typep newline 'fixnum)
+			     (decf (cdr payload) width)
+			     (width-prop (node-right cdr-end) width))))))
+	      (cdr (setwidth top (+ (cdr type) width))
+		   (let ((payload (node-payload node)))
+		     (let ((newline (cdr payload)))
+		       (if (typep newline 'fixnum)
+			   (decf (cdr payload) width)
+			   (width-prop (node-right node) width)))))
+	      (otherwise
+	       (let ((payload (node-payload node)))
+		 (let ((newline (cdr payload)))
+		   (if (typep newline 'fixnum)
+		       (decf (cdr payload) width)
+		       (width-prop (node-right node) width))))))))))))
 
 (defparameter *test-tree*
   (quote 

@@ -1469,3 +1469,38 @@ x
 				(setf (fill-pointer *qux*) 0)
 				(klear)
 				(test3))))))
+
+(progno
+ (defun print-sexp (sexp)
+   (if (listp sexp)
+       (if sexp
+	   (progn
+	     (princ "(")
+	     (print-cells sexp))
+	   (princ nil))
+       (princ sexp)))
+
+ (defun emit-spaces (times)
+   (dotimes (x times)
+     (princ " ")))
+
+ (defun print-cells (sexp)
+   (let ((cdr (cdr sexp))
+	 (car (car sexp)))
+     (if (listp car)
+	 (if car
+	     (progn
+	       (princ "(")
+	       (print-cells car))
+	     (princ nil))
+	 (prin1 car))
+     (if (listp cdr)
+	 (if cdr
+	     (progn
+	       (princ " ")
+	       (print-cells cdr))
+	     (princ ")"))
+	 (progn
+	   (princ " . ")
+	   (prin1  cdr)
+	   (princ ")"))))))
