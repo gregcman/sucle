@@ -12,8 +12,8 @@
     (defparameter *mouse-y* 0.0)))
 
 (progn
-  (defparameter *block-height* (/ 32.0 1.0))
-  (defparameter *block-width* (/ 18.0 1.0)))
+  (defparameter *block-height* (/ (* 2 11) 1.0))
+  (defparameter *block-width* (/ (* 2 6) 1.0)))
 
 (progn
   (defparameter *camera-x* 0)
@@ -257,6 +257,18 @@
 	       (setf moved? t))))
 	  ((or (skey-p :right-alt)
 	       (skey-p :left-alt))
+	   (progn
+	     (when (skey-r-or-p :s)
+	       (block nil
+		 (setf node (or (node-left node)
+				(return)))
+		 (setf moved? t)))
+	     (when (skey-r-or-p :f)
+	       (block nil
+		 (setf node (or (node-right node)
+				(return)))
+		 (setf moved? t)))))
+	  (t
 	     ;;;cons cells
 	     ;;;left moves to previous car
 	     ;;;right moves to next cdr
@@ -304,19 +316,7 @@
 					   (node-right node)
 					   node)))
 			   (return)))
-	       (setf moved? t))))
-	  (t
-	   (progn
-	     (when (skey-r-or-p :s)
-	       (block nil
-		 (setf node (or (node-left node)
-				(return)))
-		 (setf moved? t)))
-	     (when (skey-r-or-p :f)
-	       (block nil
-		 (setf node (or (node-right node)
-				(return)))
-		 (setf moved? t))))))
+	       (setf moved? t)))))
     (progn (when (skey-r-or-p :d)
 	     (block nil
 	       (setf node (or (short-down node)
@@ -605,210 +605,26 @@
 
 (defparameter *test-tree*
   (quote
-   ((defun other-stuff ()
-  (let ((moved? nil)
-	(last-node node))
-    (progno
-     (with-hash-table-iterator (next e:*keypress-hash*)
-       (loop (multiple-value-bind (more key value) (next)
-	       (if more
-		   (let ((ans (keyword-ascii key value)))
-		     (when ans
-		       (when (e::r-or-p (e::get-press-value value))
-			 (setf moved? t)
-			 (node-splice
-			  (node-left node)
-			  (vector-circular-node
-			   (string (code-char ans)))))))
-		   (return))))))
- 
-    (when (skey-r-or-p :up)
-      (block nil
-	(setf node (or (node-up node)
-		       (return)))
-	(setf moved? t)))
-    (when (skey-r-or-p :down)
-      (block nil
-	(setf node (or (node-down node)
-		       (return)))
-	(setf moved? t)))
-    (cond ((skey-p :right-control)
-	     ;;;long jumps
-	   (when (skey-r-or-p :s)
-	     (block nil
-	       (setf node (or (node-left (jump-car node))
-			      (node-left node)
-			      (return)))
-	       (setf moved? t)))
-	   (when (skey-r-or-p :f)
-	     (block nil
-	       (setf node (or (node-right (jump-cdr node))
-			      (node-right node)
-			      (return)))
-	       (setf moved? t))))
-	  ((skey-p :left-shift)
-	   ;;character
-	   (when (skey-r-or-p :s)
-	     (block nil
-	       (setf node (or (prev-newline node)
-			      (return)))
-	       (setf moved? t)))
-	   (when (skey-r-or-p :f)
-	     (block nil
-	       (setf node (or (next-newline node)
-			      (return)))
-	       (setf moved? t))))
-	  ((or (skey-p :right-alt)
-	       (skey-p :left-alt))
-	     ;;;cons cells
-	     ;;;left moves to previous car
-	     ;;;right moves to next cdr
-	   (when (skey-r-or-p :s)
-	     (block nil
-	       (setf node (or 
-			   (labels ((find-car (node &optional (count 256))
-				      (when node
-					(unless (zerop count)					  
-					  (let ((payload (node-payload (node-up node))))
-					    (let ((type (car (car payload))))
-					      (if (and (eq type (quote car))
-						   ;    (atom (car (cdr payload)))
-						       )
-						  node						  
-						  (let ((car (jump-car node)))
-						    (if (and (atom (cdr (node-payload (node-up car))))
-							     (eq (quote cdr) type))	       
-							car
-							(find-car (node-left node) (1- count)))))))))))
-			     (find-car (if (eq (quote car)
-					       (car (car (node-payload (node-up node)))))
-					   (node-left node)
-					   node)))
-			   (return)))
-	       (setf moved? t)))
-	   (when (skey-r-or-p :f)
-	     (block nil
-	       (setf node (or 
-			   (labels ((find-cdr (node &optional (count 256))
-				      (when node
-					(unless (zerop count)
-					  (let ((payload (node-payload (node-up node))))
-					    (let ((type (car (car payload))))
-					      (if (and (eq (quote cdr) type)
-						    ;   (atom (car (cdr payload)))
-						       )
-						node
-						(if (and (atom (cdr payload))
-							 (eq (quote car) type))
-						    (jump-cdr node)
-						    (find-cdr (node-right node) (1- count))))))))))
-			     (find-cdr (if (eq (quote cdr)
-					       (car (car (node-payload (node-up node)))))
-					   (node-right node)
-					   node)))
-			   (return)))
-	       (setf moved? t))))
-	  (t
+   (defun print-cells (sexp)
+     (let ((cdr (cdr sexp))
+	   (car (car sexp)))
+       (if (listp car)
+	   (if car
+	       (progn
+		 (princ "(")
+		 (print-cells car))
+	       (princ nil))
+	   (prin1 car))
+       (if (listp cdr)
+	   (if cdr
+	       (progn
+		 (princ " ")
+		 (print-cells cdr))
+	       (princ ")"))
 	   (progn
-	     (when (skey-r-or-p :s)
-	       (block nil
-		 (setf node (or (node-left node)
-				(return)))
-		 (setf moved? t)))
-	     (when (skey-r-or-p :f)
-	       (block nil
-		 (setf node (or (node-right node)
-				(return)))
-		 (setf moved? t))))))
-    (progn (when (skey-r-or-p :d)
-	     (block nil
-	       (setf node (or (short-down node)
-			      (next-newline node nil)
-			      (return)))
-	       (setf moved? t)))
-	   (when (skey-r-or-p :e)
-	     (block nil
-	       (setf node (or (short-up node)
-			      (prev-newline node nil)
-			      (return)))
-	       (setf moved? t))))
-
-    (when (skey-r-or-p :kp-4)
-      (setf moved? t)
-      (let ((payload (node-payload node)))
-	(let ((newline (cdr payload)))
-	  (when Newline
-	    (decf (cdr payload))
-	    (width-prop (node-right node) -1)))))
-    (when (skey-r-or-p :kp-6)
-      (setf moved? t)
-      (let ((payload (node-payload node)))
-	(let ((newline (cdr payload)))
-	  (when Newline
-	    (incf (cdr payload))
-	    (width-prop (node-right node) 1)))))
-
-    (when (skey-r-or-p :kp-5)
-      (setf moved? t)
-      (let ((payload (node-payload node)))
-	(let ((newline (cdr payload)))
-	  (if Newline
-	      (progn
-		(setf (cdr payload) nil)
-		(width-prop (node-right node) (- Newline))) 
-	      (setf (cdr payload) 0)))))
-
-    (when (skey-r-or-p :backspace)
-      (setf moved? t)
-      (let ((ans (node-left node)))
-	(node-disconnect ans)))
-    (when (skey-r-or-p :j)
-      (print (node-payload (node-up node))))
-    (progn
-      (when (skey-r-or-p :kp-enter)
-	(setf moved? t)
-	(setf node (turn-node node))
-	(pop directions)
-	(copy-string-to-world 0 5 (symbol-name (car directions)) *white-black-color*)))
-    (when moved?
-      (clear-screen)
-      (unless (eq node last-node)
-	(setf (car (node-payload node))
-	      (let ((char (car (node-payload node))))
-		(if (typep char (quote character))
-		    (setf char (char-code char)))
-		(typecase char
-		  (fixnum (let (( a (logand 255 char)))
-			    (logior a (random-color)))))))
-	(setf (car (node-payload last-node))
-	      (let ((char (car (node-payload last-node))))
-		(if (typep char (quote character))
-		    (setf char (char-code char)))
-		(typecase char
-		  (fixnum (let ((a (logand 255 char)))
-			    (logior a *white-black-color*)))))))
-      (draw-nodal-text *node-start* 0 0 1 -1 nil 1024)
-      (draw-nodal-text (reverse-node *node-start*) 0 0 1 -1 t 1024))))
-    (defun print-cells (sexp)
-      (let ((cdr (cdr sexp))
-	    (car (car sexp)))
-	(if (listp car)
-	    (if car
-		(progn
-		  (princ "(")
-		  (print-cells car))
-		(princ nil))
-	    (prin1 car))
-	(if (listp cdr)
-	    (if cdr
-		(progn
-		  (princ " ")
-		  (print-cells cdr))
-		(princ ")"))
-	    (progn
-	      (princ " . ")
-	      (prin1  cdr)
-	      (princ ")"))))))))
+	     (princ " . ")
+	     (prin1  cdr)
+	     (princ ")")))))))
 
 (defun reset-test ()
   (test)

@@ -4,7 +4,9 @@
 		 #:bordeaux-threads
 
 		 #:alexandria
-		 #:opticl  
+		 #:opticl
+
+		 #:cl-freetype2
 
 		 #:window-glfw3
 		 #:cl-conspack
@@ -22,6 +24,7 @@
 	       (:file "camera-matrix") ;;;1st person perspective vision
 	       (:file "meshing")
 	       (:file "tilemap")
+	       (:file "fonts"
 	       (:file "axis-aligned-quads")
 	       (:file "keys-ascii")
 	       (:file "list-junction")

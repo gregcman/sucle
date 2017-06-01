@@ -17,8 +17,8 @@
 	(chunk-size-y 16))
     (let ((array (make-array (* chunk-size-x chunk-size-y 4))))
       (let ((iter (iter-ator:make-iterator (length array) array nil nil)))
-	(let ((char-width (if t 18.0 *block-width*))
-	      (char-height (if t 32.0 *block-height*)))
+	(let ((char-width (if t 12.0 *block-width*))
+	      (char-height (if t 22.0 *block-height*)))
 	  (iter-ator:wasabios ((epos iter))
 	    (dobox ((iy 0 chunk-size-y)
 		    (ix 0 chunk-size-x))
@@ -202,16 +202,16 @@
 		   program)))
       
       (namexpr backup :text-vs
-	       (lambda () (file-string (shader-path "pos4f-tex2f-bgcol3f-fgcol3f.vs"))))      
+	       (lambda () (file-string (shader-path "pos4f-tex2f-bgcol4f-fgcol4f.vs"))))      
       (namexpr backup :text-frag
-	       (lambda () (file-string (shader-path "ftex2f-bg3f-fg3f.frag")))))
+	       (lambda () (file-string (shader-path "ftex2f-bg4f-fg4f.frag")))))
     
     (progn
       (namexpr backup :font-image
 	       (lambda ()
 		 (flip-image
 		  (load-png
-		   (img-path #P"font/font.png")))))
+		   (img-path #P"font/achar.png")))))
       (namexpr backup :font
 	       (lambda ()
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
@@ -247,8 +247,8 @@
   (with-iterators (xyz uv eft ebg) bufs iter-ator:wasabiis iter-ator:iter-ator
     (dotimes (x times)
       (%gl:vertex-attrib-2f 8 (uv) (uv))
-      (%gl:vertex-attrib-3f 9 (eft) (eft) (eft))
-      (%gl:vertex-attrib-3f 10 (ebg) (ebg) (ebg))
+      (%gl:vertex-attrib-4f 9 (eft) (eft) (eft) 1f0)
+      (%gl:vertex-attrib-4f 10 (ebg) (ebg) (ebg) 1f0)
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
 
