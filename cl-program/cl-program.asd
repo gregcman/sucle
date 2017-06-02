@@ -8,6 +8,10 @@
 
 		 #:cl-freetype2
 
+		 #:cl-openal
+		 #:cl-alc
+		 #:cl-alut
+		 
 		 #:window-glfw3
 		 #:cl-conspack
 		 

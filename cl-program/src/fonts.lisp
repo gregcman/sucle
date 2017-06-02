@@ -5,6 +5,11 @@
    (case 0
      (0 "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf")
      (1 "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"))))
+
+(defparameter *face-bold*
+  (freetype2:new-face
+   "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-B.ttf"))
+
 (defun test78 ()
   (freetype2:set-char-size *face* (* 8 64) 0 96 96)
   (let ((height (round (freetype2::string-pixel-height *face* "█")))

@@ -140,12 +140,12 @@
   (defun aload (&optional (file *save-file*))
     (myload file))
 
-  (defun save (filename thing)
+  (defun save (filename thing &optional (overwritep nil))
     (let ((path (saves-path filename)))
       (with-open-file (stream path
 			      :direction :output
 			      :if-does-not-exist :create
-			      :if-exists :supersede
+			      :if-exists (if overwritep :supersede :error)
 			      :element-type '(unsigned-byte 8))
 	(conspack:encode thing :stream stream))))
 
