@@ -12,10 +12,6 @@
     (defparameter *mouse-y* 0.0)))
 
 (progn
-  (defparameter *block-height* (/ (* 2 11) 1.0))
-  (defparameter *block-width* (/ (* 2 6) 1.0)))
-
-(progn
   (defparameter *camera-x* 0)
   (defparameter *camera-y* 0))
 
@@ -187,17 +183,6 @@
 	  (multiple-value-bind (char esc) (convert-char code mods)
 	    (values char esc)))))))
 
-
-(progn
-  (defparameter wombo nil)
-  (defparameter hello nil)
-  (defun test ()
-    (setf wombo (vector-circular-node "wombo "))
-    (setf hello (vector-nodes2 "hello "))
-    (node-splice
-     (nthcdr 5 hello)
-     wombo)
-    (nodes-vector hello)))
 
 (defparameter node nil)
 
@@ -626,6 +611,8 @@
 	     (prin1  cdr)
 	     (princ ")")))))))
 
+(defparameter *node-start* nil)
 (defun reset-test ()
-  (test)
-  (setf node hello))
+  (setf node (print-cells2 *test-tree*))
+  (setf *node-start* (reverse-node (last (reverse-node node))))
+  (quote reset-test))

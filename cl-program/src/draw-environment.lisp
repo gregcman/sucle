@@ -5,29 +5,35 @@
 
 (defparameter *16x16-tilemap* (regular-enumeration 16 16))
 
-(alexandria:define-constant +byte-fraction-lookup+
-    (load-time-value
-     (let ((array (make-array 256 :element-type 'single-float)))
-       (dotimes (x 256)
-	 (setf (aref array x) (/ (float x) 255.0)))
-       array)))
+(defparameter +byte-fraction-lookup+
+  (let ((array (make-array 256 :element-type 'single-float)))
+    (dotimes (x 256)
+      (setf (aref array x) (/ (float x) 255.0)))
+    array))
 
-(defparameter *chunk-vertices-lookup*
+(progn
+  (defparameter *block-height* (/ (* 2 11.0) 1.0))
+  (defparameter *block-width* (/ (* 2 6.0) 1.0)))
+
+(defun generate-chunk-vertices-lookup (&optional
+					 (char-width *block-width*)
+					 (char-height *block-height*))
   (let ((chunk-size-x 16)
 	(chunk-size-y 16))
     (let ((array (make-array (* chunk-size-x chunk-size-y 4))))
-      (let ((iter (iter-ator:make-iterator (length array) array nil nil)))
-	(let ((char-width (if t 12.0 *block-width*))
-	      (char-height (if t 22.0 *block-height*)))
-	  (iter-ator:wasabios ((epos iter))
-	    (dobox ((iy 0 chunk-size-y)
-		    (ix 0 chunk-size-x))
-		   (let ((foox0 (* (float ix) char-width))
-			 (fooy0 (* (float iy) char-height)))
-		     (let ((x1 (+ foox0 char-width))
-			   (y1 (+ fooy0 char-height)))
-		       (etouq (ngorp (preach 'epos '(foox0 fooy0 x1 y1))))))))))
+      (let ((iter (iter-ator:make-iterator (length array) array nil nil)))	
+	(iter-ator:wasabios ((epos iter))
+	  (dobox ((iy 0 chunk-size-y)
+		  (ix 0 chunk-size-x))
+		 (let ((foox0 (* (float ix) char-width))
+		       (fooy0 (* (float iy) char-height)))
+		   (let ((x1 (+ foox0 char-width))
+			 (y1 (+ fooy0 char-height)))
+		     (etouq (ngorp (preach 'epos '(foox0 fooy0 x1 y1)))))))))
       (nreverse array))))
+
+(defparameter *chunk-vertices-lookup*
+  (generate-chunk-vertices-lookup))
 
 (defparameter *screen-scaled-matrix* (cg-matrix:identity-matrix))
 
@@ -211,7 +217,7 @@
 	       (lambda ()
 		 (flip-image
 		  (load-png
-		   (img-path #P"font/achar.png")))))
+		   (saves-path #P"achar.png")))))
       (namexpr backup :font
 	       (lambda ()
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
@@ -276,7 +282,8 @@
 			  amount
 			  mesh-lookup
 			  x y z)
-      (let ((nope 0))
+      (let ((nope 0)
+	    (lookup +byte-fraction-lookup+))
 	(with-iterators (epos etex efg ebg) bufs iter-ator:wasabios iter-ator:iter-ator
 	  (dobox ((index 0 amount))
 		 (let ((obj (aref world index)))
@@ -291,7 +298,7 @@
 					       (XBG-R BG-R)
 					       (XBG-G BG-G)
 					       (XBG-B BG-B))
-				'(+byte-fraction-lookup+)
+				'(lookup)
 			      '(dotimes (x 4)
 				(etouq (ngorp (preach 'efg '(fg-r fg-g fg-b))))
 				(etouq (ngorp (preach 'ebg '(bg-r bg-g bg-b))))))))

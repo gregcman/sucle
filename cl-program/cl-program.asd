@@ -24,7 +24,7 @@
 	       (:file "camera-matrix") ;;;1st person perspective vision
 	       (:file "meshing")
 	       (:file "tilemap")
-	       (:file "fonts"
+	       (:file "fonts")
 	       (:file "axis-aligned-quads")
 	       (:file "keys-ascii")
 	       (:file "list-junction")

@@ -132,16 +132,16 @@
 (progn
 
   (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
-  (defparameter *save-file* (merge-pathnames #P"file" *saves-dir*))
+  (defparameter *save-file* "file")
 
-  (defun asave (thing)
-    (save *save-file* thing))
+  (defun asave (thing &optional (file *save-file*))
+    (save file thing))
 
-  (defun aload ()
-    (myload *save-file*))
+  (defun aload (&optional (file *save-file*))
+    (myload file))
 
   (defun save (filename thing)
-    (let ((path (merge-pathnames filename *saves-dir*)))
+    (let ((path (saves-path filename)))
       (with-open-file (stream path
 			      :direction :output
 			      :if-does-not-exist :create
@@ -150,8 +150,11 @@
 	(conspack:encode thing :stream stream))))
 
   (defun myload (filename)
-    (let ((path (merge-pathnames filename *saves-dir*)))
+    (let ((path (saves-path filename)))
       (conspack:decode (byte-read path)))))
+(defun saves-path (path)
+  (merge-pathnames path *saves-dir*))
+
 
 (defun quit ()
   (setf e:*status* t))

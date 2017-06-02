@@ -1504,3 +1504,15 @@ x
 	   (princ " . ")
 	   (prin1  cdr)
 	   (princ ")"))))))
+
+
+(progno
+  (defparameter wombo nil)
+  (defparameter hello nil)
+  (defun test ()
+    (setf wombo (vector-circular-node "wombo "))
+    (setf hello (vector-nodes2 "hello "))
+    (node-splice
+     (nthcdr 5 hello)
+     wombo)
+    (nodes-vector hello)))
