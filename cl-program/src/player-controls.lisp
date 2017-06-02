@@ -616,15 +616,3 @@
   (setf node (print-cells2 *test-tree*))
   (setf *node-start* (reverse-node (last (reverse-node node))))
   (quote reset-test))
-
-
-(defun alut-hello-world ()
-  (alut:with-init
-    (al:with-source (source)
-      (let ((buffer (if t
-			(print (alut:create-buffer-from-file "/home/terminal256/Music/Bustin.wav"))
-			(alut:create-buffer-hello-world))))
-	(print (alut:get-error))
-        (al:source source :buffer buffer)
-        (al:source-play source)
-        (alut:sleep 500)))))

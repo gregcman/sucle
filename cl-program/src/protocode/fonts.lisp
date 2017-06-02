@@ -1,5 +1,9 @@
 (in-package :sandbox)
 
+(progno
+ #:cl-freetype2)
+(progno
+ (:file "fonts"))
 (defparameter *face*
   (freetype2:new-face
    (case 0

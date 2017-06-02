@@ -217,7 +217,7 @@
 	       (lambda ()
 		 (flip-image
 		  (load-png
-		   (saves-path #P"achar.png")))))
+		   (img-path "font/achar.png")))))
       (namexpr backup :font
 	       (lambda ()
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
