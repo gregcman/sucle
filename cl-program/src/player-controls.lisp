@@ -616,3 +616,10 @@
   (setf node (print-cells2 *test-tree*))
   (setf *node-start* (reverse-node (last (reverse-node node))))
   (quote reset-test))
+
+
+(defun reload-test ()
+  (setf *chunks* (aload)
+	*node-start* (get-char 0 0 *chunks*)
+	node *node-start*)
+  (quote nil))

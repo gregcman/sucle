@@ -134,8 +134,8 @@
   (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
   (defparameter *save-file* "file")
 
-  (defun asave (thing &optional (file *save-file*))
-    (save file thing))
+  (defun asave (thing &key (file *save-file*) (overwritep nil))
+    (save file thing overwritep))
 
   (defun aload (&optional (file *save-file*))
     (myload file))
@@ -147,11 +147,13 @@
 			      :if-does-not-exist :create
 			      :if-exists (if overwritep :supersede :error)
 			      :element-type '(unsigned-byte 8))
-	(conspack:encode thing :stream stream))))
+	(conspack:tracking-refs ()
+	  (conspack:encode thing :stream stream)))))
 
   (defun myload (filename)
     (let ((path (saves-path filename)))
-      (conspack:decode (byte-read path)))))
+      (conspack:tracking-refs ()
+	(conspack:decode (byte-read path))))))
 (defun saves-path (path)
   (merge-pathnames path *saves-dir*))
 
