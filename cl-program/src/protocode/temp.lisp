@@ -1516,3 +1516,8 @@ x
      (nthcdr 5 hello)
      wombo)
     (nodes-vector hello)))
+
+(progno
+ (defparameter *postexcol* (quote (("POS" . 0)	
+				   ("TEX" . 8)
+				   ("COL" . 9)))))

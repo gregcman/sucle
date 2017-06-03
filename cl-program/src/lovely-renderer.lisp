@@ -56,3 +56,17 @@
     (unless (zerop (length success))
       (print success)
       (error "~S" success))))
+
+(defconstant +gltexture0+ (get-gl-constant :texture0))
+
+(defun glActiveTexture (num)
+  "sets the active texture"
+  (gl:active-texture (+ num +gltexture0+)))
+
+(defun sizeof (type-keyword)
+  "gets the size of a foreign c type"
+  (cffi:foreign-type-size type-keyword))
+
+(defun get-gl-constant (keyword)
+  "gets a gl-constant"
+  (cffi:foreign-enum-value '%gl:enum keyword))

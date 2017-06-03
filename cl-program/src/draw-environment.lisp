@@ -12,8 +12,8 @@
     array))
 
 (progn
-  (defparameter *block-height* (/ (* 2 11.0) 1.0))
-  (defparameter *block-width* (/ (* 2 6.0) 1.0)))
+  (defparameter *block-height* (/ (* 2 (if nil 16.0 11.0)) 1.0))
+  (defparameter *block-width* (/ (* 2 (if nil 16.0 6.0)) 1.0)))
 
 (defun generate-chunk-vertices-lookup (&optional
 					 (char-width *block-width*)
@@ -51,16 +51,6 @@
 					   (:texture-wrap-s . :repeat)
 					   (:texture-wrap-t . :repeat))))
 
-(defparameter *postex* (quote (("POS" . 0)	
-			       ("TEX" . 8)
-			       ("FGCOL" . 9)
-			       ("BGCOL" . 10)
-			       )))
-
-(defparameter *postexcol* (quote (("POS" . 0)	
-				  ("TEX" . 8)
-				  ("COL" . 9))))
-
 (defparameter *clear-display-buffer* t)
 (defparameter vsync? t)
 
@@ -72,16 +62,44 @@
 (defparameter *window-width* nil)
 (defparameter *window-height* nil)
 
+(defconstant +null-pointer+ (cffi:null-pointer))
+
 (defun draw-things ()
   (when *clear-display-buffer*
     (gl:clear :color-buffer-bit)) 
 
-  (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
-	 (solidshader-uniforms (glget solidshader :program))
-	 (pmv (getuniform solidshader-uniforms :pmv)))
-    (gl:use-program solidshader)
-    (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
-    (draw-text-layers pmv)))
+  
+  (progn
+    (let* ((solidshader (get-stuff :textshader *stuff* *backup*))
+	   (solidshader-uniforms (glget solidshader :program))
+	   (pmv (getuniform solidshader-uniforms :pmv))
+	   (sampler2d (getuniform solidshader-uniforms :sampler-2d)))
+      (gl:use-program solidshader)
+      (gl:uniformi sampler2d 1)
+      (gl:active-texture (+ 1 +gltexture0+))
+      (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
+      (draw-text-layers pmv)))
+
+  (progn
+    (let* ((solidshader (get-stuff :other-text-shader *stuff* *backup*))
+	   (solidshader-uniforms (glget solidshader :program))
+	   (pmv (getuniform solidshader-uniforms :pmv))
+	   (sampler2d (getuniform solidshader-uniforms :sampler-2d))
+	   (indirection (getuniform solidshader-uniforms :indirection)))
+      (gl:use-program solidshader)
+      (gl:uniformi sampler2d 1)
+      (gl:active-texture (+ 1 +gltexture0+))
+      (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
+      
+      (gl:uniformi indirection 0)
+      (gl:active-texture (+ 0 +gltexture0+))    
+      (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+      (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil)
+      (let ((list (get-stuff :fast-text-display-list *stuff* *backup*)))
+	(gl:call-list list)
+	(if (skey-j-p :y)
+	    (progn (gl:delete-lists list 1)
+		   (remhash :fast-text-display-list *stuff*)))))))
 
 (defun rescale-screen-matrix (result x y)
   (setf (cg-matrix:mref result 0 3) x
@@ -201,16 +219,41 @@
 			(make-shader-program-from-strings
 			 (get-stuff :text-vs *stuff* *backup*)
 			 (get-stuff :text-frag *stuff* *backup*)
-			 *postex*)))
+			 (quote (("POS" . 0)	
+				 ("TEX" . 8)
+				 ("FGCOL" . 9)
+				 ("BGCOL" . 10)
+				 )))))
 		   (let ((table (make-eq-hash)))
 		     (register program :program table)
-		     (cache-program-uniforms program table (quote ((:pmv . "PMV")))))
+		     (cache-program-uniforms program table (quote ((:pmv . "PMV")
+								   (:sampler-2d . "samptwodee")))))
 		   program)))
       
       (namexpr backup :text-vs
 	       (lambda () (file-string (shader-path "pos4f-tex2f-bgcol4f-fgcol4f.vs"))))      
       (namexpr backup :text-frag
-	       (lambda () (file-string (shader-path "ftex2f-bg4f-fg4f.frag")))))
+	       (lambda () (file-string (shader-path "ftex2f-bg4f-fg4f.frag"))))
+
+
+      (namexpr backup :other-text-shader
+	       (lambda ()
+		 (let ((program
+			(make-shader-program-from-strings
+			 (get-stuff :text-indirect *stuff* *backup*)
+			 (get-stuff :text-frag *stuff* *backup*)
+			 (quote (("POS" . 0)	
+				 ("TEX" . 8)
+				 ("INDIRECT" . 9)
+				 )))))
+		   (let ((table (make-eq-hash)))
+		     (register program :program table)
+		     (cache-program-uniforms program table (quote ((:pmv . "PMV")
+								   (:sampler-2d . "samptwodee")
+								   (:indirection . "indirection")))))
+		   program)))
+      (namexpr backup :text-indirect
+	       (lambda () (file-string (shader-path "text.vs")))))
     
     (progn
       (namexpr backup :font-image
@@ -222,7 +265,26 @@
 	       (lambda ()
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
 			      :rgba
-			      *default-tex-params*))))))
+			      *default-tex-params*))))
+    (progn
+      (namexpr backup :items-image
+	       (lambda ()
+		 (flip-image
+		  (load-png
+		   (img-path "font/items.png")))))
+      (namexpr backup :items
+	       (lambda ()
+		 (pic-texture (get-stuff :items-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*)))
+      (namexpr backup :text-scratch
+	       (lambda ()
+		 (pic-texture (get-stuff :items-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*)))
+      (namexpr backup :fast-text-display-list
+	       (lambda ()
+		 (draw-fast-text-display-list 0 0))))))
 
 (defun cache-program-uniforms (program table args)
   (dolist (arg args)
@@ -306,8 +368,8 @@
 			   (etouq
 			    (with-vec-params
 				`((offset ,@(vec-slots :rectangle
-							'((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
-				'(tilemap-lookup)
+						       '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
+			      '(tilemap-lookup)
 			      '(etouq (ngorp (preach 'etex (duaq 1 nil '(x0 x1 y0 y1))))))))
 			 (let ((offset (* 4 index)))
 			   (etouq
@@ -324,3 +386,63 @@
 				(etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1))))))))))
 		       (incf nope)))))
 	(* 4 (- amount nope))))))
+
+
+(progn
+  (declaim (ftype (function (simple-vector
+			     fixnum
+			     fixnum
+			     single-float single-float single-float)
+			    fixnum)
+		  draw-box-char)))
+(with-unsafe-speed)
+(defun draw-fast-text (bufs
+		       width height
+		       xwidth ywidth
+		      x y z)
+  (with-iterators (epos etex eindirect) bufs iter-ator:wasabios iter-ator:iter-ator
+    (dobox ((xcell 0 width)
+	    (ycell 0 width))
+	   ;;;texcoords
+	   (etouq (ngorp (preach 'etex (duaq 3 nil '(0f0 1f0 0f0 1f0)))))
+	   (let ((xactual (* xwidth xcell))
+		 (yactual (* ywidth ycell)))
+	     (let* ((x1 (float (+ x xactual)))
+		    (y1 (float (+ y yactual)))
+		    (foox0 (+ x1 xwidth))
+		    (fooy0 (+ y1 ywidth)))
+	       ;;position
+	       (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1)))))))
+	   ;;;indirection
+	   (dotimes (x 4)
+	     (let ((xi (float (/ xcell width)))
+		   (yi (float (/ ycell height))))
+	       (progn
+		 (eindirect xi)
+		 (eindirect yi))))))
+  (* 4 width height))
+
+(defun draw-fast-text-display-list (xstart ystart  &optional (display-list (gl:gen-lists 1)))
+  (let ((iter *attrib-buffer-iterators*))
+    (let ((buf (get-buf-param iter
+			      (etouq (vector 0 8 9)))))
+      (reset-attrib-buffer-iterators iter)
+      (let ((times (draw-fast-text
+		    buf
+		    256 256
+		    *block-width*  *block-height*
+		    (* *block-width* (float xstart)) 
+		    (* *block-height* (float ystart)) 
+		    0.0)))
+	(reset-attrib-buffer-iterators iter)
+	(gl:with-new-list (display-list :compile)
+	  (gl:with-primitives :quads
+	    (mesh-test89 times buf)))
+	display-list))))
+
+(defun mesh-test89 (times bufs)
+  (with-iterators (xyz uv eindirect) bufs iter-ator:wasabiis iter-ator:iter-ator
+    (dotimes (x times)
+      (%gl:vertex-attrib-2f 8 (uv) (uv))
+      (%gl:vertex-attrib-2f 9 (eindirect) (eindirect))
+      (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))

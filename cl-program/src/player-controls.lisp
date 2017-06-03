@@ -68,7 +68,7 @@
     (if *running*
 	(copy-string-to-world 0 9 "do stuff now" *white-black-color*)
 	(copy-string-to-world 0 9 "drag to move" *white-black-color*)))
-  (if *running*
+  (progn *running*
       (when (zerop (mod *ticks* (floor (/ 60 60))))
 	(other-stuff))
       (etouq
@@ -345,7 +345,30 @@
       (let ((ans (node-left node)))
 	(node-disconnect ans)))
     (when (skey-r-or-p :j)
-      (print (node-payload (node-up node))))
+      (print (node-payload (node-up node)))
+      (print (node-payload node)))
+    (when (skey-p :l)
+      (dobox ((x 0 228)
+	      (y 0 70))
+	     (scwu (random most-positive-fixnum) x y)))
+    (when (skey-p :k)
+      (let ((a (load-time-value (make-array (* 256 256 4) :element-type '(unsigned-byte 8)))))
+	(dotimes (x (* 256 256))
+	  (let ((offset (* 4 x))
+		(lookup (* 4 (random 256)))
+		(tilemap-lookup *uint-lookup*))
+	    (etouq
+	     (with-vec-params
+		 `((lookup ,@(vec-slots :rectangle
+					'((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
+	       '(tilemap-lookup)
+	       '(progn
+		 (setf (aref a (+ offset 0)) x0)
+		 (setf (aref a (+ offset 1)) y0)
+		 (setf (aref a (+ offset 2)) x1)
+		 (setf (aref a (+ offset 3)) y1))))))
+	(gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+	(gl:tex-sub-image-2d :texture-2d 0 0 0 256 256 :rgba :unsigned-byte a)))
     (progn
       (when (skey-r-or-p :kp-enter)
 	(setf moved? t)
@@ -371,6 +394,10 @@
 			    (logior a *white-black-color*)))))))
       (draw-nodal-text *node-start* 0 0 1 -1 nil 1024)
       (draw-nodal-text (reverse-node *node-start*) 0 0 1 -1 t 1024))))
+
+(defparameter *uint-lookup*
+  (let ((ans (make-array (length *16x16-tilemap*) :element-type '(unsigned-byte 8))))
+    (map-into ans (lambda (x) (round (* x 255))) *16x16-tilemap*)))
 
 (defun prev-newline (node &optional (after t))
   (labels ((rec (lastnode node &optional (cap 1024))
@@ -589,27 +616,28 @@
 		       (width-prop (node-right node) width))))))))))))
 
 (defparameter *test-tree*
-  (quote
-   (defun print-cells (sexp)
-     (let ((cdr (cdr sexp))
-	   (car (car sexp)))
-       (if (listp car)
-	   (if car
-	       (progn
-		 (princ "(")
-		 (print-cells car))
-	       (princ nil))
-	   (prin1 car))
-       (if (listp cdr)
-	   (if cdr
-	       (progn
-		 (princ " ")
-		 (print-cells cdr))
-	       (princ ")"))
-	   (progn
-	     (princ " . ")
-	     (prin1  cdr)
-	     (princ ")")))))))
+  (copy-tree
+   (quote
+    (defun print-cells (sexp)
+      (let ((cdr (cdr sexp))
+	    (car (car sexp)))
+	(if (listp car)
+	    (if car
+		(progn
+		  (princ "(")
+		  (print-cells car))
+		(princ nil))
+	    (prin1 car))
+	(if (listp cdr)
+	    (if cdr
+		(progn
+		  (princ " ")
+		  (print-cells cdr))
+		(princ ")"))
+	    (progn
+	      (princ " . ")
+	      (prin1  cdr)
+	      (princ ")"))))))))
 
 (defparameter *node-start* nil)
 (defun reset-test ()
@@ -619,7 +647,7 @@
 
 
 (defun reload-test ()
-  (setf *chunks* (aload)
-	*node-start* (get-char 0 0 *chunks*)
+  (setf *chunks* (aload "indentation")
+	*node-start* (reverse-node (get-char 0 0 *chunks*))
 	node *node-start*)
   (quote nil))
