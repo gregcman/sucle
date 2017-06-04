@@ -70,10 +70,10 @@
   (defun truecolorp (x)
     (logbitp 24 x))
   (defun color-rgb (color)
-  ;; fixme: should this return list or (typed?) vector?
-  (if (truecolorp color)
-      (mod color (ash 1 24))
-      (aref *color-map* color)))
+    ;; fixme: should this return list or (typed?) vector?
+    (if (truecolorp color)
+	(mod color (ash 1 24))
+	(aref *color-map* color)))
   (defun fill-color-map ()
     (dotimes (color 256)
       (labels ((c (r g b)

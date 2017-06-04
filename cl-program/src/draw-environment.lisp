@@ -45,6 +45,7 @@
 
 (defparameter *backup* (make-eq-hash))
 (defparameter *stuff* (make-eq-hash))
+(defparameter *other-stuff* (make-eq-hash))
 
 (defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
 					   (:texture-mag-filter . :nearest)
@@ -61,8 +62,6 @@
 
 (defparameter *window-width* nil)
 (defparameter *window-height* nil)
-
-(defconstant +null-pointer+ (cffi:null-pointer))
 
 (defun draw-things ()
   (when *clear-display-buffer*
@@ -85,9 +84,7 @@
 	   (solidshader-uniforms (glget solidshader :program))
 	   (pmv (getuniform solidshader-uniforms :pmv))
 	   (sampler2d (getuniform solidshader-uniforms :sampler-2d))
-	   (indirection (getuniform solidshader-uniforms :indirection))
-	   (fgindirection (getuniform solidshader-uniforms :fgindirection))
-	   (bgindirection (getuniform solidshader-uniforms :bgindirection)))
+	   (indirection (getuniform solidshader-uniforms :indirection)))
       (gl:use-program solidshader)
       (gl:uniformi sampler2d 1)
       (gl:active-texture (+ 1 +gltexture0+))
@@ -96,14 +93,6 @@
       (gl:uniformi indirection 0)
       (gl:active-texture (+ 0 +gltexture0+))    
       (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
-
-      (gl:uniformi fgindirection 2)
-      (gl:active-texture (+ 2 +gltexture0+))    
-      (gl:bind-texture :texture-2d (get-stuff :text-scratch-fg *stuff* *backup*))
-      
-      (gl:uniformi bgindirection 3)
-      (gl:active-texture (+ 3 +gltexture0+))    
-      (gl:bind-texture :texture-2d (get-stuff :text-scratch-bg *stuff* *backup*))
       
       (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil)
       (let ((list (get-stuff :fast-text-display-list *stuff* *backup*)))
@@ -262,11 +251,26 @@
 		     (cache-program-uniforms program table (quote ((:pmv . "PMV")
 								   (:sampler-2d . "samptwodee")
 								   (:indirection . "indirection")
-								   (:fgindirection . "fgindirection")
-								   (:bgindirection . "bgindirection")))))
+								   (:texcoord . "texcoords")
+								   (:fgcolor . "fgcolor")
+								   (:bgcolor . "bgcolor")
+								   )))
+		     (let* ((solidshader program)
+			    (solidshader-uniforms (glget solidshader :program)))
+		       (progn
+			 (gl:use-program program)
+			 (%gl:uniform-4fv (getuniform solidshader-uniforms :texcoord)
+					  256
+					  (get-stuff :glsl-code-lookup *other-stuff* *backup*))
+			 (%gl:uniform-4fv (getuniform solidshader-uniforms :fgcolor)
+					  256
+					  (get-stuff :terminal256color-lookup *other-stuff* *backup*))
+			 (%gl:uniform-4fv (getuniform solidshader-uniforms :bgcolor)
+					  256
+					  (get-stuff :terminal256color-lookup *other-stuff* *backup*)))))
 		   program)))
       (namexpr backup :text-indirect
-	       (lambda () (file-string (shader-path "text.vs")))))
+	       (lambda () (file-string (shader-path "text42.vs")))))
     
     (progn
       (namexpr backup :font-image
@@ -279,6 +283,38 @@
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
 			      :rgba
 			      *default-tex-params*))))
+    (namexpr backup :glsl-code-lookup
+	     (lambda ()
+	       (let ((a (cffi:foreign-alloc :float :count (* 4 256))))
+		 (dotimes (x 256)
+		   (let ((offset (* 4 x))
+			 (tilemap-lookup *16x16-tilemap*))
+		     (etouq
+		      (with-vec-params
+			  `((offset ,@(vec-slots :rectangle
+						 '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
+			'(tilemap-lookup)
+			'(progn
+			  (setf (cffi:mem-aref a :float (+ offset 0)) x0)
+			  (setf (cffi:mem-aref a :float (+ offset 1)) y0)
+			  (setf (cffi:mem-aref a :float (+ offset 2)) x1)
+			  (setf (cffi:mem-aref a :float (+ offset 3)) y1))))))
+		 a)))
+    (namexpr backup :terminal256color-lookup
+	     (lambda ()
+	       (let ((a (cffi:foreign-alloc :float :count (* 4 256))))
+		 (dotimes (x 256)
+		   (let ((offset (* 4 x)))
+		     (multiple-value-bind (r g b) (color-rgb x) 
+			 (progn
+			   (setf (cffi:mem-aref a :float (+ offset 0)) r)
+			   (setf (cffi:mem-aref a :float (+ offset 1)) g)
+			   (setf (cffi:mem-aref a :float (+ offset 2)) b)
+			   (setf (cffi:mem-aref a :float (+ offset 3)) 0f0)))))
+		 a)))
+    (namexpr backup :glyph-screen
+	     (lambda ()
+	       (cffi:foreign-alloc :uint8 :count (* 256 256 4))))
     (progn
       (namexpr backup :items-image
 	       (lambda ()
@@ -291,16 +327,6 @@
 			      :rgba
 			      *default-tex-params*)))
       (namexpr backup :text-scratch
-	       (lambda ()
-		 (pic-texture (get-stuff :items-image *stuff* *backup*)
-			      :rgba
-			      *default-tex-params*)))
-      (namexpr backup :text-scratch-fg
-	       (lambda ()
-		 (pic-texture (get-stuff :items-image *stuff* *backup*)
-			      :rgba
-			      *default-tex-params*)))
-      (namexpr backup :text-scratch-bg
 	       (lambda ()
 		 (pic-texture (get-stuff :items-image *stuff* *backup*)
 			      :rgba
