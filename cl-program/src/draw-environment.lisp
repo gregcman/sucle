@@ -85,7 +85,9 @@
 	   (solidshader-uniforms (glget solidshader :program))
 	   (pmv (getuniform solidshader-uniforms :pmv))
 	   (sampler2d (getuniform solidshader-uniforms :sampler-2d))
-	   (indirection (getuniform solidshader-uniforms :indirection)))
+	   (indirection (getuniform solidshader-uniforms :indirection))
+	   (fgindirection (getuniform solidshader-uniforms :fgindirection))
+	   (bgindirection (getuniform solidshader-uniforms :bgindirection)))
       (gl:use-program solidshader)
       (gl:uniformi sampler2d 1)
       (gl:active-texture (+ 1 +gltexture0+))
@@ -94,6 +96,15 @@
       (gl:uniformi indirection 0)
       (gl:active-texture (+ 0 +gltexture0+))    
       (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+
+      (gl:uniformi fgindirection 2)
+      (gl:active-texture (+ 2 +gltexture0+))    
+      (gl:bind-texture :texture-2d (get-stuff :text-scratch-fg *stuff* *backup*))
+      
+      (gl:uniformi bgindirection 3)
+      (gl:active-texture (+ 3 +gltexture0+))    
+      (gl:bind-texture :texture-2d (get-stuff :text-scratch-bg *stuff* *backup*))
+      
       (gl:uniform-matrix-4fv pmv *screen-scaled-matrix* nil)
       (let ((list (get-stuff :fast-text-display-list *stuff* *backup*)))
 	(gl:call-list list)
@@ -250,7 +261,9 @@
 		     (register program :program table)
 		     (cache-program-uniforms program table (quote ((:pmv . "PMV")
 								   (:sampler-2d . "samptwodee")
-								   (:indirection . "indirection")))))
+								   (:indirection . "indirection")
+								   (:fgindirection . "fgindirection")
+								   (:bgindirection . "bgindirection")))))
 		   program)))
       (namexpr backup :text-indirect
 	       (lambda () (file-string (shader-path "text.vs")))))
@@ -278,6 +291,16 @@
 			      :rgba
 			      *default-tex-params*)))
       (namexpr backup :text-scratch
+	       (lambda ()
+		 (pic-texture (get-stuff :items-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*)))
+      (namexpr backup :text-scratch-fg
+	       (lambda ()
+		 (pic-texture (get-stuff :items-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*)))
+      (namexpr backup :text-scratch-bg
 	       (lambda ()
 		 (pic-texture (get-stuff :items-image *stuff* *backup*)
 			      :rgba

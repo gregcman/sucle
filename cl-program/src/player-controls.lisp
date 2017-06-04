@@ -352,23 +352,48 @@
 	      (y 0 70))
 	     (scwu (random most-positive-fixnum) x y)))
     (when (skey-p :k)
-      (let ((a (load-time-value (make-array (* 256 256 4) :element-type '(unsigned-byte 8)))))
-	(dotimes (x (* 256 256))
-	  (let ((offset (* 4 x))
-		(lookup (* 4 (random 256)))
-		(tilemap-lookup *uint-lookup*))
-	    (etouq
-	     (with-vec-params
-		 `((lookup ,@(vec-slots :rectangle
-					'((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
-	       '(tilemap-lookup)
-	       '(progn
-		 (setf (aref a (+ offset 0)) x0)
-		 (setf (aref a (+ offset 1)) y0)
-		 (setf (aref a (+ offset 2)) x1)
-		 (setf (aref a (+ offset 3)) y1))))))
-	(gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
-	(gl:tex-sub-image-2d :texture-2d 0 0 0 256 256 :rgba :unsigned-byte a)))
+      (let ((width 227)
+	    (height 70))
+	(progn
+	  
+	  (let ((a (load-time-value (cffi:foreign-alloc :uint8 :count (* 256 256 4)))))
+	    (dotimes (x (* width height))
+	      (let ((offset (* 4 x))
+		    (lookup (* 4 (random 256)))
+		    (tilemap-lookup *uint-lookup*))
+		(etouq
+		 (with-vec-params
+		     `((lookup ,@(vec-slots :rectangle
+					    '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
+		   '(tilemap-lookup)
+		   '(progn
+		     (setf (cffi:mem-aref a :uint8 (+ offset 0)) x0)
+		     (setf (cffi:mem-aref a :uint8 (+ offset 1)) y0)
+		     (setf (cffi:mem-aref a :uint8 (+ offset 2)) x1)
+		     (setf (cffi:mem-aref a :uint8 (+ offset 3)) y1))))))
+	    (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+	    (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte a))
+	  (progn
+	    (let ((b (load-time-value (cffi:foreign-alloc :uint8 :count (* 256 256 4)))))
+	      (dotimes (x (* width height))
+		(let ((offset (* 4 x)))
+		  (progn
+		    (setf (cffi:mem-aref b :uint8 (+ offset 0)) (random 256))
+		    (setf (cffi:mem-aref b :uint8 (+ offset 1)) (random 256))
+		    (setf (cffi:mem-aref b :uint8 (+ offset 2)) (random 256))
+		    (setf (cffi:mem-aref b :uint8 (+ offset 3)) (random 256)))))
+	      (gl:bind-texture :texture-2d (get-stuff :text-scratch-bg *stuff* *backup*))
+	      (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b))
+	    (let ((c (load-time-value (cffi:foreign-alloc :uint8 :count (* 256 256 4)))))
+	      (dotimes (x (* width height))
+		(let ((offset (* 4 x)))
+		  (progn
+		    (setf (cffi:mem-aref c :uint8 (+ offset 0)) (random 256))
+		    (setf (cffi:mem-aref c :uint8 (+ offset 1)) (random 256))
+		    (setf (cffi:mem-aref c :uint8 (+ offset 2)) (random 256))
+		    (setf (cffi:mem-aref c :uint8 (+ offset 3)) (random 256)))))
+	      (gl:bind-texture :texture-2d (get-stuff :text-scratch-fg *stuff* *backup*))
+	      (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte c))))))
     (progn
       (when (skey-r-or-p :kp-enter)
 	(setf moved? t)

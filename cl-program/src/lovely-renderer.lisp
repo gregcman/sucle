@@ -57,8 +57,6 @@
       (print success)
       (error "~S" success))))
 
-(defconstant +gltexture0+ (get-gl-constant :texture0))
-
 (defun glActiveTexture (num)
   "sets the active texture"
   (gl:active-texture (+ num +gltexture0+)))
@@ -70,3 +68,5 @@
 (defun get-gl-constant (keyword)
   "gets a gl-constant"
   (cffi:foreign-enum-value '%gl:enum keyword))
+
+(defconstant +gltexture0+ (cffi:foreign-enum-value (quote %gl:enum) :texture0))

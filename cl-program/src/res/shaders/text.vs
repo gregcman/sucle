@@ -9,6 +9,8 @@ varying vec4 FG;
 
 uniform mat4 PMV;
 uniform sampler2D indirection;
+uniform sampler2D fgindirection;
+uniform sampler2D bgindirection;
 
 void main()
 {
@@ -17,7 +19,7 @@ gl_Position = PMV * POS;
 vec4 chardata = texture2D(indirection, INDIRECT);
 
 FTEX = mix(chardata.rg, chardata.ba, TEX);
-BG = vec4(0.0, 0.0, 0.0, 0.0);
-FG = vec4(1.0, 1.0, 1.0, 1.0);
+BG = texture2D(fgindirection, INDIRECT);
+FG = texture2D(bgindirection, INDIRECT);
 
 } 
