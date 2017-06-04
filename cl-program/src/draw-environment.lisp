@@ -39,6 +39,15 @@
 (defparameter *window-width* nil)
 (defparameter *window-height* nil)
 
+(defparameter *window-block-width* nil)
+(defparameter *window-block-height* nil)
+
+(defun update-window-block-size ()
+  (setf (values *window-block-width* *window-block-height*)
+	(values
+	 (floor (/ e:*width* *block-width* 0.5))
+	 (floor (/ e:*height* *block-height* 0.5)))))
+
 (defun draw-things () 
   (progn
     (let* ((solidshader (get-stuff :other-text-shader *stuff* *backup*))
@@ -54,11 +63,13 @@
       (gl:active-texture (+ 0 +gltexture0+))    
       (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
       
-      (let ((list (get-stuff :fast-text-display-list *stuff* *backup*)))
-	(gl:call-list list)
-	(if (skey-j-p :y)
-	    (progn (gl:delete-lists list 1)
-		   (remhash :fast-text-display-list *stuff*)))))))
+      (gl:call-list (get-stuff :fast-text-display-list *stuff* *backup*)))))
+
+(defun reset-text-display-list ()
+  (let ((list (get-stuff :fast-text-display-list *stuff* *backup*)))
+    (when list
+      (gl:delete-lists list 1)
+      (remhash :fast-text-display-list *stuff*))))
 
 (defmacro with-iterators ((&rest bufvars) buf func type &body body)
   (let* ((syms (mapcar (lambda (x) (gensym (string x))) bufvars))
@@ -201,8 +212,8 @@
       (namexpr backup :fast-text-display-list
 	       (lambda ()
 		 (draw-fast-text-display-list
-		  (floor (/ e:*width* *block-width* 0.5))
-		  (floor (/ e:*height* *block-height* 0.5))))))))
+		  *window-block-width*
+		  *window-block-height*))))))
 
 (defun cache-program-uniforms (program table args)
   (dolist (arg args)
@@ -214,6 +225,8 @@
 (defun on-resize (w h)
   (setf *window-height* h
 	*window-width* w)
+  (update-window-block-size)
+  (reset-text-display-list)
   (gl:viewport 0 0 w h))
 
 (defparameter *buffer-vector-scratch* (make-array 16))

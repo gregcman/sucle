@@ -1565,3 +1565,19 @@ x
 	   (setf (cffi:mem-aref c :uint8 (+ offset 3)) (random 256)))))
      (gl:bind-texture :texture-2d (get-stuff :text-scratch-fg *stuff* *backup*))
      (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte c))))
+
+(when (skey-p :k)
+  (let ((width *window-block-width*)
+	(height *window-block-height*))
+    (let ((b (get-stuff :glyph-screen *other-stuff* *backup*)))
+      (dotimes (x (* width height))
+	(let ((offset (* 4 x)))
+	  (progn
+	    (setf (cffi:mem-aref b :uint8 (+ offset 0)) (if nil 65 (random 256)))
+	    (setf (cffi:mem-aref b :uint8 (+ offset 1)) (if nil 189 (random 256)))
+	    (setf (cffi:mem-aref b :uint8 (+ offset 2)) (if nil 222 (random 256)))
+					;	 (setf (cffi:mem-aref b :uint8 (+ offset 3)) (random 256))
+	    )))
+      (progn
+	(gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b)))))

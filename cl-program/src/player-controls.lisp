@@ -190,6 +190,8 @@
 (defun other-stuff ()
   (let ((moved? nil)
 	(last-node node))
+    (dotimes (x 69)
+      (copy-string-to-world (random 256) (random 256) "yolo" (logandc1 255 (random most-positive-fixnum))))
     (progno
      (with-hash-table-iterator (next e:*keypress-hash*)
        (loop (multiple-value-bind (more key value) (next)
@@ -228,7 +230,8 @@
 			      (node-right node)
 			      (return)))
 	       (setf moved? t))))
-	  ((skey-p :left-shift)
+	  ((or (skey-p :right-alt)
+	       (skey-p :left-alt))
 	   ;;character
 	   (when (skey-r-or-p :s)
 	     (block nil
@@ -240,8 +243,7 @@
 	       (setf node (or (next-newline node)
 			      (return)))
 	       (setf moved? t))))
-	  ((or (skey-p :right-alt)
-	       (skey-p :left-alt))
+	  ((skey-p :left-shift)
 	   (progn
 	     (when (skey-r-or-p :s)
 	       (block nil
@@ -351,21 +353,26 @@
       (dobox ((x 0 228)
 	      (y 0 70))
 	     (scwu (random most-positive-fixnum) x y)))
-    (when (skey-p :k)
-      (let ((width 228)
-	    (height 70))
-	(let ((b (get-stuff :glyph-screen *other-stuff* *backup*)))
-	  (dotimes (x (* width height))
-	    (let ((offset (* 4 x)))
+    (when (or t (skey-p :o))
+      (progn
+	(let ((width *window-block-width*)
+	      (height *window-block-height*))
+	  (let ((xstart *camera-x*)
+		(ystart *camera-y*))
+	    (let ((b (get-stuff :glyph-screen *other-stuff* *backup*)))
+	      (dobox ((xpos 0 *window-block-width*)
+		      (ypos 0 *window-block-height*))		   
+		     (let ((offset (* 4 (+ xpos (* ypos width))))
+			   (value (get-char (+ xpos xstart) (+ ypos ystart) *chunks*)))
+		       (let ((num (get-char-num value)))
+			 (progn
+			   (setf (cffi:mem-aref b :uint8 (+ offset 0)) (logand 255 num))
+			   (setf (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num))
+			   (setf (cffi:mem-aref b :uint8 (+ offset 2)) (ldb (byte 8 40) num))
+			   ))))
 	      (progn
-		(setf (cffi:mem-aref b :uint8 (+ offset 0)) (if nil 65 (random 256)))
-		(setf (cffi:mem-aref b :uint8 (+ offset 1)) (if nil 189 (random 256)))
-		(setf (cffi:mem-aref b :uint8 (+ offset 2)) (if nil 222 (random 256)))
-					;	 (setf (cffi:mem-aref b :uint8 (+ offset 3)) (random 256))
-		)))
-	  (progn
-	    (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
-	    (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b)))))
+		(gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+		(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b)))))))
     (progn
       (when (skey-r-or-p :kp-enter)
 	(setf moved? t)
@@ -373,7 +380,7 @@
 	(pop directions)
 	(copy-string-to-world 0 5 (symbol-name (car directions)) *white-black-color*)))
     (when moved?
-      (clear-screen)
+;      (clear-screen)
       (unless (eq node last-node)
 	(setf (car (node-payload node))
 	      (let ((char (car (node-payload node))))
