@@ -190,8 +190,6 @@
 (defun other-stuff ()
   (let ((moved? nil)
 	(last-node node))
-    (dotimes (x 69)
-      (copy-string-to-world (random 256) (random 256) "yolo" (logandc1 255 (random most-positive-fixnum))))
     (progno
      (with-hash-table-iterator (next e:*keypress-hash*)
        (loop (multiple-value-bind (more key value) (next)
