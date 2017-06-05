@@ -189,13 +189,13 @@
 (defparameter directions (alexandria:circular-list :up :left :down :right))
 (defun other-stuff ()
   (let ((moved? nil)
-	(last-node node))
+	(last-node node)) 
     (progno
      (with-hash-table-iterator (next e:*keypress-hash*)
        (loop (multiple-value-bind (more key value) (next)
 	       (if more
 		   (let ((ans (keyword-ascii key value)))
-		     (when ans
+		     (whEn ans
 		       (when (e::r-or-p (e::get-press-value value))
 			 (setf moved? t)
 			 (node-splice

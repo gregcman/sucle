@@ -32,6 +32,9 @@
 (defparameter vsync? t)
 
 (defun render ()
+  (let ((now (get-internal-real-time)))
+    (print (/ 1.0 (/ (- now *last-time*) 1000.0)))
+    (setf *last-time* now))
   (draw-things)
 
   (window:update-display))
@@ -41,6 +44,7 @@
 
 (defparameter *window-block-width* nil)
 (defparameter *window-block-height* nil)
+(defparameter *last-time* 0)
 
 (defun update-window-block-size ()
   (setf (values *window-block-width* *window-block-height*)
