@@ -1,4 +1,4 @@
-(in-package :windxow)
+(in-package :window)
 
 (progno  (def-key-callback key-callback (window key scancode action mod-keys)
 	     (declare (ignorable scancode window))

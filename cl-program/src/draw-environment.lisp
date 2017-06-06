@@ -33,17 +33,17 @@
 
 (defun render ()
   (let ((now (get-internal-real-time)))
-    (print (/ 1.0 (/ (- now *last-time*) 1000.0)))
+    
     (setf *last-time* now))
   (draw-things)
 
   (window:update-display))
 
-(defparameter *window-width* nil)
-(defparameter *window-height* nil)
+(defparameter *window-width* 64) ;;random numbers which change
+(defparameter *window-height* 64);;
 
-(defparameter *window-block-width* nil)
-(defparameter *window-block-height* nil)
+(defparameter *window-block-width* 16)
+(defparameter *window-block-height* 16)
 (defparameter *last-time* 0)
 
 (defun update-window-block-size ()

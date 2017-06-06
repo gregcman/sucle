@@ -33,7 +33,7 @@
 				       (x1 :x1)
 				       (y0 :y0))))
      (quote (*mouse-rectangle*))
-     (quote (declare (type single-float x0 y1 x1 y0)))
+;;     (quote (declare (type single-float x0 y1 x1 y0)))
      (quote (progn
 	      (setf
 	       x0 x1
@@ -64,10 +64,7 @@
 			      rx1 x1
 			      ry1 y1))))))))
   (when (skey-j-p :escape)
-    (toggle *running*)
-    (if *running*
-	(copy-string-to-world 0 9 "do stuff now" *white-black-color*)
-	(copy-string-to-world 0 9 "drag to move" *white-black-color*)))
+    (setf e:*status* t))
   (progn *running*
       (when (zerop (mod *ticks* (floor (/ 60 60))))
 	(other-stuff))

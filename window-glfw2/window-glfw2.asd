@@ -1,9 +1,9 @@
-(asdf:defsystem #:window-glfw3
-  :description "glfw3 opengl context creation, windowing and input"
+(asdf:defsystem #:window-glfw2
+  :description "glfw2 opengl context creation, windowing and input"
   :author "Gregorio Manabat"
   :maintainer "Gregorio Manabat"
 
-  :depends-on (#:cl-glfw3
+  :depends-on (#:cl-glfw2
 	       #:funland)
 
   :serial t

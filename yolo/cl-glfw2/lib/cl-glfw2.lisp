@@ -7,7 +7,7 @@
 (progn
   (cffi:define-foreign-library libglfw
     (:darwin (:or "libglfw.dylib" (:framework "GLFW")))
-    (:unix (:or "libglfw.so" "libglfw.so.2"  #P"/usr/lib/x86_64-linux-gnu/libglfw.so.2"))
+    (:unix (:or "glfw" "libglfw.so" "libglfw.so.2"  #P"/usr/lib/x86_64-linux-gnu/libglfw.so.2"))
     (:windows (:or "glfw.dll" "libglfw.dll")) 
     (t (:default "libglfw")))
   (cffi:use-foreign-library libglfw))
@@ -193,39 +193,40 @@
 (defconstant +window+ #x00010001)
 (defconstant +fullscreen+ #x00010002)
 
-  ;; glfwGetWindowParam tokens
 
-(defconstant +opened+ #x00020001)
-(defconstant +active+ #x00020002)
-(defconstant +iconified+ #x00020003)
-(defconstant +accelerated+ #x00020004)
-(defconstant +red-bits+ #x00020005)
-(defconstant +green-bits+ #x00020006)
-(defconstant +blue-bits+ #x00020007)
-(defconstant +alpha-bits+ #x00020008)
-(defconstant +depth-bits+ #x00020009)
-(defconstant +stencil-bits+ #x0002000a)
+(defcenum (window-hint)
+   ;; glfwGetWindowParam tokens
+  (:opened 131073)
+  (:active 131074)
+  (:iconified 131075)
+  (:accelerated 131076)
+  (:red-bits 131077)
+  (:green-bits 131078)
+  (:blue-bits 131079)
+  (:alpha-bits 131080)
+  (:depth-bits 131081)
+  (:stencil-bits 131082)
 
+  
   ;; The following constants are used for both glfwGetWindowParam
-  ;; and glfwOpenWindowHint
-
-(defconstant +refresh-rate+ #x0002000b)
-(defconstant +accum-red-bits+ #x0002000c)
-(defconstant +accum-green-bits+ #x0002000d)
-(defconstant +accum-blue-bits+ #x0002000e)
-(defconstant +accum-alpha-bits+ #x0002000f)
-(defconstant +aux-buffers+ #x00020010)
-(defconstant +stereo+ #x00020011)
-(defconstant +window-no-resize+ #x00020012)
-(defconstant +fsaa-samples+ #x00020013)
-(defconstant +opengl-version-major+ #x00020014)
-(defconstant +opengl-version-minor+ #x00020015)
-(defconstant +opengl-forward-compat+ #x00020016)
-(defconstant +opengl-debug-context+ #x00020017)
-(defconstant +opengl-profile+ #x00020018)
-
-(defconstant +opengl-core-profile+ #x00050001)
-(defconstant +opengl-compat-profile+ #x00050002)
+  ;; an d glfwOpenWindowHint
+  
+  (:refresh-rate 131083)
+  (:accum-red-bits 131084)
+  (:accum-green-bits 131085)
+  (:accum-blue-bits 131086)
+  (:accum-alpha-bits 131087)
+  (:aux-buffers 131088)
+  (:stereo 131089)
+  (:window-no-resize 131090)
+  (:fsaa-samples 131091)
+  (:opengl-version-major 131092)
+  (:opengl-version-minor 131093)
+  (:opengl-forward-compat 131094)
+  (:opengl-debug-context 131095)
+  (:opengl-profile 131096)
+  (:opengl-core-profile 327681)
+  (:opengl-compat-profile 327682))
 
   ;; glfwEnable/glfwDisable tokens
 
@@ -321,86 +322,58 @@ Signals an error on failure to initialize. Wrapped in a block named glfw:with-in
 		    (opengl-profile 0 opengl-profile-p)
 		    (opengl-core-profile 0 opengl-core-profile-p)
 		    (opengl-compat-profile 0 opengl-compat-profile-p))
-  "width
-      The width of the window. If width is zero, it will be calculated as width = 4/3 height, if height is
-      not zero. If both width and height are zero, then width will be set to 640.
-height
-      The height of the window. If height is zero, it will be calculated as height = 3/4 width, if width is
-      not zero. If both width and height are zero, then height will be set to 480.
-redbits, greenbits, bluebits
-      The number of bits to use for each color component of the color buffer (0 means default color
-      depth). For instance, setting redbits=5, greenbits=6, and bluebits=5 will generate a 16-bit color
-      buffer, if possible.
-alphabits
-      The number of bits to use for the alpha buffer (0 means no alpha buffer).
-depthbits
-      The number of bits to use for the depth buffer (0 means no depth buffer).
-stencilbits
-      The number of bits to use for the stencil buffer (0 means no stencil buffer).
-mode
-      Selects which type of OpenGL window to use. mode can be either +WINDOW+, which
-      will generate a normal desktop window, or +FULLSCREEN+ which will generate a
-      window which covers the entire screen. When +FULLSCREEN+ is selected, the video
-      mode will be changed to the resolution that closest matches the width and height parameters.
 
-Return values
-If the function succeeds, t is returned.
-If the function fails, nil is returned.
-
-Description
-
-The function opens a window that best matches the parameters given to
-the function. How well the resulting window matches the desired window
-depends mostly on the available hardware and OpenGL drivers. In
-general, selecting a fullscreen mode has better chances of generating
-a close match than does a normal desktop window, since GLFW can freely
-select from all the available video modes. A desktop window is
-normally restricted to the video mode of the desktop.
-
-Notes
-
-For additional control of window properties, see glfw::OpenWindowHint.
-In fullscreen mode the mouse cursor is hidden by default, and any system screensavers are prohibited
-from starting. In windowed mode the mouse cursor is visible, and screensavers are allowed to start. To
-change the visibility of the mouse cursor, use glfwEnable or glfwDisable with the argument
-+MOUSE_CURSOR+
-In order to determine the actual properties of an opened window, use glfw::GetWindowParam and
-glfw::GetWindowSize (or glfw::SetWindowSizeCallback).
-"
-  (macrolet ((output-int-hints (&rest names)
-	       `(progn
-		  ,@(loop for name in names collect
-			 `(when ,(intern (format nil "~a-P" name) '#:cl-glfw)
-			    (open-window-hint ,(intern (format nil "+~A+" name) '#:cl-glfw)
-					      ,name)))))
-	     (output-boolean-hints (&rest names)
-	       `(progn
-		  ,@(loop for name in names collect
-			 `(when ,(intern (format nil "~a-P" name) '#:cl-glfw)
-			    (open-window-hint ,(intern (format nil "+~A+" name) '#:cl-glfw)
-					      (if ,name +true+ +false+)))))))
-    (output-int-hints refresh-rate 
-		      accum-red-bits accum-green-bits accum-blue-bits
-		      accum-alpha-bits
-		      aux-buffers
-		      fsaa-samples
-		      opengl-version-major
-		      opengl-version-minor
-		      opengl-profile
-		      opengl-core-profile
-		      opengl-compat-profile)
-    (output-boolean-hints stereo
-			  window-no-resize
-			  opengl-forward-compat
-			  opengl-debug-context))
+  (if cl-glfw::refresh-rate-p
+      (open-window-hint :refresh-rate refresh-rate))
+  (if cl-glfw::accum-red-bits-p
+      (open-window-hint :accum-red-bits accum-red-bits))
+  (if cl-glfw::accum-green-bits-p
+      (open-window-hint :accum-green-bits accum-green-bits))
+  (if cl-glfw::accum-blue-bits-p
+      (open-window-hint :accum-blue-bits accum-blue-bits))
+  (if cl-glfw::accum-alpha-bits-p
+      (open-window-hint :accum-alpha-bits accum-alpha-bits))
+  (if cl-glfw::aux-buffers-p
+      (open-window-hint :aux-buffers aux-buffers))
+  (if cl-glfw::fsaa-samples-p
+      (open-window-hint :fsaa-samples fsaa-samples))
+  (if cl-glfw::opengl-version-major-p
+      (open-window-hint :opengl-version-major opengl-version-major))
+  (if cl-glfw::opengl-version-minor-p
+      (open-window-hint :opengl-version-minor opengl-version-minor))
+  (if cl-glfw::opengl-profile-p
+      (open-window-hint :opengl-profile opengl-profile))
+  (if cl-glfw::opengl-core-profile-p
+      (open-window-hint :opengl-core-profile opengl-core-profile))
+  (if cl-glfw::opengl-compat-profile-p
+      (open-window-hint :opengl-compat-profile
+			opengl-compat-profile))
+  (if cl-glfw::stereo-p
+      (open-window-hint :stereo
+			(if stereo
+			    +true+
+			    +false+)))
+  (if cl-glfw::window-no-resize-p
+      (open-window-hint :window-no-resize
+			(if window-no-resize
+			    +true+
+			    +false+)))
+  (if cl-glfw::opengl-forward-compat-p
+      (open-window-hint :opengl-forward-compat
+			(if opengl-forward-compat
+			    +true+
+			    +false+)))
+  (if cl-glfw::opengl-debug-context-p
+      (open-window-hint :opengl-debug-context
+			(if opengl-debug-context
+			    +true+
+			    +false+)))
   (if (%open-window width height redbits greenbits bluebits alphabits depthbits stencilbits mode)
       (when title (set-window-title title))
       (error "Error initializing glfw window.")))
 
- 
-
 (defcfun ("glfwOpenWindowHint" open-window-hint) :void
-  (target :int)
+  (target window-hint)
   (hint :int))
 
 (defcfun ("glfwCloseWindow" close-window) :void)
@@ -416,7 +389,7 @@ Wrapped in a block named glfw:with-open-window."
      (open-window ,@open-window-keys)
      (unwind-protect
 	  (block with-open-window ,@forms)
-       (when (= +true+ (glfw:get-window-param glfw:+opened+))
+       (when (= +true+ (glfw:get-window-param :opened))
 	 (close-window)))))
 
 (defmacro with-init-window ((&rest open-window-keys)
@@ -440,7 +413,7 @@ If the window is closed, the loop is also exited."
 	  (progn
 	    ,@forms
 	    (glfw:swap-buffers)
-	    (unless (= +true+ (glfw:get-window-param glfw:+opened+))	
+	    (unless (= +true+ (glfw:get-window-param :opened))	
 	      (return-from do-open-window))))))
 
 (defmacro do-window ((&rest open-window-keys)
@@ -453,65 +426,6 @@ The loop is in a block named do-window [so can be exited by a call to (return-fr
 If the window is closed, the loop is also exited."
   `(with-init 
      (do-open-window (,@open-window-keys) (,@setup-forms) ,@forms)))
-
-(defmacro define-callback-setter (c-name callback-prefix return-type (&body args) &key before-form after-form documentation)
-  (let* ((callback-name (intern (format nil "~A-CALLBACK" callback-prefix)))
-         (special-name (intern (format nil "*~S*" callback-name)))
-         (setter-name (intern (format nil "SET-~S" callback-name)))
-         (internal-setter-name (intern (format nil "%~S" setter-name))))
-    `(progn
-       (defparameter ,special-name nil)
-       (cffi:defcallback ,callback-name ,return-type ,args
-         (when ,special-name
-           (prog2
-               ,before-form
-               (funcall ,special-name ,@(mapcar #'car args))
-             ,after-form)))
-       (cffi:defcfun (,c-name ,internal-setter-name) :void (cbfun :pointer))
-       (defun ,setter-name (callback)
-         ,(format nil "GENERAL CL-GLFW CALLBACK NOTES
-
-All callback setting functions can take either a pointer to a C function,
-a function object, a function symbol, or nil to clear the callback function.
-
-THIS CALLBACK FUNCTION
-
-~a" documentation)
-         (cl:cond
-           ((null callback)
-            (,internal-setter-name (cffi:null-pointer)))
-           ((symbolp callback)
-            (setf ,special-name callback)
-            (,internal-setter-name (cffi:callback ,callback-name)))
-           ((functionp callback)
-            (setf ,special-name callback)
-            (,internal-setter-name (cffi:callback ,callback-name)))
-           ((cffi:pointerp callback)
-            (,internal-setter-name callback))
-           (t (error "Not an acceptable callback. Must be foreign pointer, function object, function's symbol, or nil.")))))))
-
-
-(define-callback-setter "glfwSetWindowCloseCallback" #:window-close :int ()
-                        :documentation
-                        "
-Function that will be called when a user requests that the window should be
-closed, typically by clicking the window close icon (e.g. the cross in the upper right corner of a
-window under Microsoft Windows). The function should have the following type:
-(function () integer)
-
-The return value of the callback function indicates whether or not the window close action should continue. If the function returns
-gl:+true+, the window will be closed. If the function returns gl:+false+, the window will not
-be closed. If you give a CFFI callback returning glfw:boolean, you can use t and nil as return types.
-
-Notes
-Window close events are recorded continuously, but only reported when glfwPollEvents,
-glfwWaitEvents or glfwSwapBuffers is called.
-The OpenGL context is still valid when this function is called.
-Note that the window close callback function is not called when glfwCloseWindow is called, but only
-when the close request comes from the window manager.
-Do not call glfwCloseWindow from a window close callback function. Close the window by returning
-gl:+true+ from the function.
-")
 
 
 (defcfun ("glfwSetWindowTitle" set-window-title) :void
@@ -526,54 +440,19 @@ gl:+true+ from the function.
   (width :pointer)
   (height :pointer))
 (defun get-window-size ()
-  "The function is used for determining the size of an opened window. The returned values are dimensions
-of the client area of the window (i.e. excluding any window borders and decorations).
-(list width height)"
   (cffi:with-foreign-objects ((width :int)
 			      (height :int))
     (%get-window-size width height)
-    (list (mem-ref width :int)
-	  (mem-ref height :int))))
-
-(define-callback-setter "glfwSetWindowSizeCallback" #:window-size :void ((width :int) (height :int))
-                        :documentation
-                        "
-Function that will be called every time the window size changes. The
-function should takes the arguments (width height) giving the new width and height of the window client area.
-
-A window has to be opened for this function to have any effect.
-Notes
-Window size changes are recorded continuously, but only reported when glfwPollEvents,
-glfwWaitEvents or glfwSwapBuffers is called. ")
+    (values (mem-ref width :int)
+	    (mem-ref height :int))))
 
 (defcfun ("glfwIconifyWindow" iconify-window) :void)
 (defcfun ("glfwRestoreWindow" restore-window) :void)
 (defcfun ("glfwGetWindowParam" get-window-param) :int
-  (param :int))
+  (param window-hint))
 (defcfun ("glfwSwapBuffers" swap-buffers) :void)
 (defcfun ("glfwSwapInterval" swap-interval) :void
   (interval :int))
-
-
-(define-callback-setter "glfwSetWindowRefreshCallback" #:window-refresh :void ()
-                        :documentation
-                        "
-Function that will be called when the window client area needs to be
-refreshed. The function takes no arguments and returns nothing (void).
-
-Description
-
-The function selects which function to be called upon a window refresh
-event, which occurs when any part of the window client area has been
-damaged, and needs to be repainted (for instance, if a part of the
-window that was previously occluded by another window has become
-visible).  A window has to be opened for this function to have any
-effect.
-
-Notes
-Window refresh events are recorded continuously, but only reported when glfwPollEvents,
-glfwWaitEvents or glfwSwapBuffers is called.
-")
 
 (defcstruct vidmode
   (width :int)
@@ -587,22 +466,6 @@ glfwWaitEvents or glfwSwapBuffers is called.
   (maxcount :int))
 
 (defun get-video-modes (maxcount)
-  "Parameters
-maxcount
-      Maximum number of video modes that list vector can hold.
-
-Return values
-The function returns the number of detected video modes (this number will never exceed maxcount).
-The list vector is filled out with the video modes that are supported by the system.
-
-Description
-The function returns a list of supported video modes. Each video mode is represented by a
-list of the form:
-(width height redbits greenbits bluebits)
-
-Notes
-The returned list is sorted, first by color depth (RedBits + GreenBits + BlueBits), and then by
-resolution (Width * Height), with the lowest resolution, fewest bits per pixel mode first. "
   (declare (optimize (debug 3)))
   (with-foreign-object (list 'vidmode maxcount)
     (let ((count (%get-video-modes list maxcount)))
@@ -618,22 +481,6 @@ resolution (Width * Height), with the lowest resolution, fewest bits per pixel m
 (defcfun ("glfwGetDesktopMode" %get-desktop-mode) :void
   (mode :pointer))
 (defun get-desktop-mode ()
-  "Parameters
-mode
-       Pointer to a GLFWvidmode structure, which will be filled out by the function.
-Return values
-The GLFWvidmode structure pointed to by mode is filled out with the desktop video mode.
-Description
-The function returns the desktop video mode in a GLFWvidmode structure. See glfwGetVideoModes
-for a definition of the GLFWvidmode structure.
-Notes
-The color depth of the desktop display is always reported as the number of bits for each individual color
-component (red, green and blue), even if the desktop is not using an RGB or RGBA color format. For
-instance, an indexed 256 color display may report RedBits = 3, GreenBits = 3 and BlueBits = 2, which
-adds up to 8 bits in total.
-The desktop video mode is the video mode used by the desktop, not the current video mode (which may
-differ from the desktop video mode if the GLFW window is a fullscreen window).
-"
   (with-foreign-object (mode 'vidmode)
     (%get-desktop-mode mode)
     (list (foreign-slot-value mode 'vidmode 'width)
@@ -658,117 +505,14 @@ differ from the desktop video mode if the GLFW window is a fullscreen window).
 (defun get-mouse-pos ()
   (with-foreign-objects ((xpos :int) (ypos :int))
     (%get-mouse-pos xpos ypos)
-    (list (mem-ref xpos :int)
-	  (mem-ref ypos :int))))
+    (values (mem-ref xpos :int)
+	    (mem-ref ypos :int))))
 (defcfun ("glfwSetMousePos" set-mouse-pos) :void
   (xpos :int)
   (ypos :int))
 (defcfun ("glfwGetMouseWheel" get-mouse-wheel) :int)
 (defcfun ("glfwSetMouseWheel" set-mouse-wheel) :void
   (pos :int))
-
-
-(define-callback-setter "glfwSetKeyCallback" #:key :void ((key :int) (action :int))
-                        :before-form (setf key (lispify-key key))
-                        :documentation
-                        "
-Function that will be called every time a key is pressed or released.
-Function should take the arguments (key action), where key is either a character,
-if the key pressed was a member of iso-8859-1, or a keyword representing the key pressed if not.
-See the GLFW manual, table 3.3 for special key identifiers. Action is either glfw:+press+ or
-glfw:+release+. Use set-char-callback instead if you want to read just characters.
-
-Description
-The function selects which function to be called upon a keyboard key event. The callback function is
-called every time the state of a single key is changed (from released to pressed or vice versa). The
-reported keys are unaffected by any modifiers (such as shift or alt).
-A window has to be opened for this function to have any effect.
-
-Notes
-Keyboard events are recorded continuously, but only reported when glfw::PollEvents, glfw::WaitEvents
-or glfw::SwapBuffers is called.
-")
-(define-callback-setter "glfwSetCharCallback" #:char :void ((character :int) (action :int))
-                        :before-form (setf character (code-char character))
-                        :documentation
-                        "
-Function that will be called every time a printable character is generated by
-the keyboard. The function should take the arguments (character action)
-where character is a lisp character and action is either glfw:+press+ or glfw:+release+.
-
-NB this makes the presumption that your lisp implementation will use Unicode for code-char.
-
-Description
-The function selects which function to be called upon a keyboard character event. The callback function
-is called every time a key that results in a printable Unicode character is pressed or released. Characters
-are affected by modifiers (such as shift or alt).
-A window has to be opened for this function to have any effect.
-
-Notes
-Character events are recorded continuously, but only reported when glfw::PollEvents, glfw::WaitEvents
-or glfw::SwapBuffers is called.
-Control characters, such as tab and carriage return, are not reported to the character callback function,
-since they are not part of the Unicode character set. Use the key callback function for such events (see
-glfw::SetKeyCallback).
-The Unicode character set supports character codes above 255, so never cast a Unicode character to an
-eight bit data type (e.g. the C language char type) without first checking that the character code is less
-than 256. Also note that Unicode character codes 0 to 255 are equal to ISO 8859-1 (Latin 1).
-")
-
-(define-callback-setter "glfwSetMouseButtonCallback" #:mouse-button :void ((button mouse) (action :int))
-                        :before-form (setf button (lispify-mouse-button button))
-                        :documentation
-                        "
-Function that will be called every time a mouse button is pressed or released.
-The function takes the arguments (button action), where button is a keyword symbol as returned by
-lispify-mouse-button and action is either glfw:+press+ or glfw:+release+.
-
-Description
-The function selects which function to be called upon a mouse button event.
-A window has to be opened for this function to have any effect.
-
-Notes
-Mouse button events are recorded continuously, but only reported when glfw::PollEvents,
-glfw::WaitEvents or glfw::SwapBuffers is called.
-+MOUSE_BUTTON_LEFT+ is equal to +MOUSE_BUTTON_1+
-+MOUSE_BUTTON_RIGHT+ is equal to +MOUSE_BUTTON_2+
-+MOUSE_BUTTON_MIDDLE+ is equal to +MOUSE_BUTTON_3+
-")
-(define-callback-setter "glfwSetMousePosCallback" #:mouse-pos :void ((x :int) (y :int))
-                        :documentation
-                        "
-Function that will be called every time the mouse is moved.
-The function takes the arguments (x y), where x and y are the current position of the mouse.
-
-Description
-The function selects which function to be called upon a mouse motion event.
-A window has to be opened for this function to have any effect.
-
-Notes
-Mouse motion events are recorded continuously, but only reported when glfw::PollEvents,
-glfw::WaitEvents or glfw::SwapBuffers is called.
-")
-
-(defparameter *mouse-wheel-cumulative* nil)
-(define-callback-setter "glfwSetMouseWheelCallback" #:mouse-wheel :void ((pos :int))
-                        :after-form (unless *mouse-wheel-cumulative* (glfw:set-mouse-wheel 0))
-                        :documentation
-                        "
-Function that will be called every time the mouse wheel is moved.
-The function takes one argument: the position of the mouse wheel.
-This DIFFERS FROM GLFW's DEFAULT behaviour in that the position is
-reset after every call to this function, effectively giving the delta.
-As most programs are only interested in the delta anyway, this is thought
-to save others recording the state of it again.
-If you wish to have the original GLFW behaviour, set cl-glfw:*mouse-wheel-cumulative* to t.
-
-Description
-The function selects which function to be called upon a mouse wheel event.
-A window has to be opened for this function to have any effect.
-Notes
-Mouse wheel events are recorded continuously, but only reported when glfw::PollEvents,
-glfw::WaitEvents or glfw::SwapBuffers is called.
-")
 
 (defcfun ("glfwGetJoystickParam" get-joystick-param) :int
   (joy joystick)
@@ -780,31 +524,6 @@ glfw::WaitEvents or glfw::SwapBuffers is called.
   (numaxes :int))
 
 (defun get-joystick-pos (joy numaxes)
-  "Parameters
-joy
-       A joystick identifier, which should be +JOYSTICK_n+ where n is in the range 1 to 16.
-numaxes
-       Specifies how many axes should be returned.
-Return values
-       An list that will hold the positional values for all requested axes.
-If the joystick is not supported or connected, the function will
-return nil.
-
-Description
-The function queries the current position of one or more axes of a joystick. The positional values are
-returned in an array, where the first element represents the first axis of the joystick (normally the X
-axis). Each position is in the range -1.0 to 1.0. Where applicable, the positive direction of an axis is
-right, forward or up, and the negative direction is left, back or down.
-If numaxes exceeds the number of axes supported by the joystick, or if the joystick is not available, the
-unused elements in the pos array will be set to 0.0 (zero).
-
-Notes
-The joystick state is updated every time the function is called, so there is no need to call glfw::PollEvents
-or glfw::WaitEvents for joystick state to be updated.
-Use glfw::GetJoystickParam to retrieve joystick capabilities, such as joystick availability and number of
-supported axes.
-No window has to be opened for joystick input to be valid.
-"
   (with-foreign-object (pos :float numaxes)
     (let ((numaxes (%get-joystick-pos joy pos numaxes)))
       (loop for i below numaxes collecting (mem-aref pos :float i)))))
@@ -815,31 +534,6 @@ No window has to be opened for joystick input to be valid.
   (buttons :pointer)
   (numbuttons :int))
 (defun get-joystick-buttons (joy numbuttons)
-  "Parameters
-joy
-       A joystick identifier, which should be +JOYSTICK_n+ where n is in the range 1 to 16.
-numbuttons
-       Specifies how many buttons should be returned.
-Return values
-       A list that will hold the button states for all requested buttons.
-The function returns the number of actually returned buttons. This is the minimum of numbuttons and
-the number of buttons supported by the joystick. If the joystick is not supported or connected, the
-function will return 0 (zero).
-
-Description
-The function queries the current state of one or more buttons of a joystick. The button states are
-returned in an array, where the first element represents the first button of the joystick. Each state can be
-either +PRESS+ or +RELEASE+
-If numbuttons exceeds the number of buttons supported by the joystick, or if the joystick is not
-available, the unused elements in the buttons array will be set to +RELEASE+
-
-Notes
-The joystick state is updated every time the function is called, so there is no need to call glfw::PollEvents
-or glfw::WaitEvents for joystick state to be updated.
-Use glfw::GetJoystickParam to retrieve joystick capabilities, such as joystick availability and number of
-supported buttons.
-No window has to be opened for joystick input to be valid.
-"
   (with-foreign-object (buttons :unsigned-char numbuttons)
     (let ((numbuttons (%get-joystick-buttons joy buttons numbuttons)))
       (loop for i below numbuttons collecting (mem-aref buttons :unsigned-char i)))))
@@ -919,16 +613,6 @@ No window has to be opened for joystick input to be valid.
   (mutex mutex))
 
 (defmacro with-lock-mutex (mutex &body forms)
-  "Parameters
-mutex
-      A mutex object handle.
-forms
-      Body of code to execute
-Description
-This macro will acquire a lock on the selected mutex object using glfw::LockMutex and release it afterwards
-using glfw::UnlockMutex.
-So, forms will not execute until an exclusive lock is held.
-The lock is then released when the stack is unwound."
   (let ((smutex (gensym "MUTEX-")))
     `(let ((,smutex ,mutex))
        (glfw:lock-mutex ,smutex)

@@ -3,4 +3,5 @@
   :components ((:module lib :serial t 
                         :components ((:file "types")
 				     (:file "package")
-                                     (:file "cl-glfw2")))))
+                                     (:file "cl-glfw2")
+				     (:file "callbacks")))))

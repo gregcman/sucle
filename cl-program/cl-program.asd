@@ -6,7 +6,7 @@
 		 #:alexandria
 		 #:opticl
 		 
-		 #:window-glfw3
+		 #:window-glfw2
 		 #:cl-conspack
 		 
 		 #:funland

@@ -10,20 +10,19 @@
 (defparameter *height* nil)
 
 (progn
-  (defmacro def-key-callback (name (window key scancode action mod-keys) &body body)
-    `(%glfw:define-glfw-callback ,name
-	 ((,window :pointer) (,key %glfw::key) (,scancode :int)
-	  (,action :int) (,mod-keys :unsigned-int))
+  (defmacro def-key-callback (name (key action) &body body)
+    `(cffi:defcallback ,name :void
+	 ((,key glfw::key) (,action :int))
        ,@body))
 
-  (defmacro def-mouse-button-callback (name (window button action mod-keys) &body body)
-    `(%glfw:define-glfw-callback ,name
-	 ((,window :pointer) (,button %glfw::mouse)
-	  (,action :int) (,mod-keys :unsigned-int))
+  (defmacro def-mouse-button-callback (name (button action) &body body)
+    `(cffi:defcallback ,name :void
+	 ((,button glfw::mouse)
+	  (,action :int) )
        ,@body))
-  (defmacro def-char-callback (name (window char) &body body)
-    `(%glfw:define-glfw-callback ,name
-	 ((,window :pointer) (,char :unsigned-int))
+  (defmacro def-char-callback (name (char) &body body)
+    `(cffi:defcallback ,name :void
+	 ((,char :unsigned-int))
        ,@body)))
 
 (defconstant +false+ 0)
@@ -32,11 +31,11 @@
 (defconstant +press+ 3)
 (defconstant +repeat+ 4)
 
-(defparameter *action-map* (vector 1 3 4))
-
 (defconstant +mod-key-shift+ 3)
 (defconstant +key-state-mask+ #b111)
 (defconstant +mod-state-mask+ #b1111000)
+
+(defparameter *action-map* (vector 1 3 4))
 
 (defun step-hash (hash)
   (with-hash-table-iterator (next hash)
@@ -116,28 +115,22 @@
 ;;;glfw callbacks which will update the hashes to contain nil t
 ;;;+press+ or +release+ per key [each key is a symbol]
 
-(def-key-callback key-callback (window key scancode action mod-keys)
+(def-key-callback key-callback (key action)
   (let ((vec *keys*))
     (flet ((add (x)
 	     (vector-push-extend x vec)))
-      (add window)
       (add key)
-      (add scancode)
-      (add action)
-      (add mod-keys))))
-(def-mouse-button-callback mouse-callback (window button action mod-keys)
+      (add action))))
+(def-mouse-button-callback mouse-callback (button action)
   (let ((vec *buttons*))
     (flet ((add (x)
 	     (vector-push-extend x vec)))
-      (add window)
       (add button)
-      (add action)
-      (add mod-keys))))
-(def-char-callback char-callback (window char)
+      (add action))))
+(def-char-callback char-callback (char)
   (let ((vec *zchars*))
     (flet ((add (x)
 	     (vector-push-extend x vec)))
-      (add window)
       (add char))))
 
 (defun make-fill-vector ()
@@ -150,21 +143,24 @@
 (defparameter *chars* (make-fill-vector))
 (defparameter *zchars* (make-fill-vector))
 
-(glfw:def-scroll-callback scroll-callback (window x y)
-  (declare (ignore window))
-  (setf *scroll-x* (coerce x 'single-float)
-	*scroll-y* (coerce y 'single-float)))
+(glfw:def-mouse-wheel-callback scroll-callback (y)
+  (setf *scroll-y* (coerce y 'single-float)))
 (defparameter *status* nil)
-(glfw:def-window-size-callback update-viewport (window w h)
-  (declare (ignorable window))
+(glfw:def-window-size-callback update-viewport (w h)
   (setf *width* w *height* h)
   (funcall *resize-hook* w h))
+(glfw:def-window-close-callback close ()
+  (setf *should-close-p* t)
+  (setf *status* t)
+  glfw:+false+)
 
 (defparameter *resize-hook* (constantly nil))
 
 (defun init ()
+  (setf *mouse-locked* :normal)
   (setf *scroll-x* 0.0
 	*scroll-y* 0.0)
+  (setf *should-close-p* nil)
   (if *keypress-hash*
       (clrhash *keypress-hash*)
       (setf *keypress-hash* (make-hash-table :test 'eq)))
@@ -174,10 +170,12 @@
   (setq *status* nil)
   #+sbcl (sb-int:set-floating-point-modes :traps nil))
 
+(defparameter *should-close-p* nil)
+
 (defun poll ()
   (setf *scroll-x* 0.0
 	*scroll-y* 0.0)
-  (setq *status* (glfw:window-should-close-p))
+
   (step-hash *keypress-hash*)
   (step-hash *mousepress-hash*)
   (setf (fill-pointer *zchars*) 0
@@ -185,27 +183,25 @@
 	(fill-pointer *keys*) 0)
   (setf (fill-pointer *chars*) 0)
   (glfw:poll-events)
+  (setq *status* *should-close-p*)
   (let ((charsize (fill-pointer *zchars*)))
-    (dobox ((offset 0 charsize :inc 2))
-	   (etouq (with-vec-params '((offset nil char)) '(*zchars*)
-					;    (declare (ignorable window))
+    (dobox ((offset 0 charsize :inc 1))
+	   (etouq (with-vec-params '((offset char)) '(*zchars*)
 		    '(if (< char char-code-limit)
 		      (vector-push-extend (code-char char) *chars*))))))
   (let ((buttonsize (fill-pointer *buttons*)))
-    (dobox ((offset 0 buttonsize :inc 4))     
-	   (etouq (with-vec-params '((offset nil button action mod-keys)) '(*buttons*)
-					;    (declare (ignorable window))
-		    '(let* ((mod-shift (ash mod-keys +mod-key-shift+))
-			    (new-composite (logior mod-shift (aref *action-map* action))))
-		      (declare (type fixnum mod-shift  new-composite))
+    (dobox ((offset 0 buttonsize :inc 2))     
+	   (etouq (with-vec-params '((offset button action)) '(*buttons*)
+		    '(let* (
+			    (new-composite (aref *action-map* action)))
+		      (declare (type fixnum  new-composite))
 		      (setf (mice button) new-composite))))))
   (let ((keysize (fill-pointer *keys*)))
-    (dobox ((offset 0 keysize :inc 5))
-	   (etouq (with-vec-params '((offset nil key nil action mod-keys)) '(*keys*)
-					;  (declare (ignorable window scancode))
-		    '(let* ((mod-shift (ash mod-keys +mod-key-shift+))
-			    (new-composite (logior mod-shift (aref *action-map* action))))
-		      (declare (type fixnum mod-shift new-composite))
+    (dobox ((offset 0 keysize :inc 2))
+	   (etouq (with-vec-params '((offset key action)) '(*keys*)
+		    '(let* (
+			    (new-composite (aref *action-map* action)))
+		      (declare (type fixnum new-composite))
 		      (setf (key key) new-composite)))))))
 
 
@@ -217,27 +213,35 @@
 (defun wrapper (func)
   (glfw:with-init
     (window:init)
-    (glfw:with-window (:title "" :width 1 :height 1 :resizable nil)
+    (glfw:with-open-window (:title "" :width 1 :height 1)
+      (glfw:disable :auto-poll-events)
       (glfw:set-mouse-button-callback 'mouse-callback)
       (glfw:set-key-callback 'key-callback)
-      (glfw:set-scroll-callback 'scroll-callback)
+      (glfw:set-mouse-wheel-callback 'scroll-callback)
       (glfw:set-window-size-callback 'update-viewport)
       (glfw:set-char-callback 'char-callback)
+      (glfw:set-window-close-callback 'close)
       (funcall func))))
 
 (defun get-mouse-out ()
-  (glfw:set-input-mode :cursor :normal))
+  (glfw:enable :mouse-cursor))
+
+(defparameter *mouse-locked* :normal)
 
 (defun toggle-mouse-capture ()
   (if (mice-locked-p)
-      (glfw:set-input-mode :cursor :normal)
-      (glfw:set-input-mode :cursor :disabled)))
+      (progn
+	(setf *mouse-locked* :disabled)
+	(glfw:disable :mouse-cursor))
+      (progn
+	(setf *mouse-locked* :normal)
+	(glfw:enable :mouse-cursor))))
 
 (defun mice-locked-p ()
-  (eq :disabled (glfw:get-input-mode :cursor)))
+  (eq :disabled *mouse-locked*))
 
 (defun mice-free-p ()
-  (eq :normal (glfw:get-input-mode :cursor)))
+  (eq :normal *mouse-locked*))
 
 (defun push-dimensions (width height)
   (setf *width* width
@@ -255,9 +259,5 @@
       (glfw:swap-interval 1) ;;1 is on
       (glfw:swap-interval 0))) ;;0 is off
 
-(defun get-mouse-position (&optional (window glfw:*window*))
-  (cffi:with-foreign-objects ((x :int) (y :int))
-    (cffi:foreign-funcall "glfwGetCursorPos"
-			  %glfw::window window :pointer x :pointer y :void)
-    (values (coerce (cffi:mem-ref x :double) 'single-float)
-	    (coerce (cffi:mem-ref y :double) 'single-float))))
+(defun get-mouse-position ()
+  (glfw:get-mouse-pos))

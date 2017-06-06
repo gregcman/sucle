@@ -18,7 +18,7 @@
   (window:poll)
   (physics)
   (render)
-  (unless window:*status* 
+  (unless window:*status*
     (injection)))
 
 (defun main ()
