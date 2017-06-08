@@ -187,28 +187,3 @@
 
 (defun make-eq-hash ()
   (make-hash-table :test (quote eq)))
-
-(progn
-  (defun floor-chunk (x y)
-    (* y (floor x y)))
-
-  (defun acolor (&rest values)
-    (setf values (nreverse values))
-    (let ((acc 0))
-      (dolist (value values)
-	(setf acc (ash (logior acc value) 8)))
-      (logand acc most-positive-fixnum)))
-
-  (progn
-    (declaim (inline byte-color)
-	     (ftype (function (fixnum) single-float)
-		    byte-color))
-    (with-unsafe-speed
-      (defun byte-color (x)
-	(/ (float x) 255.0))))
-
-  (defun strip-char (color)
-    (logandc1 255 color))
-
-  (defparameter *white-black-color* (acolor 255 255 255 0 0 0))
-  (defparameter *color-nil* (logandc1 255 (sxhash nil))))

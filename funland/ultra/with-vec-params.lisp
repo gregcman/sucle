@@ -1,21 +1,33 @@
 (in-package :fuktard)
-(export (quote with-vec-params))
+(export (quote (with-vec-params with-vec-params2)))
 (defun with-vec-params (&rest args)
   (destructuring-bind ((&rest bufvars)
-		       (buf &optional (binder 'let)) &body body) args 
-    (multiple-value-bind (letargsoffset letargs decl)
-	(%2aux-with-vec-params bufvars)
+		       (buf &optional (binder 'let)) &body body) args
+    (let ((param-data (with-vec-params2 bufvars)))
+      (let ((last (cdr (assoc :last param-data)))
+	    (letargs (cdr (assoc :letargs param-data))))
+	(let ((new-let-args (mapcar
+			     (lambda (x)
+			       `(,(pop x) (aref ,buf ,(pop x))))
+			     letargs)))
+	  (let ((new-last
+		 `(,binder ,new-let-args ,@body)))
+	    (setf (cdr last) (list new-last)))))
+      (cdr (assoc :head param-data)))))
 
-      (setf letargs (mapcar (lambda (x)
-			      `(,(pop x) (aref ,buf ,(pop x))))
-			    letargs))
-      (let ((fin `(,binder ,letargs 
-			   ,@body)))
-	(if letargsoffset
-	    `(let* ,letargsoffset
-	       (declare (type fixnum ,@decl))
-	       ,fin)
-	    fin)))))
+(defun with-vec-params2 (bufvars)
+  (multiple-value-bind (letargsoffset letargs decl)
+      (%2aux-with-vec-params bufvars)
+
+    (let ((fin `(let* ,letargsoffset
+		  (declare (type fixnum ,@decl)))))
+      (let ((last (last fin)))
+	(pairlis (quote (:head
+			 :last
+			 :letargs))
+		 (list fin
+		       last
+		       letargs))))))
 
 (defun %2aux-with-vec-params (bufvars)
   (let ((letargs nil)

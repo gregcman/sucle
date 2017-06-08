@@ -96,8 +96,10 @@
 				(array &optional (array-type '(or null simple-vector)))
 				(index &optional (index-type 'fixnum)))
 					 iterator &body body)
-  `(with-let-mapped-places ((,array (p-array ,iterator) ,array-type)
-			    (,index (p-index ,iterator) ,index-type))
+  `(with-let-mapped-places ((,array (p-array ,iterator))
+			    (,index (p-index ,iterator)))
+     (declare (type ,array-type ,array)
+	      (type ,index-type ,index))
      (flet ((,next ()
 	      (backwards-array-iterator3
 	       ,index ,array

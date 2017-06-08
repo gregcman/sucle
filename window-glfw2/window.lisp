@@ -3,8 +3,8 @@
 (defparameter *keypress-hash* nil)
 (defparameter *mousepress-hash* nil)
 
-(defparameter *scroll-x* nil)
-(defparameter *scroll-y* nil)
+(defparameter *scroll-x* 0)
+(defparameter *scroll-y* 0)
 
 (defparameter *width* nil)
 (defparameter *height* nil)
@@ -143,8 +143,11 @@
 (defparameter *chars* (make-fill-vector))
 (defparameter *zchars* (make-fill-vector))
 
+(defparameter *last-y-scroll* 0)
+
 (glfw:def-mouse-wheel-callback scroll-callback (y)
-  (setf *scroll-y* (coerce y 'single-float)))
+  (setf *scroll-y* (- y *last-y-scroll*))
+  (setf *last-y-scroll* y))
 (defparameter *status* nil)
 (glfw:def-window-size-callback update-viewport (w h)
   (setf *width* w *height* h)
@@ -157,9 +160,10 @@
 (defparameter *resize-hook* (constantly nil))
 
 (defun init ()
+  (setf *last-y-scroll* 0)
   (setf *mouse-locked* :normal)
-  (setf *scroll-x* 0.0
-	*scroll-y* 0.0)
+  (setf *scroll-x* 0
+	*scroll-y* 0)
   (setf *should-close-p* nil)
   (if *keypress-hash*
       (clrhash *keypress-hash*)
@@ -173,9 +177,7 @@
 (defparameter *should-close-p* nil)
 
 (defun poll ()
-  (setf *scroll-x* 0.0
-	*scroll-y* 0.0)
-
+  (setf *scroll-y* 0)
   (step-hash *keypress-hash*)
   (step-hash *mousepress-hash*)
   (setf (fill-pointer *zchars*) 0

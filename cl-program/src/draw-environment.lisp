@@ -1,34 +1,26 @@
 (in-package :sandbox)
 
-
-(defconstant +single-float-just-less-than-one+ 0.99999997)
-
-(defparameter *16x16-tilemap* (regular-enumeration 16 16))
-
-(defparameter +byte-fraction-lookup+
-  (let ((array (make-array 256 :element-type 'single-float)))
-    (dotimes (x 256)
-      (setf (aref array x) (/ (float x) 255.0)))
-    array))
-
-(progn
-  (defparameter *block-height* (/ (* 2 (if t 16.0 11.0)) 1.0))
-  (defparameter *block-width* (/ (* 2 (if t 9.0 6.0)) 1.0)))
-
 (defparameter *attrib-buffers* (fill-with-flhats (make-attrib-buffer-data)))
 (defparameter *attrib-buffer-iterators*
   (make-iterators *attrib-buffers* (make-attrib-buffer-data)))
 (defparameter *attrib-buffer-fill-pointer*
   (tally-buffer *attrib-buffer-iterators* (make-attrib-buffer-data)))
 
-(defparameter *backup* (make-eq-hash))
-(defparameter *stuff* (make-eq-hash))
-(defparameter *other-stuff* (make-eq-hash))
-
 (defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
 					   (:texture-mag-filter . :nearest)
 					   (:texture-wrap-s . :repeat)
 					   (:texture-wrap-t . :repeat))))
+
+(defparameter *16x16-tilemap* (regular-enumeration 16 16))
+
+(progn
+  (defparameter *block-height* (/ (* 2 (if t 16.0 11.0)) 1.0))
+  (defparameter *block-width* (/ (* 2 (if t 9.0 6.0)) 1.0)))
+
+(defparameter *backup* (make-eq-hash))
+(defparameter *stuff* (make-eq-hash))
+(defparameter *other-stuff* (make-eq-hash))
+
 (defparameter vsync? t)
 
 (defun render ()
@@ -49,10 +41,10 @@
 (defun update-window-block-size ()
   (setf (values *window-block-width* *window-block-height*)
 	(values
-	 (floor (/ e:*width* *block-width* 0.5))
-	 (floor (/ e:*height* *block-height* 0.5)))))
+	 (ceiling (/ e:*width* *block-width* 0.5))
+	 (ceiling (/ e:*height* *block-height* 0.5)))))
 
-(defun draw-things () 
+(defun draw-things ()
   (progn
     (let* ((solidshader (get-stuff :other-text-shader *stuff* *backup*))
 	   (solidshader-uniforms (glget solidshader :program))
@@ -100,9 +92,6 @@
   (setf e:*resize-hook* #'on-resize)
 
   (progn
-    (gl:clear-color 0.0
-		    (aref +byte-fraction-lookup+ 8)
-		    (aref +byte-fraction-lookup+ 16) 0f0)
     (gl:disable :depth-test :blend)
     (gl:depth-mask :false)
     (gl:depth-func :always)
@@ -119,6 +108,8 @@
       (namexpr backup :text-frag
 	       (lambda () (file-string (shader-path "ftex2f-bg4f-fg4f.frag"))))
 
+      (namexpr backup :text-indirect
+	       (lambda () (file-string (shader-path "text69.vs"))))
       (namexpr backup :other-text-shader
 	       (lambda ()
 		 (let ((program
@@ -144,15 +135,14 @@
 			 (%gl:uniform-4fv (getuniform solidshader-uniforms :texcoord)
 					  256
 					  (get-stuff :glsl-code-lookup *other-stuff* *backup*))
-			 (%gl:uniform-4fv (getuniform solidshader-uniforms :fgcolor)
-					  256
-					  (get-stuff :terminal256color-lookup *other-stuff* *backup*))
-			 (%gl:uniform-4fv (getuniform solidshader-uniforms :bgcolor)
-					  256
-					  (get-stuff :terminal256color-lookup *other-stuff* *backup*)))))
-		   program)))
-      (namexpr backup :text-indirect
-	       (lambda () (file-string (shader-path "text69.vs")))))
+			 (let ((color-lookup (get-stuff :terminal256color-lookup *other-stuff* *backup*)))
+			   (%gl:uniform-4fv (getuniform solidshader-uniforms :fgcolor)
+					    256
+					    color-lookup)
+			   (%gl:uniform-4fv (getuniform solidshader-uniforms :bgcolor)
+					    256
+					    color-lookup)))))
+		   program))))
     
     (progn
       (namexpr backup :font-image
@@ -216,8 +206,8 @@
       (namexpr backup :fast-text-display-list
 	       (lambda ()
 		 (draw-fast-text-display-list
-		  *window-block-width*
-		  *window-block-height*))))))
+		  (/ *window-width* *block-width* 0.5)
+		  (/ *window-height* *block-height* 0.5)))))))
 
 (defun cache-program-uniforms (program table args)
   (dolist (arg args)
@@ -249,29 +239,32 @@
 		       z)
   (let ((xwidth (/ 2.0 width))
 	(ywidth (/ 2.0 height)))
-    (with-iterators (epos etex eindirect) bufs iter-ator:wasabios iter-ator:iter-ator
-      (dobox ((xcell 0 width)
-	      (ycell 0 height))
+    (let ((upwidth (ceiling width))
+	  (upheight (ceiling height)))
+      (with-iterators (epos etex eindirect) bufs iter-ator:wasabios iter-ator:iter-ator
+	(dobox ((xcell 0 upwidth)
+		(ycell 0 upheight))
 	   ;;;texcoords
-	     (etouq (ngorp (preach 'etex (duaq 3 nil '(0f0 1f0 0f0 1f0)))))
-	     (let ((xactual (- (* xwidth xcell) 1.0))
-		   (yactual (- (* ywidth ycell) 1.0)))
-	       (let* ((x1 (float xactual))
-		      (y1 (float yactual))
-		      (foox0 (+ x1 xwidth))
-		      (fooy0 (+ y1 ywidth)))
-		 ;;position
-		 (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1)))))))
+	       (etouq (ngorp (preach 'etex (duaq 3 nil '(0f0 1f0 0f0 1f0)))))
+	       (let ((xactual (- (* xwidth xcell) 1.0))
+		     (yactual (- (* ywidth ycell) 1.0)))
+		 (let* ((x1 (float xactual))
+			(y1 (float yactual))
+			(foox0 (+ x1 xwidth))
+			(fooy0 (+ y1 ywidth)))
+		   ;;position
+		   (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1)))))))
 	   ;;;indirection
-	     (let ((xi (* xoffset xcell))
-		   (yi (* yoffset ycell)))
-	       (dotimes (x 4)
-		 (progn
-		   (eindirect xi)
-		   (eindirect yi)))))))
-  (* 4 width height))
+	       (let ((xi (* xoffset xcell))
+		     (yi (* yoffset ycell)))
+		 (dotimes (x 4)
+		   (progn
+		     (eindirect xi)
+		     (eindirect yi))))))
+      (* 4 upwidth upheight))))
 
 (defun draw-fast-text-display-list (width height &optional (display-list (gl:gen-lists 1)))
+  (declare (optimize (debug 3)))
   (let ((iter *attrib-buffer-iterators*))
     (let ((buf (get-buf-param iter
 			      (etouq (vector 0 8 9)))))

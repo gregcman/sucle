@@ -1,9 +1,0 @@
-*#
-.#*
-*.lx64fsl
-*.lx32fsl
-*.dx64fsl
-*.dx32fsl
-*.wx64fsl
-*.wx32fsl
-*.fasl

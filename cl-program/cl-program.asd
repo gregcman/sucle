@@ -24,7 +24,6 @@
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
 	       (:file "keys-ascii")
-	       (:file "list-junction")
 	       
 	       (:file "globjects")
 	       (:file "pix")

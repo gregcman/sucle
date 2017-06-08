@@ -1581,3 +1581,27 @@ x
       (progn
 	(gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
 	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b)))))
+
+(progno
+ (defparameter *uint-lookup*
+   (let ((ans (make-array (length *16x16-tilemap*) :element-type '(unsigned-byte 8))))
+     (map-into ans (lambda (x) (round (* x 255))) *16x16-tilemap*))))
+
+(progno
+ (defun keyword-ascii (keyword &optional (value (gethash keyword e:*keypress-hash*)))
+	  (when value
+	    (let ((code (gethash keyword *keyword-ascii*)))
+	      (when code
+		(let ((mods (ash value (- e::+mod-key-shift+))))
+		  (multiple-value-bind (char esc) (convert-char code mods)
+		    (values char esc))))))))
+
+
+
+(progno
+ (defconstant +single-float-just-less-than-one+ 0.99999997)
+ (defparameter +byte-fraction-lookup+
+   (let ((array (make-array 256 :element-type 'single-float)))
+     (dotimes (x 256)
+       (setf (aref array x) (/ (float x) 255.0)))
+     array)))
