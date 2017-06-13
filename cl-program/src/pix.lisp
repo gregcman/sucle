@@ -76,6 +76,24 @@
       (values (offset index 31)
 	      (page index 31)))))
 
+(defparameter *space* (make-array (* 64 64)))
+
+(progn
+  (declaim (ftype (function (fixnum fixnum simple-vector)
+			    (values simple-vector fixnum))
+		  area2))
+  (with-unsafe-speed
+    (defun area2 (x y world)
+      (let ((xbig (page x 4))
+	    (ybig (page y 4)))
+	(let ((index (index xbig ybig 6 6)))
+	  (let ((subarray (aref world index)))
+	    (declare (type (or null simple-vector) subarray))
+	    (values (or subarray
+			(setf (aref world index)
+			      (make-chunk)))
+		    (index x y 4 4))))))))
+
 (defun area (x y world)
   (let ((xbig (page x 4))
 	(ybig (page y 4)))

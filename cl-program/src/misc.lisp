@@ -187,3 +187,10 @@
 
 (defun make-eq-hash ()
   (make-hash-table :test (quote eq)))
+
+(progn
+  (declaim (ftype (function (symbol t)) set-symbol-value))
+  (with-unsafe-speed
+    (defun set-symbol-value (symbol value)
+      #+sbcl (sb-impl::%set-symbol-value symbol value)
+      #-sbcl (set symbol value))))

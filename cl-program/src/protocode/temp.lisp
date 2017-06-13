@@ -1605,3 +1605,104 @@ x
      (dotimes (x 256)
        (setf (aref array x) (/ (float x) 255.0)))
      array)))
+
+(progno
+ (defparameter *chunk-call-lists* (make-eq-hash)))
+
+(progno
+ (defparameter *snapshot* (make-array (list 1024 1024 4) :element-type '(unsigned-byte 8)))
+
+ (dobox ((x 0 1024)
+	 (y 0 1024))
+	(let ((value (get-char-num (get-char x y))))
+	  (setf (aref *snapshot* x y 0) (ldb (byte 8 0) value))
+	  (setf (aref *snapshot* x y 1) (ldb (byte 8 8) value))
+	  (setf (aref *snapshot* x y 2) (ldb (byte 8 16) value))
+	  (setf (aref *snapshot* x y 3) (ldb (byte 8 24) value))))
+
+ (opticl:write-png-file (saves-path "asnapshot") *snapshot*))
+
+(progno
+ (defparameter *x-zoom-offset* 0)
+ (defparameter *y-zoom-offset* 0))
+
+(progno (defun set-char-with-update (x y value)
+	    (multiple-value-bind (chunk offset) (pix::area2 x y pix::*world*)
+	      (setf (aref chunk offset) value)
+	      (setf (aref chunk (* 16 16)) *ticks*))))
+
+(progno  (when (skey-p :t)
+	     (map-box
+	      *cam-rectangle*
+	      (lambda (x y)
+		(let ((value (get-char x y)))
+		  (if (and (listp value) value)
+		      (setf (car value) (random most-positive-fixnum)))))))
+	   (when (skey-p :q)
+	     (map-box
+	      *cam-rectangle*
+	      (lambda (x y)
+		(let ((value (get-char x y))
+		      (value2 (get-char x (1- y))))
+		  (when (> (get-char-num value2) (get-char-num value))
+		    (scwu value x (1- y))
+		    (scwu value2 x y)))))
+	     (map-box
+	      *cam-rectangle*
+	      (lambda (x y)
+		(let ((value (get-char x y))
+		      (value2 (get-char (1- x) y)))
+		  (when (> (get-char-num value2) (get-char-num value))
+		    (scwu value (1- x) y)
+		    (scwu value2 x y))))))
+	   (when (skey-p :r)
+	     (etouq
+	      (with-vec-params
+		  (vec-slots :rectangle (quote ((x :x1) (y :y1))))
+		'(*point-rectangle*)
+		(quote
+		 (let ((xstart (- x 0))
+		       (ystart (- y 0))
+		       (counter 0))
+		   (dobox ((x xstart (+ xstart 16))
+			   (y ystart (+ ystart 16)))
+			  (scwu (logior counter
+					(ash (logior counter
+						     (ash (- 256 counter) 8)) 8)) x y)
+			  (incf counter)))))))
+	   (when (skey-p :l)
+	     (dobox ((x 0 228)
+		     (y 0 70))
+		    (scwu (random most-positive-fixnum) x y)))
+	   (when (skey-p :v)
+	     (etouq
+	      (with-vec-params
+		  (vec-slots :rectangle (quote ((cx1 :x1) (cy1 :y1) (cx0 :x0) (cy0 :y0))))
+		(quote (*point-rectangle*))
+		(quote
+		 (progn
+		   (progn (setf (fill-pointer foobar) 0)
+			  (with-output-to-string (out foobar)
+			    (print *mouse-rectangle* out))
+			  (copy-string-to-world cx1 cy1 foobar))
+		   (progn (setf (fill-pointer foobar) 0)
+			  (with-output-to-string (out foobar)
+			    (print *cursor-rectangle* out))
+			  (copy-string-to-world cx1 (+ 1 cy1) foobar))
+		   (progn (setf (fill-pointer foobar) 0)
+			  (with-output-to-string (out foobar)
+			    (print (list *point-x* *point-y*) out))
+			  (copy-string-to-world cx1 (+ 2 cy1) foobar))))))))
+
+(progno
+ (let ((xstart cx0)
+       (ystart cy0))
+   (let ((value (list (random most-positive-fixnum))))
+     (scwu value xstart ystart)
+     (if (> xstart cx1)
+	 (rotatef xstart cx1))
+     (if (> ystart cy1)
+	 (rotatef ystart cy1))
+     (dobox ((x xstart (1+ cx1))
+	     (y ystart (1+ cy1)))
+	    (scwu value x y)))))

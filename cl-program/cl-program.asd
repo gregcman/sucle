@@ -6,7 +6,7 @@
 		 #:alexandria
 		 #:opticl
 		 
-		 #:window-glfw2
+		 #:window-glfw3
 		 #:cl-conspack
 		 
 		 #:funland
@@ -19,8 +19,6 @@
 	      :components
 	      ((:file "package")
 	       (:file "vec-param-layout")
-	       (:file "camera-matrix") ;;;1st person perspective vision
-	       (:file "meshing")
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
 	       (:file "keys-ascii")

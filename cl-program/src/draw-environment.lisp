@@ -1,5 +1,20 @@
 (in-package :sandbox)
 
+(defun make-attrib-buffer-data ()
+  (make-array 16 :element-type t :initial-element nil))
+(defun fill-with-flhats (array)
+  (map-into array #'flhat:make-flhat))
+(defun make-iterators (buffer result)
+  (map-into result (lambda (x) (flhat:make-flhat-iterator x)) buffer))
+(defun tally-buffer (iterator-buffer result)
+  (map-into result (lambda (x) (iterator-count x)) iterator-buffer))
+(defun reset-attrib-buffer-iterators (fill-data)
+  (dotimes (x (array-total-size fill-data))
+    (flhat:reset-iterator (aref fill-data x))))
+(defun iterator-count (iterator)
+  (if (iter-ator:p-array iterator)
+      (1+ (flhat:iterator-position iterator))
+      0))
 (defparameter *attrib-buffers* (fill-with-flhats (make-attrib-buffer-data)))
 (defparameter *attrib-buffer-iterators*
   (make-iterators *attrib-buffers* (make-attrib-buffer-data)))
@@ -14,8 +29,15 @@
 (defparameter *16x16-tilemap* (regular-enumeration 16 16))
 
 (progn
-  (defparameter *block-height* (/ (* 2 (if t 16.0 11.0)) 1.0))
-  (defparameter *block-width* (/ (* 2 (if t 9.0 6.0)) 1.0)))
+  (defparameter *block-height* nil)
+  (defparameter *block-width* nil)
+  (setf (values *block-height* *block-width*)
+	(case 0
+	  (0 (values 16.0 9.0))
+	  (1 (values 11.0 6.0))
+	  (2 (values 16.0 16.0))))
+  (setf *block-height* (* *block-height* 2.0)
+	*block-width* (* *block-width* 2.0)))
 
 (defparameter *backup* (make-eq-hash))
 (defparameter *stuff* (make-eq-hash))
@@ -80,7 +102,6 @@
 (defun glinnit ()
   (reset *gl-objects*)
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
-  (clrhash *chunk-call-lists*)
 
   (if vsync?
       (window::set-vsync t)
@@ -207,7 +228,18 @@
 	       (lambda ()
 		 (draw-fast-text-display-list
 		  (/ *window-width* *block-width* 0.5)
-		  (/ *window-height* *block-height* 0.5)))))))
+		  (/ *window-height* *block-height* 0.5)))))
+    (progn
+      (namexpr backup :terrain-image
+	       (lambda ()
+		 (flip-image
+		  (load-png
+		   (img-path "font/terrain.png")))))
+      (namexpr backup :terrain
+	       (lambda ()
+		 (pic-texture (get-stuff :terrain-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*))))))
 
 (defun cache-program-uniforms (program table args)
   (dolist (arg args)

@@ -52,14 +52,19 @@
       *yaw* 0.0
       *pitch* 0.0)
 
-(defun skey-p (enum)
-  (e:key-p (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
-(defun skey-j-r (enum)
-  (e:key-j-r (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
-(defun skey-j-p (enum)
-  (e:key-j-p (cffi:convert-to-foreign enum (quote %cl-glfw3::key))))
-(defun smice-j-p (enum)
-  (e:mice-j-p (cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))))
+(progn
+  (defun skey-p (enum)
+    (e:key-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+	     ))
+  (defun skey-j-r (enum)
+    (e:key-j-r enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+	       ))
+  (defun skey-j-p (enum)
+    (e:key-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+	       ))
+  (defun smice-j-p (enum)
+    (e:mice-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
+		)))
 
 (defun controls ()
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
