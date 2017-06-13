@@ -155,22 +155,49 @@
 			      (node-prev
 			       (bracket-left (find-enclosing-block-left value))))))
 		(print payload)))))))))
-  
+
   (when (skey-p :f)
-    (setf barfoo (node-next-char (node-next barfoo))))
+    (let ((it (node-next-char (node-next barfoo))))
+      (when it
+	(setf barfoo it))))
   (when (skey-p :s)
-    (setf barfoo (node-prev-char (node-prev barfoo))))
-  (when (skey-p :q)
-    (map-box *cam-rectangle*
-	     (lambda (x y)
-	       (scwu nil x y))))
+    (let ((it (node-prev-char (node-prev barfoo))))
+      (when it
+	(setf barfoo it))))
+  (when (skey-p :q))
+;  (clear-cam)
   (progn
+   (multiple-value-bind (node hole)
+       (find-node-forward barfoo (lambda (x) (typep x
+						    (quote hole ))))
+     (declare (ignorable node))
+     (when node
+       (when (skey-p :kp-8)
+	 (setf (hole-active hole) nil))
+       (when (skey-p :kp-5)
+	 (setf (hole-active hole) t))))
+   (multiple-value-bind (node hole)
+       (find-node-forward barfoo (lambda (x) (typecase x
+					       (hole (hole-active x)))))
+     (declare (ignorable node))
+     (when node
+       (when (skey-r-or-p :kp-4)
+	 (incf (hole-width hole)))
+       (when (skey-r-or-p :kp-6)
+	 (decf (hole-width hole))))))
+  (progn
+    (when (skey-p :a)
+      (test420))
     (let ((pos (load-time-value (cons 0 0))))
       (when (skey-p :e)
 	(incf (cdr pos)))
       (when (skey-p :d)
 	(decf (cdr pos)))
-      (draw-nodes (car pos) (cdr pos) barfoo))
+      (let ((x (car pos))
+	    (y (cdr pos)))
+	(scwu t x y)
+	(draw-nodes2 (1+ x) y barfoo)
+	(draw-nodes2-reverse (1- x) y barfoo)))
     (let ((width *window-block-width*)
 	  (height *window-block-height*))
       (let ((xstart *camera-x*)
@@ -190,6 +217,10 @@
 	    (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
 	    (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b)))))))
 
+(defun clear-cam ()
+  (map-box *cam-rectangle*
+	     (lambda (x y)
+	       (scwu nil x y))))
 (defun color-rgb (color)
   (labels ((c (r g b)
 	     (values (/ r 255.0) (/ g 255.0) (/ b 255.0)))

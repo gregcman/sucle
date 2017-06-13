@@ -15,6 +15,10 @@
   left
   right)
 
+(defstruct hole
+  width
+  active)
+
 (progn
   (defparameter *node-print-depth* (ash 2 4))
   (defun pprint-node (stream node)
@@ -43,6 +47,13 @@
 			   (left "{")
 			   (right "}"))))))))
   (set-pprint-dispatch (quote payload) (quote pprint-payload)))
+
+(progn
+  (defun pprint-hole (stream hole)
+    (pprint-logical-block (stream nil)
+      (let ((width (hole-width hole)))
+	(format stream "<~a, ~a>" width (hole-active hole)))))
+  (set-pprint-dispatch (quote hole) (quote pprint-hole)))
 
 (defun link-nodes (prev-node next-node)
   (setf (node-next prev-node) next-node
@@ -129,8 +140,15 @@
 		 (add-no-bracket (new)
 		   (let ((next-base (node-prev new)))
 		     (if last-node
-			 (splice-nodes last-node new)
+			 (progn
+			   (let ((hole (gen-hole)))
+			     (add-hole hole))
+			   (splice-nodes last-node new))
 			 (setf base new))
+		     (setf last-node next-base)))
+		 (add-hole (new)
+		   (let ((next-base (node-prev new)))
+		     (splice-nodes last-node new)
 		     (setf last-node next-base))))
 	  (let ((car (car cell))
 		(cdr (cdr cell)))
@@ -177,6 +195,12 @@
 	(values base
 		total-width)))))
 
+(defun gen-hole ()
+  (let ((hole (make-hole :width 0 :active nil)))
+    (let ((node (make-node :payload hole)))
+      (link-nodes node node)
+      node)))
+
 (setf *print-case* :downcase)
 (defparameter *test-tree*
   (copy-tree
@@ -214,6 +238,35 @@
 	      (setf nodes next))
 	    (return))))))
 
+(defun draw-nodes2 (x y nodes)
+  (let ((cap 512))
+    (dotimes (index cap)
+      (let ((next (node-next nodes)))
+	(cond ((not next) (return))
+	      (t
+	       (let ((payload (node-payload next)))
+		 (typecase payload
+		   (character (scwu next x y) (incf x))
+		   (payload)
+		   (hole (when (hole-active payload)
+			   (decf y 1)
+			   (incf x (- (hole-width payload)))))))
+	       (setf nodes next)))))))
+(defun draw-nodes2-reverse (x y nodes)
+  (let ((cap 512))
+    (dotimes (index cap)
+      (let ((next (node-prev nodes)))
+	(cond ((not next) (return))
+	      (t
+	       (let ((payload (node-payload next)))
+		 (typecase payload
+		   (character (scwu next x y) (decf x))
+		   (payload)
+		   (hole (when (hole-active payload)
+			   (incf y 1)
+			   (incf x (hole-width payload))))))
+	       (setf nodes next)))))))
+
 (defun node-next-char (node)
   (if node
       (if (typep (node-payload node) (quote character))
@@ -242,3 +295,30 @@
 		      (if (eq (quote right) side)
 			  (setf node (jump-block-left node)))))))
 	  (find-enclosing-block-left (node-prev node))))))
+
+(defun map-nodes (nodes function &optional (times 512))
+  (dotimes (x times)
+    (funcall function nodes)
+    (setf nodes (node-next nodes))))
+
+(progn
+  (declaim (ftype (function (node (function (t) t)) (or null node)) find-node-forward))
+  (defun find-node-forward (nodes test)
+    (labels ((rec (node)
+	       (if node
+		   (let ((payload (node-payload node)))
+		     (if (funcall test payload)
+			 (values node payload)
+			 (rec (node-next node))))
+		   nil)))
+      (rec nodes))))
+
+(defun test420 ()
+  (map-nodes barfoo
+	     (lambda (x)
+	       (let ((payload (node-payload x)))
+		 (typecase payload
+		   (hole (setf (hole-active payload)
+			       (if (zerop (random 2)) t nil)
+			       (hole-width payload)
+			       (random 10))))))))
