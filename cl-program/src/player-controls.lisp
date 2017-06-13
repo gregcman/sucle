@@ -142,7 +142,7 @@
 
 (defparameter barfoo (emit-cons *test-tree*))
 (defun other-stuff ()
-  (when (smice-j-p :left)
+  (when (skey-r-or-p :Z)
     (etouq
      (with-vec-params
 	 (vec-slots :rectangle (quote ((cx1 :x1) (cy1 :y1))))
@@ -156,35 +156,45 @@
 			       (bracket-left (find-enclosing-block-left value))))))
 		(print payload)))))))))
 
-  (when (skey-p :f)
+  (when (skey-r-or-p :f)
     (let ((it (node-next-char (node-next barfoo))))
       (when it
 	(setf barfoo it))))
-  (when (skey-p :s)
+  (when (skey-r-or-p :s)
     (let ((it (node-prev-char (node-prev barfoo))))
       (when it
 	(setf barfoo it))))
   (when (skey-p :q))
-;  (clear-cam)
+  (clear-cam)
   (progn
    (multiple-value-bind (node hole)
        (find-node-forward barfoo (lambda (x) (typep x
-						    (quote hole ))))
+						    (quote hole))))
      (declare (ignorable node))
      (when node
        (when (skey-p :kp-8)
-	 (setf (hole-active hole) nil))
+	 (when (hole-active hole)
+	   (print hole)
+	   (deactivate-hole hole)
+	   (width-prop node)))
        (when (skey-p :kp-5)
-	 (setf (hole-active hole) t))))
+	 (unless (hole-active hole)
+	   (print hole)
+	   (activate-hole hole)
+	   (width-prop node)))))
    (multiple-value-bind (node hole)
        (find-node-forward barfoo (lambda (x) (typecase x
 					       (hole (hole-active x)))))
      (declare (ignorable node))
      (when node
-       (when (skey-r-or-p :kp-4)
-	 (incf (hole-width hole)))
        (when (skey-r-or-p :kp-6)
-	 (decf (hole-width hole))))))
+	 (incf (hole-width hole))
+	 (decf (hole-motion hole))
+	 (width-prop node))
+       (when (skey-r-or-p :kp-4)
+	 (decf (hole-width hole))
+	 (incf (hole-motion hole))
+	 (width-prop node)))))
   (progn
     (when (skey-p :a)
       (test420))
