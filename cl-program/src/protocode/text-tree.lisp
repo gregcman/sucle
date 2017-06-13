@@ -19,7 +19,8 @@
   (width 0 :type fixnum)
   active
   (motion 0 :type fixnum)
-  generator)
+  generator
+  indentation-func)
 
 (progn
   (defparameter *node-print-depth* (ash 2 (if t 7 4)))
@@ -50,7 +51,7 @@
   (defun pprint-hole (stream hole)
     (pprint-logical-block (stream nil)
       (let ((width (hole-width hole)))
-	(format stream "<~a, ~a>" width (hole-active hole)))))
+	(format stream "<~a ~a>" (if (hole-active hole) #\@ #\#) width))))
   (set-pprint-dispatch (quote hole) (quote pprint-hole)))
 
 (defun link-nodes (prev-node next-node)
@@ -246,6 +247,7 @@
 		   (character (scwu next x y) (incf x))
 		   (payload)
 		   (hole
+		    (update-whole-hole next)
 		    (width-prop next)
 		    (when (hole-active payload)
 		      (decf y 1)
@@ -261,7 +263,9 @@
 		 (typecase payload
 		   (character (scwu next x y) (decf x))
 		   (payload)
-		   (hole (when (hole-active payload)
+		   (hole
+		    (update-whole-hole next)
+		    (when (hole-active payload)
 			   (incf y 1)
 			   (incf x (- (hole-width payload)))))))
 	       (setf nodes next)))))))
@@ -356,3 +360,55 @@
 			       (if (zerop (random 2)) t nil)
 			       (hole-width payload)
 			       (random 10))))))))
+
+(defun find-parent-hole (node)
+  (%find-parent-hole (node-prev node) 0))
+
+(defun %find-parent-hole (node depth)
+  (when node
+    (let ((payload (node-payload node)))
+      (typecase payload
+	(hole (values node depth))
+	(payload
+	 (case (payload-metadata payload)
+	   (left (%find-parent-hole (node-prev (jump-block-left node)) depth))
+	   (right (%find-parent-hole (node-prev node) (+ 1 depth)))))
+	(t (%find-parent-hole (node-prev node) depth))))))
+
+(defun generate-child-indentation-type (parent-type depth))
+
+(defun update-hole-indentation-func (node)
+  (multiple-value-bind (parent depth) (find-parent-hole node)
+    (when parent
+      (let ((parent-hole (node-payload parent)))
+	(let ((parent-type (hole-generator parent-hole)))
+	  (multiple-value-bind (child-type function)
+	      (generate-child-indentation-type parent-type depth)
+	    (let ((hole (node-payload node)))
+	      (setf (hole-indentation-func hole) function
+		    (hole-generator hole) child-type))))))))
+(defun reindent-hole (node)
+  (let ((hole (node-payload node)))
+    (let ((func (hole-indentation-func hole)))
+      (multiple-value-bind (width active) (if func (funcall func node) (values 0 nil))
+	(set-node width active node)))))
+(defun set-node (new-width active node)
+  (let ((hole (node-payload node)))
+    (if active
+	(activate-hole hole)
+	(deactivate-hole hole))
+    (set-hole-width new-width node)))
+(defun set-hole-width (new-width node)
+  (let ((hole (node-payload node)))
+    (if (hole-active hole)
+	(let ((width (hole-width hole)))
+	  (setf (hole-width hole) new-width)
+	  (decf (hole-motion hole) (- new-width width))
+	  (width-prop node))
+	(setf (hole-width hole) new-width))))
+
+(defun update-whole-hole (node)
+  (when node
+    (update-hole-indentation-func node)
+    (reindent-hole node)
+    (width-prop node)))

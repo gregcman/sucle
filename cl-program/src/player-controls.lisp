@@ -140,7 +140,7 @@
 		   (setf x (1+ x))))))
 	(values x y)))))
 
-(defparameter barfoo (emit-cons *test-tree*))
+(defparameter barfoo (disconnect-node-prev (emit-cons (cons *test-tree* nil))))
 (defun other-stuff ()
   (when (skey-r-or-p :Z)
     (etouq
