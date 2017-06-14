@@ -22,7 +22,7 @@
 	       (:file "tilemap")
 	       (:file "axis-aligned-quads")
 	       (:file "keys-ascii")
-	       
+	       (:file "text-tree")
 	       (:file "globjects")
 	       (:file "pix")
 	       

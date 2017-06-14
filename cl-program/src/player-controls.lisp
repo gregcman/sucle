@@ -140,7 +140,15 @@
 		   (setf x (1+ x))))))
 	(values x y)))))
 
-(defparameter barfoo (disconnect-node-prev (emit-cons (cons *test-tree* nil))))
+(defun atest ()
+  (let ((barfoo (disconnect-node-prev (emit-cons (cons *test-tree* nil)))))
+    (multiple-value-bind (node hole)
+	(find-node-forward barfoo (lambda (x) (typep x (quote hole))))
+      (declare (ignorable node))
+      (set-hole-type hole (quote nope)))
+    barfoo))
+
+(defparameter barfoo (atest))
 (defun other-stuff ()
   (when (skey-r-or-p :Z)
     (etouq
@@ -172,6 +180,11 @@
 						    (quote hole))))
      (declare (ignorable node))
      (when node
+       (when (skey-j-p :kp-3)
+	 (format t "~a ~a" hole (funcall
+				 (hole-generator hole)
+				 (quote info)))
+	 (terpri))
        (when (skey-p :kp-8)
 	 (when (hole-active hole)
 	   (print hole)

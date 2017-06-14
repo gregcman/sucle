@@ -371,11 +371,29 @@
 	(hole (values node depth))
 	(payload
 	 (case (payload-metadata payload)
-	   (left (%find-parent-hole (node-prev (jump-block-left node)) depth))
-	   (right (%find-parent-hole (node-prev node) (+ 1 depth)))))
+	   (right (%find-parent-hole (node-prev (jump-block-left node)) depth))
+	   (left (%find-parent-hole (node-prev node) (1+ depth)))))
 	(t (%find-parent-hole (node-prev node) depth))))))
 
-(defun generate-child-indentation-type (parent-type depth))
+(defparameter *no-indent*
+  (lambda (node-hole) (declare (ignorable node-hole)) (values 0 nil)))
+(progn
+  (defparameter *null-parent* nil)
+  (setf *null-parent*
+	(lambda (child-type)
+	  (case child-type
+	    (car (values *null-parent* *no-indent*))
+	    (cdr (values *null-parent* *no-indent*))
+	    (otherwise (error "child not car or cdr: ~a" child-type))))))
+
+(defun generate-child-indentation-type (parent-type depth)
+  (let ((value (ecase depth
+		 (0 (quote cdr))
+		 (1 (quote car))
+		 (otherwise (error "depth not 0 or 1: ~a" depth)))))
+    (if parent-type
+	(funcall parent-type value)
+	(funcall *null-parent* value))))
 
 (defun update-hole-indentation-func (node)
   (multiple-value-bind (parent depth) (find-parent-hole node)
@@ -412,3 +430,54 @@
     (update-hole-indentation-func node)
     (reindent-hole node)
     (width-prop node)))
+
+(defparameter *generator-rules* (make-hash-table :test (quote eq)))
+(defparameter *generator-graph* (make-hash-table :test (quote eq)))
+
+(defun define-indentation-rule (name &key (width-function *no-indent*)
+				       (car (quote nope))
+				       (cdr (quote nope)))
+  (let ((function
+	 ((lambda (parent-type)
+	    (lambda (child-type)
+	      (multiple-value-bind (value exists-p) (gethash parent-type *generator-graph*)
+		(if exists-p
+		    (ecase child-type
+		      (car (multiple-value-bind (rule exists-p)
+			       (gethash (car value) *generator-rules*)
+			     (if exists-p
+				 (values (car rule) (cdr rule))
+				 (error "no child-type"))))
+		      (cdr (multiple-value-bind (rule exists-p)
+			       (gethash (cdr value) *generator-rules*)
+			     (if exists-p
+				 (values (car rule) (cdr rule))
+				 (error "no child-type"))))
+		      (info (print parent-type))
+		      (otherwise (error "child not car or cdr: ~a" child-type)))
+		    (error "parent-type nonexistent"))))) name)))
+    (setf (gethash name *generator-rules*) (cons function width-function))
+    (setf (gethash name *generator-graph*) (cons car cdr))))
+
+(defun set-hole-type (hole type)
+  (multiple-value-bind (rules exists-p) (gethash type *generator-rules*)
+    (if exists-p
+	(setf (hole-indentation-func hole) (cdr rules)
+	      (hole-generator hole) (car rules))
+	(error "hole type does not exist: ~a" type))))
+
+(define-indentation-rule (quote nope) :width-function (function allow-indentation-outside-cons-cells))
+
+(defun allow-indentation-outside-cons-cells (node)
+  (let* ((left (node-prev node))
+	 (right (node-next node))
+	 (left-payload (node-payload left))
+	 (right-payload (node-payload right))
+	 (left-payload-type (payload-metadata left-payload))
+	 (right-payload-type (payload-metadata right-payload))
+	 (left-type (car (bracket-object (payload-data left-payload))))
+	 (right-type (car (bracket-object (payload-data right-payload)))))
+    (if (and (eq left-type (quote cons))
+	     (eq right-type (quote cons)))
+	(values -5 t)
+	(values 0 nil))))
