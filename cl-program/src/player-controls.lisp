@@ -179,6 +179,13 @@
 
 (defparameter pos (load-time-value (cons 0 0)))
 (defparameter barfoo (atest))
+(defun reset-barfoo-indentation ()
+  (let ((first-node (first-node barfoo)))
+    (map-nodes first-node (lambda (payload) 
+				  (when (typep payload (quote hole))
+				    (zerofy-hole payload))))
+    (set-hole-type (node-payload first-node) (quote form))))
+(defparameter *sleepy-time* 0.1)
 (defun other-stuff ()
   (etouq
    (with-vec-params
@@ -217,15 +224,13 @@
 	  (when it
 	    (setf barfoo it))))))
   (when (skey-r-or-p :d)
-    (multiple-value-bind (it height) (char-search-down barfoo)
+    (multiple-value-bind (it) (char-search-down barfoo)
       (when it
-	(setf barfoo it)
-	(incf (cdr pos) height))))
+	(setf barfoo it))))
   (when (skey-r-or-p :e)
-    (multiple-value-bind (it height) (char-search-up barfoo)
+    (multiple-value-bind (it) (char-search-up barfoo)
       (when it
-	(setf barfoo it)
-	(incf (cdr pos) height))))
+	(setf barfoo it))))
   (clear-cam)
   (progn
    (multiple-value-bind (node hole)
@@ -233,10 +238,10 @@
      (declare (ignorable node))
      (when node
        (when (skey-j-p :kp-3)
-	 (format t "~a ~a" hole (funcall
-				 (hole-generator hole)
-				 (quote info)))
+	 (format t "~a" hole)
 	 (terpri))
+       (when (skey-j-p :kp-1)
+	 (reset-barfoo-indentation))
        (when (skey-p :kp-8)
 	 (when (hole-active hole)
 	   (print hole)
@@ -342,3 +347,80 @@
 	    (character (logior *color-white-black* (char-code obj)))
 	    (node (recurse (node-payload obj)))
 	    (t (sxhash obj))))))))
+
+(defun nthfnc (function data &optional (times 0))
+  (dotimes (amount times)
+    (setf data (funcall function data)))
+  data)
+
+(defun char-search-down (node)
+  (labels ((rec (node offset height)
+	     (when node
+	       (let ((data (node-payload node)))
+		 (typecase data
+		   (character
+		    (if (zerop offset)
+			(values node height)
+			(rec (node-next node)
+			     (+ offset 1)
+			     height)))
+		   (hole (if (hole-active data)
+			     (rec (node-next node)
+				  (+ offset (hole-width data))
+				  (1- height))
+			     (rec (node-next node) offset height)))
+		   (t (rec (node-next node) offset height)))))))
+    (rec (node-next node) 1 0)))
+
+(defun char-search-up (node)
+  (labels ((rec (node offset height)
+	     (when node
+	       (let ((data (node-payload node)))
+		 (typecase data
+		   (character
+		    (if (zerop offset)
+			(values node height)
+			(rec (node-prev node)
+			     (- offset 1)
+			     height)))
+		   (hole (if (hole-active data)
+			     (rec (node-prev node)
+				  (- offset (hole-width data))
+				  (1+ height))
+			     (rec (node-prev node) offset height)))
+		   (t (rec (node-prev node) offset height)))))))
+    (rec (node-prev node) -1 0)))
+
+(progn
+  (declaim (ftype (function (node (function (t) t)) (or null node))
+		  find-node-forward find-node-backward))
+  (defun find-node-forward (nodes test)
+    (labels ((rec (node)
+	       (if node
+		   (let ((payload (node-payload node)))
+		     (if (funcall test payload)
+			 (values node payload)
+			 (rec (node-next node))))
+		   nil)))
+      (rec nodes)))
+  (defun find-node-backward (nodes test)
+    (labels ((rec (node)
+	       (if node
+		   (let ((payload (node-payload node)))
+		     (if (funcall test payload)
+			 (values node payload)
+			 (rec (node-prev node))))
+		   nil)))
+      (rec nodes))))
+
+(defun first-node (node)
+  (block nil
+    (first-node (or (node-prev node)
+		    (return node)))))
+
+(defun map-nodes (nodes function)
+  (labels ((rec (node)
+	     (when node
+	       (funcall function (node-payload node))
+	       (rec (node-next node)))))
+    (rec nodes)))

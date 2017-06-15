@@ -260,6 +260,8 @@
 	  (find-enclosing-block-left (node-prev node))))))
 
 
+;;;;propagate width changes to enclosing brackets, stopping when reaching
+;;;;an active newline
 (defun width-prop (node)
   (let* ((hole (node-payload node))
 	 (motion (hole-motion hole)))
@@ -302,51 +304,47 @@
 (progn
   (defparameter *null-parent* nil)
   (setf *null-parent*
-	(lambda (child-type)
+	(lambda (child-type &optional child)
+	  (declare (ignorable child))
 	  (case child-type
 	    (car (values *null-parent* *no-indent*))
 	    (cdr (values *null-parent* *no-indent*))
 	    (info "void")
 	    (otherwise (error "child not car or cdr: ~a" child-type))))))
 
-(defun generate-child-indentation-type (parent-type depth)
-  (let ((value (ecase depth
-		 (0 (quote cdr))
-		 (1 (quote car))
-		 (otherwise (error "depth not 0 or 1: ~a" depth)))))
-    (if parent-type
-	(funcall parent-type value)
-	(funcall *null-parent* value))))
-
 (defun update-hole-indentation-func (node)
   (multiple-value-bind (parent depth) (find-parent-hole node)
     (when parent
       (let ((parent-hole (node-payload parent)))
 	(let ((parent-type (hole-generator parent-hole)))
-	  (multiple-value-bind (child-type function)
-	      (generate-child-indentation-type parent-type depth)
-	    (let ((hole (node-payload node)))
-	      (setf (hole-indentation-func hole) function
-		    (hole-generator hole) child-type))))))))
+	  (flet ((gen-child (child parent-type depth)
+		   (let ((value (ecase depth
+				  (0 (quote cdr))
+				  (1 (quote car))
+				  (otherwise (error "depth not 0 or 1: ~a" depth)))))
+		     (if parent-type
+			 (funcall parent-type value child)
+			 (funcall *null-parent* value child)))))
+	    (multiple-value-bind (child-type function)
+		(gen-child node parent-type depth)
+	      (let ((hole (node-payload node)))
+		(setf (hole-indentation-func hole) function
+		      (hole-generator hole) child-type)))))))))
 (defun reindent-hole (node)
   (let ((hole (node-payload node)))
     (let ((func (hole-indentation-func hole)))
       (multiple-value-bind (width active) (if func (funcall func node) (values 0 nil))
-	(set-node width active node)))))
-(defun set-node (new-width active node)
-  (let ((hole (node-payload node)))
-    (if active
-	(activate-hole hole)
-	(deactivate-hole hole))
-    (set-hole-width new-width node)))
-(defun set-hole-width (new-width node)
-  (let ((hole (node-payload node)))
-    (if (hole-active hole)
-	(let ((width (hole-width hole)))
-	  (setf (hole-width hole) new-width)
-	  (decf (hole-motion hole) (- new-width width))
-	  (width-prop node))
-	(setf (hole-width hole) new-width))))
+	(set-hole-state hole active)
+	(set-hole-width width hole)))))
+(defun set-hole-state (hole state)
+  (if state
+      (activate-hole hole)
+      (deactivate-hole hole)))
+(defun set-hole-width (new-width hole)
+  (when (hole-active hole)     	
+    (decf (hole-motion hole)
+	  (- new-width (hole-width hole))))
+  (setf (hole-width hole) new-width))
 
 (defun update-whole-hole (node)
   (when node
@@ -354,39 +352,29 @@
     (reindent-hole node)
     (width-prop node)))
 
-(defparameter *generator-rules* (make-hash-table :test (quote eq)))
-(defparameter *generator-graph* (make-hash-table :test (quote eq)))
+(defun zerofy-hole (hole)
+  (set-hole-width 0 hole)
+  (set-hole-state hole nil)
+  (setf (hole-indentation-func hole) nil
+	(hole-generator hole) nil))
 
-(defun define-indentation-rule (name &key (width-function *no-indent*)
-				       (car (quote nope))
-				       (cdr (quote nope)))
-  (let ((function
-	 ((lambda (parent-type)
-	    (lambda (child-type)
-	      (multiple-value-bind (value exists-p) (gethash parent-type *generator-graph*)
-		(if exists-p
-		    (ecase child-type
-		      (car (multiple-value-bind (rule exists-p)
-			       (gethash (car value) *generator-rules*)
-			     (if exists-p
-				 (values (car rule) (cdr rule))
-				 (error "no child-type"))))
-		      (cdr (multiple-value-bind (rule exists-p)
-			       (gethash (cdr value) *generator-rules*)
-			     (if exists-p
-				 (values (car rule) (cdr rule))
-				 (error "no child-type"))))
-		      (info parent-type)
-		      (otherwise (error "child not car or cdr: ~a" child-type)))
-		    (error "parent-type nonexistent"))))) name)))
-    (setf (gethash name *generator-rules*) (cons function width-function))
-    (setf (gethash name *generator-graph*) (cons car cdr))))
+(defun gen-hole-spread-func (&key
+			       (name (random most-positive-fixnum))
+			       ((:car inner-func) *null-parent*)
+			       ((:cdr outer-func) *null-parent*)
+			       &allow-other-keys)
+  (lambda (child-type &optional child)
+    (ecase child-type
+      (car (funcall inner-func child))
+      (cdr (funcall outer-func child))
+      (info name)
+      (otherwise (error "child not car or cdr: ~a" child-type)))))
 
 (defun set-hole-type (hole type)
-  (multiple-value-bind (rules exists-p) (gethash type *generator-rules*)
+  (multiple-value-bind (rules exists-p) (get-hole-generator type)
     (if exists-p
-	(setf (hole-indentation-func hole) (cdr rules)
-	      (hole-generator hole) (car rules))
+	(setf (hole-indentation-func hole) *no-indent*
+	      (hole-generator hole) rules)
 	(error "hole type does not exist: ~a" type))))
 
 (defun allow-indentation-outside-cons-cells (node)
@@ -396,101 +384,35 @@
 	     (right (or (node-next node) (punt)))
 	     (left-payload (node-payload left))
 	     (right-payload (node-payload right))
-	     (left-payload-type (payload-metadata left-payload))
-	     (right-payload-type (payload-metadata right-payload))
 	     (left-type (car (bracket-object (payload-data left-payload))))
 	     (right-type (car (bracket-object (payload-data right-payload)))))
-	(declare (ignorable right-payload-type left-payload-type))
 	(if (and (eq left-type (quote cons))
 		 (eq right-type (quote cons)))
 	    (values (- (bracket-width (payload-data left-payload))) t)
 	    (values 0 nil))))))
-(define-indentation-rule (quote nope) :width-function (function allow-indentation-outside-cons-cells))
 
+(defun define-indentation-rule (&rest args)
+  (let ((function	   
+	 (apply (function gen-hole-spread-func) args)))
+    (print args)
+    (setf (get-hole-generator (getf args :name)) function)))
 
-(defun nthfnc (function data &optional (times 0))
-  (dotimes (amount times)
-    (setf data (funcall function data)))
-  data)
-
-(defun char-search-down (node)
-  (labels ((rec (node offset height)
-	     (when node
-	       (let ((data (node-payload node)))
-		 (typecase data
-		   (character
-		    (if (zerop offset)
-			(values node height)
-			(rec (node-next node)
-			     (+ offset 1)
-			     height)))
-		   (hole (if (hole-active data)
-			     (rec (node-next node)
-				  (+ offset (hole-width data))
-				  (1- height))
-			     (rec (node-next node) offset height)))
-		   (t (rec (node-next node) offset height)))))))
-    (rec (node-next node) 1 0)))
-
-(defun char-search-up (node)
-  (labels ((rec (node offset height)
-	     (when node
-	       (let ((data (node-payload node)))
-		 (typecase data
-		   (character
-		    (if (zerop offset)
-			(values node height)
-			(rec (node-prev node)
-			     (- offset 1)
-			     height)))
-		   (hole (if (hole-active data)
-			     (rec (node-prev node)
-				  (- offset (hole-width data))
-				  (1+ height))
-			     (rec (node-prev node) offset height)))
-		   (t (rec (node-prev node) offset height)))))))
-    (rec (node-prev node) -1 0)))
-
-(defun payload-width (payload)
-  (typecase payload
-    (character 1)
-    (hole (if (hole-active payload)
-	      (hole-width payload)
-	      0))
-    (t 0)))
-
+;;;;ftype (function (child) (values spread-function width-function)) value
 (progn
-  (declaim (ftype (function (node (function (t) t)) (or null node))
-		  find-node-forward find-node-backward))
-  (defun find-node-forward (nodes test)
-    (let ((width 0)
-	  (height 0))
-      (labels ((rec (node)
-		 (if node
-		     (let ((payload (node-payload node)))		       
-		       (if (funcall test payload)
-			   (values node payload width height)
-			   (progn
-			     (incf width (payload-width payload))
-			     (when (and (typep payload (quote hole))
-					(hole-active payload))
-			       (decf height))
-			     (rec (node-next node)))))
-		     nil)))
-	(rec nodes))))
-  (defun find-node-backward (nodes test)
-    (let ((width 0)
-	  (height 0))
-      (labels ((rec (node)
-		 (if node
-		     (let ((payload (node-payload node)))
-		       (if (funcall test payload)
-			   (values node payload width height)
-			   (progn
-			     (decf width (payload-width payload))
-			     (when (and (typep payload (quote hole))
-					(hole-active payload))
-			       (incf height))
-			     (rec (node-prev node)))))
-		     nil)))
-	(rec nodes)))))
+  (defparameter *generator-rules* (make-hash-table :test (quote eq)))
+  (defun get-hole-generator (name)
+    (gethash name *generator-rules*))
+  (defun (setf get-hole-generator) (value name)
+    (setf (gethash name *generator-rules*) value)))
+
+(define-indentation-rule
+    :name (quote form)
+    :car (lambda (node)
+	   (declare (ignorable node))
+	   (values (get-hole-generator (quote form))
+		   (function allow-indentation-outside-cons-cells)))
+    :cdr (lambda (node)
+	   (declare (ignorable node))
+	   (values (get-hole-generator (quote form))
+		   (function allow-indentation-outside-cons-cells))))
+
