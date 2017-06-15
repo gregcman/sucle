@@ -1,42 +1,70 @@
 (in-package :sandbox)
 
-(defstruct node
-  prev
-  next
-  payload)
+(progn
+  (defstruct node
+    prev
+    next
+    payload)
+  (progn
+    (defparameter *node-print-depth* (ash 2 (if t 7 4)))
+    (defun pprint-node (stream node)
+      (pprint-logical-block (stream nil)
+	(print-unreadable-object (node stream :type nil :identity nil)
+	  (dotimes (x *node-print-depth*)
+	    (format stream "~a" (node-payload node))
+	    (let ((next (node-next node)))
+	      (if (typep next (quote node))
+		  (progn
+		    (setf node next))
+		  (return)))))))
+    (set-pprint-dispatch (quote node) (quote pprint-node)))
+  (progn
+    (defun link-nodes (prev-node next-node)
+      (setf (node-next prev-node) next-node
+	    (node-prev next-node) prev-node))
+    (defun disconnect-node (node)
+      (let ((prev (node-prev node))
+	    (next (node-next node)))
+	(setf (node-next node) nil
+	      (node-prev node) nil)
+	(when (typep prev (quote node))
+	  (setf (node-next prev) next))
+	(when (typep next (quote node))
+	  (setf (node-prev next) prev))))
+    (defun disconnect-node-prev (node)
+      (let ((prev (node-prev node)))
+	(setf (node-prev node) nil)
+	(when (typep prev (quote node))
+	  (setf (node-next prev) nil)))
+      node)
+    (defun disconnect-node-next (node)
+      (let ((next (node-next node)))
+	(setf (node-next node) nil)
+	(when (typep next (quote node))
+	  (setf (node-prev next) nil)))
+      node)
+    (defun string-nodes (string &optional (base (load-time-value (make-node))))
+      (let ((prev-node base))
+	(let ((len (length string)))
+	  (dotimes (index len)
+	    (let ((char (aref string index)))
+	      (let ((new-node (make-node :payload char)))
+		(link-nodes prev-node new-node)
+		(setf prev-node new-node))))
+	  (let ((start (node-next base)))
+	    (disconnect-node base)
+	    (link-nodes prev-node start)
+	    (values start
+		    len)))))
+    (defun splice-nodes (prev next)
+      (let ((otherprev (node-prev next))
+	    (othernext (node-next prev)))
+	(link-nodes otherprev othernext)
+	(link-nodes prev next)))))
 
 (defstruct payload
   metadata
   data)
-
-(defstruct bracket
-  object
-  (width 0 :type fixnum)
-  left
-  right)
-
-(defstruct hole
-  (width 0 :type fixnum)
-  active
-  (motion 0 :type fixnum)
-  generator
-  indentation-func)
-
-(progn
-  (defparameter *node-print-depth* (ash 2 (if t 7 4)))
-  (defun pprint-node (stream node)
-    (pprint-logical-block (stream nil)
-      (print-unreadable-object (node stream :type nil :identity nil)
-	(dotimes (x *node-print-depth*)
-	  (format stream "~a" (node-payload node))
-	  (let ((next (node-next node)))
-	    (if (typep next (quote node))
-		(progn
-					;		(format stream ", ")
-		  (setf node next))
-		(return)))))))
-  (set-pprint-dispatch (quote node) (quote pprint-node)))
-
 (progn
   (defun pprint-payload (stream payload)
     (pprint-logical-block (stream nil)
@@ -47,55 +75,44 @@
 		  (right "]"))))))
   (set-pprint-dispatch (quote payload) (quote pprint-payload)))
 
+(defstruct bracket
+  object
+  (width 0 :type fixnum)
+  left
+  right)
+
 (progn
-  (defun pprint-hole (stream hole)
-    (pprint-logical-block (stream nil)
-      (let ((width (hole-width hole)))
-	(format stream "<~a ~a ~a>" (if (hole-active hole) #\@ #\#) width (hole-motion hole)))))
-  (set-pprint-dispatch (quote hole) (quote pprint-hole)))
-
-(defun link-nodes (prev-node next-node)
-  (setf (node-next prev-node) next-node
-	(node-prev next-node) prev-node))
-(defun disconnect-node (node)
-  (let ((prev (node-prev node))
-	(next (node-next node)))
-    (setf (node-next node) nil
-	  (node-prev node) nil)
-    (when (typep prev (quote node))
-      (setf (node-next prev) next))
-    (when (typep next (quote node))
-      (setf (node-prev next) prev))))
-
-(defun disconnect-node-prev (node)
-  (let ((prev (node-prev node)))
-    (setf (node-prev node) nil)
-    (when (typep prev (quote node))
-      (setf (node-next prev) nil)))
-  node)
-(defun disconnect-node-next (node)
-  (let ((next (node-next node)))
-    (setf (node-next node) nil)
-    (when (typep next (quote node))
-      (setf (node-prev next) nil)))
-  node)
-
-(defun string-nodes (string &optional (base (load-time-value (make-node))))
-  (let ((prev-node base))
-    (let ((len (length string)))
-      (dotimes (index len)
-	(let ((char (aref string index)))
-	  (let ((new-node (make-node :payload char)))
-	    (link-nodes prev-node new-node)
-	    (setf prev-node new-node))))
-      (let ((start (node-next base)))
-	(disconnect-node base)
-	(link-nodes prev-node start)
-	(values start
-		len)))))
+  (defstruct hole
+    (width 0 :type fixnum)
+    active
+    (motion 0 :type fixnum)
+    generator
+    indentation-func)
+  (defun hole-type (hole)
+    (let ((gen-func (hole-generator hole)))
+      (if (functionp gen-func)
+	  (funcall gen-func (quote info))
+	  gen-func)))
+  (progn
+    (defun pprint-hole (stream hole)
+      (pprint-logical-block (stream nil)
+	(let ((width (hole-width hole)))
+	  (format stream "<~a ~a ~a ~a>" (if (hole-active hole) #\@ #\#) width (hole-motion hole)
+		  (hole-type hole)))))
+    (set-pprint-dispatch (quote hole) (quote pprint-hole)))
+  (progn
+    (defun deactivate-hole (hole)
+      (when (hole-active hole)
+	(incf (hole-motion hole) (hole-width hole))
+	(setf (hole-active hole) nil)))
+    (defun activate-hole (hole)
+      (unless (hole-active hole)
+	(decf (hole-motion hole) (hole-width hole))
+	(setf (hole-active hole) t)))))
 
 (defun print-to-buf (object)
-  (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t :element-type (quote character))))
+  (let ((buffer (load-time-value
+		 (make-array 0 :fill-pointer 0 :adjustable t :element-type (quote character)))))
     (setf (fill-pointer buffer) 0)
     (with-output-to-string (var buffer)
       (prin1 object var))
@@ -115,12 +132,6 @@
       (link-nodes left-bracket right-bracket)
       (link-nodes right-bracket left-bracket)
       left-bracket)))
-
-(defun splice-nodes (prev next)
-  (let ((otherprev (node-prev next))
-	(othernext (node-next prev)))
-    (link-nodes otherprev othernext)
-    (link-nodes prev next)))
 
 (defun enbracket (a data2 width)
   (let ((brackets (gen-brackets data2 width)))
@@ -199,92 +210,43 @@
       (link-nodes node node)
       node)))
 
-(setf *print-case* :downcase)
-(defparameter *test-tree*
-  (copy-tree
-   (quote
-    (defun print-cells (sexp)
-      (let ((cdr (cdr sexp))
-	    (car (car sexp)))
-	(if (listp car)
-	    (if car
-		(progn
-		  (princ "(")
-		  (print-cells car))
-		(princ nil))
-	    (prin1 car))
-	(if (listp cdr)
-	    (if cdr
-		(progn
-		  (princ " ")
-		  (print-cells cdr))
-		(princ ")"))
-	    (progn
-	      (princ " . ")
-	      (prin1  cdr)
-	      (princ ")"))))))))
-
-
-(defun draw-nodes (x y nodes)
-  (let ((cap 512))
-    (dotimes (index cap)
-      (scwu nodes x y)
-      (let ((next (node-next-char (node-next nodes))))
-	(if next
-	    (progn
-	      (incf x)
-	      (setf nodes next))
-	    (return))))))
-
-(defun draw-nodes2 (x y nodes)
-  (let ((cap 1024))
-    (dotimes (index cap)
-      (let ((next (node-next nodes)))
-	(cond ((not next) (return))
-	      (t
-	       (let ((payload (node-payload next)))
+;;walking
+(defun draw-nodes2 (x y node &optional (cap 1024))
+  (dotimes (index cap)
+    (if node
+	(progn (let ((payload (node-payload node)))
 		 (typecase payload
-		   (character (scwu next x y) (incf x))
-		   (payload)
+		   (character (scwu node x y) (incf x))
 		   (hole
-		    (update-whole-hole next)
+		    (update-whole-hole node)
 		    (when (hole-active payload)
 		      (decf y 1)
 		      (incf x (hole-width payload))))))
-	       (setf nodes next)))))))
-(defun draw-nodes2-reverse (x y nodes)
-  (let ((cap 1024))
-    (dotimes (index cap)
-      (let ((next (node-prev nodes)))
-	(cond ((not next) (return))
-	      (t
-	       (let ((payload (node-payload next)))
+	       (setf node (node-next node)))
+	(return))))
+
+;;walking
+(defun draw-nodes2-reverse (x y node &optional (cap 1024))
+  (dotimes (index cap) 
+    (if node
+	(progn (let ((payload (node-payload node)))
 		 (typecase payload
-		   (character (scwu next x y) (decf x))
-		   (payload)
+		   (character (scwu node x y) (decf x))
 		   (hole
-		    (update-whole-hole next)
+		    (update-whole-hole node)
 		    (when (hole-active payload)
-			   (incf y 1)
-			   (incf x (- (hole-width payload)))))))
-	       (setf nodes next)))))))
+		      (incf y 1)
+		      (decf x (hole-width payload))))))
+	       (setf node (node-prev node)))
+	(return))))
 
-(defun node-next-char (node)
-  (if node
-      (if (typep (node-payload node) (quote character))
-	  node
-	  (node-next-char (node-next node)))))
-(defun node-prev-char (node)
-  (if node
-      (if (typep (node-payload node) (quote character))
-	  node
-	  (node-prev-char (node-prev node)))))
-
+;;;;walking
 (defun jump-block-left (node)
   (bracket-left (payload-data (node-payload node))))
 (defun jump-block-right (node)
   (bracket-right (payload-data (node-payload node))))
 
+;;;walking
 (defun find-enclosing-block-left (node)
   (block nil
     (if node
@@ -297,74 +259,33 @@
 			(setf node (jump-block-left node))))))
 	  (find-enclosing-block-left (node-prev node))))))
 
-(defun map-nodes (nodes function &optional (times 512))
-  (dotimes (x times)
-    (funcall function nodes)
-    (setf nodes (node-next nodes))))
-
-(progn
-  (declaim (ftype (function (node (function (t) t)) (or null node)) find-node-forward))
-  (defun find-node-forward (nodes test)
-    (labels ((rec (node)
-	       (if node
-		   (let ((payload (node-payload node)))
-		     (if (funcall test payload)
-			 (values node payload)
-			 (rec (node-next node))))
-		   nil)))
-      (rec nodes))))
-
-(defun bracket-type (data)
-  (when (or (eq data (quote left))
-	    (eq data (quote right)))
-    data))
-
-(defun deactivate-hole (hole)
-  (when (hole-active hole)
-    (incf (hole-motion hole) (hole-width hole))
-    (setf (hole-active hole) nil)))
-(defun activate-hole (hole)
-  (unless (hole-active hole)
-    (decf (hole-motion hole) (hole-width hole))
-    (setf (hole-active hole) t)))
 
 (defun width-prop (node)
-  (let ((hole (node-payload node)))
-    (let ((motion (hole-motion hole)))
-      (unless (zerop motion)
-	(setf (hole-motion hole) 0)
+  (let* ((hole (node-payload node))
+	 (motion (hole-motion hole)))
+    (unless (zerop motion)
+      (setf (hole-motion hole) 0)
+      (labels ((%width-prop (node value)
+		 (when node
+		   (let ((payload (node-payload node)))
+		     (typecase payload
+		       (hole (if (hole-active payload)
+				 (incf (hole-width payload) value)
+				 (incf (hole-motion payload) value))
+			     node)
+		       (payload
+			(case (payload-metadata payload)
+			  (left (%width-prop (node-next (jump-block-right node))
+					     value))
+			  (right (let ((bracket (payload-data payload)))
+				   (decf (bracket-width bracket) value))
+				 (%width-prop (node-next node) value))))
+		       (t (%width-prop (node-next node) value))))))) 
 	(%width-prop (node-next node) motion)))))
 
-(defun %width-prop (node value)
-  (when node
-    (let ((payload (node-payload node)))
-      (typecase payload
-	(hole (if (hole-active payload)
-		  (incf (hole-width payload) value)
-		  (incf (hole-motion payload) value))
-	      node)
-	(payload
-	 (case (payload-metadata payload)
-	   (left (%width-prop (node-next (jump-block-right node))
-			     value))
-	   (right (let ((bracket (payload-data payload)))
-		    (decf (bracket-width bracket) value))
-		  (%width-prop (node-next node) value))))
-	(t (%width-prop (node-next node) value))))))
-
-(defun test420 ()
-  (map-nodes barfoo
-	     (lambda (x)
-	       (let ((payload (node-payload x)))
-		 (typecase payload
-		   (hole (setf (hole-active payload)
-			       (if (zerop (random 2)) t nil)
-			       (hole-width payload)
-			       (random 10))))))))
 
 (defun find-parent-hole (node)
   (%find-parent-hole (node-prev node) 0))
-
 (defun %find-parent-hole (node depth)
   (when node
     (let ((payload (node-payload node)))
@@ -385,6 +306,7 @@
 	  (case child-type
 	    (car (values *null-parent* *no-indent*))
 	    (cdr (values *null-parent* *no-indent*))
+	    (info "void")
 	    (otherwise (error "child not car or cdr: ~a" child-type))))))
 
 (defun generate-child-indentation-type (parent-type depth)
@@ -454,7 +376,7 @@
 			     (if exists-p
 				 (values (car rule) (cdr rule))
 				 (error "no child-type"))))
-		      (info (print parent-type))
+		      (info parent-type)
 		      (otherwise (error "child not car or cdr: ~a" child-type)))
 		    (error "parent-type nonexistent"))))) name)))
     (setf (gethash name *generator-rules*) (cons function width-function))
@@ -468,17 +390,107 @@
 	(error "hole type does not exist: ~a" type))))
 
 (defun allow-indentation-outside-cons-cells (node)
-  (let* ((left (node-prev node))
-	 (right (node-next node))
-	 (left-payload (node-payload left))
-	 (right-payload (node-payload right))
-	 (left-payload-type (payload-metadata left-payload))
-	 (right-payload-type (payload-metadata right-payload))
-	 (left-type (car (bracket-object (payload-data left-payload))))
-	 (right-type (car (bracket-object (payload-data right-payload)))))
-    (declare (ignorable right-payload-type left-payload-type))
-    (if (and (eq left-type (quote cons))
-	     (eq right-type (quote cons)))
-	(values (- (bracket-width (payload-data left-payload))) t)
-	(values 0 nil))))
+  (block yolo-baggins
+    (flet ((punt () (return-from yolo-baggins (values 0 nil))))
+      (let* ((left (or (node-prev node) (punt)))
+	     (right (or (node-next node) (punt)))
+	     (left-payload (node-payload left))
+	     (right-payload (node-payload right))
+	     (left-payload-type (payload-metadata left-payload))
+	     (right-payload-type (payload-metadata right-payload))
+	     (left-type (car (bracket-object (payload-data left-payload))))
+	     (right-type (car (bracket-object (payload-data right-payload)))))
+	(declare (ignorable right-payload-type left-payload-type))
+	(if (and (eq left-type (quote cons))
+		 (eq right-type (quote cons)))
+	    (values (- (bracket-width (payload-data left-payload))) t)
+	    (values 0 nil))))))
 (define-indentation-rule (quote nope) :width-function (function allow-indentation-outside-cons-cells))
+
+
+(defun nthfnc (function data &optional (times 0))
+  (dotimes (amount times)
+    (setf data (funcall function data)))
+  data)
+
+(defun char-search-down (node)
+  (labels ((rec (node offset height)
+	     (when node
+	       (let ((data (node-payload node)))
+		 (typecase data
+		   (character
+		    (if (zerop offset)
+			(values node height)
+			(rec (node-next node)
+			     (+ offset 1)
+			     height)))
+		   (hole (if (hole-active data)
+			     (rec (node-next node)
+				  (+ offset (hole-width data))
+				  (1- height))
+			     (rec (node-next node) offset height)))
+		   (t (rec (node-next node) offset height)))))))
+    (rec (node-next node) 1 0)))
+
+(defun char-search-up (node)
+  (labels ((rec (node offset height)
+	     (when node
+	       (let ((data (node-payload node)))
+		 (typecase data
+		   (character
+		    (if (zerop offset)
+			(values node height)
+			(rec (node-prev node)
+			     (- offset 1)
+			     height)))
+		   (hole (if (hole-active data)
+			     (rec (node-prev node)
+				  (- offset (hole-width data))
+				  (1+ height))
+			     (rec (node-prev node) offset height)))
+		   (t (rec (node-prev node) offset height)))))))
+    (rec (node-prev node) -1 0)))
+
+(defun payload-width (payload)
+  (typecase payload
+    (character 1)
+    (hole (if (hole-active payload)
+	      (hole-width payload)
+	      0))
+    (t 0)))
+
+(progn
+  (declaim (ftype (function (node (function (t) t)) (or null node))
+		  find-node-forward find-node-backward))
+  (defun find-node-forward (nodes test)
+    (let ((width 0)
+	  (height 0))
+      (labels ((rec (node)
+		 (if node
+		     (let ((payload (node-payload node)))		       
+		       (if (funcall test payload)
+			   (values node payload width height)
+			   (progn
+			     (incf width (payload-width payload))
+			     (when (and (typep payload (quote hole))
+					(hole-active payload))
+			       (decf height))
+			     (rec (node-next node)))))
+		     nil)))
+	(rec nodes))))
+  (defun find-node-backward (nodes test)
+    (let ((width 0)
+	  (height 0))
+      (labels ((rec (node)
+		 (if node
+		     (let ((payload (node-payload node)))
+		       (if (funcall test payload)
+			   (values node payload width height)
+			   (progn
+			     (decf width (payload-width payload))
+			     (when (and (typep payload (quote hole))
+					(hole-active payload))
+			       (incf height))
+			     (rec (node-prev node)))))
+		     nil)))
+	(rec nodes)))))
