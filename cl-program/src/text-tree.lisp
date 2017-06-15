@@ -51,7 +51,7 @@
   (defun pprint-hole (stream hole)
     (pprint-logical-block (stream nil)
       (let ((width (hole-width hole)))
-	(format stream "<~a ~a>" (if (hole-active hole) #\@ #\#) width))))
+	(format stream "<~a ~a ~a>" (if (hole-active hole) #\@ #\#) width (hole-motion hole)))))
   (set-pprint-dispatch (quote hole) (quote pprint-hole)))
 
 (defun link-nodes (prev-node next-node)
@@ -248,7 +248,6 @@
 		   (payload)
 		   (hole
 		    (update-whole-hole next)
-		    (width-prop next)
 		    (when (hole-active payload)
 		      (decf y 1)
 		      (incf x (hole-width payload))))))
@@ -321,11 +320,13 @@
     data))
 
 (defun deactivate-hole (hole)
-  (incf (hole-motion hole) (hole-width hole))
-  (setf (hole-active hole) nil))
+  (when (hole-active hole)
+    (incf (hole-motion hole) (hole-width hole))
+    (setf (hole-active hole) nil)))
 (defun activate-hole (hole)
-  (decf (hole-motion hole) (hole-width hole))
-  (setf (hole-active hole) t))
+  (unless (hole-active hole)
+    (decf (hole-motion hole) (hole-width hole))
+    (setf (hole-active hole) t)))
 
 (defun width-prop (node)
   (let ((hole (node-payload node)))
@@ -466,8 +467,6 @@
 	      (hole-generator hole) (car rules))
 	(error "hole type does not exist: ~a" type))))
 
-(define-indentation-rule (quote nope) :width-function (function allow-indentation-outside-cons-cells))
-
 (defun allow-indentation-outside-cons-cells (node)
   (let* ((left (node-prev node))
 	 (right (node-next node))
@@ -477,7 +476,9 @@
 	 (right-payload-type (payload-metadata right-payload))
 	 (left-type (car (bracket-object (payload-data left-payload))))
 	 (right-type (car (bracket-object (payload-data right-payload)))))
+    (declare (ignorable right-payload-type left-payload-type))
     (if (and (eq left-type (quote cons))
 	     (eq right-type (quote cons)))
-	(values -5 t)
+	(values (- (bracket-width (payload-data left-payload))) t)
 	(values 0 nil))))
+(define-indentation-rule (quote nope) :width-function (function allow-indentation-outside-cons-cells))

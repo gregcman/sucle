@@ -172,7 +172,6 @@
     (let ((it (node-prev-char (node-prev barfoo))))
       (when it
 	(setf barfoo it))))
-  (when (skey-p :q))
   (clear-cam)
   (progn
    (multiple-value-bind (node hole)
@@ -209,8 +208,9 @@
 	 (incf (hole-motion hole))
 	 (width-prop node)))))
   (progn
-    (when (skey-p :a)
-      (test420))
+    (when (skey-j-p :a)
+      (let ((barfoo (find-enclosing-block-left (node-prev (bracket-left (find-enclosing-block-left barfoo))))))
+	(print barfoo)))
     (let ((pos (load-time-value (cons 0 0))))
       (when (skey-p :e)
 	(incf (cdr pos)))
