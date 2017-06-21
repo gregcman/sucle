@@ -1706,3 +1706,37 @@ x
      (dobox ((x xstart (1+ cx1))
 	     (y ystart (1+ cy1)))
 	    (scwu value x y)))))
+
+
+(progn
+  (defparameter *mandelbrot-iteration-cap* 1024)
+  (with-unsafe-speed
+    (defun mandelbrot (x y &optional (cap *mandelbrot-iteration-cap*))
+      (let ((a (complex x y)))
+	(labels ((rec (value count)
+		   (declare (type (complex double-float) value))
+		   (if (> count cap)
+		       nil
+		       (if (>= (abs value) pi)
+			   count
+			   (rec (+ a (expt value pi)) (1+ count))))))
+	  (rec a 0))))))
+(defun mandel-color (x)
+  (if x
+      (sxhash x)
+      0))
+(defun square (x)
+  (vector (- x) (- x) x x))
+
+(progn
+ (defparameter *snapshot* (make-array (list 1024 1024 4) :element-type '(unsigned-byte 8)))
+
+ (dobox ((x 0 1024)
+	 (y 0 1024))
+	(let ((value (get-char-num (get-char (- x 512) (- y 512)))))
+	  (setf (aref *snapshot* x y 0) (ldb (byte 8 0) value))
+	  (setf (aref *snapshot* x y 1) (ldb (byte 8 8) value))
+	  (setf (aref *snapshot* x y 2) (ldb (byte 8 16) value))
+	  (setf (aref *snapshot* x y 3) (ldb (byte 8 24) value))))
+
+ (opticl:write-png-file (saves-path "amandel2") *snapshot*))

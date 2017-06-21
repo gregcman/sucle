@@ -53,18 +53,15 @@
 			 cy1 (floor y1 *block-height*))))))))))
   (when (skey-j-p :escape)
     (setf e:*status* t))
-  (progn *running*
-      (when (zerop (mod *ticks* (floor (/ 60 60))))
-	(other-stuff))
-      (etouq
-       (with-vec-params
-	   (vec-slots :rectangle (quote ((cx0 :x0) (cy1 :y1)
-					 (cx1 :x1) (cy0 :y0))))
-	 (quote (*cursor-rectangle*))
-	 (quote
-	  (when (smice-p :right)
-	    (decf *camera-x* (- cx1 cx0))
-	    (decf *camera-y* (- cy1 cy0)))))))
+  (etouq
+   (with-vec-params
+       (vec-slots :rectangle (quote ((cx0 :x0) (cy1 :y1)
+				     (cx1 :x1) (cy0 :y0))))
+     (quote (*cursor-rectangle*))
+     (quote
+      (when (smice-p :right)
+	(decf *camera-x* (- cx1 cx0))
+	(decf *camera-y* (- cy1 cy0))))))
   (etouq
    (with-vec-params
        (vec-slots :rectangle (quote ((px0 :x0) (py1 :y1)
@@ -80,9 +77,27 @@
 		       py0 py1
 		       px1 (+ cx1 *camera-x*)
 		       py1 (+ cy1 *camera-y*)))))))))
-
+  (other-stuff)
   (uncentered-rectangle *cam-rectangle* *camera-x* *camera-y*
-		      (/ e:*width* *block-width*) (/ e:*height* *block-height*)))
+			(/ e:*width* *block-width*) (/ e:*height* *block-height*))
+  (let ((width *window-block-width*)
+	(height *window-block-height*))
+    (let ((xstart *camera-x*)
+	  (ystart *camera-y*))
+      (let ((b (get-stuff :glyph-screen *other-stuff* *backup*)))
+	(dobox ((xpos 0 *window-block-width*)
+		(ypos 0 *window-block-height*))		   
+	       (let ((offset (* 4 (+ xpos (* ypos width))))
+		     (value (get-char (+ xpos xstart)
+				      (+ ypos ystart))))
+		 (let ((num (get-char-num value)))
+		   (setf (cffi:mem-aref b :uint8 (+ offset 0)) (logand 255 num))
+		   (setf (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num))
+		   (setf (cffi:mem-aref b :uint8 (+ offset 2)) (ldb (byte 8 16) num))
+		   )))
+	(progn
+	  (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+	  (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b))))))
 
 
 (defun uncentered-rectangle (rect x y width height)
@@ -140,16 +155,6 @@
 		   (setf x (1+ x))))))
 	(values x y)))))
 
-(defun atest ()
-  (let ((circle (emit-cons (cons *test-tree* nil))))
-    (let ((last (node-prev circle)))
-      (setf (node-payload last) #\Space))
-    (let ((barfoo (disconnect-node-prev circle)))
-      (let ((start-hole (make-hole)))
-	(set-hole-type start-hole (quote nope))
-	(let ((start (make-node :payload start-hole)))
-	  (link-nodes start barfoo)
-	  start)))))
 
 (progn
   (setf *print-case* :downcase)
@@ -176,122 +181,6 @@
 		(princ " . ")
 		(prin1  cdr)
 		(princ ")")))))))))
-
-(defparameter pos (load-time-value (cons 0 0)))
-(defparameter barfoo (atest))
-(defun reset-barfoo-indentation ()
-  (let ((first-node (first-node barfoo)))
-    (map-nodes first-node (lambda (payload) 
-				  (when (typep payload (quote hole))
-				    (zerofy-hole payload))))
-    (set-hole-type (node-payload first-node) (quote form))))
-(defparameter *sleepy-time* 0.1)
-(defun other-stuff ()
-  (etouq
-   (with-vec-params
-       (vec-slots :rectangle (quote ((cx1 :x1) (cy1 :y1))))
-     (quote (*point-rectangle*))
-     (quote
-      (progn
-	(let ((value (get-char cx1 cy1)))
-	  (when (skey-r-or-p :Z)
-	    (when (typep value (quote node))
-	      (let ((payload (find-enclosing-block-left
-			      (node-prev
-			       (bracket-left (find-enclosing-block-left value))))))
-		(print payload))))
-	  (when (smice-p :left)
-	    (when (typep value (quote node))
-	      (setf (car pos) cx1
-		    (cdr pos) cy1)
-	      (setf barfoo value))))))))
-
-  (block nil
-    (when (skey-r-or-p :f)
-      (let ((next (node-next barfoo)))
-	(multiple-value-bind (it )
-	    (find-node-forward
-	     (or next (return))
-	     (function characterp))
-	  (when it
-	    (setf barfoo it))))))
-  (block nil
-    (when (skey-r-or-p :s)
-      (let ((prev (node-prev barfoo)))
-	(multiple-value-bind (it)
-	    (find-node-backward (or prev (return))
-				(function characterp))
-	  (when it
-	    (setf barfoo it))))))
-  (when (skey-r-or-p :d)
-    (multiple-value-bind (it) (char-search-down barfoo)
-      (when it
-	(setf barfoo it))))
-  (when (skey-r-or-p :e)
-    (multiple-value-bind (it) (char-search-up barfoo)
-      (when it
-	(setf barfoo it))))
-  (clear-cam)
-  (progn
-   (multiple-value-bind (node hole)
-       (find-node-forward barfoo (function hole-p))
-     (declare (ignorable node))
-     (when node
-       (when (skey-j-p :kp-3)
-	 (format t "~a" hole)
-	 (terpri))
-       (when (skey-j-p :kp-1)
-	 (reset-barfoo-indentation))
-       (when (skey-p :kp-8)
-	 (when (hole-active hole)
-	   (print hole)
-	   (deactivate-hole hole)
-	   (width-prop node)))
-       (when (skey-p :kp-5)
-	 (unless (hole-active hole)
-	   (print hole)
-	   (activate-hole hole)
-	   (width-prop node)))))
-   (multiple-value-bind (node hole)
-       (find-node-forward barfoo (lambda (x) (typecase x
-					       (hole (hole-active x)))))
-     (declare (ignorable node))
-     (when node
-       (when (skey-r-or-p :kp-6)
-	 (incf (hole-width hole))
-	 (decf (hole-motion hole))
-	 (width-prop node))
-       (when (skey-r-or-p :kp-4)
-	 (decf (hole-width hole))
-	 (incf (hole-motion hole))
-	 (width-prop node)))))
-  (progn
-    (when (skey-j-p :a)
-      (let ((barfoo (find-enclosing-block-left (node-prev (bracket-left (find-enclosing-block-left barfoo))))))
-	(print barfoo)))
-    (let ((x (car pos))
-	  (y (cdr pos)))
-      (scwu t x y)
-      (draw-nodes2 (1+ x) y (node-next barfoo))
-      (draw-nodes2-reverse (1- x) y (node-prev barfoo)))
-    (let ((width *window-block-width*)
-	  (height *window-block-height*))
-      (let ((xstart *camera-x*)
-	    (ystart *camera-y*))
-	(let ((b (get-stuff :glyph-screen *other-stuff* *backup*)))
-	  (dobox ((xpos 0 *window-block-width*)
-		  (ypos 0 *window-block-height*))		   
-		 (let ((offset (* 4 (+ xpos (* ypos width))))
-		       (value (get-char (+ xpos xstart)
-					(+ ypos ystart))))
-		   (let ((num (get-char-num value)))
-		     (setf (cffi:mem-aref b :uint8 (+ offset 0)) (logand 255 num))
-		     (setf (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num))
-		     (setf (cffi:mem-aref b :uint8 (+ offset 2)) (ldb (byte 8 16) num))
-		     )))
-	  (progn
-	    (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
-	    (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b)))))))
 
 (defun clear-cam ()
   (map-box *cam-rectangle*
@@ -345,7 +234,7 @@
 	    (fixnum obj)
 	    (cons (recurse (car obj)))
 	    (character (logior *color-white-black* (char-code obj)))
-	    (node (recurse (node-payload obj)))
+	    (node (recurse (payload obj)))
 	    (t (sxhash obj))))))))
 
 (defun nthfnc (function data &optional (times 0))
@@ -353,74 +242,113 @@
     (setf data (funcall function data)))
   data)
 
-(defun char-search-down (node)
-  (labels ((rec (node offset height)
-	     (when node
-	       (let ((data (node-payload node)))
-		 (typecase data
-		   (character
-		    (if (zerop offset)
-			(values node height)
-			(rec (node-next node)
-			     (+ offset 1)
-			     height)))
-		   (hole (if (hole-active data)
-			     (rec (node-next node)
-				  (+ offset (hole-width data))
-				  (1- height))
-			     (rec (node-next node) offset height)))
-		   (t (rec (node-next node) offset height)))))))
-    (rec (node-next node) 1 0)))
+(defun print-to-buf (object)
+  (let ((buffer (load-time-value
+		 (make-array 0 :fill-pointer 0 :adjustable t :element-type (quote character)))))
+    (setf (fill-pointer buffer) 0)
+    (with-output-to-string (var buffer)
+      (prin1 object var))
+    buffer))
 
-(defun char-search-up (node)
-  (labels ((rec (node offset height)
-	     (when node
-	       (let ((data (node-payload node)))
-		 (typecase data
-		   (character
-		    (if (zerop offset)
-			(values node height)
-			(rec (node-prev node)
-			     (- offset 1)
-			     height)))
-		   (hole (if (hole-active data)
-			     (rec (node-prev node)
-				  (- offset (hole-width data))
-				  (1+ height))
-			     (rec (node-prev node) offset height)))
-		   (t (rec (node-prev node) offset height)))))))
-    (rec (node-prev node) -1 0)))
+(defun atest ()
+  (let ((circle (emit-cons (cons *test-tree* nil))))
+    (let ((barfoo (disconnect-prev circle)))
+      (let ((start-hole (make-instance (quote hole))))
+	(link-nodes start-hole barfoo)
+	start-hole))))
 
-(progn
-  (declaim (ftype (function (node (function (t) t)) (or null node))
-		  find-node-forward find-node-backward))
-  (defun find-node-forward (nodes test)
-    (labels ((rec (node)
-	       (if node
-		   (let ((payload (node-payload node)))
-		     (if (funcall test payload)
-			 (values node payload)
-			 (rec (node-next node))))
-		   nil)))
-      (rec nodes)))
-  (defun find-node-backward (nodes test)
-    (labels ((rec (node)
-	       (if node
-		   (let ((payload (node-payload node)))
-		     (if (funcall test payload)
-			 (values node payload)
-			 (rec (node-prev node))))
-		   nil)))
-      (rec nodes))))
+(defparameter barfoo (atest))
+(defparameter pos (load-time-value (cons 0 0)))
+(defun other-stuff ()
+   (etouq
+    (with-vec-params
+	(vec-slots :rectangle (quote ((cx1 :x1) (cy1 :y1))))
+      (quote (*point-rectangle*))
+      (quote
+       (progn
+	 (let ((value (get-char cx1 cy1)))
+	   (when (smice-p :left)
+	     (when (typep value (quote node))
+	       (setf (car pos) cx1
+		     (cdr pos) cy1)
+	       (setf barfoo value))))))))
+   (clear-cam)
+   (esdf)
+   (let ((x (car pos))
+	 (y (cdr pos)))
+     (scwu t x y)
+     (draw-nodes2 (1+ x) y (next barfoo))
+     (draw-nodes2-reverse (1- x) y (prev barfoo))))
 
-(defun first-node (node)
-  (block nil
-    (first-node (or (node-prev node)
-		    (return node)))))
+(defun esdf ()
+  (progn
+   (block nil
+     (when (skey-r-or-p :f)
+       (let ((next (next barfoo)))
+	 (multiple-value-bind (it )
+	     (find-node-forward
+	      (or next (return))
+	      (function (lambda (x) (typep x (quote char-node)))))
+	   (when it
+	     (setf barfoo it))))))
+   (block nil
+     (when (skey-r-or-p :s)
+       (let ((prev (prev barfoo)))
+	 (multiple-value-bind (it)
+	     (find-node-backward (or prev (return))
+				 (function (lambda (x) (typep x (quote char-node)))))
+	   (when it
+	     (setf barfoo it))))))
+   (when (skey-r-or-p :d)
+     (multiple-value-bind (it) (char-search-down barfoo)
+       (when it
+	 (setf barfoo it))))
+   (when (skey-r-or-p :e)
+     (multiple-value-bind (it) (char-search-up barfoo)
+       (when it
+	 (setf barfoo it))))))
 
-(defun map-nodes (nodes function)
-  (labels ((rec (node)
-	     (when node
-	       (funcall function (node-payload node))
-	       (rec (node-next node)))))
-    (rec nodes)))
+(progno
+  (when (skey-j-p :a)
+    (let ((barfoo (find-enclosing-block-left (node-prev (bracket-left (find-enclosing-block-left barfoo))))))
+      (print barfoo))))
+
+(progno (when (skey-r-or-p :Z)
+	  (when (typep value (quote node))
+	    (quote (let ((payload (find-enclosing-block-left
+				   (node-prev
+				    (bracket-left (find-enclosing-block-left value))))))
+		     (print payload))))))
+(progno
+ (multiple-value-bind (node hole)
+     (find-node-forward barfoo (function hole-p))
+    (declare (ignorable node))
+    (when node
+      (when (skey-j-p :kp-3)
+	(format t "~a" hole)
+	(terpri))
+      (when (skey-j-p :kp-1)
+	(reset-barfoo-indentation))
+      (when (skey-p :kp-8)
+	(when (hole-active hole)
+	  (print hole)
+	  (deactivate-hole hole)
+	  (width-prop node)))
+      (when (skey-p :kp-5)
+	(unless (hole-active hole)
+	  (print hole)
+	  (activate-hole hole)
+	  (width-prop node)))))
+  (multiple-value-bind (node hole)
+      (find-node-forward barfoo (lambda (x) (typecase x
+					      (hole (hole-active x)))))
+    (declare (ignorable node))
+    (when node
+      (when (skey-r-or-p :kp-6)
+	(incf (hole-width hole))
+	(decf (hole-motion hole))
+	(width-prop node))
+      (when (skey-r-or-p :kp-4)
+	(decf (hole-width hole))
+	(incf (hole-motion hole))
+	(width-prop node)))))
