@@ -1,4 +1,5 @@
 (asdf:defsystem #:funland
+  :depends-on (#:alexandria)
   :serial t
   :components
   ((:module "ultra"

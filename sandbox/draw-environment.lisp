@@ -42,7 +42,6 @@
    (luse-shader :solidshader)
    (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
 
-   
    (draw-framebuffer)
    (draw-crosshair))
   (window:update-display)
@@ -93,6 +92,7 @@
       (+ (coerce fist-side-x 'single-float))
       (+ (coerce fist-side-y 'single-float))
       (+ (coerce fist-side-z 'single-float))))))
+  (gl:color 0.0 0.0 0.0)
   (gl:disable :cull-face :blend)
   (gl:polygon-mode :front-and-back :line)
   (ldrawlist :selected-box)

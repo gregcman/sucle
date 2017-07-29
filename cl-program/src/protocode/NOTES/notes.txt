@@ -6,3 +6,5 @@
 - context-aware: indentation -> 2 and 3d, coloring -flood fill the fuck out of it
 - rebuilding
 - inserting/ deleting characters/cons cells
+
+- short-jumping and long jumping with a cursor and offset

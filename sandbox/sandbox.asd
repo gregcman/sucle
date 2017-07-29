@@ -1,10 +1,4 @@
 (asdf:defsystem #:sandbox
-    :description "???"
-    :version "0.0.0"
-    :author "Gregorio Manabat III"
-    :maintainer "???"
-    :licence "???"
-
     :depends-on (#:cl-opengl
                  #:cg-matrix
 		 #:bordeaux-threads
@@ -26,12 +20,7 @@
     ((:file "macrology") 
      (:file "package")
      (:module other
-	      :components ((:file "zymbol");;symbol alternative
-			   (:file "cons-pool");;so cons cells can be reused
-			   (:file "hash");;hash functions for standard data)
-			   (:file "unique-id-fixnum");;give out number names
-			   (:file "string-fixnum");;putting strings into fixnums
-			   (:file "hook-elisp")
+	      :components ((:file "hook-elisp")
 			   (:file "queue")))
 
      (:module one
@@ -52,12 +41,6 @@
 			   (:file "block-light") ;;lighting
 			   (:file "block-meshing");;turn world data into a mesh to render
 			   ))
-     (:module webglsl
-	      :serial t
-	      :components ((:file "package")
-			   (:file "types")
-			   (:file "webglsl-grammar")
-			   (:file "webglsl-generator")))
 
      (:file "camera-matrix") ;;matrices for cameras - view, projection
      (:file "magic") ;;initial asset loading

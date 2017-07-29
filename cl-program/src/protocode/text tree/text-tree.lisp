@@ -233,7 +233,7 @@
 
 ;;walking
 (let ((offset (load-time-value (make-instance (quote dimension)))))
-  (defun draw-nodes2 (x y node &optional (cap 1024))
+  (defun draw-nodes2 (x y node &optional (cap 128))
     (setf (x offset) x
 	  (y offset) y)
     (dotimes (index cap)
@@ -252,7 +252,7 @@
 
 ;;walking
 (let ((offset (load-time-value (make-instance (quote dimension)))))
-  (defun draw-nodes2-reverse (x y node &optional (cap 1024))
+  (defun draw-nodes2-reverse (x y node &optional (cap 128))
     (setf (x offset) x
 	  (y offset) y)
     (dotimes (index cap) 

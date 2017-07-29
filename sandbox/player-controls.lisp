@@ -64,6 +64,9 @@
 	       ))
   (defun smice-j-p (enum)
     (e:mice-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
+		))
+  (defun smice-p (enum)
+    (e:mice-p enum
 		)))
 
 (defun controls ()
@@ -187,6 +190,7 @@
   ;;e to escape mouse
   (when (skey-j-p :E) (window:toggle-mouse-capture))
   (hotbar-add e:*scroll-y*)
+  (setf daytime 1.0)
   (unless (zerop e:*scroll-y*)
     (lcalllist-invalidate :hotbar-selector))
   (macrolet ((k (number-key)
@@ -229,12 +233,17 @@
 				  fist-side-z
 				  0
 				  0))
-	  (when (smice-j-p :right)
-	    (setblock-with-update (floor fistx)
-				  (floor fisty)
-				  (floor fistz)
-				  blockval
-				  (aref mc-blocks::lightvalue blockval)))))))
+	  (case 1
+	    (0 (when (smice-j-p :right)
+		 (what345 (floor fistx)
+			  (floor fisty)
+			  (floor fistz))))
+	    (1 (when (smice-j-p :right)
+		 (setblock-with-update (floor fistx)
+				       (floor fisty)
+				       (floor fistz)
+				       blockval
+				       (aref mc-blocks::lightvalue blockval)))))))))
   (collide-with-world)
   
   (if fly
@@ -268,6 +277,12 @@
 	(standard-fist vx vy vz)))))
 
 
+(defun what345 (x y z)
+  (declare (optimize (speed 3) (safety 0))
+	   (type fixnum x y z))
+  (dobox ((y0 y (+ y 10)))
+	 (setblock-with-update x y0 z 3 0)))
+
 (defun collide-with-world ()
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
       (aabbcc::step-motion #'myafunc
@@ -287,7 +302,7 @@
 
 (defun big-swing-fist (vx vy vz)
   (when (and (window:mice-locked-p) (skey-p :q))
-    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 10 vx) (* 10 vy) (* 10 vz)
+    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 5 vx) (* 5 vy) (* 5 vz)
 			 block-aabb
 			 (lambda (x y z)
 			   (when (and (<= 0 x 127)

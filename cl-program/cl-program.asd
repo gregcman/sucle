@@ -23,7 +23,6 @@
 	       (:file "axis-aligned-quads")
 	       (:file "keys-ascii")
 	       (:file "pix")
-	       (:file "text-tree")
 	       (:file "globjects")
 	       
 	       (:file "misc") ;;;everything else

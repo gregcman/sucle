@@ -94,7 +94,7 @@
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
 (defun modify-greens (xpos ypos &optional (color
-					   (case 1
+					   (case 2
 					     (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 					     (1 (imagewise:getapixel 0 255 (get-image "misc/grasscolor.png")))
 					     (2 (imagewise:getapixel 0 0 (get-image "misc/grasscolor.png")))
@@ -424,6 +424,25 @@
 				 1))) v))
 	   world:chunkhash))
 
+(defparameter height (make-array (list 128 128)))
+(defparameter avg (make-array (list 128 128)))
+
+(dobox ((x 0 128)
+	(z -128 0))
+       (setf (aref height x (1- (- z)))
+	     (floor (+ (find-height x (1+ z))
+		       (find-height (1+ x) z)
+		       (find-height x (1- z))
+		       (find-height (1- x) z))
+		    4)))
+
+(defun find-height (x y)
+  (loop for i downfrom 256 to 0 do
+       (let ((block (world:getblock x i y)))
+	 (unless (zerop block)
+	   (return-from find-height i))))
+  0)
+
 (defun all-zeroes-p (sequence)
   (dotimes (x (length sequence))
     (unless (zerop (aref sequence x))
@@ -507,6 +526,14 @@
 	  (y 0 128)
 	  (z -128 0))
 	 (let ((blockid (world:getblock x y z)))
+	   (when (> y (aref height x (1- (- z))))
+	     (plain-setblock x y z 0 15 0)))))
+
+(defun edge-bench ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
 	   (unless (zerop blockid)
 	     (when (= 4 (neighbors x y z))
 	       (plain-setblock x y z 58 0 0))))))
@@ -520,7 +547,13 @@
 	     (when (= 3 (neighbors x y z))
 	       (plain-setblock x y z 49 0 0))))))
 
-(defun stone? ()
+(defun fill-bottom ()
+  (dobox ((x 0 128)
+	  (y 0 64)
+	  (z -128 0))
+	 (plain-setblock x y z 3 0 0)))
+
+(defun bone?r ()
   (dobox ((x 0 128)
 	  (y 0 128)
 	  (z -128 0))
@@ -528,12 +561,31 @@
 	   (unless (zerop blockid)
 	     (when (> 3 (neighbors x y z))
 	       (plain-setblock x y z 0 0 0))))))
+(defun bonder ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (unless (zerop blockid))
+	   (when (< 4 (neighbors x y z))
+	     (plain-setblock x y z 1 0 0)))))
+
+(defun bonder ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:getblock x y z)))
+	   (unless (zerop blockid)
+	     (let ((naybs (neighbors x y z)))
+	       (when (> 3 naybs)
+		 
+		 (plain-setblock x y z 0 0 0)))))))
 
 (defun what? ()
   (dobox ((x 0 128)
 	  (y 0 128)
 	  (z -128 0))
-e	 (let ((blockid (world:getblock x y z)))
+	 (let ((blockid (world:getblock x y z)))
 	   (setblock-with-update x y z blockid 0))))
 
 (defun what? ()
@@ -570,6 +622,15 @@ e	 (let ((blockid (world:getblock x y z)))
 	 (let ((blockid (world:getblock x y z)))
 	   (when (= blockid id)
 	     (plain-setblock x y z 0 0)))))
+
+(defun clcok? ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:skygetlight x y z)))
+	   (when 
+	     (< blockid 15)
+	     (plain-setblock x y z 1 0)))))
 
 (defun grassify ()
   (dobox ((x 0 128)
