@@ -17,7 +17,7 @@
 (defparameter *xpos* nil)
 (defparameter *ypos* nil)
 (defparameter *zpos* nil)
-(defparameter defaultfov (deg-rad 70))
+(defparameter defaultfov (deg-rad (or 95 70)))
 
 (defparameter *xvel* 0)
 (defparameter *yvel* 0)
@@ -258,7 +258,7 @@
   (when (and gravity (not onground))
     (decf *yvel* (* 0.08 (expt tickscale 2))))
   (setf *yvel* (* *yvel* air-friction))
-  (mvb (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
+  (multiple-value-bind (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
        (cond ((plusp *xvel*) (when i+ (setf *xvel* 0.0))
 	      (minusp *xvel*) (when i- (setf *xvel* 0.0))))
        (cond ((plusp *yvel*) (when j+ (setf *yvel* 0.0))
@@ -301,9 +301,9 @@
 (defparameter *fist-function* (constantly nil))
 
 (defun big-swing-fist (vx vy vz)
-  (when (and (window:mice-locked-p) (skey-p :q))
+  (when (and (window:mice-locked-p) (if nil (smice-p :right) (skey-p :q)))
     (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 5 vx) (* 5 vy) (* 5 vz)
-			 block-aabb
+			 chunk-aabb
 			 (lambda (x y z)
 			   (when (and (<= 0 x 127)
 				      (<= 0 y 127)
@@ -311,7 +311,7 @@
 			     (setblock-with-update x y z 0  (aref mc-blocks::lightvalue 0)))))))
 
 (defun standard-fist (vx vy vz)
-  (mvb (frac type blockx blocky blockz)
+  (multiple-value-bind (frac type blockx blocky blockz)
        (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
        (if frac
 	   (setf fist? t
@@ -360,6 +360,12 @@
 	     (,yvar miny maxy)
 	     (,zvar minz maxz))
 	    ,@body)))
+
+(defmacro null! (&rest args)
+  (let (acc)
+    (dolist (arg args)
+      (push `(setf ,arg nil) acc))
+    `(progn ,@acc)))
 
 (defun blocktocontact (aabb px py pz vx vy vz)
   (let ((tot-min 1))
@@ -470,7 +476,7 @@
 	       (let ((i-next (aux-func x dx))
 		     (j-next (aux-func y dy))
 		     (k-next (aux-func z dz)))
-		 (mvb (ratio i? j? k?) (smallest (if i-next
+		 (multiple-value-bind (ratio i? j? k?) (smallest (if i-next
 						     (/ (- i-next x) dx)
 						     most-positive-single-float)
 						 (if j-next

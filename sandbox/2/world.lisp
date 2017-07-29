@@ -53,8 +53,6 @@
 (defparameter skylighthash nil)
 (defparameter metahash nil)
 
-(defparameter heighthash (make-hash-table))
-
 (defun send-to-free-mem (hash pool)
   (maphash
    (lambda (k v)
@@ -160,11 +158,7 @@
        ,block-code
        ,light-code
        ,skylight-code
-       ,meta-code
-       (setf (fdefinition 'getheight) (pix::func-get heighthash 0))
-       (setf (fdefinition 'setheight) (pix::func-set heighthash 0))
-       (defun (setf getheight) (new x y)
-	 (setheight x y new))))
+       ,meta-code))
   (defmacro setup ()
     (establish-system)))
 

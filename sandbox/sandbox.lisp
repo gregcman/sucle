@@ -14,13 +14,11 @@
 
 ;;(defparameter init-hook (hook:create-hook))
 (defun handoff-three ()
-  (macrolet ((k (val)
-	       (nthcdr 3 val)))
-    (k (hook:add-hook init-hook :call-list (lambda () (clrhash *g/call-list*))))
-    (k (hook:add-hook init-hook :texture (lambda () (clrhash *g/texture*))))
-    (k (hook:add-hook init-hook :shader (lambda () (clrhash *g/shader*))))
-    (k (hook:add-hook init-hook :chunk-call-list (lambda () (clrhash *g/chunk-call-list*)))))
-  ;;(hook:run-hook init-hook)
+  (clrhash *g/call-list*)
+  (clrhash *g/texture*)
+  (clrhash *g/shader*)
+  (clrhash *g/chunk-call-list*)
+  
   (glinnit) ;opengl
   (physinnit) ;physics
   (injection)) 
@@ -156,8 +154,8 @@
 	  (aux-func2 z dz)))
 
 (defun aux-step-next (x y z dx dy dz)
-  (mvb (i j k) (step-next x y z dx dy dz)
-       (mvb (value i? j? k?) (smallest i j k)
+  (multiple-value-bind (i j k) (step-next x y z dx dy dz)
+       (multiple-value-bind (value i? j? k?) (smallest i j k)
 	    (values value
 		    (+ x (* dx value))
 		    (+ y (* dy value))
@@ -174,7 +172,7 @@
     (declare (ignorable pluspdx pluspdy pluspdz))
     (tagbody
        rep
-       (mvb (ratio newx newy newz i? j? k?) (aux-step-next x y z dx dy dz)
+       (multiple-value-bind (ratio newx newy newz i? j? k?) (aux-step-next x y z dx dy dz)
 	    (declare (ignorable i? j? k?))
 	    (when i?
 	      (if pluspdx nil))
@@ -427,14 +425,15 @@
 (defparameter height (make-array (list 128 128)))
 (defparameter avg (make-array (list 128 128)))
 
-(dobox ((x 0 128)
-	(z -128 0))
-       (setf (aref height x (1- (- z)))
-	     (floor (+ (find-height x (1+ z))
-		       (find-height (1+ x) z)
-		       (find-height x (1- z))
-		       (find-height (1- x) z))
-		    4)))
+(defun yo ()
+  (dobox ((x 0 128)
+	  (z -128 0))
+	 (setf (aref height x (1- (- z)))
+	       (floor (+ (find-height x (1+ z))
+			 (find-height (1+ x) z)
+			 (find-height x (1- z))
+			 (find-height (1- x) z))
+		      4))))
 
 (defun find-height (x y)
   (loop for i downfrom 256 to 0 do
@@ -454,7 +453,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* #P"world/")
+(defparameter *save* #P"terrarium/")
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -549,9 +548,9 @@
 
 (defun fill-bottom ()
   (dobox ((x 0 128)
-	  (y 0 64)
+	  (y 0 60)
 	  (z -128 0))
-	 (plain-setblock x y z 3 0 0)))
+	 (plain-setblock x y z 0 0 0)))
 
 (defun bone?r ()
   (dobox ((x 0 128)
@@ -629,7 +628,7 @@
 	  (z -128 0))
 	 (let ((blockid (world:skygetlight x y z)))
 	   (when 
-	     (< blockid 15)
+	     (< blockid 12)
 	     (plain-setblock x y z 1 0)))))
 
 (defun grassify ()

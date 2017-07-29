@@ -185,9 +185,10 @@
 		   (1 0 0))))))
 
 (defparameter light-index-table
-  (ret foo-array (make-array 16 :element-type 'single-float)
+  (let ((foo-array (make-array 16 :element-type 'single-float)))
     (dotimes (x 16)
-      (setf (aref foo-array x) (expt 0.8 (- 15 x))))))
+      (setf (aref foo-array x) (expt 0.8 (- 15 x))))
+    foo-array))
 
 (declaim (inline lightfunc))
 (defun lightfunc (light)

@@ -5,11 +5,11 @@
 		 
 		 
 		 #:opticl
-
+		 
 		 #:window-glfw3
 		 #:pileup
 
-		 
+		 #:funland
 		 #:cl-mc-shit)
     :serial t
     :components
@@ -17,11 +17,9 @@
     ;;;;The module numbers roughly correspond to what gets loaded first
     ;;;;The stuff at the beginning has no dependents
     
-    ((:file "macrology") 
-     (:file "package")
+    ((:file "package")
      (:module other
-	      :components ((:file "hook-elisp")
-			   (:file "queue")))
+	      :components ((:file "queue")))
 
      (:module one
 	      :pathname "1"
@@ -30,7 +28,6 @@
 			   (:file "imagewise");;images?
 			   
 			   (:file "aabbcc") ;;box collisions			   
-			   (:file "pix")
 			   (:file "vox")))
      (:module two
 	      :serial t
