@@ -57,6 +57,7 @@
 
 (defun fractionalize (x)
   (clamp x 0.0 1.0))
+(setf (camera-frustum-far *camera*) 256.0)
 
 (defparameter *vec4* (make-array 4 :element-type 'single-float)) 
 (defun vec4 (vec3)

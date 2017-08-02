@@ -77,7 +77,7 @@
 		       py0 py1
 		       px1 (+ cx1 *camera-x*)
 		       py1 (+ cy1 *camera-y*)))))))))
-;  (other-stuff)
+  (other-stuff)
   (uncentered-rectangle *cam-rectangle* *camera-x* *camera-y*
 			(/ e:*width* *block-width*) (/ e:*height* *block-height*))
   (let ((width *window-block-width*)
@@ -222,3 +222,50 @@
     (with-output-to-string (var buffer)
       (prin1 object var))
     buffer))
+
+(defparameter *firing-time* (make-array 128 :initial-element nil))
+(defparameter *pivot* nil)
+(defun other-stuff ()
+  (let ((hash e:*keypress-hash*)
+	(firing-time *firing-time*))
+    (let ((pivot nil)
+	  (timing most-positive-fixnum)
+	  (news nil))
+      (with-hash-table-iterator (gen-fn hash)
+	(loop
+	   (multiple-value-bind (more? key value) (gen-fn)
+	     (if more?
+		 (let ((value (e::get-press-value value))
+		       (code (keyword-code key)))
+		   (when code
+		     (let ((new-timing
+			    (case value
+			      (1 nil) ;;;release
+			      (2 (1+ (aref firing-time code))) ;;;;true
+			      (3 (push code news) 0) ;;;;press
+			      (4 (1+ (aref firing-time code)))))) ;;;;repeat
+		       (setf (aref firing-time code) new-timing)
+		       (unless (or (eql 3 value) (eql 1 value))
+			 (when (< new-timing timing)
+			   (setf pivot code)
+			   (setf timing new-timing))))))
+		 (return)))))
+      (when pivot
+	(let ((x 0)
+	      (y 0)
+	      (changed? nil))
+	  (let ((pivot-pos (physical-keyboard::code-position pivot)))
+	    (dolist (key news)
+	      (unless (= key pivot)
+		(setf changed? t)
+		(let ((pos (physical-keyboard::code-position key)))
+		  (print pos)
+		  (incf x (car pos))
+		  (incf y (cdr pos))
+		  (decf x (car pivot-pos))
+		  (decf y (cdr pivot-pos))))))
+	  (when changed?
+	    (incf *camera-x* x)
+	    (incf *camera-y* y))
+	  )
+	))))

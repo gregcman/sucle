@@ -17,7 +17,7 @@
 (defparameter *xpos* nil)
 (defparameter *ypos* nil)
 (defparameter *zpos* nil)
-(defparameter defaultfov (deg-rad (or 95 70)))
+(defparameter defaultfov (deg-rad (and 95 70)))
 
 (defparameter *xvel* 0)
 (defparameter *yvel* 0)
@@ -190,7 +190,6 @@
   ;;e to escape mouse
   (when (skey-j-p :E) (window:toggle-mouse-capture))
   (hotbar-add e:*scroll-y*)
-  (setf daytime 1.0)
   (unless (zerop e:*scroll-y*)
     (lcalllist-invalidate :hotbar-selector))
   (macrolet ((k (number-key)
@@ -213,12 +212,12 @@
     (when (skey-j-p :t) (update-world-vao))
     (when (skey-j-p :f) (toggle fly))
     (when (skey-j-p :c) (toggle walkblock))
-    (when walkblock (setblock-with-update
-			(truncate *xpos*)
-			(- (truncate *ypos*) 2)
-			(- (truncate *zpos*) 1)
-			*hotbar-selection*
-			0))
+    (when walkblock (
+		     what345
+		     (truncate *xpos*)
+		     (- (truncate *ypos*) 2)
+		     (- (truncate *zpos*) 1)
+		     *hotbar-selection*))
     (when (skey-j-p :h) (time (setf foo (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte))))
     (if fly
 	(setf air-friction 0.9)
@@ -235,9 +234,9 @@
 				  0))
 	  (case 1
 	    (0 (when (smice-j-p :right)
-		 (what345 (floor fistx)
-			  (floor fisty)
-			  (floor fistz))))
+		 (tree (floor fistx)
+		       (floor fisty)
+		       (floor fistz))))
 	    (1 (when (smice-j-p :right)
 		 (setblock-with-update (floor fistx)
 				       (floor fisty)
@@ -277,11 +276,12 @@
 	(standard-fist vx vy vz)))))
 
 
-(defun what345 (x y z)
+(defun what345 (x y z w)
   (declare (optimize (speed 3) (safety 0))
-	   (type fixnum x y z))
-  (dobox ((y0 y (+ y 10)))
-	 (setblock-with-update x y0 z 3 0)))
+	   (type fixnum x y z w))
+  (dobox ((x0 -1 2)
+	  (z0 -1 2))
+	 (setblock-with-update (+ x x0) y (+ z z0) w 0)))
 
 (defun collide-with-world ()
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
@@ -301,9 +301,10 @@
 (defparameter *fist-function* (constantly nil))
 
 (defun big-swing-fist (vx vy vz)
-  (when (and (window:mice-locked-p) (if nil (smice-p :right) (skey-p :q)))
-    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 5 vx) (* 5 vy) (* 5 vz)
-			 chunk-aabb
+  (when (and (window:mice-locked-p) (skey-p :q))
+    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 100 vx) (* 100 vy) (* 100 vz)
+			chunk-aabb
+			 
 			 (lambda (x y z)
 			   (when (and (<= 0 x 127)
 				      (<= 0 y 127)

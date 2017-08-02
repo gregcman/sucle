@@ -73,3 +73,6 @@
       (values char
 	      (if meta
 		  (etouq (char-code #\esc)))))))
+
+(defun keyword-char (keyword)
+  (gethash keyword *keyword-ascii*))
