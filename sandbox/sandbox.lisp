@@ -14,6 +14,10 @@
 
 ;;(defparameter init-hook (hook:create-hook))
 (defun handoff-three ()
+  (initialization1)
+  (injection))
+
+(defun initialization1 ()
   (clrhash *g/call-list*)
   (clrhash *g/texture*)
   (clrhash *g/shader*)
@@ -21,15 +25,19 @@
   
   (glinnit) ;opengl
   (physinnit) ;physics
-  (injection)) 
+  )
 
-(defun injection ()
-  (window:poll)
+(defun thunkit ()
   (physics)
   (set-render-cam-pos *camera*)
   (remove-spurious-mouse-input)
   (render)
-  (incf *ticks*)
+  (incf *ticks*))
+
+(defun injection ()
+  (window:poll)
+  (thunkit)
+  (window:update-display)
   (unless window:*status* 
     (injection)))
 

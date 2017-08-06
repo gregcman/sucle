@@ -20,7 +20,7 @@
   (update-matrices *camera*)
   
   (luse-shader :blockshader)
-   (set-overworld-fog daytime)
+  (set-overworld-fog daytime)
   (bind-default-framebuffer)
   (gl:clear
    :color-buffer-bit
@@ -36,16 +36,17 @@
   (draw-chunk-meshes)
   (progn
    (when fist?
-     (draw-fist *camera*))
+     (draw-fist *camera*)
+     )
    
    (gl:disable :cull-face) 
    (luse-shader :solidshader)
    (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
 
-   (draw-framebuffer)
-   (draw-crosshair))
-  (window:update-display)
-  (progn
+;   (draw-framebuffer)
+;   (draw-crosshair)
+   )
+  (progno
    (draw-hud))
   
   (designatemeshing))

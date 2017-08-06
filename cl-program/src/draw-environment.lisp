@@ -32,7 +32,7 @@
   (defparameter *block-height* nil)
   (defparameter *block-width* nil)
   (setf (values *block-height* *block-width*)
-	(case 1
+	(case 0
 	  (0 (values 16.0 9.0))
 	  (1 (values 11.0 6.0))
 	  (2 (values 16.0 16.0))))
@@ -49,9 +49,7 @@
   (let ((now (get-internal-real-time)))
     
     (setf *last-time* now))
-  (draw-things)
-
-  (window:update-display))
+  (draw-things))
 
 (defparameter *window-width* 64) ;;random numbers which change
 (defparameter *window-height* 64);;
@@ -80,11 +78,17 @@
       (gl:use-program solidshader)
       (gl:uniformi sampler2d 1)
       (set-active-texture 1)
-      (gl:bind-texture :texture-2d (get-stuff :font2 *stuff* *backup*))
+      (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
       
       (gl:uniformi indirection 0)
       (set-active-texture 0)    
       (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+
+      (progn
+	(gl:disable :depth-test :blend)
+	(gl:depth-mask :false)
+	(gl:depth-func :always)
+	(gl:disable :cull-face))
       
       (gl:call-list (get-stuff :fast-text-display-list *stuff* *backup*)))))
 
@@ -116,12 +120,6 @@
 	(height (if t 360 480)))
     (window:push-dimensions width height))
   (setf e:*resize-hook* #'on-resize)
-
-  (progn
-    (gl:disable :depth-test :blend)
-    (gl:depth-mask :false)
-    (gl:depth-func :always)
-    (gl:disable :cull-face))
 
   (let ((hash *stuff*))
     (maphash (lambda (k v)
@@ -178,7 +176,7 @@
 		   (img-path "font/font.png")))))
       (namexpr backup :font
 	       (lambda ()
-		 (pic-texture (get-stuff :font-image *stuff* *backup*)
+		 (lovely-shader-and-texture-uploader:pic-texture (get-stuff :font-image *stuff* *backup*)
 			      :rgba
 			      *default-tex-params*))))
     (progn
@@ -219,7 +217,7 @@
 			   (setf (cffi:mem-aref a :float (+ offset 0)) r)
 			   (setf (cffi:mem-aref a :float (+ offset 1)) g)
 			   (setf (cffi:mem-aref a :float (+ offset 2)) b)
-			   (setf (cffi:mem-aref a :float (+ offset 3)) 0f0)))))
+			   (setf (cffi:mem-aref a :float (+ offset 3)) 0.1)))))
 		 a)))
     (namexpr backup :glyph-screen
 	     (lambda ()

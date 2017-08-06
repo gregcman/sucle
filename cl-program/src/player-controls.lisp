@@ -77,27 +77,29 @@
 		       py0 py1
 		       px1 (+ cx1 *camera-x*)
 		       py1 (+ cy1 *camera-y*)))))))))
-  (other-stuff)
+;;  (other-stuff)
   (uncentered-rectangle *cam-rectangle* *camera-x* *camera-y*
 			(/ e:*width* *block-width*) (/ e:*height* *block-height*))
-  (let ((width *window-block-width*)
-	(height *window-block-height*))
-    (let ((xstart *camera-x*)
-	  (ystart *camera-y*))
-      (let ((b (get-stuff :glyph-screen *other-stuff* *backup*)))
-	(dobox ((xpos 0 *window-block-width*)
-		(ypos 0 *window-block-height*))		   
-	       (let ((offset (* 4 (+ xpos (* ypos width))))
-		     (value (get-char (+ xpos xstart)
-				      (+ ypos ystart))))
-		 (let ((num (get-char-num value)))
-		   (setf (cffi:mem-aref b :uint8 (+ offset 0)) (logand 255 num))
-		   (setf (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num))
-		   (setf (cffi:mem-aref b :uint8 (+ offset 2)) (ldb (byte 8 16) num))
-		   )))
-	(progn
-	  (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
-	  (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b))))))
+  (progn
+   (let ((width *window-block-width*)
+	 (height *window-block-height*))
+     (let ((xstart *camera-x*)
+	   (ystart *camera-y*))
+       (let ((b (get-stuff :glyph-screen *other-stuff* *backup*)))
+	 (dobox ((xpos 0 *window-block-width*)
+		 (ypos 0 *window-block-height*))		   
+		(let ((offset (* 4 (+ xpos (* ypos width))))
+		      (value (get-char (+ xpos xstart)
+				       (+ ypos ystart))))
+		  (let ((num (get-char-num value)))
+		    (setf (cffi:mem-aref b :uint8 (+ offset 0)) (logand 255 num))
+		    (setf (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num))
+		    (setf (cffi:mem-aref b :uint8 (+ offset 2)) (ldb (byte 8 16) num))
+		    (setf (cffi:mem-aref b :uint8 (+ offset 3)) (ldb (byte 8 24) num))
+		    )))
+	 (progn
+	   (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
+	   (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :rgba :unsigned-byte b)))))))
 
 
 (defun uncentered-rectangle (rect x y width height)
@@ -202,12 +204,12 @@
     (setf data (funcall function data)))
   data)
 
-(defun print-to-buf (object)
+(defun print-to-buf (object &optional (print-func #'prin1))
   (let ((buffer (load-time-value
 		 (make-array 0 :fill-pointer 0 :adjustable t :element-type (quote character)))))
     (setf (fill-pointer buffer) 0)
     (with-output-to-string (var buffer)
-      (prin1 object var))
+      (funcall print-func object var))
     buffer))
 
 (defparameter *firing-time* (make-array 128 :initial-element nil))
