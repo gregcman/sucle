@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :aplayground)
 
 (defparameter *vec-types* (make-hash-table :test 'equalp))
 (defun vec-slots (type args &optional (lookup *vec-types*))

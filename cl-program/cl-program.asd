@@ -14,23 +14,25 @@
     :serial t
     :components
     
-    ((:module "src"
+    ((:module "auxiliary-functions"
+	      :components
+	      ((:file "rectangular-tilemap")
+	       (:file "axis-aligned-quads")
+	       (:file "pix")
+	       (:file "lovely-shader-and-texture-uploader")))
+
+     (:module "src"
 	      :serial t
 	      :components
 	      ((:file "package")
-	       (:file "vec-param-layout")
-	       (:file "tilemap")
-	       (:file "axis-aligned-quads")
+	       
+	       (:file "vec-param-layout")	       
 	       (:file "keys-ascii")
-	       (:file "pix")
+	       (:file "physical-keyboard")
+	       
+	       (:file "misc") ;;;everything else	       
 	       (:file "globjects")
-	       
-	       (:file "misc") ;;;everything else
-	       
-	       (:file "lovely-renderer") ;;;layers over opengl
-	       
 	       (:file "draw-environment") ;;;random rendering
-	       
+	       (:file "pix2")
 	       (:file "player-controls");;;layers over input
-	       
 	       (:file "sandbox"))))) ;;;initialization and loop

@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :aplayground)
 
 
 (defparameter *mouse-rectangle* (vector 0.0 0.0 0.0 0.0))
@@ -114,19 +114,6 @@
        y1 (+ y height height))))))
 
 (progn
- (defun (setf get-char) (value x y)
-   (set-char value x y))
- (defun get-char (x y)
-   (multiple-value-bind (chunk offset) (pix::area2 x y pix::*world*)
-     (aref chunk offset)))
- (defun set-char (value x y)
-   (multiple-value-bind (chunk offset) (pix::area2 x y pix::*world*)
-     (setf (aref chunk offset) value)))
- (defun scwu (char x y)
-   (set-char char x y)))
-
-
-(progn
   (declaim (ftype (function (vector (function (fixnum fixnum)))) map-box))
   (with-unsafe-speed
     (defun map-box (box function)
@@ -225,11 +212,14 @@
 
 (defparameter *firing-time* (make-array 128 :initial-element nil))
 (defparameter *pivot* nil)
+(defparameter *cursor-x* 0)
+(defparameter *cursor-y* 0)
+
 (defun other-stuff ()
   (let ((hash e:*keypress-hash*)
 	(firing-time *firing-time*))
     (let ((pivot nil)
-	  (timing most-positive-fixnum)
+	  (timing -1)
 	  (news nil))
       (with-hash-table-iterator (gen-fn hash)
 	(loop
@@ -246,7 +236,7 @@
 			      (4 (1+ (aref firing-time code)))))) ;;;;repeat
 		       (setf (aref firing-time code) new-timing)
 		       (unless (or (eql 3 value) (eql 1 value))
-			 (when (< new-timing timing)
+			 (when (> new-timing timing)
 			   (setf pivot code)
 			   (setf timing new-timing))))))
 		 (return)))))
@@ -259,13 +249,41 @@
 	      (unless (= key pivot)
 		(setf changed? t)
 		(let ((pos (physical-keyboard::code-position key)))
-		  (print pos)
 		  (incf x (car pos))
 		  (incf y (cdr pos))
 		  (decf x (car pivot-pos))
 		  (decf y (cdr pivot-pos))))))
 	  (when changed?
-	    (incf *camera-x* x)
-	    (incf *camera-y* y))
-	  )
-	))))
+	    (etouq
+	     (with-vec-params
+		 (vec-slots :rectangle (quote ((px0 :x0) (py1 :y1)
+					       (px1 :x1) (py0 :y0))))
+	       (quote (*cam-rectangle* with-let-mapped-places))
+	       (quote
+		(let ((a0 (floor px0))
+		      (a1 (floor px1))
+		      (b0 (floor py0))
+		      (b1  (floor py1)))
+		  (let ((xnew (+ a0 (mod (- (+ *cursor-x* x) a0) (- a1 a0))))
+			(ynew (+ b0 (mod (- (+ *cursor-y* y) b0) (- b1 b0)))))
+		    (progn (foobar (sxhash (sxhash (sxhash (ash (get-internal-run-time) -6))))
+				   *cursor-x* *cursor-y* xnew ynew))
+		    (setf *cursor-x* xnew)
+		    (setf *cursor-y* ynew)))))))))))
+  (set-char 0 *cursor-x* *cursor-y*))
+
+
+(defun foobar (a x y x0 y0)
+  (dobox ((c (min x x0) (1+ (max x x0)))
+	  (d (min y y0) (1+ (max y y0))))
+	 (set-char a c d)))
+
+(defun rectangle-size (rectangle)
+  (etouq
+   (with-vec-params
+       (vec-slots :rectangle (quote ((px0 :x0) (py1 :y1)
+				     (px1 :x1) (py0 :y0))))
+     (quote (rectangle let))
+     (quote
+      (* (- px1 px0)
+	 (- py1 py0))))))

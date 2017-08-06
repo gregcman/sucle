@@ -1,4 +1,7 @@
-(in-package :sandbox)
+(defpackage :rectangular-tilemap
+  (:use :cl))
+
+(in-package :rectangular-tilemap)
 
 (progn
   (declaim (ftype (function (fixnum fixnum fixnum)
@@ -39,3 +42,5 @@
 	      (aref array (1+ p))
 	      (aref array (+ 2 p))
 	      (aref array (+ 3 p))))))
+
+(export (quote (sequential-index-generator regular-enumeration index-quad-lookup)))

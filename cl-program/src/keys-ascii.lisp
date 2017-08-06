@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :aplayground)
 
 (progn
   (defun map-symbol-ascii (hash)
@@ -74,5 +74,5 @@
 	      (if meta
 		  (etouq (char-code #\esc)))))))
 
-(defun keyword-char (keyword)
+(defun keyword-code (keyword)
   (gethash keyword *keyword-ascii*))

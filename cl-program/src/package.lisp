@@ -1,4 +1,4 @@
-(defpackage #:sandbox
+(defpackage #:aplayground
   (:use 
    #:cl
    #:fuktard))

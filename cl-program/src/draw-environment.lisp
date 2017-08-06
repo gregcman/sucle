@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :aplayground)
 
 (defun make-attrib-buffer-data ()
   (make-array 16 :element-type t :initial-element nil))
@@ -26,13 +26,13 @@
 					   (:texture-wrap-s . :repeat)
 					   (:texture-wrap-t . :repeat))))
 
-(defparameter *16x16-tilemap* (regular-enumeration 16 16))
+(defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16))
 
 (progn
   (defparameter *block-height* nil)
   (defparameter *block-width* nil)
   (setf (values *block-height* *block-width*)
-	(case 0
+	(case 1
 	  (0 (values 16.0 9.0))
 	  (1 (values 11.0 6.0))
 	  (2 (values 16.0 16.0))))
@@ -66,6 +66,11 @@
 	 (ceiling (/ e:*width* *block-width* 0.5))
 	 (ceiling (/ e:*height* *block-height* 0.5)))))
 
+(progn
+  (defconstant +gltexture0+ (cffi:foreign-enum-value (quote %gl:enum) :texture0))
+  (defun set-active-texture (num)
+    (gl:active-texture (+ num +gltexture0+))))
+
 (defun draw-things ()
   (progn
     (let* ((solidshader (get-stuff :other-text-shader *stuff* *backup*))
@@ -74,11 +79,11 @@
 	   (indirection (getuniform solidshader-uniforms :indirection)))
       (gl:use-program solidshader)
       (gl:uniformi sampler2d 1)
-      (gl:active-texture (+ 1 +gltexture0+))
-      (gl:bind-texture :texture-2d (get-stuff :font *stuff* *backup*))
+      (set-active-texture 1)
+      (gl:bind-texture :texture-2d (get-stuff :font2 *stuff* *backup*))
       
       (gl:uniformi indirection 0)
-      (gl:active-texture (+ 0 +gltexture0+))    
+      (set-active-texture 0)    
       (gl:bind-texture :texture-2d (get-stuff :text-scratch *stuff* *backup*))
       
       (gl:call-list (get-stuff :fast-text-display-list *stuff* *backup*)))))
@@ -134,7 +139,7 @@
       (namexpr backup :other-text-shader
 	       (lambda ()
 		 (let ((program
-			(make-shader-program-from-strings
+			(lovely-shader-and-texture-uploader:make-shader-program-from-strings
 			 (get-stuff :text-indirect *stuff* *backup*)
 			 (get-stuff :text-frag *stuff* *backup*)
 			 (quote (("POS" . 0)	
@@ -174,6 +179,17 @@
       (namexpr backup :font
 	       (lambda ()
 		 (pic-texture (get-stuff :font-image *stuff* *backup*)
+			      :rgba
+			      *default-tex-params*))))
+    (progn
+      (namexpr backup :font-image2
+	       (lambda ()
+		 (flip-image
+		  (load-png
+		   (img-path "font/achar.png")))))
+      (namexpr backup :font2
+	       (lambda ()
+		 (lovely-shader-and-texture-uploader:pic-texture (get-stuff :font-image2 *stuff* *backup*)
 			      :rgba
 			      *default-tex-params*))))
     (namexpr backup :glsl-code-lookup
@@ -216,12 +232,12 @@
 		   (img-path "font/items.png")))))
       (namexpr backup :items
 	       (lambda ()
-		 (pic-texture (get-stuff :items-image *stuff* *backup*)
+		 (lovely-shader-and-texture-uploader:pic-texture (get-stuff :items-image *stuff* *backup*)
 			      :rgba
 			      *default-tex-params*)))
       (namexpr backup :text-scratch
 	       (lambda ()
-		 (pic-texture (get-stuff :items-image *stuff* *backup*)
+		 (lovely-shader-and-texture-uploader:pic-texture (get-stuff :items-image *stuff* *backup*)
 			      :rgba
 			      *default-tex-params*)))
       (namexpr backup :fast-text-display-list
@@ -237,7 +253,7 @@
 		   (img-path "font/terrain.png")))))
       (namexpr backup :terrain
 	       (lambda ()
-		 (pic-texture (get-stuff :terrain-image *stuff* *backup*)
+		 (lovely-shader-and-texture-uploader:pic-texture (get-stuff :terrain-image *stuff* *backup*)
 			      :rgba
 			      *default-tex-params*))))))
 
@@ -277,7 +293,7 @@
 	(dobox ((xcell 0 upwidth)
 		(ycell 0 upheight))
 	   ;;;texcoords
-	       (etouq (ngorp (preach 'etex (duaq 3 nil '(0f0 1f0 0f0 1f0)))))
+	       (etouq (ngorp (preach 'etex (axis-aligned-quads:duaq 3 nil '(0f0 1f0 0f0 1f0)))))
 	       (let ((xactual (- (* xwidth xcell) 1.0))
 		     (yactual (- (* ywidth ycell) 1.0)))
 		 (let* ((x1 (float xactual))
@@ -285,7 +301,7 @@
 			(foox0 (+ x1 xwidth))
 			(fooy0 (+ y1 ywidth)))
 		   ;;position
-		   (etouq (ngorp (preach 'epos (quadk+ 'z '(foox0 x1 fooy0 y1)))))))
+		   (etouq (ngorp (preach 'epos (axis-aligned-quads:quadk+ 'z '(foox0 x1 fooy0 y1)))))))
 	   ;;;indirection
 	       (let ((xi (* xoffset xcell))
 		     (yi (* yoffset ycell)))

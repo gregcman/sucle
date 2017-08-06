@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package :aplayground)
 
 (defparameter *opengl-objects-regular*
   '(:buffer

@@ -1,4 +1,7 @@
-(in-package :sandbox)
+(defpackage :axis-aligned-quads
+  (:use :cl :fuktard))
+
+(in-package :axis-aligned-quads)
 
 (progn
   (eval-always
@@ -62,3 +65,5 @@
        (aalgnqd 2 k (duaq 1 nil form)))
      (defun quadk- (k form)
        (aalgnqd 2 k (duaq 3 t form))))))
+
+(export-all-functions-and-symbols :axis-aligned-quads)

@@ -1,4 +1,4 @@
-(in-package #:sandbox)
+(in-package #:aplayground)
 
 (defparameter *gl-thread* nil)
 (defun threaded-main (func)
