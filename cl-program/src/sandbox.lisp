@@ -61,7 +61,8 @@
 									sandbox::fist-side-z))
 						 #'princ)))))
    (physics)
-   (render))
+   (render)
+   )
   (window:update-display)
   (unless window:*status*
     (injection2)))
