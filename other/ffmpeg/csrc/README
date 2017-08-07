@@ -1,3 +1,30 @@
+ 
+Libavcodec tutorial: decode virtually any audio file in C/C++
+2017-01-28 by Mathieu Rodic	
+
+After hours browsing the Internet, I couldn’t get my hands on a working tutorial to simply extract audio samples from a file using libavcodec. So here’s to you, a full working example!
+Warning
+
+FFMPEG and the libraries it depends on are often updated, and their API can drastically change between versions. This code works with the libraries available under Ubuntu 16.04, but might become outdated in the future, or cause trouble with earlier versions.
+
+Only one way to know: try it!
+Installation
+
+First, you need to set up the required libraries. Let’s use apt-get to perform this easily:
+
+apt-get install libavcodec-dev libavformat-dev libavutil-dev libswresample-dev
+
+The code
+
+The function decode_audio_file takes 4 parameters:
+
+    path: the path of the file to decode
+    sample_rate: the desired sample rate for the output data
+    data: a pointer to a pointer to double precision values, where the extracted data will be stored
+    size: a pointer to the length of the final extracted values array (number of samples)
+
+It returns 0 upon success, and -1 in case of failure, assorted with error message written to the stderr stream.
+
 #include <stdio.h>
 #include <stdlib.h>
  
@@ -7,7 +34,7 @@
 #include <libswresample/swresample.h>
  
  
-int decode_audio_file(const char* path, const int sample_rate, int16_t** data, int* size) {
+int decode_audio_file(const char* path, const int sample_rate, double** data, int* size) {
  
     // initialize all muxers, demuxers and protocols for libavformat
     // (does nothing if called twice during the course of one program execution)
@@ -54,7 +81,7 @@ int decode_audio_file(const char* path, const int sample_rate, int16_t** data, i
     av_opt_set_int(swr, "in_sample_rate", codec->sample_rate, 0);
     av_opt_set_int(swr, "out_sample_rate", sample_rate, 0);
     av_opt_set_sample_fmt(swr, "in_sample_fmt",  codec->sample_fmt, 0);
-    av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_S16,  0);
+    av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_DBL,  0);
     swr_init(swr);
     if (!swr_is_initialized(swr)) {
         fprintf(stderr, "Resampler has not been properly initialized\n");
@@ -83,12 +110,12 @@ int decode_audio_file(const char* path, const int sample_rate, int16_t** data, i
             continue;
         }
         // resample frames
-        int16_t* buffer;
-        av_samples_alloc((uint8_t**) &buffer, NULL, 1, frame->nb_samples, AV_SAMPLE_FMT_S16, 0);
+        double* buffer;
+        av_samples_alloc((uint8_t**) &buffer, NULL, 1, frame->nb_samples, AV_SAMPLE_FMT_DBL, 0);
         int frame_count = swr_convert(swr, (uint8_t**) &buffer, frame->nb_samples, (const uint8_t**) frame->data, frame->nb_samples);
         // append resampled frames to data
-        *data = (int16_t*) realloc(*data, (*size + frame->nb_samples) * sizeof(int16_t));
-        memcpy(*data + *size, buffer, frame_count * sizeof(int16_t));
+        *data = (double*) realloc(*data, (*size + frame->nb_samples) * sizeof(double));
+        memcpy(*data + *size, buffer, frame_count * sizeof(double));
         *size += frame_count;
     }
  
@@ -101,9 +128,22 @@ int decode_audio_file(const char* path, const int sample_rate, int16_t** data, i
     // success
     return 0;
  
-} 
+}
 
-/*int main(int argc, char const *argv[]) {
+Compilation
+
+You will need the following flags to compile a program that uses : -lavcodec-ffmpeg -lavformat-ffmpeg -lavutil -lswresample
+
+.
+
+Depending on your system and installation, it could also be: -lavcodec -lavformat -lavutil -lswresample
+
+.
+Usage
+
+This program takes the first command-line argument it has been provided as the path to an audio file, decodes it, and outputs the average value for every sample met:
+
+int main(int argc, char const *argv[]) {
  
     // check parameters
     if (argc < 2) {
@@ -129,5 +169,4 @@ int decode_audio_file(const char* path, const int sample_rate, int16_t** data, i
     printf("sum is %f", sum);
     free(data);
     return 0;
-}*/
-
+}

@@ -1,16 +1,14 @@
 SHELL = /bin/sh
 CC    = gcc
-LIBS = -lavcodec-ffmpeg -lavformat-ffmpeg -lavutil -lswresample
+LIBS = -lavcodec -lavformat -lavutil -lswresample #-lavcodec-ffmpeg -lavformat-ffmpeg -lavutil -lswresample
 
 TARGET  = libprog.so
-SOURCES = src/stuff.c
-HEADERS = src/stuff.h
 OBJECTS = $(SOURCES:.c=.o)
 
-all: $(TARGET)
+all: libprog.so
 
 stuff.o:
-	$(CC) -c -Wall -Werror -fpic stuff.c stuff.h
+	$(CC) -c -Wall -Werror -fpic src/stuff.c include/stuff.h
 
-$(TARGET): $(OBJECTS)
-	$(CC) -shared -o $(TARGET) $(OBJECTS) $(LIBS)
+libprog.so: stuff.o
+	$(CC) -shared -o libprog.so stuff.o $(LIBS)

@@ -7,7 +7,7 @@
 #include <libswresample/swresample.h>
  
  
-int decode_audio_file(const char* path, const int sample_rate, int16_t** data, int* size) {
+int decode_audio_file(const char* path, const int sample_rate, double** data, int* size) {
  
     // initialize all muxers, demuxers and protocols for libavformat
     // (does nothing if called twice during the course of one program execution)
@@ -54,7 +54,7 @@ int decode_audio_file(const char* path, const int sample_rate, int16_t** data, i
     av_opt_set_int(swr, "in_sample_rate", codec->sample_rate, 0);
     av_opt_set_int(swr, "out_sample_rate", sample_rate, 0);
     av_opt_set_sample_fmt(swr, "in_sample_fmt",  codec->sample_fmt, 0);
-    av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_S16,  0);
+    av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_DBL,  0);
     swr_init(swr);
     if (!swr_is_initialized(swr)) {
         fprintf(stderr, "Resampler has not been properly initialized\n");
@@ -83,12 +83,12 @@ int decode_audio_file(const char* path, const int sample_rate, int16_t** data, i
             continue;
         }
         // resample frames
-        int16_t* buffer;
-        av_samples_alloc((uint8_t**) &buffer, NULL, 1, frame->nb_samples, AV_SAMPLE_FMT_S16, 0);
+        double* buffer;
+        av_samples_alloc((uint8_t**) &buffer, NULL, 1, frame->nb_samples, AV_SAMPLE_FMT_DBL, 0);
         int frame_count = swr_convert(swr, (uint8_t**) &buffer, frame->nb_samples, (const uint8_t**) frame->data, frame->nb_samples);
         // append resampled frames to data
-        *data = (int16_t*) realloc(*data, (*size + frame->nb_samples) * sizeof(int16_t));
-        memcpy(*data + *size, buffer, frame_count * sizeof(int16_t));
+        *data = (double*) realloc(*data, (*size + frame->nb_samples) * sizeof(double));
+        memcpy(*data + *size, buffer, frame_count * sizeof(double));
         *size += frame_count;
     }
  

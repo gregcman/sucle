@@ -1,6 +1,8 @@
 (asdf:defsystem #:ffmpeg
   :depends-on (#:funland
-	       :cffi)
+	       :cffi
+	       :cl-openal
+	       :cl-alc)
     :serial t
     :components
     

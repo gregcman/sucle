@@ -100,7 +100,7 @@
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
 (defun modify-greens (xpos ypos &optional (color
-					   (case 1
+					   (case 3
 					     (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 					     (1 (imagewise:getapixel 0 255 (get-image "misc/grasscolor.png")))
 					     (2 (imagewise:getapixel 0 0 (get-image "misc/grasscolor.png")))
@@ -850,7 +850,7 @@
       x))
 
 (defparameter atest nil)
-(setatest 0)
+;;(setatest 0)
 
 (defun someseq (x y)
   (let* ((thechunk (helpchunk x y)))

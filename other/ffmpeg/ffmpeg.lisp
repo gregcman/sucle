@@ -29,65 +29,49 @@
   (let ((adubs nil)
 	(aans nil)
 	(asize -3))
-    (cffi:with-foreign-object (double-pointer :pointer)
+    (cffi:with-foreign-object (data-pointer :pointer)
       (cffi:with-foreign-object (an-int :int)
 	(setf aans
 	      (decode-audio-file
-	       (case 1
+	       (case 6
 		 (0 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/damage/hit3.ogg")
 		 (1 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/streaming/cat.ogg")
-		 (2 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/portal/portal.ogg"))
+		 (2 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/portal/portal.ogg")
+		 (3 "/home/imac/quicklisp/local-projects/symmetrical-umbrella/sandbox/res/resources/sound3/ambient/weather/rain4.ogg")
+		 (4 "/home/imac/Music/6PQv-Adele - Hello.mp3")
+		 (5 "/home/imac/Music/Louis The Child ft. K.Flay - It's Strange [Premiere] (FIFA 16 Soundtrack) -  128kbps.mp3")
+		 (6 "/home/imac/Music/Birdy_-_Keeping_Your_Head_Up_Official.mp3"))
 	       44100
-	       double-pointer
+	       data-pointer
 	       an-int))
-	(setf adubs (cffi:mem-ref double-pointer :pointer))
+	(setf adubs (cffi:mem-ref data-pointer :pointer))
 	(setf asize (cffi:mem-ref an-int :int))))
     (values adubs asize aans)))
 
 (defparameter dubs nil)
 (defparameter size nil)
 (defparameter ans nil)
-(defparameter actual-dubs nil)
-(defparameter actual-size 0)
 
 
 (defun test ()
   (reset)
   (setf (values dubs size ans)
 	(get-sound-buff))
-  (let ((act-size size))
-    (let ((pcmbuf (foreign-alloc :int16 :count act-size)))
-      (setf actual-size act-size)
-      (setf actual-dubs pcmbuf)
-      (dotimes (index act-size)
-	(let ((value (mem-aref dubs :double index)))
-	  (let ((foo (truncate (- (* 32767.5d0
-				     (1+ (min 1.0 (max -1.0 value))))
-				  32768d0))))
-	    (setf (mem-aref pcmbuf :int16 index)
-		  foo)))))))
-
+  )
 
 (defun reset ()
   (when dubs
     
     (foreign-free dubs)
-    (setf dubs nil))
-  (when actual-dubs
-    (foreign-free actual-dubs)
-    (setf actual-dubs nil)))
-
-(progno
- (case 0
-   (1 (print (alut:create-buffer-from-file "/home/terminal256/Music/Bustin.wav")))
-   (2 (alut:create-buffer-hello-world))))
+    (setf dubs nil)))
 
 (defun alut-hello-world ()
-  (alut:with-init
-    (al:with-source (source)
-      (al:with-buffer (buffer)
-	(al:buffer-data buffer :mono16 actual-dubs (* 2 actual-size) 44100)
-	(print (alut:get-error))
-        (al:source source :buffer buffer)
-        (al:source-play source)
-	(read)))))
+  (alc:with-device (device)
+    (alc:with-context (context device)
+      (alc:make-context-current context)
+      (al:with-source (source)
+	(al:with-buffer (buffer)
+	  (al:buffer-data buffer :mono16 dubs (* 2 size) 44100)
+	  (al:source source :buffer buffer)
+	  (al:source-play source)
+	  (read))))))
