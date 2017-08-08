@@ -1,4 +1,4 @@
-#version 100
+#version 120
 
 attribute vec4 position;
 attribute vec2 texCoord;
@@ -10,9 +10,9 @@ uniform vec3 cameraPos;
 uniform float foglet;
 uniform float aratio;
 
-varying lowp vec2 TexCoord;
-varying lowp float mycolor;
-varying lowp float fogratio;
+varying vec2 TexCoord;
+varying float mycolor;
+varying float fogratio;
 
 void main()
 {

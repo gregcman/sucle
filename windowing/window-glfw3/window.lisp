@@ -212,12 +212,20 @@
 (defun get-proc-address ()
   (function glfw:get-proc-address))
 
-  ;;Graphics calls on OS X must occur in the main thread
+;;Graphics calls on OS X must occur in the main thread
+
+(defparameter *iresizable* nil)
+(defparameter *iwidth* 1)
+(defparameter *iheight* 1)
+(defparameter *ititle* "Common Lisp")
 
 (defun wrapper (func)
   (glfw:with-init
     (window:init)
-    (glfw:with-window (:title "" :width 1 :height 1 :resizable nil)
+    (glfw:with-window (:title *ititle*
+			      :width *iwidth*
+			      :height *iheight*
+			      :resizable *iresizable*)
       (glfw:set-mouse-button-callback 'mouse-callback)
       (glfw:set-key-callback 'key-callback)
       (glfw:set-scroll-callback 'scroll-callback)

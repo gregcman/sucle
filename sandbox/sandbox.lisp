@@ -100,7 +100,7 @@
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
 (defun modify-greens (xpos ypos &optional (color
-					   (case 3
+					   (case 1
 					     (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 					     (1 (imagewise:getapixel 0 255 (get-image "misc/grasscolor.png")))
 					     (2 (imagewise:getapixel 0 0 (get-image "misc/grasscolor.png")))
@@ -466,7 +466,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* #P"terrarium/")
+(defparameter *save* #P"terrarium2/")
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -850,7 +850,7 @@
       x))
 
 (defparameter atest nil)
-;;(setatest 0)
+;(setatest 2)
 
 (defun someseq (x y)
   (let* ((thechunk (helpchunk x y)))
@@ -859,7 +859,8 @@
 	      (blocks (getblockslizz thechunk))
 	      (skylight (getskylightlizz thechunk))
 	      (meta (getmetadatalizz thechunk))
-	      (leheight (getheightlizz thechunk)))
+	;      (leheight (getheightlizz thechunk))
+	      )
 	  (let ((xscaled (ash x 4))
 		(yscaled (ash y 4)))
 	    (progn (sandbox::flat3-chunk
@@ -877,11 +878,11 @@
 		    (lambda (x y z b)
 		      (setf (world:getmeta x y z) b))
 		    xscaled 0 yscaled)
-		   (sandbox::flat2-chunk
-		    leheight
-		    (lambda (x y b)
-		      (setf (world::getheight x y) b))
-		    xscaled yscaled))
+		   (progno (sandbox::flat2-chunk
+			    leheight
+			    (lambda (x y b)
+			      (setf (world::getheight x y) b))
+			    xscaled yscaled)))
 	    (sandbox::flat3-chunk
 	     blocks
 	     (lambda (x y z b)

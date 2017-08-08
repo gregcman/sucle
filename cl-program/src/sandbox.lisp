@@ -68,5 +68,18 @@
     (injection2)))
 
 (defun main2 ()
-  (threaded-main #'handoff-four))
+  (trivial-main-thread:call-in-main-thread
+   (lambda ()
+     (let ((window::*iresizable* t)
+	   (window::*iwidth* 256)
+	   (window::*iheight* 256)
+	   )
+       (window::wrapper #'handoff-four)))))
 
+(defun testigan ()
+  (sandbox::dirt-sand)
+  (sandbox::cacti)
+  (sandbox::dirts)
+  (sandbox::grassify)
+  (sandbox::trees)
+  (sandbox::simple-relight))

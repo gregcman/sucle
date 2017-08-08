@@ -5,7 +5,7 @@
 
 		 #:alexandria
 		 #:opticl
-		 
+		 #:trivial-main-thread
 		 #:window-glfw3
 		 #:cl-conspack
 		 
