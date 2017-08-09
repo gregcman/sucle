@@ -848,3 +848,42 @@
 (defcfun ("avformat_free_context" avformat-free-context)
     :void
   (s :pointer))
+
+(defun decode-audio-file (path sample-rate data size)
+  (av-register-all)
+  (with-foreign-object (format-pointer :pointer)
+    (setf (mem-ref format-pointer :pointer) (avformat-alloc-context))
+    (unless
+	(zerop
+	 (with-foreign-string (cpath path)
+	   (avformat-open-input
+	    format-pointer
+	    cpath
+	    (cffi:null-pointer)
+	    (cffi:null-pointer))))
+      (print "could not open file")
+      (return-from decode-audio-file -1))
+    (when (< (avformat-find-stream-info
+	      (mem-ref format-pointer :pointer)
+	      (cffi:null-pointer))
+	     0)
+      (print "could not retrieve stream info from file")
+      (return-from decode-audio-file -1))
+    (let ((avformat (mem-ref format-pointer :pointer)))
+      (let ((stream-index -1))
+	(block break
+	  (with-foreign-slots ((nb_streams streams) avformat (:struct |AVFormatContext|))	   
+	    (dotimes (i nb_streams)
+	      (when (= 1 (with-foreign-slots ((codec) streams |AVStream|)
+			   (with-foreign-slots ((codec_type) codec |AVCodecContext|)
+			     codec_type)))
+		(setf stream-index i)
+		(return-from break)))))
+	(when (= -1 stream-index)
+	  (print "could not retrieve audio stream from file")
+	  (return-from decode-audio-file -1))
+	(let ((stream-pointer (with-foreign-slots ((streams)))))))
+      (av-frame-free frame-pointer)
+      (swr-free swr-pointer)
+      (avcodec-close codec)
+      (avformat-free-context avformat))))
