@@ -32,14 +32,14 @@
   (defparameter ans nil)
 
 
-  (defun test ()
+  (defun test (&optional (music *music*))
     (reset)
     (setf (values dubs size ans)
-	  (get-sound-buff))
+	  (get-sound-buff :music music))
     )
 
   (defun reset ()
-    (when dubs
+    (when (pointerp dubs)
       
       (foreign-free dubs)
       (setf dubs nil)))
@@ -334,10 +334,37 @@
   (mix_2_1_simd :pointer)
   (mix_any_f :pointer))
 
+(defcenum |AVMediaType|
+  (:unknown -1)
+  :video
+  :audio
+  :data
+  :subtitle
+  :attachment
+  :nb)
+
+(defcenum |AVSampleFormat|
+  (:none -1)
+  :u8
+  :s16
+  :s32
+  :flt
+  :fbl
+
+  :u8p
+  :s16p
+  :s32p
+  :fltp
+  :dblp
+  :s64
+  :s64p
+
+  :nb)
+
 (defcstruct |AVCodecContext|
   (av_class :pointer)
   (log_level_offset :int)
-  (codec_type :int)
+  (codec_type |AVMediaType|)
   (codec :pointer)
   (codec_name :char :count 32)
   (codec_id :int)
@@ -396,9 +423,12 @@
   (me_subpel_quality :int)
   (dtg_active_format :int)
   (me_range :int)
-  (intra_quant_bias :int)
-  (inter_quant_bias :int)
+  (intra_quant_bias :int);;;;fine up here
+  (inter_quant_bias :int);;;;fine here tooo
   (slice_flags :int)
+  
+  #+darwin(xvmc_acceleration :int)
+  
   (mb_decision :int)
   (intra_matrix :pointer)
   (inter_matrix :pointer)
@@ -421,21 +451,21 @@
   (scenechange_factor :int)
   (mv0_threshold :int)
   (b_sensitivity :int)
-  (color_primaries :int)
-  (color_trc :int)
-  (colorspace :int)
-  (color_range :int)
-  (chroma_sample_location :int)
+  (color_primaries :int) ;;enum
+  (color_trc :int);;enum
+  (colorspace :int);;enum
+  (color_range :int);;enum
+  (chroma_sample_location :int);;enum
   (slices :int)
-  (field_order :int)
-  (sample_rate :int)
-  (channels :int)
-  (sample_fmt :int)
+  (field_order :int);;enum
+  (sample_rate :int);;;;;;;;;;;;;;; ::huh??
+  (channels :int);;;;;;;;;;;;;;;;;;
+  (sample_fmt |AVSampleFormat|);;;;;;;;;;;;;;;
   (frame_size :int)
-  (frame_number :int)
+  (frame_number :int) ;;;sample rate appearing here
   (block_align :int)
   (cutoff :int)
-  (channel_layout :uint64)
+  (channel_layout :uint64);;;;;;;;;;;;;;
   (request_channel_layout :uint64)
   (audio_service_type :int)
   (request_sample_fmt :int)
@@ -725,100 +755,99 @@
     :void
   (s :pointer))
 
-(defun get-sound-buff ()
+(defun get-sound-buff (&key (music *music*) (sample-rate 44100))
   (block bye
-    (let ((music *music*)
-	  (sample-rate 44100))
-      (let ((adubs nil)
-	    (aans nil)
-	    (asize -3))
-	(cffi:with-foreign-string (path music)
-	  ;; initialize all muxers, demuxers and protocols for libavformat
-	  ;; (does nothing if called twice during the course of one program execution)
-	  (av-register-all)
-	  (cffi:with-foreign-objects ((data-pointer :pointer)
-				      (an-int :int)
-				      (&format :pointer)
-				      (&swr :pointer)
-				      (&frame :pointer)
-				      (&stream :pointer)
-				      (&codec :pointer))
+    (let ((adubs nil)
+	  (aans nil)
+	  (asize -3))
+      (cffi:with-foreign-string (path music)
+	;; initialize all muxers, demuxers and protocols for libavformat
+	;; (does nothing if called twice during the course of one program execution)
+	(av-register-all)
+	(cffi:with-foreign-objects ((data-pointer :pointer)
+				    (an-int :int)
+				    (&format :pointer)
+				    (&swr :pointer)
+				    (&frame :pointer)
+				    (&stream :pointer)
+				    (&codec :pointer))
 
-	    (setf (cffi:mem-ref &format :pointer)
-		  (avformat-alloc-context))
-	    (unless (zerop
-		     (avformat-open-input &format
-					  path
-					  (cffi:null-pointer)
-					  (cffi:null-pointer)))
-	      (print "could not open file")
-	      (return-from bye -1))
-	    (when (> 0 (avformat-find-stream-info (cffi:mem-ref &format :pointer)
-						  (cffi:null-pointer)))
-	      (print "could not retrive stream info from file")
-	      (return-from bye -1))
-	    (let ((stream-index (find-first-audio-stream2 (cffi:mem-ref &format :pointer))))
-	      (when (= -1 stream-index)
-		(print "could not retrieve audio stream from file")
-		(return-from bye -1))
-	      (let* ((stream-array (cffi:foreign-slot-value (cffi:mem-ref &format :pointer)
-							    (quote (:struct |AVFormatContext|))
-							    (quote streams)))
-		     (the-stream (mem-aref stream-array
-					   :pointer
-					   stream-index)))
-		(setf (cffi:mem-ref &stream :pointer)
-		      the-stream)))
-	    (progn
-	    ;;;find and open codec
-	      (setf (cffi:mem-ref &codec :pointer)
-		    (foreign-slot-value (cffi:mem-ref &stream :pointer)
-					(quote (:struct |AVStream|))
-					(quote codec)))
-	      (when (> 0 (avcodec-open2 (cffi:mem-ref &codec :pointer)
-					(avcodec-find-decoder
-					 (cffi:foreign-slot-value
-					  (cffi:mem-ref &codec :pointer)
-					  (quote (:struct |AVCodecContext|))
-					  (quote codec_id)))
+	  (setf (cffi:mem-ref &format :pointer)
+		(avformat-alloc-context))
+;;;	  (print 343)
+	  (unless (zerop
+		   (avformat-open-input &format
+					path
+					(cffi:null-pointer)
 					(cffi:null-pointer)))
-		(print "failed to open decoder for stream number stream-index for file path")
-		(return-from bye -1)))
-	    (progn
-	      ;;prepare resampler
-	      (setf (mem-ref &swr :pointer) (swr-alloc))
-	      (prepare-resampler2 (cffi:mem-ref &swr :pointer)
-				  (cffi:mem-ref &codec :pointer)
-				  sample-rate)
-	      (when (zerop (swr-is-initialized (cffi:mem-ref &swr :pointer)))
-		;;resampler-not-properly initialized
-		(return-from bye -1)))
-	    (progn (setf (cffi:mem-ref &frame :pointer) (av-frame-alloc))
-		   (when (cffi:null-pointer-p (cffi:mem-ref &frame :pointer))
-		       ;;;error allocating the frame
-		     (return-from bye -1)))
-	    (cffi:with-foreign-object (packet (quote (:struct |AVPacket|)))
-	      ;;prepare to read data
-	      (av-init-packet packet)
+	    (print "could not open file")
+	    (return-from bye -1))
+	  (when (> 0 (avformat-find-stream-info (cffi:mem-ref &format :pointer)
+						(cffi:null-pointer)))
+	    (print "could not retrive stream info from file")
+	    (return-from bye -1))
+	  (let ((stream-index (find-first-audio-stream2 (cffi:mem-ref &format :pointer))))
+	    (when (= -1 stream-index)
+	      (print "could not retrieve audio stream from file")
+	      (return-from bye -1))
+	    (let* ((stream-array (cffi:foreign-slot-value (cffi:mem-ref &format :pointer)
+							  (quote (:struct |AVFormatContext|))
+							  (quote streams)))
+		   (the-stream (mem-aref stream-array
+					 :pointer
+					 stream-index)))
+	      (setf (cffi:mem-ref &stream :pointer)
+		    the-stream)))
+	  (progn
+	    ;;;find and open codec
+	    (setf (cffi:mem-ref &codec :pointer)
+		  (foreign-slot-value (cffi:mem-ref &stream :pointer)
+				      (quote (:struct |AVStream|))
+				      (quote codec)))
+	    (when (> 0 (avcodec-open2 (cffi:mem-ref &codec :pointer)
+				      (avcodec-find-decoder
+				       (cffi:foreign-slot-value
+					(cffi:mem-ref &codec :pointer)
+					(quote (:struct |AVCodecContext|))
+					(quote codec_id)))
+				      (cffi:null-pointer)))
+	      (print "failed to open decoder for stream number stream-index for file path")
+	      (return-from bye -1)))
+	  (progn
+	    ;;prepare resampler
+	    (setf (mem-ref &swr :pointer) (swr-alloc))
+	    (prepare-resampler2 (cffi:mem-ref &swr :pointer)
+				(cffi:mem-ref &codec :pointer)
+				sample-rate)
+	    (when (zerop (swr-is-initialized (cffi:mem-ref &swr :pointer)))
+	      (print "resampler-not-properly initialized")
+	      (return-from bye -1)))
+	  (progn (setf (cffi:mem-ref &frame :pointer) (av-frame-alloc))
+		 (when (cffi:null-pointer-p (cffi:mem-ref &frame :pointer))
+		   (print "error allocating the frame")
+		   (return-from bye -1)))
+	  (cffi:with-foreign-object (packet (quote (:struct |AVPacket|)))
+	    ;;prepare to read data
+	    (av-init-packet packet)
 
-	      (setf aans
-		    (iterate-through-frames2 
-		     (cffi:mem-ref &format :pointer)
-		     packet
-		     (cffi:mem-ref &codec :pointer)
-		     (cffi:mem-ref &frame :pointer)
-		     (cffi:mem-ref &swr :pointer)
-		     data-pointer
-		     an-int)))
-	    (progn ;;clean up
-	      (av-frame-free &frame)
-	      (swr-free &swr)
-	      (avcodec-close (cffi:mem-ref &codec :pointer))
-	      (avformat-free-context (cffi:mem-ref &format :pointer)))
-	    
-	    (setf adubs (cffi:mem-ref data-pointer :pointer))
-	    (setf asize (cffi:mem-ref an-int :int))))
-	(values adubs asize aans)))))
+	    (setf aans
+		  (iterate-through-frames2 
+		   (cffi:mem-ref &format :pointer)
+		   packet
+		   (cffi:mem-ref &codec :pointer)
+		   (cffi:mem-ref &frame :pointer)
+		   (cffi:mem-ref &swr :pointer)
+		   data-pointer
+		   an-int)))
+	  (progn ;;clean up
+	    (av-frame-free &frame)
+	    (swr-free &swr)
+	    (avcodec-close (cffi:mem-ref &codec :pointer))
+	    (avformat-free-context (cffi:mem-ref &format :pointer)))
+	  
+	  (setf adubs (cffi:mem-ref data-pointer :pointer))
+	  (setf asize (cffi:mem-ref an-int :int))))
+      (values adubs asize aans))))
 
 (defparameter av-ch-front-left 1)
 (defparameter av-ch-front-right 2)
@@ -826,8 +855,24 @@
 (defparameter av-sample-fmt-16 1)
 
 
+(defun print-struct (yo)
+  (let ((odd -1)
+	(acc nil)
+	(temp nil))
+    (dolist (x yo)
+      (if (= -1 odd)
+	  (push x temp)
+	  (progn
+	    (push x temp)
+	    (push temp acc)
+	    (setf temp nil)))
+      (setf odd (* -1 odd)))
+    (dolist (x acc)
+      (princ x)
+      (terpri))))
 
 (defun prepare-resampler2 (swr codec user-sample-rate)
+  (print-struct (cffi:convert-from-foreign codec (quote (:struct |AVCodecContext|))))
   (cffi:with-foreign-slots ((channels
 			     channel_layout
 			     sample_rate
@@ -838,8 +883,14 @@
     (av-opt-set-int swr "out_channel_layout" av-ch-front-center 0)
     (av-opt-set-int swr "in_sample_rate" sample_rate 0)
     (av-opt-set-int swr "out_sample_rate" user-sample-rate 0)
-    (av-opt-set-sample-fmt swr "in_sample_fmt" sample_fmt 0)
-    (av-opt-set-sample-fmt swr "out_sample_fmt" av-sample-fmt-16 0))
+    (av-opt-set-sample-fmt swr "in_sample_fmt" (cffi:foreign-enum-value
+						(quote |AVSampleFormat|)
+						sample_fmt) 0)
+    (av-opt-set-sample-fmt swr "out_sample_fmt" (cffi:foreign-enum-value
+						(quote |AVSampleFormat|)
+						:s16)
+			   0)
+    )
   (swr-init swr))
 (defparameter avmedia-type-audio 1)
 
@@ -862,7 +913,7 @@
 	       (codec_type (cffi:foreign-slot-value codec
 					(quote (:struct |AVCodecContext|))
 					(quote codec_type))))
-	  (when (= avmedia-type-audio codec_type)
+	  (when (eq :audio codec_type)
 	    (setf stream-index index)
 	    (return-from out)))))
     stream-index))
