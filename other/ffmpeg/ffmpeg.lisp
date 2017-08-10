@@ -3,22 +3,6 @@
 
 (in-package :cl-sound-ffmpeg)
 
-(eval-always
- (progn
-   (defparameter *something* #.(or *compile-file-truename* *load-truename*))
-   (defparameter ourdir
-     (make-pathname :host (pathname-host *something*)
-		    :directory (pathname-directory *something*)))
-
-   (defparameter *dylib* (namestring (merge-pathnames "csrc/libprog" ourdir)))))
-
-(etouq
- `(define-foreign-library cl-sound-ffmpeg
-    (t (:default ,*dylib*))))
-(defun reload-lib ()
-  (use-foreign-library cl-sound-ffmpeg))
-
-
 (progn
   (define-foreign-library libavutil
     (t (:default "libavutil")))
@@ -33,29 +17,8 @@
     (t (:default "libswresample")))
   (use-foreign-library libswresample))
 
-
-;;;int decode_audio_file(const char* path, const int sample_rate, double** data, int* size)
-
-(defcfun "decode_audio_file" :int
-  (path :string)
-  (sample-rate :int)
-  (data :pointer)
-  (size :pointer))
-
-(defcfun "iterate_through_frames"
-    :int
-  (format :pointer)
-  (packet :pointer)
-  (codec :pointer)
-  (frame :pointer)
-  (swr :pointer)
-  (data :pointer)
-  (size :pointer))
-(defcfun "find_first_audio_stream" :int
-  (format :pointer))
-
 (defparameter *music*
-  (case 5
+  (case 6
     (0 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/damage/hit3.ogg")
     (1 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/streaming/cat.ogg")
     (2 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/portal/portal.ogg")
@@ -63,30 +26,6 @@
     (4 "/home/imac/Music/6PQv-Adele - Hello.mp3")
     (5 "/home/imac/Music/Louis The Child ft. K.Flay - It's Strange [Premiere] (FIFA 16 Soundtrack) -  128kbps.mp3")
     (6 "/home/imac/Music/Birdy_-_Keeping_Your_Head_Up_Official.mp3")))
-
-(defcfun ("prepare_resampler" prepare-resampler)
-    :void
-  (swr :pointer)
-  (codec :pointer)
-  (sample_rate :int))
-
-(defun get-sound-bufforign ()
-  (let ((adubs nil)
-	(aans nil)
-	(asize -3))
-    (cffi:with-foreign-object (data-pointer :pointer)
-      (cffi:with-foreign-object (an-int :int)
-	(setf aans
-	      (decode-audio-file
-	       *music*
-	       44100
-	       data-pointer
-	       an-int))
-	(setf adubs (cffi:mem-ref data-pointer :pointer))
-	(setf asize (cffi:mem-ref an-int :int))))
-    (values adubs asize aans)))
-
-(reload-lib)
 (progn
   (defparameter dubs nil)
   (defparameter size nil)
@@ -749,7 +688,6 @@
     :int
   (audio_data :pointer)
   (linesize :pointer)
-  (buf :pointer)
   (nb_channels :int)
   (nb_samples :int)
   (sample_fmt :int)
@@ -764,7 +702,7 @@
   (in_count :int))
 
 (defcfun ("realloc" realloc)
-    :void
+    :pointer
   (ptr :pointer)
   (size :uint))
 
@@ -819,7 +757,7 @@
 						  (cffi:null-pointer)))
 	      (print "could not retrive stream info from file")
 	      (return-from bye -1))
-	    (let ((stream-index (find-first-audio-stream (cffi:mem-ref &format :pointer))))
+	    (let ((stream-index (find-first-audio-stream2 (cffi:mem-ref &format :pointer))))
 	      (when (= -1 stream-index)
 		(print "could not retrieve audio stream from file")
 		(return-from bye -1))
@@ -864,7 +802,7 @@
 	      (av-init-packet packet)
 
 	      (setf aans
-		    (iterate-through-frames 
+		    (iterate-through-frames2 
 		     (cffi:mem-ref &format :pointer)
 		     packet
 		     (cffi:mem-ref &codec :pointer)
@@ -888,6 +826,7 @@
 (defparameter av-sample-fmt-16 1)
 
 
+
 (defun prepare-resampler2 (swr codec user-sample-rate)
   (cffi:with-foreign-slots ((channels
 			     channel_layout
@@ -902,7 +841,94 @@
     (av-opt-set-sample-fmt swr "in_sample_fmt" sample_fmt 0)
     (av-opt-set-sample-fmt swr "out_sample_fmt" av-sample-fmt-16 0))
   (swr-init swr))
+(defparameter avmedia-type-audio 1)
 
+(defun find-first-audio-stream2 (format)
+  (let ((stream-index -1)
+	(count (cffi:foreign-slot-value format
+					(quote (:struct |AVFormatContext|))
+					(quote nb_streams))))
+    (block out
+      (dotimes (index count)
+	(let* ((streams (cffi:foreign-slot-value format
+					(quote (:struct |AVFormatContext|))
+					(quote streams)))
+	       (stream (cffi:mem-aref
+			streams
+			:pointer))
+	       (codec (cffi:foreign-slot-value stream
+					(quote (:struct |AVStream|))
+					(quote codec)))
+	       (codec_type (cffi:foreign-slot-value codec
+					(quote (:struct |AVCodecContext|))
+					(quote codec_type))))
+	  (when (= avmedia-type-audio codec_type)
+	    (setf stream-index index)
+	    (return-from out)))))
+    stream-index))
+
+(defun iterate-through-frames2 (format packet codec frame swr data size)
+  (setf (cffi:mem-ref data :pointer) (cffi:null-pointer))
+  (setf (cffi:mem-ref size :int) 0)
+  (loop
+     (progn
+       (unless (>= (av-read-frame format packet) 0)
+	 (return))
+       (cffi:with-foreign-objects ((gotframe :int))
+	 (when (< (avcodec-decode-audio4 codec frame gotframe packet) 0)
+	   (return))
+	 (when (zerop (mem-ref gotframe :int))
+	   (continue))
+	 (cffi:with-foreign-object (&buffer :pointer)
+	   (av-samples-alloc
+	    &buffer
+	    (cffi:null-pointer)
+	    1
+	    (cffi:foreign-slot-value frame
+				     (quote (:struct |AVFrame|))
+				     (quote nb_samples))
+	    av-sample-fmt-16
+	    0)
+	   (let ((frame-count
+		  (swr-convert swr
+			       &buffer
+			       (cffi:foreign-slot-value
+				frame
+				(quote (:struct |AVFrame|))
+				(quote nb_samples))
+			       (cffi:foreign-slot-value
+				frame
+				(quote (:struct |AVFrame|))
+				(quote data))
+			       (cffi:foreign-slot-value
+				frame
+				(quote (:struct |AVFrame|))
+				(quote nb_samples)))))
+	     (setf (cffi:mem-ref data :pointer)
+		   (realloc (cffi:mem-ref data :pointer)
+			    (* (cffi:foreign-type-size :int16)
+			       (+ (cffi:mem-ref size :int)
+				  (cffi:foreign-slot-value
+				   frame
+				   (quote (:struct |AVFrame|))
+				   (quote nb_samples))))))
+	     (memcpy (cffi:inc-pointer (mem-ref data :pointer) (* (foreign-type-size :int16)
+								  (mem-ref size :int)))
+		     (mem-ref &buffer :pointer)
+		     (* frame-count (foreign-type-size :int16)))
+	     (setf (mem-ref size :int)
+		   (+ (mem-ref size :int)
+		      frame-count))))))))
+
+"  191 enum AVMediaType {
+  192     AVMEDIA_TYPE_UNKNOWN = -1,  ///< Usually treated as AVMEDIA_TYPE_DATA
+  193     AVMEDIA_TYPE_VIDEO,
+  194     AVMEDIA_TYPE_AUDIO,
+  195     AVMEDIA_TYPE_DATA,          ///< Opaque data information usually continuous
+  196     AVMEDIA_TYPE_SUBTITLE,
+  197     AVMEDIA_TYPE_ATTACHMENT,    ///< Opaque data information usually sparse
+  198     AVMEDIA_TYPE_NB
+  199 };"
 
 "   59 enum AVSampleFormat {
    60     AV_SAMPLE_FMT_NONE = -1,

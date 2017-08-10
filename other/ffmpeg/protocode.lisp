@@ -125,3 +125,56 @@
        (swr-free swr-pointer)
        (avcodec-close codec)
        (avformat-free-context avformat)))))
+
+(progno
+ (eval-always
+  (progn
+    (defparameter *something* #.(or *compile-file-truename* *load-truename*))
+    (defparameter ourdir
+      (make-pathname :host (pathname-host *something*)
+		     :directory (pathname-directory *something*)))
+
+    (defparameter *dylib* (namestring (merge-pathnames "csrc/libprog" ourdir)))))
+ (etouq
+  `(define-foreign-library cl-sound-ffmpeg
+     (t (:default ,*dylib*))))
+ (defun reload-lib ()
+   (use-foreign-library cl-sound-ffmpeg))
+ (reload-lib)
+;;;int decode_audio_file(const char* path, const int sample_rate, double** data, int* size)
+ (defcfun "decode_audio_file" :int
+   (path :string)
+   (sample-rate :int)
+   (data :pointer)
+   (size :pointer))
+ (defcfun "iterate_through_frames"
+     :int
+   (format :pointer)
+   (packet :pointer)
+   (codec :pointer)
+   (frame :pointer)
+   (swr :pointer)
+   (data :pointer)
+   (size :pointer))
+ (defcfun "find_first_audio_stream" :int
+   (format :pointer))
+ (defcfun ("prepare_resampler" prepare-resampler)
+     :void
+   (swr :pointer)
+   (codec :pointer)
+   (sample_rate :int))
+ (defun get-sound-bufforign ()
+   (let ((adubs nil)
+	 (aans nil)
+	 (asize -3))
+     (cffi:with-foreign-object (data-pointer :pointer)
+       (cffi:with-foreign-object (an-int :int)
+	 (setf aans
+	       (decode-audio-file
+		*music*
+		44100
+		data-pointer
+		an-int))
+	 (setf adubs (cffi:mem-ref data-pointer :pointer))
+	 (setf asize (cffi:mem-ref an-int :int))))
+     (values adubs asize aans))))
