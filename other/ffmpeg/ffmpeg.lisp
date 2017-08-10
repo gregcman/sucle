@@ -872,7 +872,7 @@
       (terpri))))
 
 (defun prepare-resampler2 (swr codec user-sample-rate)
-  (print-struct (cffi:convert-from-foreign codec (quote (:struct |AVCodecContext|))))
+;;;  (print-struct (cffi:convert-from-foreign codec (quote (:struct |AVCodecContext|))))
   (cffi:with-foreign-slots ((channels
 			     channel_layout
 			     sample_rate
