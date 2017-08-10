@@ -12,3 +12,7 @@ stuff.o:
 
 libprog.so: stuff.o
 	$(CC) -shared -o libprog.so stuff.o $(LIBS)
+
+clean:
+	rm stuff.o
+	rm libprog.so
