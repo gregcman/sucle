@@ -12,16 +12,19 @@
 ;;110 is quake pro
 
 
-(defparameter *yaw* nil)
-(defparameter *pitch* nil)
-(defparameter *xpos* nil)
-(defparameter *ypos* nil)
-(defparameter *zpos* nil)
+(defparameter *yaw* 0.0)
+(defparameter *pitch* 0.0)
+(defparameter *xpos* 0.0)
+(defparameter *ypos* 0.0)
+(defparameter *zpos* 0.0)
+(defparameter *xpos-old* 0.0)
+(defparameter *ypos-old* 0.0)
+(defparameter *zpos-old* 0.0)
 (defparameter defaultfov (deg-rad (and 95 70)))
 
-(defparameter *xvel* 0)
-(defparameter *yvel* 0)
-(defparameter *zvel* 0)
+(defparameter *xvel* 0.0)
+(defparameter *yvel* 0.0)
+(defparameter *zvel* 0.0)
 
 (defparameter air-friction 0.98)
 (defparameter walking-friction (* 0.6 0.9))
@@ -108,27 +111,41 @@
 (defconstant two-pi (coerce (* 2 pi) 'single-float))
 (defconstant half-pi (coerce (/ pi 2) 'single-float))
 
+
+(progn
+  (declaim (ftype (function (single-float) single-float)
+		  translator))
+  (fuktard::with-unsafe-speed
+    (defun translator (x)
+      (let* ((a (* x 0.6))
+	     (b (+ 0.2 a))
+	     (c (* b b b))
+	     (d (* 8.0 0.15 (/ (coerce pi 'single-float) 180.0)))
+	     (e (* d c)))
+	(declare (type single-float a b c d e))
+	e))))
+
 (defun look-around ()
   (mouse-looking))
 (defun mouse-looking ()
   (multiple-value-bind (dx dy) (delta)
-    (let ((x (* mouse-sensitivity (/ dx 360.0)))
-	  (y (* mouse-sensitivity (/ dy 360.0))))
-      (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
+    (let ((x (* dx (translator 0.5)))
+	  (y (* dy (translator 0.5))))
+      (multiple-value-bind (dyaw dpitch)
+	  (if t (values x y) (%sphere-mouse-help x y))
 	(setf *yaw* (mod (+ *yaw* dyaw) two-pi))
 	(setf *pitch* (clamp (+ *pitch* dpitch)
 			     (* -0.99 half-pi)
 			     (* 0.99 half-pi)))))))
 
-(defparameter old-mouse-x 0)
-(defparameter old-mouse-y 0)
 (defun delta ()
-  (multiple-value-bind (newx newy) (window:get-mouse-position)
-    (multiple-value-prog1 (values
-			   (- newx old-mouse-x)
-			   (- newy old-mouse-y))
-      (setf old-mouse-x newx
-	    old-mouse-y newy))))
+  (let ((mouse-data (load-time-value (cons 0 0))))
+    (multiple-value-bind (newx newy) (window:get-mouse-position)
+      (multiple-value-prog1 (values
+			     (- newx (car mouse-data))
+			     (- newy (cdr mouse-data)))
+	(setf (car mouse-data) newx
+	      (cdr mouse-data) newy)))))
 
 
 (defun %sphere-mouse-help (x y)
@@ -188,6 +205,9 @@
 (defparameter foo nil)
 (defun physics ()
   ;;e to escape mouse
+  (setf *xpos-old* *xpos*
+	*ypos-old* *ypos*
+	*zpos-old* *zpos*)
   (when (skey-j-p :E) (window:toggle-mouse-capture))
   (hotbar-add e:*scroll-y*)
   (unless (zerop e:*scroll-y*)

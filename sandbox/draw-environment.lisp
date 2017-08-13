@@ -8,15 +8,20 @@
 (defparameter *camera* nil) ;;global camera
 (defparameter *fog-ratio* 0.75)
 
-(defun render ()
+(defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
+(defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
+
+(defun render (partial-time)
   (declare (optimize (safety 3) (debug 3)))
 
   (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
   (if vsync?
       (window::set-vsync t)
       (window::set-vsync nil))
+  (remove-spurious-mouse-input)
   (when (window:mice-locked-p)
     (look-around))
+  (set-render-cam-pos *camera* partial-time)
   (update-matrices *camera*)
   
   (luse-shader :blockshader)
@@ -43,14 +48,37 @@
    (luse-shader :solidshader)
    (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
 
-;   (draw-framebuffer)
-;   (draw-crosshair)
-   )
-  (progno
-   (draw-hud))
+   (progn
+    (draw-framebuffer)
+    (draw-crosshair)
+    (draw-hud)))
   
   (designatemeshing))
 
+
+(defun set-render-cam-pos (camera partial)
+  (let ((vec (camera-vec-position camera))
+	(cev (camera-vec-noitisop camera))
+	(prev *pos-previous*)
+	(curr *pos-current*))
+
+    (setf (aref prev 0) *xpos-old*)
+    (setf (aref prev 1) *ypos-old*)
+    (setf (aref prev 2) *zpos-old*)
+    
+    (setf (aref curr 0) *xpos*)
+    (setf (aref curr 1) *ypos*)
+    (setf (aref curr 2) *zpos*)
+
+    (cg-matrix:%vec-lerp vec prev curr partial)
+    (cg-matrix:%vec* cev vec -1.0)
+    
+    (unit-pitch-yaw (camera-vec-forward *camera*)
+		    (coerce *pitch* 'single-float)
+		    (coerce *yaw* 'single-float))
+    
+    (setf (camera-fov *camera*) defaultfov)
+    ))
 
 (defparameter *crosshair-size* 20.0)
 (defparameter *hotbar-box-size* (* 22 4))
@@ -195,23 +223,6 @@
 
   (load-shaders)
   (load-some-images))
-
-(defun set-render-cam-pos (camera)
-  (let ((vec (camera-vec-position camera))
-	(cev (camera-vec-noitisop camera)))
-    (setf (aref vec 0) *xpos*)
-    (setf (aref vec 1) *ypos*)
-    (setf (aref vec 2) *zpos*)
-
-    (setf (aref cev 0) (- *xpos*))
-    (setf (aref cev 1) (- *ypos*))
-    (setf (aref cev 2) (- *zpos*))
-
-    (unit-pitch-yaw (camera-vec-forward *camera*)
-		    (coerce *pitch* 'single-float)
-		    (coerce *yaw* 'single-float))
-    
-    (setf (camera-fov *camera*) defaultfov)))
 
 (defun on-resize (w h)
   (setf *window-height* h

@@ -29,13 +29,11 @@
 
 (defun thunkit ()
   (physics)
-  (set-render-cam-pos *camera*)
-  (remove-spurious-mouse-input)
-  (render)
+ ; (remove-spurious-mouse-input)
   (incf *ticks*))
 
 (defun injection ()
-  (window:poll)
+ ;; (window:poll)
   (thunkit)
   (window:update-display)
   (unless window:*status* 
