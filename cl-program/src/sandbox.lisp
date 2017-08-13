@@ -109,7 +109,6 @@
 		       (setf frame-time quarter-million)))
 		 (setf current-time new-time)
 		 (incf accumulator frame-time)
-
 		 (block later
 		   (loop
 		      (if (>= accumulator dt)
@@ -122,7 +121,6 @@
 			    (incf ttt dt)
 			    (decf accumulator dt))
 			  (return-from later))))
-		 
 		 (let ((fraction (/ (float accumulator)
 				    (float dt))))
 		   (sandbox::render fraction))
@@ -130,14 +128,13 @@
 
 (defparameter *thread* nil)
 (defun main3 ()
-  ;(setf *thread*)
-;  (bordeaux-threads:make-thread)
-  ((lambda ()
-      (let ((window::*iresizable* t)
-	    (window::*iwidth* 256)
-	    (window::*iheight* 256)
-	    )
-	(window::wrapper #'handoff-five)))))
+  (trivial-main-thread:call-in-main-thread
+   ((lambda ()
+       (let ((window::*iresizable* t)
+	     (window::*iwidth* 256)
+	     (window::*iheight* 256)
+	     )
+	 (window::wrapper #'handoff-five))))))
 
 (defun fine-time ()
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)

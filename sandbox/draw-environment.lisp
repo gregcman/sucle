@@ -20,6 +20,7 @@
       (window::set-vsync nil))
   (remove-spurious-mouse-input)
   (when (window:mice-locked-p)
+    (glfw:poll-events)
     (look-around))
   (set-render-cam-pos *camera* partial-time)
   (update-matrices *camera*)

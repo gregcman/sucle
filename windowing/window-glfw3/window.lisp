@@ -180,10 +180,6 @@
   (setq *status* (glfw:window-should-close-p))
   (step-hash *keypress-hash*)
   (step-hash *mousepress-hash*)
-  (setf (fill-pointer *zchars*) 0
-	(fill-pointer *buttons*) 0
-	(fill-pointer *keys*) 0)
-  (setf (fill-pointer *chars*) 0)
   (glfw:poll-events)
   (let ((charsize (fill-pointer *zchars*)))
     (dobox ((offset 0 charsize :inc 2))
@@ -206,7 +202,12 @@
 		    '(let* ((mod-shift (ash mod-keys +mod-key-shift+))
 			    (new-composite (logior mod-shift (aref *action-map* action))))
 		      (declare (type fixnum mod-shift new-composite))
-		      (setf (key key) new-composite)))))))
+		      (setf (key key) new-composite))))))
+  (progn
+    (setf (fill-pointer *zchars*) 0
+	  (fill-pointer *buttons*) 0
+	  (fill-pointer *keys*) 0)
+    (setf (fill-pointer *chars*) 0)))
 
 
 (defun get-proc-address ()
