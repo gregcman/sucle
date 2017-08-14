@@ -92,7 +92,7 @@
 
 (defun injection3 ()
   (let ((ttt 0)
-	(dt (floor +million+ 20))
+	(dt (floor +million+ 60))
 	(current-time (fine-time))
 	(accumulator 0)
 	(previous)
@@ -128,13 +128,13 @@
 
 (defparameter *thread* nil)
 (defun main3 ()
-  (trivial-main-thread:call-in-main-thread
-   ((lambda ()
-       (let ((window::*iresizable* t)
-	     (window::*iwidth* 256)
-	     (window::*iheight* 256)
-	     )
-	 (window::wrapper #'handoff-five))))))
+  (trivial-main-thread:call-in-main-thread   
+   (lambda ()
+     (let ((window::*iresizable* t)
+	   (window::*iwidth* 256)
+	   (window::*iheight* 256)
+	   )
+       (window::wrapper #'handoff-five)))))
 
 (defun fine-time ()
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)

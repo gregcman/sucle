@@ -270,3 +270,12 @@
 			  %glfw::window window :pointer x :pointer y :void)
     (values (coerce (cffi:mem-ref x :double) 'single-float)
 	    (coerce (cffi:mem-ref y :double) 'single-float))))
+
+(cffi:defcstruct |GLFWStruct|
+  (width :int)
+  (height :int)
+  (pixels :pointer))
+
+(cffi:defcfun "glfwSetCursor" :void
+  (window :pointer)
+  (cursor :pointer))

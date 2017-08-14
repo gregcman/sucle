@@ -44,15 +44,17 @@
    (when fist?
      (draw-fist *camera*)
      )
-   
-   (gl:disable :cull-face) 
-   (luse-shader :solidshader)
-   (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
 
-   (progn
-    (draw-framebuffer)
-    (draw-crosshair)
-    (draw-hud)))
+   (progno
+    (gl:disable :cull-face) 
+    (luse-shader :solidshader)
+    (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
+
+    (progno
+     (draw-framebuffer)
+     (draw-crosshair)
+     ;;  (draw-hud)
+     )))
   
   (designatemeshing))
 
@@ -144,7 +146,7 @@
 (defun draw-hud ()
   (bind-custom-framebuffer)
   (gl:clear-color 0.0 0.0 0.0 0.0)
-;  (gl:clear :color-buffer-bit)
+;;  (gl:clear :color-buffer-bit)
   (gl:enable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (bind-shit :gui)

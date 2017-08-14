@@ -185,7 +185,8 @@
     (let ((framebuffer-status (gl:check-framebuffer-status-ext :framebuffer-ext)))
       (unless (gl::enum= framebuffer-status :framebuffer-complete-ext)
         (error "Framebuffer not complete: ~A." framebuffer-status)))
-    
+
+    (gl:clear-color 0.0 0.0 0.0 0.0)
     (gl:clear :color-buffer-bit
 	      :depth-buffer-bit)
     (gl:enable :depth-test :multisample)
