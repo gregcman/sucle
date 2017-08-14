@@ -190,6 +190,8 @@
       (setf (aref foo-array x) (expt 0.8 (- 15 x))))
     foo-array))
 
+(setf (aref light-index-table 15) 1.0)
+
 (declaim (inline lightfunc))
 (defun lightfunc (light)
   (aref light-index-table light))

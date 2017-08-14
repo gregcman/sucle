@@ -122,7 +122,7 @@
 			     (declare (type fixnum displacement))
 			     (let ((val (world:%skygetlight displacement)))
 			       (declare (type (unsigned-byte 4) val))
-			       (when (< val  lower-level)
+			       (when (< val 15)
 				 (unless (or (isOpaque (world:%getblock displacement))
 					     (> 4503599627370496 displacement))
 				   (setf (world:%skygetlight displacement) 15)

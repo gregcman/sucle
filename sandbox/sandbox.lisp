@@ -98,7 +98,7 @@
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
 (defun modify-greens (xpos ypos &optional (color
-					   (case 2
+					   (case 1
 					     (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 					     (1 (imagewise:getapixel 0 255 (get-image "misc/grasscolor.png")))
 					     (2 (imagewise:getapixel 0 0 (get-image "misc/grasscolor.png")))
@@ -464,7 +464,14 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* #P"terrarium2/")
+(defparameter *save* (case 5
+		       (0 #P"terrarium2/")
+		       (1 #P"first/")
+		       (2 #P"second/")
+		       (3 #P"third/")
+		       (4 #P"fourth/")
+		       (5 #P"world/")
+		       (6 #P"terrarium/")))
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -689,6 +696,14 @@
 	   (when 
 	     (< blockid 12)
 	     (plain-setblock x y z 1 0)))))
+(defun clcok3 ()
+  (dobox ((x 0 128)
+	  (y 0 128)
+	  (z -128 0))
+	 (let ((blockid (world:skygetlight x y z)))
+	   (when 
+	     (= blockid 15)
+	     (plain-setblock x y z 14 15)))))
 
 (defun grassify ()
   (dobox ((x 0 128)

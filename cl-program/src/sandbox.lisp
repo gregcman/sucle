@@ -128,7 +128,7 @@
 
 (defparameter *thread* nil)
 (defun main3 ()
-  (trivial-main-thread:call-in-main-thread   
+  (;trivial-main-thread:call-in-main-thread   
    (lambda ()
      (let ((window::*iresizable* t)
 	   (window::*iwidth* 256)

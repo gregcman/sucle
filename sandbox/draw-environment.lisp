@@ -45,15 +45,15 @@
      (draw-fist *camera*)
      )
 
-   (progno
+   (progn
     (gl:disable :cull-face) 
     (luse-shader :solidshader)
     (set-matrix "projectionmodelview" cg-matrix:+identity-matrix+)
 
-    (progno
+    (progn
      (draw-framebuffer)
      (draw-crosshair)
-     ;;  (draw-hud)
+      (draw-hud)
      )))
   
   (designatemeshing))
@@ -121,12 +121,17 @@
      (camera-matrix-projection-view-player camera)
      (cg-matrix:%translate*
       *temp-matrix*
-      (+ (coerce fist-side-x 'single-float))
-      (+ (coerce fist-side-y 'single-float))
-      (+ (coerce fist-side-z 'single-float))))))
+      (coerce fist-side-x 'single-float)
+      (coerce fist-side-y 'single-float)
+      (coerce fist-side-z 'single-float)))))
   (gl:color 0.0 0.0 0.0)
   (gl:disable :cull-face :blend)
   (gl:polygon-mode :front-and-back :line)
+  (let ((fist-pos (load-time-value
+		   (make-array 3 :element-type (quote single-float)
+			       :initial-contents (quote
+						  (0.0 0.0 0.0))))))   
+    (set-vec3 "fogcolor" fist-pos))
   (ldrawlist :selected-box)
   (gl:polygon-mode :front-and-back :fill))
 

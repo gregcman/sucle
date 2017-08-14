@@ -203,6 +203,11 @@
 
 (defparameter walkblock nil)
 (defparameter foo nil)
+
+(progno
+ (print (reduce #'+ foo))
+ (/ 21450611.0 23824968.0)) 
+
 (defun physics ()
   ;;e to escape mouse
   (setf *xpos-old* *xpos*
@@ -238,7 +243,8 @@
 		     (- (truncate *ypos*) 2)
 		     (- (truncate *zpos*) 1)
 		     *hotbar-selection*))
-    (when (skey-j-p :h) (time (setf foo (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte))))
+    (when (skey-j-p :h) (time (let ((ans (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte)))
+				(Setf foo ans))))
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
@@ -252,17 +258,19 @@
 				  fist-side-z
 				  0
 				  0))
-	  (case 1
-	    (0 (when (smice-j-p :right)
-		 (tree (floor fistx)
-		       (floor fisty)
-		       (floor fistz))))
-	    (1 (when (smice-j-p :right)
-		 (setblock-with-update (floor fistx)
-				       (floor fisty)
-				       (floor fistz)
-				       blockval
-				       (aref mc-blocks::lightvalue blockval)))))))))
+	  (let ((xop (floor fistx))
+		(yop (floor fisty))
+		(zop (floor fistz)))
+	    (case 1
+	      (0 (when (smice-j-p :right)
+		   (print (list xop yop zop))
+		   (princ (world:skygetlight xop yop zop))))
+	      (1 (when (smice-j-p :right)
+		   (setblock-with-update (floor fistx)
+					 (floor fisty)
+					 (floor fistz)
+					 blockval
+					 (aref mc-blocks::lightvalue blockval))))))))))
   (collide-with-world)
   
   (if fly
