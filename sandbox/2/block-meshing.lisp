@@ -6,8 +6,10 @@
 (declaim (inline add-to-shapebuffer))
 (defun add-to-shapebuffer (x y z u v darkness b0 b1 b2 b3 s0 s1 s2 s3)
   (declare (type (simple-array single-float *) shapebuffer-vs))
-  (declare (type single-float x y z darkness b0 b1 b2 b3 s0 s1 s2 s3))
-  ;(declare (optimize (speed 3) (safety 0)))
+  (declare (type single-float x y z darkness))
+  (declare (type (unsigned-byte 4) b0 b1 b2 b3 s0 s1 s2 s3))
+					;(declare (optimize (speed 3) (safety 0)))
+  (declare (ignorable b0 b1 b2 b3))
   (let ((vertlength shapebuffer-index))
     (declare (type fixnum vertlength))
     (let ((fp (* 6 vertlength)))
@@ -16,12 +18,13 @@
 	    (aref shapebuffer-vs (+ fp 2)) z
 	    (aref shapebuffer-vs (+ fp 3)) (coerce u 'single-float)
 	    (aref shapebuffer-vs (+ fp 4)) (coerce v 'single-float)	    
-	    (aref shapebuffer-vs (+ fp 5)) (* 0.25
-					      darkness
-					      (+ (max b0 (* daytime s0))
-						 (max b1 (* daytime s1))
-						 (max b2 (* daytime s2))
-						 (max b3 (* daytime s3)))))))
+	    (aref shapebuffer-vs (+ fp 5))
+	    (* darkness
+	       0.25
+	       (+ (max b0 (* daytime s0))
+		  (max b1 (* daytime s1))
+		  (max b2 (* daytime s2))
+		  (max b3 (* daytime s3)))))))
   (incf shapebuffer-index))
 
 (defun chunk-shape (chunk-position)
@@ -133,7 +136,7 @@
 	  (zd (+ ,k ,z3)))
       (declare (type fixnum xd yd zd))
       (lightfunc (,getfunc xd yd zd)))))
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :execute)
   (progn
     (defun light-edge-i (i j k)
       (macroexpand-1
@@ -184,20 +187,31 @@
 		   (0 0 0)
 		   (1 0 0))))))
 
+
+;;0.9 for nether???
+;;0.8 for overworld(in-package :sandbox)???
+(defun light-gen? (f i)
+  (expt f (- 15 i)))
+
+;;;overworld f = 0.05
+;;;nether f = 0.1
+(defun light-gen (f i)
+  (+ f
+     (/ (* i (- 1 f))
+	(- 60 i i i))))
+
 (defparameter light-index-table
   (let ((foo-array (make-array 16 :element-type 'single-float)))
     (dotimes (x 16)
-      (setf (aref foo-array x) (expt 0.8 (- 15 x))))
+      (setf (aref foo-array x)
+	    (light-gen 0.05 x)))
     foo-array))
 
-(setf (aref light-index-table 15) 1.0)
 
 (declaim (inline lightfunc))
 (defun lightfunc (light)
   (aref light-index-table light))
 
-;;0.9 for nether
-;;0.8 for overworld(in-package :sandbox)
 
 (declaim (inline trans))
 (defun trans (foo foo-translator)

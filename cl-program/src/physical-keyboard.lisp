@@ -31,7 +31,24 @@
 			  (map 'list #'second *regular-keys*))))))
 
 (eval-always
- (defparameter *data* (make-array 128)))
+ (progn
+   (defparameter *data* (make-array 128))
+   (defparameter *finger-keys*
+     #("5tgbnhy6"
+       "4rfvmju7"
+       "3edc,ki8"
+       "2wsx.lo9"
+       "1qaz/;p0"))
+
+   (let ((keys *finger-keys*))
+     (dotimes (x 5)
+       (let ((data (aref keys x))
+	     (ypos (- 5 x)))     
+	 (let ((len (length data)))
+	   (dotimes (index len)
+	     (let ((xpos index))
+	       (setf (aref *data* (char-code (aref data index)))
+		     (cons xpos ypos))))))))))
 
 (defun key-position (char)
   (aref (fuktard:etouq *data*) (char-code char)))
@@ -39,19 +56,4 @@
   (aref (fuktard:etouq *data*) code))
 
 
-(defparameter *finger-keys*
-  #("5tgbnhy6"
-    "4rfvmju7"
-    "3edc,ki8"
-    "2wsx.lo9"
-    "1qaz/;p0"))
 
-(let ((keys *finger-keys*))
-  (dotimes (x 5)
-    (let ((data (aref keys x))
-	  (ypos (- 5 x)))     
-      (let ((len (length data)))
-	(dotimes (index len)
-	  (let ((xpos index))
-	    (setf (aref *data* (char-code (aref data index)))
-		  (cons xpos ypos))))))))

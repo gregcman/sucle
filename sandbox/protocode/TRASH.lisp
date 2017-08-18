@@ -1,5 +1,11 @@
 (in-package :sandbox)
 
+(let ((f1 (- 1.0 (/ i 15.0))))
+  (let ((fun (+ f (* (/ (- 1.0 f1)
+			(+ (* f1 3.0) 1.0))
+		     (- 1.0 f)))))
+    fun))
+
 (in-package :macrology)
 
 ;;;toggle a place between true and nil

@@ -77,7 +77,7 @@
 		       py0 py1
 		       px1 (+ cx1 *camera-x*)
 		       py1 (+ cy1 *camera-y*)))))))))
-;;  (other-stuff)
+  (other-stuff)
   (uncentered-rectangle *cam-rectangle* *camera-x* *camera-y*
 			(/ e:*width* *block-width*) (/ e:*height* *block-height*))
   (progn

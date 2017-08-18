@@ -35,4 +35,4 @@
 	       (:file "draw-environment") ;;;random rendering
 	       (:file "pix2")
 	       (:file "player-controls");;;layers over input
-	       (:file "sandbox"))))) ;;;initialization and loop
+	       ))))

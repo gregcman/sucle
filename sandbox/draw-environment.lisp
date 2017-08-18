@@ -111,7 +111,7 @@
     (set-float "aratio" (/ 1.0 *fog-ratio*))))
 
 (defun draw-fist (camera)
-  (gl:line-width 1.0)
+  (gl:line-width 30.0)
   (set-matrix
    "projectionmodelview"
    (cg-matrix:%transpose-matrix

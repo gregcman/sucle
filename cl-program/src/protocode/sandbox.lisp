@@ -19,8 +19,9 @@
   (physics)
   (render)
   (window:update-display)
-  (unless window:*status*
-    (injection)))
+  (progn
+   (unless window:*status*
+     (injection))))
 
 (defun main ()
   (threaded-main #'handoff-three))
@@ -74,14 +75,6 @@
 	   (window::*iheight* 256)
 	   )
        (window::wrapper #'handoff-four)))))
-
-(defun testigan ()
-  (sandbox::dirt-sand)
-  (sandbox::cacti)
-  (sandbox::dirts)
-  (sandbox::grassify)
-  (sandbox::trees)
-  (sandbox::simple-relight))
 
 (defun handoff-five ()
   (sandbox::initialization1)

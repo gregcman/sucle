@@ -64,7 +64,7 @@
 	 (plain-setblock x y z 0 0)))
 
 (defun test-world ()
-  (dobox ((x 0 8) (y -4 4))
+  (dobox ((x 0 8) (y -8 0))
 	 (someseq x y)))
 
 (defun spawn ()
@@ -98,7 +98,7 @@
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
 (defun modify-greens (xpos ypos &optional (color
-					   (case 1
+					   (case 3
 					     (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 					     (1 (imagewise:getapixel 0 255 (get-image "misc/grasscolor.png")))
 					     (2 (imagewise:getapixel 0 0 (get-image "misc/grasscolor.png")))
@@ -411,7 +411,7 @@
 
 (defun wtf-reverse ()
   (maphash (lambda (k v)
-	     (map-into v (lambda (x) (if (zerop x) 1 x)) v ))
+	     (map-into v (lambda (x) (if (= 1 x) 0 x)) v ))
 	   world:chunkhash))
 
 (defun wtf-fill ()
@@ -464,7 +464,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* (case 5
+(defparameter *save* (case 3
 		       (0 #P"terrarium2/")
 		       (1 #P"first/")
 		       (2 #P"second/")
@@ -766,6 +766,13 @@
     (dobox ((y0 0 trunk-height))
 	   (plain-setblock (+ x 0) (+ y y0) (+ z 0) 81 0 0))))
 
+(defun testigan ()
+  (dirt-sand)
+  (dirts)
+  (grassify)
+  (trees)
+  (simple-relight))
+
 (defun meh ()
   (goto 64 128 -64))
 
@@ -857,13 +864,14 @@
   (prog2 (setf atest
 	       (case x
 		 (0 (byte-read #P "/home/terminal256/.minecraft/saves/New World-/region/r.0.-1.mcr"))
-		 (1 (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.0.1.mcr"))
-		 (2 cl-mc-shit::testchunk)
+		 (1 (byte-read #P "/home/imac/.minecraft/saves/New World/region/r.1.1.mcr"))
+		 (2 (cl-mc-shit::testchunk))
+		 (3 (byte-read #P "/home/imac/info/mcp/jars/saves/New World/region/r.-1.-1.mcr"))
 		 ))
       x))
 
 (defparameter atest nil)
-;(setatest 2)
+;;(setatest 2)
 
 (defun someseq (x y)
   (let* ((thechunk (helpchunk x y)))
