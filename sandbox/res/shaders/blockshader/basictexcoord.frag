@@ -10,8 +10,7 @@ void main()
 {
 
 vec4 texcolor = texture2D(ourTexture, TexCoord);
-gl_FragColor.rgb =  mix(fogcolor, mycolor *  texcolor.rgb, fogratio);
-
-
+vec3 ans = mix(fogcolor, mycolor *  texcolor.rgb, fogratio);
+gl_FragColor.rgb =  ans;
 }
 

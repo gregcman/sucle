@@ -30,7 +30,6 @@
 		      (if (>= accumulator dt)
 			  (progn
 			    (setf previous current)
-					;(integrate current t dt)
 			    (window:poll)
 			    (sandbox::thunkit)
 			    

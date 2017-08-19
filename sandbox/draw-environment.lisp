@@ -98,9 +98,9 @@
   *vec4*)
 
 (defun set-overworld-fog (time)
-  (let ((x (fractionalize (* time 0.68)))
-	(y (fractionalize (* time 0.8)))
-	(z (fractionalize (* time 1.0))))
+  (let ((x (fractionalize (* time (or 0.0 0.68))))
+	(y (fractionalize (* time (or 0.0 0.8))))
+	(z (fractionalize (* time (or 0.0 1.0)))))
     (gl:clear-color x y z 1.0)
     (setf (aref *avector* 0) x
 	  (aref *avector* 1) y

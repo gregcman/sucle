@@ -464,14 +464,17 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* (case 3
+(defparameter *save* (case 8
 		       (0 #P"terrarium2/")
 		       (1 #P"first/")
 		       (2 #P"second/")
 		       (3 #P"third/")
 		       (4 #P"fourth/")
 		       (5 #P"world/")
-		       (6 #P"terrarium/")))
+		       (6 #P"terrarium/")
+		       (7 #P"holymoly/")
+		       (8 #P"funkycoolclimb/")
+		       (9 #P"ahole/")))
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -702,7 +705,7 @@
 	  (z -128 0))
 	 (let ((blockid (world:skygetlight x y z)))
 	   (when 
-	     (= blockid 15)
+	     (= blockid 14)
 	     (plain-setblock x y z 14 15)))))
 
 (defun grassify ()
@@ -772,6 +775,15 @@
   (grassify)
   (trees)
   (simple-relight))
+
+(defun testicle ()
+  (dotimes (x 1)
+    (sandbox::edge-bench)
+    (sandbox::corner-obsidian)
+    (sandbox::clearblock? 49)
+    (sandbox::clearblock? 58)
+    (dotimes (x 3) (sandbox::bonder
+		    ))))
 
 (defun meh ()
   (goto 64 128 -64))
@@ -871,10 +883,10 @@
       x))
 
 (defparameter atest nil)
-;;(setatest 2)
+;;(setatest 3)
 
 (defun someseq (x y)
-  (let* ((thechunk (helpchunk x y)))
+  (let* ((thechunk (helpchunk (+ 24 x) y)))
     (if thechunk
 	(let ((light (getlightlizz thechunk))
 	      (blocks (getblockslizz thechunk))
