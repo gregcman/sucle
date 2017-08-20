@@ -464,7 +464,7 @@
 	   (optimize (speed 3) (safety 0)))
   (eq a b))
 
-(defparameter *save* (case 8
+(defparameter *save* (case 10
 		       (0 #P"terrarium2/")
 		       (1 #P"first/")
 		       (2 #P"second/")
@@ -474,7 +474,8 @@
 		       (6 #P"terrarium/")
 		       (7 #P"holymoly/")
 		       (8 #P"funkycoolclimb/")
-		       (9 #P"ahole/")))
+		       (9 #P"ahole/")
+		       (10 #P"maze-royale/")))
 
 (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
 
@@ -635,7 +636,7 @@
 	  (z -128 0))
 	 (let ((blockid (world:getblock x y z)))
 	   (unless (zerop blockid))
-	   (when (< 4 (neighbors x y z))
+	   (when (< 3 (neighbors x y z))
 	     (plain-setblock x y z 1 0 0)))))
 
 (defun bonder ()
@@ -648,6 +649,15 @@
 	       (when (> 3 naybs)
 		 
 		 (plain-setblock x y z 0 0 0)))))))
+
+(defun trees2 ()
+  (dobox ((x (+ 8 0) (- 128 8))
+	  (y 0 120)
+	  (z (+ 8 -128) (- 0 8)))
+	 (when (zerop (random 100))
+	   (when (= 2 (world:getblock x y z))
+	     (tree x (1+ y) z))))
+  )
 
 (defun what? ()
   (dobox ((x 0 128)
@@ -697,7 +707,7 @@
 	  (z -128 0))
 	 (let ((blockid (world:skygetlight x y z)))
 	   (when 
-	     (< blockid 12)
+	     (< blockid 15)
 	     (plain-setblock x y z 1 0)))))
 (defun clcok3 ()
   (dobox ((x 0 128)
@@ -773,7 +783,7 @@
   (dirt-sand)
   (dirts)
   (grassify)
-  (trees)
+  (trees2)
   (simple-relight))
 
 (defun testicle ()
@@ -1026,5 +1036,18 @@
 
 (defun delete-shaders ()
   (clrhash *g/text*))
+
+
+(progn
+  (declaim (ftype (function ((simple-bit-vector 128) (simple-bit-vector 128)) t)
+		  bit-vector-equal))
+  (with-unsafe-speed
+    (defun bit-vector-equal (a b)
+      (equal a b))))
+
+
+
+
+
 
 

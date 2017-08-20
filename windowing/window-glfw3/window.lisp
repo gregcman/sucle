@@ -1,7 +1,40 @@
 (in-package #:window)
 
-(defparameter *keypress-hash* nil)
-(defparameter *mousepress-hash* nil)
+(deftype mouse-keyboard-input-array ()
+  `(simple-bit-vector 128))
+
+(progn
+  (declaim (ftype (function () mouse-keyboard-input-array)
+		  make-mouse-keyboard-input-array))
+  (defun make-mouse-keyboard-input-array ()
+    (make-array 128 :element-type 'bit)))
+
+(defparameter *mouse-array*
+  (make-array 8 :element-type '(unsigned-byte 8)
+	      :initial-contents '(11 12 14 15 16 33 34 35)))
+
+(defparameter *key-array*
+  (make-array 349 :element-type '(unsigned-byte 8)
+	      :initial-contents
+	      '(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 32 0 0 0 0 0
+		0 39 0 0 0 0 44 45 46 47 48 49 50 51 52 53 54 55 56 57 0 59 0 61 0 0 0 65 66
+		67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92
+		93 0 0 96 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+		0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 94 95 0 0 0 0 0 0
+		0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+		0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+		0 0 0 0 0 0 0 0 0 27 10 9 8 58 127 30 31 29 28 60 62 126 122 0 0 0 0 0 0 0 0
+		0 0 123 124 125 64 63 0 0 0 0 0 97 98 99 100 101 102 103 104 105 106 107 108
+		109 110 111 112 113 114 115 116 117 118 119 120 121 0 0 0 0 0 17 18 19 20 21
+		22 23 24 25 26 37 40 42 41 43 13 38 0 0 0 0 1 2 3 4 5 6 7 36)))
+
+(declaim (type mouse-keyboard-input-array *input-state* *input-prev* *difference-state*))
+(defparameter *input-state* (make-mouse-keyboard-input-array))
+(defparameter *input-prev* (make-mouse-keyboard-input-array))
+
+(defparameter *difference-state* (make-mouse-keyboard-input-array))
+
+
 
 (defparameter *scroll-x* nil)
 (defparameter *scroll-y* nil)
@@ -26,41 +59,6 @@
 	 ((,window :pointer) (,char :unsigned-int))
        ,@body)))
 
-(defconstant +false+ 0)
-(defconstant +release+ 1)
-(defconstant +true+ 2)
-(defconstant +press+ 3)
-(defconstant +repeat+ 4)
-
-(defparameter *action-map* (vector 1 3 4))
-
-(defconstant +mod-key-shift+ 3)
-(defconstant +key-state-mask+ #b111)
-(defconstant +mod-state-mask+ #b1111000)
-
-(defun step-hash (hash)
-  (with-hash-table-iterator (next hash)
-    (loop (multiple-value-bind (more key value) (next)
-	    (if more
-		(let ((nvalue (get-press-value value)))
-		  (cond ((= +true+ nvalue))
-			((< +true+ nvalue)
-			 (setf (gethash key hash)
-			       (logior (get-mod-value value)
-				       +true+)))
-			((> +true+ nvalue)
-			 (remhash key hash))))
-		(return))))))
-
-(progn
-  (defun key (key)
-    (gethash key *keypress-hash* +false+))
-  (defun (setf key) (value key)
-    (setf (gethash key *keypress-hash*) value))
-  (defun mice (mice)
-    (gethash mice *mousepress-hash* +false+))
-  (defun (setf mice) (value mice)
-    (setf (gethash mice *mousepress-hash*) value)))
 ;;;;various functions to test the state of the keyboard
 
 ;;;"-p" stands for "press" or predicate
@@ -76,69 +74,57 @@
   (logand value +mod-state-mask+))
 
 (defun key-p (the-key)
-  (let ((value (get-press-value (key the-key))))     
-    (<= +true+ value)))
-(defun key-r-or-p (the-key)
-  (let ((value (get-press-value (key the-key))))     
-    (< +true+ value)))
-(defun key-r (the-key)
-  (let ((value (get-press-value (key the-key))))     
-    (= value +repeat+)))
+  (let ((value (key-enum-index the-key)))     
+    (not (zerop (aref *input-state* value)))))
 (defun key-j-p (the-key)
-  (let ((value (get-press-value (key the-key))))     
-    (= value +press+)))
+  (let ((value (key-enum-index the-key)))     
+    (and (not (zerop (aref *input-state* value)))
+	 (not (zerop (aref *difference-state* value))))))
 (defun key-j-r (the-key)
-  (let ((value (get-press-value (key the-key))))     
-    (= value +release+)))
+  (let ((value (key-enum-index the-key)))     
+    (and (zerop (aref *input-state* value))
+	 (not (zerop (aref *difference-state* value))))))
 
-
-(defun r-or-p (value)
-  (< +true+ value))
 ;;;for mice
 
-
 (defun mice-p (the-key)
-  (let ((value (get-press-value (mice the-key))))
-    (<= +true+ value)))
-(defun mice-r-or-p (the-key)
-  (let ((value (get-press-value (mice the-key))))
-    (< +true+ value)))
-(defun mice-r (the-key)
-  (let ((value (get-press-value (mice the-key))))
-    (= value +repeat+)))
+  (let ((value (mouse-enum-index the-key)))     
+    (not (zerop (aref *input-state* value)))))
 (defun mice-j-p (the-key)
-  (let ((value (get-press-value (mice the-key))))
-    (= value +press+)))
+  (let ((value (mouse-enum-index the-key)))     
+    (and (not (zerop (aref *input-state* value)))
+	 (not (zerop (aref *difference-state* value))))))
 (defun mice-j-r (the-key)
-  (let ((value (get-press-value (mice the-key))))
-    (= value +release+)))
+  (let ((value (mouse-enum-index the-key)))     
+    (and (zerop (aref *input-state* value))
+	 (not (zerop (aref *difference-state* value))))))
+
+
+(defun mouse-enum-index (enum)
+  (aref *mouse-array*
+	(cffi:foreign-enum-value (quote %glfw::mouse) enum)))
+
+(defun key-enum-index (enum)
+  (aref *key-array*
+	(cffi:foreign-enum-value (quote %glfw::key)
+				 enum)))
 
 ;;;glfw callbacks which will update the hashes to contain nil t
 ;;;+press+ or +release+ per key [each key is a symbol]
 
 (def-key-callback key-callback (window key scancode action mod-keys)
-  (let ((vec *keys*))
-    (flet ((add (x)
-	     (vector-push-extend x vec)))
-      (add window)
-      (add key)
-      (add scancode)
-      (add action)
-      (add mod-keys))))
+  (setf (sbit *input-state*
+	      (key-enum-index key))
+	(if (zerop action)
+	    0
+	    1)))
 (def-mouse-button-callback mouse-callback (window button action mod-keys)
-  (let ((vec *buttons*))
-    (flet ((add (x)
-	     (vector-push-extend x vec)))
-      (add window)
-      (add button)
-      (add action)
-      (add mod-keys))))
-(def-char-callback char-callback (window char)
-  (let ((vec *zchars*))
-    (flet ((add (x)
-	     (vector-push-extend x vec)))
-      (add window)
-      (add char))))
+  (setf (sbit *input-state*
+	      (mouse-enum-index button))
+	(if (zerop action)
+	    0
+	    1)))
+(def-char-callback char-callback (window char))
 
 (defun make-fill-vector ()
   (make-array 0
@@ -147,8 +133,7 @@
 
 (defparameter *buttons* (make-fill-vector))
 (defparameter *keys* (make-fill-vector))
-(defparameter *chars* (make-fill-vector))
-(defparameter *zchars* (make-fill-vector))
+
 
 (glfw:def-scroll-callback scroll-callback (window x y)
   (declare (ignore window))
@@ -163,14 +148,12 @@
 (defparameter *resize-hook* (constantly nil))
 
 (defun init ()
+  (fill *input-state* 0)
+  (fill *input-prev* 0)
+  (fill *difference-state* 0)
   (setf *scroll-x* 0.0
 	*scroll-y* 0.0)
-  (if *keypress-hash*
-      (clrhash *keypress-hash*)
-      (setf *keypress-hash* (make-hash-table :test 'eq)))
-  (if *mousepress-hash* 
-      (clrhash *mousepress-hash*)
-      (setf *mousepress-hash* (make-hash-table :test 'eq)))
+
   (setq *status* nil)
   #+sbcl (sb-int:set-floating-point-modes :traps nil))
 
@@ -178,36 +161,10 @@
   (setf *scroll-x* 0.0
 	*scroll-y* 0.0)
   (setq *status* (glfw:window-should-close-p))
-  (step-hash *keypress-hash*)
-  (step-hash *mousepress-hash*)
+
   (glfw:poll-events)
-  (let ((charsize (fill-pointer *zchars*)))
-    (dobox ((offset 0 charsize :inc 2))
-	   (etouq (with-vec-params '((offset nil char)) '(*zchars*)
-					;    (declare (ignorable window))
-		    '(if (< char char-code-limit)
-		      (vector-push-extend (code-char char) *chars*))))))
-  (let ((buttonsize (fill-pointer *buttons*)))
-    (dobox ((offset 0 buttonsize :inc 4))     
-	   (etouq (with-vec-params '((offset nil button action mod-keys)) '(*buttons*)
-					;    (declare (ignorable window))
-		    '(let* ((mod-shift (ash mod-keys +mod-key-shift+))
-			    (new-composite (logior mod-shift (aref *action-map* action))))
-		      (declare (type fixnum mod-shift  new-composite))
-		      (setf (mice button) new-composite))))))
-  (let ((keysize (fill-pointer *keys*)))
-    (dobox ((offset 0 keysize :inc 5))
-	   (etouq (with-vec-params '((offset nil key nil action mod-keys)) '(*keys*)
-					;  (declare (ignorable window scancode))
-		    '(let* ((mod-shift (ash mod-keys +mod-key-shift+))
-			    (new-composite (logior mod-shift (aref *action-map* action))))
-		      (declare (type fixnum mod-shift new-composite))
-		      (setf (key key) new-composite))))))
-  (progn
-    (setf (fill-pointer *zchars*) 0
-	  (fill-pointer *buttons*) 0
-	  (fill-pointer *keys*) 0)
-    (setf (fill-pointer *chars*) 0)))
+  (bit-xor *input-state* *input-prev* *difference-state*)
+  (bit-ior *input-state* *input-state* *input-prev*))
 
 
 (defun get-proc-address ()
@@ -279,3 +236,4 @@
 (cffi:defcfun "glfwSetCursor" :void
   (window :pointer)
   (cursor :pointer))
+

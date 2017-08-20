@@ -83,7 +83,7 @@
 	(decf *yvel* speed)))
     (unless fly
       (when onground
-	(when (or (e:mice-j-p :|3|) (skey-p :space)) ;;jumping
+	(when (skey-p :space) ;;jumping
 	  (incf *yvel* (* (if t 0.49 0.42) (expt tickscale 1)))))
       (unless onground
 	(setf speed (* speed 0.2))))    
