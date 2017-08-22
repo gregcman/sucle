@@ -34,8 +34,6 @@
 
 (defparameter *difference-state* (make-mouse-keyboard-input-array))
 
-
-
 (defparameter *scroll-x* nil)
 (defparameter *scroll-y* nil)
 
@@ -75,29 +73,29 @@
 
 (defun key-p (the-key)
   (let ((value (key-enum-index the-key)))     
-    (not (zerop (aref *input-state* value)))))
+    (not (zerop (sbit *input-state* value)))))
 (defun key-j-p (the-key)
   (let ((value (key-enum-index the-key)))     
-    (and (not (zerop (aref *input-state* value)))
-	 (not (zerop (aref *difference-state* value))))))
+    (and (not (zerop (sbit *input-state* value)))
+	 (not (zerop (sbit *difference-state* value))))))
 (defun key-j-r (the-key)
   (let ((value (key-enum-index the-key)))     
-    (and (zerop (aref *input-state* value))
-	 (not (zerop (aref *difference-state* value))))))
+    (and (zerop (sbit *input-state* value))
+	 (not (zerop (sbit *difference-state* value))))))
 
 ;;;for mice
 
 (defun mice-p (the-key)
   (let ((value (mouse-enum-index the-key)))     
-    (not (zerop (aref *input-state* value)))))
+    (not (zerop (sbit *input-state* value)))))
 (defun mice-j-p (the-key)
   (let ((value (mouse-enum-index the-key)))     
-    (and (not (zerop (aref *input-state* value)))
-	 (not (zerop (aref *difference-state* value))))))
+    (and (not (zerop (sbit *input-state* value)))
+	 (not (zerop (sbit *difference-state* value))))))
 (defun mice-j-r (the-key)
   (let ((value (mouse-enum-index the-key)))     
-    (and (zerop (aref *input-state* value))
-	 (not (zerop (aref *difference-state* value))))))
+    (and (zerop (sbit *input-state* value))
+	 (not (zerop (sbit *difference-state* value))))))
 
 
 (defun mouse-enum-index (enum)
@@ -137,8 +135,8 @@
 
 (glfw:def-scroll-callback scroll-callback (window x y)
   (declare (ignore window))
-  (setf *scroll-x* (coerce x 'single-float)
-	*scroll-y* (coerce y 'single-float)))
+  (incf *scroll-x* (coerce x 'single-float))
+  (incf *scroll-y* (coerce y 'single-float)))
 (defparameter *status* nil)
 (glfw:def-window-size-callback update-viewport (window w h)
   (declare (ignorable window))
@@ -157,15 +155,24 @@
   (setq *status* nil)
   #+sbcl (sb-int:set-floating-point-modes :traps nil))
 
+(defun poll-events ()
+  (glfw:poll-events))
+
 (defun poll ()
-  (setf *scroll-x* 0.0
-	*scroll-y* 0.0)
   (setq *status* (glfw:window-should-close-p))
+  (poll-events)
+  (array-step *input-state* *input-prev* *difference-state*)
+  *input-state*)
 
-  (glfw:poll-events)
-  (bit-xor *input-state* *input-prev* *difference-state*)
-  (bit-ior *input-state* *input-state* *input-prev*))
-
+(progn
+  (declaim (ftype (function (mouse-keyboard-input-array
+			     mouse-keyboard-input-array
+			     mouse-keyboard-input-array))
+		  array-step))
+  (with-unsafe-speed
+    (defun array-step (state prev difference)
+      (bit-xor state prev difference)
+      (bit-ior state state prev))))
 
 (defun get-proc-address ()
   (function glfw:get-proc-address))
