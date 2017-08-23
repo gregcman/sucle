@@ -1,7 +1,12 @@
 (in-package :fuck)
 
+(defparameter *al-on?* nil)
+
 (defun handoff-five ()
   (sandbox::initialization1)
+  (unless *al-on?*
+    (start-al)
+    (setf *al-on?* t))
   (injection3)) 
 
 (defconstant +million+ (expt 10 6))
@@ -28,7 +33,7 @@
 		      (progn
 			(window:poll)
 			(when (window:key-j-p :u)
-			  (reset-bag))
+			  (alut-hello-world))
 			(sandbox::thunkit)
 			
 			(incf ticks dt)
@@ -37,6 +42,9 @@
 	     (let ((fraction (/ (float accumulator)
 				(float dt))))
 	       (sandbox::render fraction)
+	       (progn
+		 (sandbox::bind-shit :lady)
+		 (fuck::draw-baggins))
 	       )
 	     (window:update-display))))))
 
@@ -118,6 +126,7 @@
 	(values array base))))
 (defparameter testx (make-array 2 :element-type '(unsigned-byte 8) :initial-contents
 				'(#b10101100 #b00000010)))
+#+nil
 (defparameter *json-data*
   (with-input-from-string (x *data*)
     (cl-json:decode-json x)))
@@ -136,35 +145,53 @@
   (initbag))
 
 (defun initbag ()
+  
+  (sandbox::src-image :lady-png "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")
+  (sandbox::texture-imagery :lady :lady-png)
   (mostuff *yolobaggins*))
+
+(progno
+    (bind-shit :lady)
+    (fuck::draw-baggins))
 
 (defun draw-baggins ()
   (let ((w *yolobaggins*))
-    (gl:disable :cull-face :blend)
-    (gl:polygon-mode :front-and-back :line)
+  ;;  (gl:disable :cull-face :blend)
+;;    (gl:polygon-mode :front-and-back :fill)
     (gl:bind-vertex-array (vertex-array w))
     
     ;; This call actually does the rendering. The vertex data comes from
     ;; the currently-bound VAO. If the input array is null, the indices
     ;; will be taken from the element array buffer bound in the current
     ;; VAO.
-    (gl:draw-elements :triangles (gl:make-null-gl-array :unsigned-short)
-		      :count (* 2 len))))
+    (gl:draw-elements :triangles (gl:make-null-gl-array :unsigned-int)
+		      :count (* 3 (array-total-size (gethash "indices" woywoy)))
+		      :offset 0)))
 
-(defparameter len (or 60 (length element2)))
+(defparameter len (or 600 (length element2)))
 (defun unzigzag (x)
   (if (oddp x)
       (/ (1+ x) -2)
       (/ x 2)))
 
-(defparameter wow (make-array (ash 1 16)))
-(map nil (lambda (x)
-	   (incf (aref wow (+ (ash 1 15) (unzigzag x))))) vertices
-     )
+(progno
+ (defparameter wow (make-array (ash 1 16)))
+ (map nil (lambda (x)
+	    (incf (aref wow (+ (ash 1 15) (unzigzag x))))) vertices
+	    )
 
-(defparameter elements (uint32-array 0 83523))
-(defparameter element2 (uint32-array 131524 29142))
-(defparameter vertices (uint32-array 1877112 (* 3 65532)))
+ (defparameter elements (uint32-array 0 83523))
+ (defparameter element2 (uint32-array 131524 29142))
+ (defparameter vertices (uint32-array 1877112 (* 3 65532))))
+
+(defparameter woywoy (cl-mesh:parse-wavefront-obj "/home/imac/Documents/stuff2/NightFox/NightFox.obj"))
+
+(progno
+ (defparameter wow2 (make-array (* 3 (ash 1 16))))
+ (map nil (lambda (x)
+	    (incf (aref wow2 (+ (ash 1 16) (unzigzag x))))) element2
+	    ))
+
 '
 ((:OSG.*GEOMETRY (:*UNIQUE-+ID+ . 2)
            (:*PRIMITIVE-SET-LIST
@@ -240,35 +267,91 @@
                (:*OFFSET . 1877112) (:*ENCODING . "varint")))
              (:*ITEM-SIZE . 3) (:*TYPE . "ARRAY_BUFFER")))))
 
+(defparameter unique-vertices (make-hash-table :test 'equalp))
+(defun generate-vertex-hash ()
+  (let* ((name 0)
+	 (indexes (gethash "indices" woywoy))
+	 (len (array-total-size indexes))
+	 (hash unique-vertices))
+    (flet ((ass (vec)
+	     (let ((value (gethash vec hash)))
+	       (if value
+		   nil
+		   (progn (setf (gethash vec hash) name)
+			  (incf name))))))
+      (dotimes (i len)
+	(let ((vec (aref indexes i)))
+	  (let ((a (aref vec 0))
+		(b (aref vec 1))
+		(c (aref vec 2)))
+
+	    (ass a)
+	    (ass b)
+	    (ass c)))))))
+(defparameter vertarray nil)
+(defun order-vertices ()
+  (let ((hash unique-vertices))
+    (let ((array (make-array (hash-table-count hash))))
+      (maphash (lambda (k v)
+		 (setf (aref array v) k))
+	       hash)
+      (setf vertarray array))))
+(defparameter vertbuf nil)
+(defun flatten-vert ()
+  (let* ((array vertarray)
+	 (len (array-total-size array))
+	 (stride 6))
+    (let ((buf (make-array (* len stride))))
+      (let ((verts (gethash "vertices" woywoy))
+	    (uv (gethash "uv" woywoy)))
+	(dotimes (index len)
+	  (let ((vec (aref array index)))
+	    (let ((base (* index stride)))
+	      (let ((verts (aref verts (aref vec 0)))
+		    (uv (aref uv (aref vec 1))))
+		(setf (aref buf (+ base 0)) (aref verts 0))
+		(setf (aref buf (+ base 1)) (aref verts 1))
+		(setf (aref buf (+ base 2)) (aref verts 2))
+		(setf (aref buf (+ base 3)) 1.0)
+		(setf (aref buf (+ base 4)) (aref uv 0))
+		(setf (aref buf (+ base 5)) (aref uv 1))
+		)))))
+      (setf vertbuf buf))))
+
+
 (defun mostuff (w)
   (let ((buffers (gl:gen-buffers 2)))
     (setf (vertex-buffer w) (elt buffers 0)
 	  (index-buffer w) (elt buffers 1)))
   (gl:bind-buffer :array-buffer (vertex-buffer w))
-  (let ((verts element2))
+  (let ((verts vertbuf))
     (let ((arr (gl:alloc-gl-array :float (length verts))))
-      (dotimes (i (length verts))
-	(let ((num (* 0.001 (coerce (unzigzag
-				     (aref verts i))
-				    'single-float))))
-	  (setf (gl:glaref arr i) num)))
+      (dotimes (i (array-total-size verts))
+	(setf (gl:glaref arr i) (aref verts i)))
       (gl:buffer-data :array-buffer :static-draw arr)
       (gl:free-gl-array arr)))
-
   ;; 0 is always reserved as an unbound object.
   (gl:bind-buffer :array-buffer 0)
 
   ;; An element array buffer stores vertex indices. We fill it in the
   ;; same way as an array buffer.
   (gl:bind-buffer :element-array-buffer (index-buffer w))
-  (let* ((indexes vertices))
-    (let ((arr (gl:alloc-gl-array :unsigned-short (* 2 len))))
-      (dotimes (i len)
-	(multiple-value-bind (large small) (floor (aref indexes i) (ash 1 16))
-	  (setf (gl:glaref arr (* 2 i)) small)
-	  (setf (gl:glaref arr (+ 1 (* 2 i))) large)))
-      (gl:buffer-data :element-array-buffer :static-draw arr)
-      (gl:free-gl-array arr)))
+  (let ((hash unique-vertices))
+    (let* ((indexes (gethash "indices" woywoy))
+	   (len (array-total-size indexes)))
+      (let ((arr (gl:alloc-gl-array :unsigned-int (* 3 len))))
+	(dotimes (i len)
+	  (let ((vec (aref indexes i))
+		(base (* 3 i)))
+	    (let ((a (aref vec 0))
+		  (b (aref vec 1))
+		  (c (aref vec 2)))
+	      (setf (gl:glaref arr base) (gethash a hash))
+	      (setf (gl:glaref arr (+ 1 base)) (gethash b hash))
+	      (setf (gl:glaref arr (+ 2 base)) (gethash c hash)))))
+	
+	(gl:buffer-data :element-array-buffer :static-draw arr)
+	(gl:free-gl-array arr))))
   (gl:bind-buffer :element-array-buffer 0)
 
   ;; Vertex array objects manage which vertex attributes are
@@ -286,7 +369,12 @@
   (gl:enable-vertex-attrib-array 0)
   ;; Using a null pointer as the data source indicates that we want
   ;; the vertex data to come from the currently bound array-buffer.
-  (gl:vertex-attrib-pointer 0 3 :float nil 0 (cffi:null-pointer))
+  (gl:vertex-attrib-pointer 0 4 :float nil (* 4 6) 0)
+
+  (gl:enable-vertex-attrib-array 2)
+  (gl:vertex-attrib-pointer 2 2 :float nil (* 4 6) (* 4 4))
+
+
 
   ;; To associate an element array with this VAO, all we need to do is
   ;; bind the element array buffer we want to use.
@@ -294,3 +382,71 @@
 
   ;; Once we're done, we can unbind the VAO, and rebind it when we want to render it.
   (gl:bind-vertex-array 0))
+
+
+(defparameter *music*
+  (case 3
+    (0 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/damage/hit3.ogg")
+    (1 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/streaming/cat.ogg")
+    (2 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/portal/portal.ogg")
+    (3 "/home/imac/quicklisp/local-projects/symmetrical-umbrella/sandbox/res/resources/sound3/ambient/weather/rain4.ogg")
+    (4 "/home/imac/Music/6PQv-Adele - Hello.mp3")
+    (5 "/home/imac/Music/Louis The Child ft. K.Flay - It's Strange [Premiere] (FIFA 16 Soundtrack) -  128kbps.mp3")
+    (6 "/home/imac/Music/Birdy_-_Keeping_Your_Head_Up_Official.mp3")))
+(progn
+  (defparameter dubs nil)
+  (defparameter size nil)
+  (defparameter ans nil))
+
+(defun test (&optional (music *music*))
+  (reset)
+  (setf (values dubs size ans)
+	(cl-ffmpeg::get-sound-buff music 44100))
+  )
+
+(defun reset ()
+  (when (cffi::pointerp dubs)
+    
+    (cffi::foreign-free dubs)
+    (setf dubs nil)))
+
+(defun alut-hello-world ()
+  (alc:make-context-current *alc-context*)
+  
+  (let ((source *source*)
+	(buffer *buffer*))
+    (al:buffer-data buffer :mono16 dubs (* 2 size) 44100)
+    (al:source source :buffer buffer)
+    (al:source-play source)))
+
+(defparameter *source* (al:gen-source))
+(defparameter *buffer* (al:gen-buffer))
+
+(defparameter *alc-device* nil)
+(defun open-device ()
+  (close-device)
+  (setf *alc-device* (alc:open-device)))
+(defun close-device ()
+  (when (cffi:pointerp *alc-device*)
+    (alc:close-device *alc-device*))
+  (setf *alc-device* nil))
+(defparameter *alc-context* nil)
+(defun open-context ()
+  (close-context)
+  (let ((context (alc:create-context *alc-device*)))
+    (setf *alc-context* context)
+    (alc:make-context-current context)))
+(defun close-context ()
+  (when (cffi:pointerp *alc-context*)
+    (when (cffi:pointer-eq *alc-context* (alc:get-current-context))
+      (alc:make-context-current (cffi:null-pointer)))
+    (alc:destroy-context *alc-context*))
+  (setf *alc-context* nil))
+
+(defun start-al ()
+  (open-device)
+  (open-context))
+
+(defun destroy-al ()
+  (close-context)
+  (close-device))

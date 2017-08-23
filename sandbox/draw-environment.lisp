@@ -39,7 +39,6 @@
     *temp-matrix*
     (camera-matrix-projection-view-player *camera*)))
   ;;;static geometry with no translation whatsoever
-  (fuck::draw-baggins)
   (draw-chunk-meshes)
   (progno
    (when fist?
@@ -59,6 +58,10 @@
   
   (designatemeshing))
 
+(defparameter *velocity* (cg-matrix:vec 0.0 0.0 0.0))
+(defparameter *orientation* (make-array 6 :element-type 'single-float
+					:initial-contents
+					'(0.0 0.0 0.0 0.0 0.0 0.0)))
 
 (defun set-render-cam-pos (camera partial)
   (let ((vec (camera-vec-position camera))
@@ -80,6 +83,25 @@
     (unit-pitch-yaw (camera-vec-forward *camera*)
 		    (coerce *pitch* 'single-float)
 		    (coerce *yaw* 'single-float))
+
+    (alc:make-context-current fuck::*alc-context*)
+   
+    (al:listener :position vec)
+    (let ((curr *velocity*))
+      (setf (aref curr 0) *xvel*)
+      (setf (aref curr 1) *yvel*)
+      (setf (aref curr 2) *zvel*)
+      (al:listener :velocity curr))
+    (let ((curr *orientation*)
+	  (other (camera-vec-forward *camera*))
+	  (other2 (camera-vec-up *camera*)))
+      (setf (aref curr 0) (- (aref other 0)))
+      (setf (aref curr 1) (- (aref other 1)))
+      (setf (aref curr 2) (- (aref other 2)))
+      (setf (aref curr 3) (aref other2 0))
+      (setf (aref curr 4) (aref other2 1))
+      (setf (aref curr 5) (aref other2 2))
+      (al:listener :orientation curr))
     
     (setf (camera-fov *camera*) defaultfov)
     ))
@@ -168,10 +190,6 @@
   (bind-shit :terrain)
   (name-mesh :world #'draw-world)
   (ldrawlist :world))
-
-(defun draw-lady-mesh ()
-  )
-
 
 
 (defun draw-world ()
