@@ -6,7 +6,7 @@
 (defparameter *temp-matrix2* (cg-matrix:identity-matrix)) ;;;opengl stored matrices the transpose of sb-cga
 
 (defparameter *camera* nil) ;;global camera
-(defparameter *fog-ratio* 0.75)
+(defparameter *fog-ratio* (or 0.0 0.75))
 
 (defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
@@ -39,8 +39,9 @@
     *temp-matrix*
     (camera-matrix-projection-view-player *camera*)))
   ;;;static geometry with no translation whatsoever
+  (fuck::draw-baggins)
   (draw-chunk-meshes)
-  (progn
+  (progno
    (when fist?
      (draw-fist *camera*)
      )
@@ -167,6 +168,11 @@
   (bind-shit :terrain)
   (name-mesh :world #'draw-world)
   (ldrawlist :world))
+
+(defun draw-lady-mesh ()
+  )
+
+
 
 (defun draw-world ()
   (maphash

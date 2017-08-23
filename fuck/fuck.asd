@@ -1,8 +1,7 @@
-(asdf:defsystem #:game-loop
+(asdf:defsystem #:fuck
     :depends-on (#:sandbox
                  #:cl-program
-		 #:funland
-		 #:hook-elisp)
+		 #:funland)
     :serial t
     :components
     
@@ -10,5 +9,5 @@
 	      :serial t
 	      :components
 	      ((:file "package")
-	       (:file "game-loop")))))
+	       (:file "fuck")))))
  
