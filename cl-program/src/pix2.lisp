@@ -24,19 +24,21 @@
 		    (pix:index x y 4 4))))))))
 
 (progn
-  (defparameter *world* (make-array (* 256 256) :initial-element nil))
+  (eval-when (:compile-toplevel)
+    (defparameter *world* (make-array (* 256 256) :initial-element nil)))
   (defun (setf get-char) (value x y)
     (set-char value x y))
   (defun get-char (x y)
-    (multiple-value-bind (chunk offset) (area2 x y *world*)
+    (multiple-value-bind (chunk offset) (area2 x y (etouq *world*))
       (aref chunk offset)))
   (defun set-char (value x y)
-    (multiple-value-bind (chunk offset) (area2 x y *world*)
+    (multiple-value-bind (chunk offset) (area2 x y (etouq *world*))
       (setf (aref chunk offset) value)))
   (defun scwu (char x y)
     (set-char char x y)))
 
 
+#+nil
 (progno
   (deftype pix-world ()
     (quote hash-table))
@@ -53,6 +55,7 @@
 			    (make-chunk)))
 		  (index x y 4 4)))))))
 
+#+nil
 (progno
  (declaim (ftype (function (fixnum) (values fixnum fixnum)) index-xy)
 	  (ftype (function (fixnum fixnum) fixnum) xy-index)	  
@@ -65,7 +68,7 @@
    (defun index-xy (index)
      (values (offset index 31)
 	     (page index 31)))))
-
+#+nil
 (progno
   (progn
     (declaim (ftype (function (fixnum fixnum simple-vector) t)

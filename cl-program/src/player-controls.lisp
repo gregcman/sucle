@@ -40,7 +40,7 @@
 	(setf x0 x1 y0 y1)
 	(multiple-value-bind (x y) (window:get-mouse-position)
 	  (setf x1 (+ x x)
-		y1 (+ (- (+ y y)) (* 2 *window-height*))))
+		y1 (+ (- (+ y y)) (* 2 window::*height*))))
 	(etouq
 	 (with-vec-params
 	     (vec-slots :rectangle (quote ((cx0 :x0) (cy1 :y1)
@@ -77,7 +77,7 @@
 		       py0 py1
 		       px1 (+ cx1 *camera-x*)
 		       py1 (+ cy1 *camera-y*)))))))))
-  (other-stuff)
+;;  (other-stuff)
   (uncentered-rectangle *cam-rectangle* *camera-x* *camera-y*
 			(/ e:*width* *block-width*) (/ e:*height* *block-height*))
   (progn
@@ -114,6 +114,24 @@
        y0 y 
        x1 (+ x width width)
        y1 (+ y height height))))))
+
+(progn
+  (defparameter *color-white-black* (ash 255 8))
+  (progn
+    (declaim (ftype (function (t &optional fixnum) fixnum) get-char-num))
+    (with-unsafe-speed
+      (defun get-char-num (obj &optional (depth 8))
+	(flet ((recurse (obj)
+		 (let ((new-num (1- depth)))
+		   (if (zerop new-num)
+		       (sxhash nil)
+		       (get-char-num obj new-num)))))
+	  (typecase obj
+	    (fixnum obj)
+	    (cons (recurse (car obj)))
+	    (character (logior *color-white-black* (char-code obj)))
+	    (t (sxhash obj))))))))
+
 
 (progn
   (declaim (ftype (function (vector (function (fixnum fixnum)))) map-box))
@@ -182,23 +200,6 @@
 	       (c6 c)
 	       (g (- c 216))))))))
 
-(progn
-  (defparameter *color-white-black* (ash 255 8))
-  (progn
-    (declaim (ftype (function (t &optional fixnum) fixnum) get-char-num))
-    (with-unsafe-speed
-      (defun get-char-num (obj &optional (depth 8))
-	(flet ((recurse (obj)
-		 (let ((new-num (1- depth)))
-		   (if (zerop new-num)
-		       (sxhash nil)
-		       (get-char-num obj new-num)))))
-	  (typecase obj
-	    (fixnum obj)
-	    (cons (recurse (car obj)))
-	    (character (logior *color-white-black* (char-code obj)))
-	    (t (sxhash obj))))))))
-
 (defun nthfnc (function data &optional (times 0))
   (dotimes (amount times)
     (setf data (funcall function data)))
@@ -212,74 +213,83 @@
       (funcall print-func object var))
     buffer))
 
+#+nil
 (defparameter *firing-time* (make-array 128 :initial-element nil))
+
+#+nil
 (defparameter *pivot* nil)
-(defparameter *cursor-x* 0)
-(defparameter *cursor-y* 0)
 
-(defun other-stuff ()
-  (let ((hash e:*keypress-hash*)
-	(firing-time *firing-time*))
-    (let ((pivot nil)
-	  (timing -1)
-	  (news nil))
-      (with-hash-table-iterator (gen-fn hash)
-	(loop
-	   (multiple-value-bind (more? key value) (gen-fn)
-	     (if more?
-		 (let ((value (e::get-press-value value))
-		       (code (keyword-code key)))
-		   (when code
-		     (let ((new-timing
-			    (case value
-			      (1 nil) ;;;release
-			      (2 (1+ (aref firing-time code))) ;;;;true
-			      (3 (push code news) 0) ;;;;press
-			      (4 (1+ (aref firing-time code)))))) ;;;;repeat
-		       (setf (aref firing-time code) new-timing)
-		       (unless (or (eql 3 value) (eql 1 value))
-			 (when (> new-timing timing)
-			   (setf pivot code)
-			   (setf timing new-timing))))))
-		 (return)))))
-      (when pivot
-	(let ((x 0)
-	      (y 0)
-	      (changed? nil))
-	  (let ((pivot-pos (physical-keyboard::code-position pivot)))
-	    (dolist (key news)
-	      (unless (= key pivot)
-		(setf changed? t)
-		(let ((pos (physical-keyboard::code-position key)))
-		  (incf x (car pos))
-		  (incf y (cdr pos))
-		  (decf x (car pivot-pos))
-		  (decf y (cdr pivot-pos))))))
-	  (when changed?
-	    (etouq
-	     (with-vec-params
-		 (vec-slots :rectangle (quote ((px0 :x0) (py1 :y1)
-					       (px1 :x1) (py0 :y0))))
-	       (quote (*cam-rectangle* with-let-mapped-places))
-	       (quote
-		(let ((a0 (floor px0))
-		      (a1 (floor px1))
-		      (b0 (floor py0))
-		      (b1  (floor py1)))
-		  (let ((xnew (+ a0 (mod (- (+ *cursor-x* x) a0) (- a1 a0))))
-			(ynew (+ b0 (mod (- (+ *cursor-y* y) b0) (- b1 b0)))))
-		    (progn (foobar (sxhash (sxhash (sxhash (ash (get-internal-run-time) -6))))
-				   *cursor-x* *cursor-y* xnew ynew))
-		    (setf *cursor-x* xnew)
-		    (setf *cursor-y* ynew)))))))))))
-  (set-char 0 *cursor-x* *cursor-y*))
+#+nil
+(progn
+  (defparameter *cursor-x* 0)
+  (defparameter *cursor-y* 0))
 
+#+nil
+(progno
+ (defun other-stuff ()
+   (let ((hash e:*keypress-hash*)
+	 (firing-time *firing-time*))
+     (let ((pivot nil)
+	   (timing -1)
+	   (news nil))
+       (with-hash-table-iterator (gen-fn hash)
+	 (loop
+	    (multiple-value-bind (more? key value) (gen-fn)
+	      (if more?
+		  (let ((value (e::get-press-value value))
+			(code (keyword-code key)))
+		    (when code
+		      (let ((new-timing
+			     (case value
+			       (1 nil) ;;;release
+			       (2 (1+ (aref firing-time code))) ;;;;true
+			       (3 (push code news) 0) ;;;;press
+			       (4 (1+ (aref firing-time code)))))) ;;;;repeat
+			(setf (aref firing-time code) new-timing)
+			(unless (or (eql 3 value) (eql 1 value))
+			  (when (> new-timing timing)
+			    (setf pivot code)
+			    (setf timing new-timing))))))
+		  (return)))))
+       (when pivot
+	 (let ((x 0)
+	       (y 0)
+	       (changed? nil))
+	   (let ((pivot-pos (physical-keyboard::code-position pivot)))
+	     (dolist (key news)
+	       (unless (= key pivot)
+		 (setf changed? t)
+		 (let ((pos (physical-keyboard::code-position key)))
+		   (incf x (car pos))
+		   (incf y (cdr pos))
+		   (decf x (car pivot-pos))
+		   (decf y (cdr pivot-pos))))))
+	   (when changed?
+	     (etouq
+	      (with-vec-params
+		  (vec-slots :rectangle (quote ((px0 :x0) (py1 :y1)
+						(px1 :x1) (py0 :y0))))
+		(quote (*cam-rectangle* with-let-mapped-places))
+		(quote
+		 (let ((a0 (floor px0))
+		       (a1 (floor px1))
+		       (b0 (floor py0))
+		       (b1  (floor py1)))
+		   (let ((xnew (+ a0 (mod (- (+ *cursor-x* x) a0) (- a1 a0))))
+			 (ynew (+ b0 (mod (- (+ *cursor-y* y) b0) (- b1 b0)))))
+		     (progn (foobar (sxhash (sxhash (sxhash (ash (get-internal-run-time) -6))))
+				    *cursor-x* *cursor-y* xnew ynew))
+		     (setf *cursor-x* xnew)
+		     (setf *cursor-y* ynew)))))))))))
+   (set-char 0 *cursor-x* *cursor-y*)))
 
+#+nil
 (defun foobar (a x y x0 y0)
   (dobox ((c (min x x0) (1+ (max x x0)))
 	  (d (min y y0) (1+ (max y y0))))
 	 (set-char a c d)))
 
+#+nil
 (defun rectangle-size (rectangle)
   (etouq
    (with-vec-params

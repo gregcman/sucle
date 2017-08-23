@@ -1,3 +1,2 @@
 (defpackage #:fuck
-  (:use #:cl))
-(in-package :fuck)
+  (:use #:cl #:fuktard))

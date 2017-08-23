@@ -84,7 +84,7 @@
 		    (coerce *pitch* 'single-float)
 		    (coerce *yaw* 'single-float))
 
-    (alc:make-context-current fuck::*alc-context*)
+ ;;   (alc:make-context-current fuck::*alc-context*)
    
     (al:listener :position vec)
     (let ((curr *velocity*))
@@ -239,7 +239,6 @@
 
 (defun glinnit ()
   (setf *camera* (make-camera))
-  (setf %gl:*gl-get-proc-address* (e:get-proc-address))
   (setf *shader-program* nil)
   (setf mesher-thread nil)
   

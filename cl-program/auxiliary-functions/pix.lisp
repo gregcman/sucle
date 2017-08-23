@@ -14,12 +14,14 @@
 		  n-bits))
   (defun n-bits (n)
     (1- (ash 1 n))))
-(defconstant
-    +n-bits+ 
-  (let ((array (make-array +available-bits+)))
-    (dotimes (x (length array))
-      (setf (aref array x) (n-bits x)))
-    array))
+
+(eval-when (:compile-toplevel)
+  (defparameter
+      *n-bits* 
+    (let ((array (make-array +available-bits+)))
+      (dotimes (x (length array))
+	(setf (aref array x) (n-bits x)))
+      array)))
 
 (progn
   (declaim (inline index)
@@ -28,8 +30,8 @@
 		  index))
   (with-unsafe-speed
     (defun index (x y xsize ysize)
-      (let ((xmask (aref +n-bits+ xsize))
-	    (ymask (aref +n-bits+ ysize)))
+      (let ((xmask (aref (etouq *n-bits*) xsize))
+	    (ymask (aref (etouq *n-bits*) ysize)))
 	(declare (type fixnum xmask ymask))
 	(let ((xbits (logand xmask x))
 	      (ybits (logand ymask y)))

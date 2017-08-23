@@ -254,11 +254,6 @@
       (progn
 	(when fist?
 	  (when (smice-j-p :left)
-	    (progn
-	      (fuck::alut-hello-world)
-	      (al:source fuck::*source* :position (list fist-side-x
-							fist-side-y
-							fist-side-z)))
 	    (setblock-with-update fist-side-x
 				  fist-side-y
 				  fist-side-z

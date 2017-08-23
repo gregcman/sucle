@@ -1,9 +1,15 @@
 (in-package :fuck)
 
 (defparameter *al-on?* nil)
+(defparameter *sandbox-on* t)
+(defparameter *aplay-on* nil)
 
 (defun handoff-five ()
-  (sandbox::initialization1)
+  (setf %gl:*gl-get-proc-address* (e:get-proc-address))
+  (when *sandbox-on*
+    (sandbox::initialization1))
+  (when *aplay-on*
+    (aplayground::glinnit))
   (unless *al-on?*
     (start-al)
     (setf *al-on?* t))
@@ -16,7 +22,9 @@
 	(dt (floor +million+ 60))
 	(current-time (fine-time))
 	(accumulator 0))
-    (initbag)
+
+    (when *sandbox-on*
+      (initbag))
     (loop
        (if window:*status*
 	   (return)
@@ -34,17 +42,24 @@
 			(window:poll)
 			(when (window:key-j-p :u)
 			  (alut-hello-world))
-			(sandbox::thunkit)
+			(when *aplay-on*
+			  (aplayground::physics))
+			(when *sandbox-on*
+			  (sandbox::thunkit))
 			
 			(incf ticks dt)
 			(decf accumulator dt))
 		      (return-from later))))
 	     (let ((fraction (/ (float accumulator)
 				(float dt))))
-	       (sandbox::render fraction)
-	       (progn
-		 (sandbox::bind-shit :lady)
-		 (fuck::draw-baggins))
+	       (when *aplay-on*
+		 (aplayground::render))
+	       (when *sandbox-on*
+		 (progn
+		   (sandbox::render fraction)
+		   (progn
+		     (sandbox::bind-shit :lady)
+		     (fuck::draw-baggins))))
 	       )
 	     (window:update-display))))))
 
@@ -76,9 +91,7 @@
 (defparameter *data2* (sandbox::byte-read "/home/imac/Documents/stuff2/model_file.bin"))
 
 
-(use-package (quote (:fuktard)))
-
-(with-unsafe-speed
+(fuktard:with-unsafe-speed
   (defun float-array (offset size &optional (data *data2*))
     (declare (type (simple-array (unsigned-byte 8)) data))
     (let ((array (make-array size :element-type 'single-float)))
@@ -317,6 +330,10 @@
 		(setf (aref buf (+ base 5)) (aref uv 1))
 		)))))
       (setf vertbuf buf))))
+
+(progn (generate-vertex-hash)
+       (order-vertices)
+       (flatten-vert))
 
 
 (defun mostuff (w)

@@ -26,13 +26,12 @@
 	      :components
 	      ((:file "package")
 	       
-	       (:file "vec-param-layout")	       
-	       (:file "keys-ascii")
-	       (:file "physical-keyboard")
-	       
-	       (:file "misc") ;;;everything else	       
-	       (:file "globjects")
-	       (:file "draw-environment") ;;;random rendering
+	       (:file "vec-param-layout")	       	       
+	       (:file "misc")
+
+	       (:file "draw-environment")
 	       (:file "pix2")
-	       (:file "player-controls");;;layers over input
+	       (:file "player-controls")
+
+	       (:file "draw2")
 	       ))))
