@@ -9,10 +9,10 @@
 	      :displaced-to array
 	      :element-type (array-element-type array)))
 
-(defun create-texture (tex-data width height type)
+(defun create-texture (tex-data width height format &optional (type :unsigned-byte))
   (let ((tex (car (gl:gen-textures 1))))
     (gl:bind-texture :texture-2d tex)
-    (gl:tex-image-2d :texture-2d 0 type width height 0 type :unsigned-byte tex-data)
+    (gl:tex-image-2d :texture-2d 0 format width height 0 format type tex-data)
     tex))
 
 
@@ -22,14 +22,16 @@
 					   (:texture-wrap-t . :repeat))))
 ;;;;tex-parameters is an alist of pairs (a . b) with
 ;;;;(lambda (a b) (gl:tex-parameter :texture-2d a b))
-(defun pic-texture (thepic type &optional (tex-parameters *default-tex-params*))
+(defun pic-texture (thepic type)
   (let ((dims (array-dimensions thepic)))
     (let ((h (pop dims))
 	  (w (pop dims)))
       (let ((texture (create-texture (array-flatten thepic) w h type)))
-	(dolist (param tex-parameters)
-	  (gl:tex-parameter :texture-2d (car param) (cdr param)))
 	texture))))
+
+(defun apply-tex-params (tex-parameters)
+  (dolist (param tex-parameters)
+    (gl:tex-parameter :texture-2d (car param) (cdr param))))
 
 (defun compile-string-into-shader (shader string)
   (gl:shader-source shader string)

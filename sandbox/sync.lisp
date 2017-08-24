@@ -18,6 +18,7 @@
        ans)))
   (q:uniq-pop dirtychunks))
 
+#+nil
 (defun time-func (distance)
   (let ((a *ticks*))
     (+ (ash a 10) distance)))

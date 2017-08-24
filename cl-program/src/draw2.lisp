@@ -83,10 +83,13 @@
   (bornfnc
    :font
    (lambda ()
-     (lovely-shader-and-texture-uploader:pic-texture
-      (get-stuff :font-image *stuff* *backup*)
-      :rgba
-      *default-tex-params*))))
+     (prog1
+	 (lovely-shader-and-texture-uploader:pic-texture
+	  (get-stuff :font-image *stuff* *backup*)
+	  :rgba)
+       (lovely-shader-and-texture-uploader::apply-tex-params
+	lovely-shader-and-texture-uploader::*default-tex-params*)))))
+#+nil
 (progn
   (bornfnc
    :font-image2
@@ -145,6 +148,7 @@
      (flip-image
       (load-png
        (img-path "font/items.png")))))
+  #+nil
   (bornfnc
    :items
    (lambda ()
@@ -155,10 +159,12 @@
   (bornfnc
    :text-scratch
    (lambda ()
-     (lovely-shader-and-texture-uploader:pic-texture
-      (get-stuff :items-image *stuff* *backup*)
-      :rgba
-      *default-tex-params*)))
+     (prog1
+	 (lovely-shader-and-texture-uploader::pic-texture
+	  (get-stuff :items-image *stuff* *backup*)
+	  :rgba)
+       (lovely-shader-and-texture-uploader::apply-tex-params
+	lovely-shader-and-texture-uploader::*default-tex-params*))))
   (bornfnc
    :fast-text-display-list
    (lambda ()
@@ -265,21 +271,12 @@
   (defun getuniform (shader-info name)
     (gethash name shader-info)))
 
+
+;;;fixme
 (defun on-resize (w h)
   (update-window-block-size)
-  (reset-text-display-list)
-  (gl:viewport 0 0 w h))
+  (reset-text-display-list))
 
 (defun glinnit ()
- ;; (reset *gl-objects*)
-  (let ((width (if t 480 854))
-	(height (if t 360 480)))
-    (window:push-dimensions width height))
-  (setf e:*resize-hook* #'on-resize)
-
-  (let ((hash *stuff*))
-    (maphash (lambda (k v)
-	       (if (integerp v)
-		   (remhash k hash)))
-	     hash)))
+  (setf e:*resize-hook* #'on-resize))
 

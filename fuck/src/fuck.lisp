@@ -2,10 +2,15 @@
 
 (defparameter *al-on?* nil)
 (defparameter *sandbox-on* t)
-(defparameter *aplay-on* nil)
+(defparameter *aplay-on* t)
 
 (defun handoff-five ()
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
+  (let ((hash aplayground::*stuff*))
+    (maphash (lambda (k v)
+	       (if (integerp v)
+		   (remhash k hash)))
+	     hash))
   (when *sandbox-on*
     (sandbox::initialization1))
   (when *aplay-on*
@@ -14,7 +19,7 @@
     (start-al)
     (setf *al-on?* t))
   (injection3)) 
-
+(defparameter barbar nil)
 (defconstant +million+ (expt 10 6))
 
 (defun injection3 ()
@@ -41,9 +46,14 @@
 		      (progn
 			(window:poll)
 			(when (window:key-j-p :u)
+			  (al:source *source* :position (list sandbox::*xpos*
+							      sandbox::*ypos*
+							      sandbox::*zpos*))
 			  (alut-hello-world))
-			(when *aplay-on*
-			  (aplayground::physics))
+			
+			(when (and barbar *aplay-on*)
+			  (aplayground::physics)
+			  )
 			(when *sandbox-on*
 			  (sandbox::thunkit))
 			
@@ -52,14 +62,27 @@
 		      (return-from later))))
 	     (let ((fraction (/ (float accumulator)
 				(float dt))))
-	       (when *aplay-on*
-		 (aplayground::render))
+	       (gl:clear
+		:color-buffer-bit
+		:depth-buffer-bit)
+	       (gl:viewport 0 0 e:*width* e:*height*)
+
 	       (when *sandbox-on*
 		 (progn
 		   (sandbox::render fraction)
 		   (progn
-		     (sandbox::bind-shit :lady)
+		     (gl:bind-texture
+		      :texture-2d
+		      (aplayground::get-stuff
+		       :lady
+		       aplayground::*stuff*
+		       aplayground::*backup*
+		       
+		       ))
 		     (fuck::draw-baggins))))
+	       (when *aplay-on*
+		 (aplayground::render)
+		 )
 	       )
 	     (window:update-display))))))
 
@@ -88,7 +111,7 @@
 	(setf (aref data n) (read-char stream)))
       data)))
 (defparameter *data* (char-read "/home/imac/Documents/stuff2/file.osgjs"))
-(defparameter *data2* (sandbox::byte-read "/home/imac/Documents/stuff2/model_file.bin"))
+#+nil(defparameter *data2* (sandbox::byte-read "/home/imac/Documents/stuff2/model_file.bin"))
 
 
 (fuktard:with-unsafe-speed
@@ -158,10 +181,27 @@
   (initbag))
 
 (defun initbag ()
-  
-  (sandbox::src-image :lady-png "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")
-  (sandbox::texture-imagery :lady :lady-png)
-  (mostuff *yolobaggins*))
+  (aplayground::bornfnc
+     :lady-png
+     (lambda ()
+       (aplayground::flip-image
+	(aplayground::load-png 
+	 "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png"))))
+    (aplayground::bornfnc
+     :lady
+     (lambda ()
+       (prog1
+	   (lovely-shader-and-texture-uploader:pic-texture
+	    (aplayground::get-stuff :lady-png aplayground::*stuff*
+				    aplayground::*backup*)
+	    :rgb)
+	 (lovely-shader-and-texture-uploader::apply-tex-params
+	  (quote ((:texture-min-filter . :linear)
+		  (:texture-mag-filter . :linear)
+		  (:texture-wrap-s . :repeat)
+		  (:texture-wrap-t . :repeat)))))))
+    
+    (mostuff *yolobaggins*))
 
 (progno
     (bind-shit :lady)
@@ -205,7 +245,7 @@
 	    (incf (aref wow2 (+ (ash 1 16) (unzigzag x))))) element2
 	    ))
 
-'
+#+nil
 ((:OSG.*GEOMETRY (:*UNIQUE-+ID+ . 2)
            (:*PRIMITIVE-SET-LIST
             ((:*DRAW-ELEMENTS-U-INT (:*UNIQUE-+ID+ . 12)
@@ -402,7 +442,7 @@
 
 
 (defparameter *music*
-  (case 3
+  (case 4
     (0 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/damage/hit3.ogg")
     (1 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/streaming/cat.ogg")
     (2 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/portal/portal.ogg")

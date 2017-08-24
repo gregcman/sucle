@@ -196,6 +196,8 @@
       (glfw:set-scroll-callback 'scroll-callback)
       (glfw:set-window-size-callback 'update-viewport)
       (glfw:set-char-callback 'char-callback)
+      (setf *width* *iwidth*
+	    *height* *iheight*)
       (funcall func))))
 
 (defun get-mouse-out ()
