@@ -110,7 +110,7 @@
 		    (coerce *pitch* 'single-float)
 		    (coerce *yaw* 'single-float))
 
-    (alc:make-context-current fuck::*alc-context*)
+  ;;  (alc:make-context-current fuck::*alc-context*)
    
     (al:listener :position vec)
     (let ((curr *velocity*))

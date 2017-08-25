@@ -5,6 +5,7 @@
 ;;;;the creation of new single-float matrices leads to stress on the garbage
 ;;;;collector, leading to 10s of megabytes of matrix waste
 
+(set-pprint-dispatch 'sb-cga::matrix nil)
 (declaim (ftype (sb-cga::sfunction (sb-cga::matrix
 			    single-float single-float single-float single-float
                             single-float single-float single-float single-float

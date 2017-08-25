@@ -2,7 +2,7 @@
 
 (defparameter *al-on?* nil)
 (defparameter *sandbox-on* t)
-(defparameter *aplay-on* t)
+(defparameter *aplay-on* nil)
 
 (defun handoff-five ()
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
@@ -29,7 +29,8 @@
 	(accumulator 0))
 
     (when *sandbox-on*
-      (initbag))
+     ; (initbag)
+      )
     (loop
        (if window:*status*
 	   (return)
@@ -70,7 +71,7 @@
 	       (when *sandbox-on*
 		 (progn
 		   (sandbox::render fraction)
-		   (progn
+		   (progno
 		     (gl:bind-texture
 		      :texture-2d
 		      (aplayground::get-stuff
@@ -507,3 +508,92 @@
 (defun destroy-al ()
   (close-context)
   (close-device))
+
+#+nil
+(defmethod print-object :before ((num fixnum) stream)
+  (print "yolo" stream))
+#+nil
+(remove-method
+ #'print-object
+ (find-method #'print-object '(:before) '(fixnum stream)))
+
+(defparameter *original* *print-pprint-dispatch*)
+(defparameter *moar* (copy-pprint-dispatch *print-pprint-dispatch*))
+
+#+nil
+(let ((*print-pprint-dispatch* *moar*))
+  (set-pprint-dispatch 'integer (lambda (stream object)
+				  (print "yolo")
+				  (let ((*print-pretty* nil))
+				    (princ object stream)))))
+(defparameter *object-stream* nil)
+
+(defconstant +nul+ (code-char 0))
+(defconstant +stx+ (code-char 2))
+(defconstant +etx+ (code-char 3))
+
+(defun pprint-atomic (stream object)
+  (let ((objs *object-stream*))
+    (when objs     
+      (write-char +stx+ stream)
+      (let ((*print-pprint-dispatch* *original*))
+	(write object :stream stream))
+      (write-char +nul+ stream)
+      (encode-num-char (fill-pointer objs) stream)
+      (write-char +etx+ stream)
+      (vector-push-extend object objs))))
+
+(defun pprint-array (stream object)
+  (let ((objs *object-stream*))
+    (when objs
+      (write-char +stx+ stream)
+      (funcall (pprint-dispatch object *original*) stream object)
+      (write-char +nul+ stream)
+      (encode-num-char (fill-pointer objs) stream)
+      (write-char +etx+ stream)
+      (vector-push-extend object objs))))
+
+(defun pprint-cons (stream object)
+  (let ((objs *object-stream*))
+    (when objs      
+      (write-char +stx+ stream)
+      (funcall (pprint-dispatch object *original*) stream object)
+      (write-char +nul+ stream)
+      (encode-num-char (fill-pointer objs) stream)
+      (write-char +etx+ stream)
+      (vector-push-extend object objs))))
+
+(let ((*print-pprint-dispatch* *moar*))
+  (set-pprint-dispatch (quote t)
+		       (quote pprint-atomic) 0)
+  (set-pprint-dispatch (quote array)
+		       (quote pprint-array) 1)
+  (set-pprint-dispatch (quote cons)
+		       (quote pprint-cons) 1))
+
+(defun ourprint (object char-buffer object-buffer)
+  (let ((*print-pprint-dispatch* *moar*)
+	(*object-stream* object-buffer)
+	(*stream-string* char-buffer))
+    (write object :stream char-buffer)))
+
+(defparameter fstr (make-string-output-stream))
+(defparameter obj-stream (make-array 0 :fill-pointer 0 :adjustable t))
+
+(defun ouprint2 (object)
+  (get-output-stream-string fstr)
+  (setf (fill-pointer obj-stream) 0)
+  (let ((*print-case* :downcase))
+    (ourprint object fstr obj-stream))
+  (values (get-output-stream-string fstr)
+	  obj-stream))
+
+(defconstant +largest-char+ 128)
+
+(defun encode-num-char (num stream)
+  (loop
+     (multiple-value-bind (small code) (floor num (- +largest-char+ 4))
+       (write-char (code-char (+ 4 code)) stream)
+       (when (zerop small)
+	 (return))
+       (setf num small))))
