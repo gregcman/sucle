@@ -734,13 +734,18 @@
 
 
 (defparameter *cells*
-  (quote ((a) ((b) (c)) (d) ((e)) f (g) (h ((i) j (k) l (m) (n) o)) p)))
+  (case 1
+    (0 (quote ((a) ((b) (c)) (d) ((e)) f (g) (h ((i) j (k) l (m) (n) o)) p)))
+    (1 (quote ((a) ((b) . c) (d) ((e)) f (g) (h ((i) j (k) l (m) (n) . o)) . p)))))
 (defparameter buf (make-array 0 :fill-pointer t :element-type (quote character)))
 "((A) ((B) (C)) (D) ((E)) F (G) (H ((I) J (K) L (M) (N) O)) P)"
-(progn
-  (setf (fill-pointer buf) 0)
-  (with-output-to-string (stream buf)
-    (write *cells* :stream stream :pretty t)))
+
+(defun ttest (x)
+  (Setf *cells* x)
+  (progn
+    (setf (fill-pointer buf) 0)
+    (with-output-to-string (stream buf)
+      (write x :stream stream :pretty t))))
 
 (defparameter *stack* nil)
 (defun top ()
@@ -765,68 +770,101 @@
 (defun stack-poop ()
   (pop *stack-stack*))
 
-(defun pop-cdrs ()
-  (loop
-     (if (or (not (topside))
-	     (eq (topside) 'car))
-	 (return)
-	 (poop))))
 (defparameter *last* 'cdr)
+(defparameter *period?* nil)
+(defparameter *parens* 0)
 (defun anext (char)
-  (setf
-   *last*
-   (cond
-     ((char= #\( char)
-      
-      (stack-puush (car (top)))
-      ;;;new frame for new list
-      
-      'car)
-     ((alphanumericp char)
-
-      (case *last*
-	(car ;;;top is the base
-	 (puush (car (top))))
-	(cdr ;;;top is cdr, underneath is base, but need to advance
-	 (poop)
-	 (setf (top) (cdr (top)))
-	 (puush (car (top)))))
-      
-      'car)
-     ((char= #\Space char)
-
-      (case *last*
-	(car (poop) ;;;top is car, under is base
-	     (puush (cdr (top))))
-	(cdr (stack-poop) ;;;old list goes away, stuff under
-	     (puush (cdr (top)))))
-      
-      'cdr)
-     ((char= #\) char)
-      (case *last*
-	(car
-	 (poop) ;;;top is car, under is base
-	 (puush (cdr (top))))
-	(cdr
-	 (stack-poop)
-	 (puush (cdr (top)))))
-      
-      'cdr))))
+  (block nil
+    (when (char= #\. char)
+      (setf *period?* *parens*)
+      (return))
+    (cond
+      ((char= #\( char)
+       (incf *parens*)
+       (setf *parent* (top))
+       (stack-puush (car (top)))
+       ;;new frame for new list
+       
+       (setf
+	*last* 'car))
+      ((alphanumericp char)
+       (when *period?*
+	 (return))
+       (case *last*
+	 ;;top is the base
+	 (car)
+	 ;;top is cdr, underneath is base, but need to advance
+	 (cdr 
+	  (poop)
+	  (setf (top) (cdr (top)))))
+       (setf *parent* (top))
+       (puush (car (top)))
+       
+       (setf
+	*last* 'car))
+      ((char= #\Space char)
+       (when *period?*
+	 (return))
+       (case *last*
+	 ;;top is car, under is base
+	 (car (poop))
+	 ;;old list goes away, stuff under
+	 (cdr (stack-poop)))
+       (setf *parent* (top))
+       (puush (cdr (top)))
+       (setf
+	*last* 'cdr))
+      ((char= #\) char)
+       (unless *period?*      
+	 (case *last*
+	   (car
+	    (poop) ;;;top is car, under is base
+	    (setf *parent* (top))
+	    (puush (cdr (top))))
+	   (cdr
+	    (stack-poop)
+	    (setf *parent* (top))
+	    (setf (top) (cdr (top)))))       
+	 (setf
+	  *last* 'cdr))
+       (when (eql *period?* *parens*)
+	 (setf *period?* nil))
+       (decf *parens*)))))
 
 (defun print-stack (x)
+  (terpri)
+  (print x)
+  #+nil
   (dolist (a x)
     (print a)))
 
 (defun test ()
   (setf *last* 'cdr)
+  (setf *parent* nil)
+  (setf *period?* nil)
+  (setf *parens* 0)
   (setf *stack-stack* (list (list (list *cells*))))
   (flet ((info ()
 	   (if t
-	       (print (top))
+	       (print (top) ;(cons *last* *parent*)
+		      )
 	       (print-stack *stack-stack*))))
     (info)
     (dotimes (x (length buf))
       (let ((value (aref buf x)))
-;;	(print value)
+	(print value)
 	(anext value))
       (info))))
+
+(defun random-shit (x)
+  (flet ((asym ()
+	   (intern (string (code-char (+ 65 (random 26)))))))
+    (if (zerop x)
+	(asym)
+	(cons (case (random 2)
+		(0 (random-shit (1- x)))
+		(1 (asym)))
+	      (case (random 3)
+		(0 nil)
+		(1 (random-shit (1- x)))
+		(2 (asym)))))))
