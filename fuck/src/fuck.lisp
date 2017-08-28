@@ -753,13 +753,14 @@
 	    (:start
 	     (let ((obj-index (cdr value)))
 	       ;;	       (print obj-index)
-	       (if (and stack (listp (aref objs obj-index)))
-		   (block nil
-		     (let ((first-obj-index (or (car stack) (return))))
-		       (when (listp (aref objs first-obj-index))
-			 (setf (aref id obj-index) first-obj-index)
-			 (setf (aref changes index) :start)))) ;;copy if list parent
-		   (push obj-index stack)))) ;;push only if there is not a parent list
+	       (let ((perhaps-list? (aref objs obj-index)))
+		 (if (and stack (consp perhaps-list?))
+		     (block nil
+		       (let ((first-obj-index (or (car stack) (return))))
+			 (when (consp (aref objs first-obj-index))
+			   (setf (aref id obj-index) first-obj-index)
+			   (setf (aref changes index) :start)))) ;;copy if list parent
+		     (push obj-index stack))))) ;;push only if there is not a parent list
 	    (:end
 	     (If (eql (car stack) ;;the stack
 		      ;;the ending, no reason to pop if not equal because of above where
@@ -786,19 +787,19 @@
 	    (:start
 	     (let ((obj-index (cdr value)))
 	       (let ((maybe-list (aref objs obj-index)))
-		 (when (listp maybe-list)
+		 (when (and maybe-list (listp maybe-list))
 		   (let ((eater (make-pareneater)))
 		     (reset-pareneater maybe-list eater)
 		     (setf (aref eaters obj-index) eater))))
 	       (setf max-object index)))))
 	(flet ((feed-em (p c)
-		 #+nil
+		 (feed c p)
+		 					;	 #+nil
 		 (progn
 		   (terpri)
 		   (print c)
 		   (print (top p))
-		   (terpri))
-		 (feed c p)))
+		   (terpri))))
 	  (when (integerp value)
 	    (print (aref chars index))
 	    (let ((eater (aref eaters value)))
