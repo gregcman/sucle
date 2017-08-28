@@ -775,11 +775,11 @@
 (defparameter *parens* 0)
 (defun anext (char)
   (block nil
-    (when (char= #\. char)
-      (setf *period?* *parens*)
-      (return))
-    (cond
-      ((char= #\( char)
+    (case char
+      (#\.
+       (setf *period?* *parens*)
+       (return))
+      (#\(
        (incf *parens*)
        (setf *parent* (top))
        (stack-puush (car (top)))
@@ -787,7 +787,7 @@
        
        (setf
 	*last* 'car))
-      ((alphanumericp char)
+      (#\*
        (when *period?*
 	 (return))
        (case *last*
@@ -802,7 +802,7 @@
        
        (setf
 	*last* 'car))
-      ((char= #\Space char)
+      (#\Space
        (when *period?*
 	 (return))
        (case *last*
@@ -814,7 +814,7 @@
        (puush (cdr (top)))
        (setf
 	*last* 'cdr))
-      ((char= #\) char)
+      (#\) 
        (unless *period?*      
 	 (case *last*
 	   (car
@@ -844,17 +844,42 @@
   (setf *period?* nil)
   (setf *parens* 0)
   (setf *stack-stack* (list (list (list *cells*))))
+  (setf *last-char* #\Space)
   (flet ((info ()
 	   (if t
-	       (print (top) ;(cons *last* *parent*)
+	       (print (top); (cons *last* *parent*)
 		      )
 	       (print-stack *stack-stack*))))
     (info)
     (dotimes (x (length buf))
       (let ((value (aref buf x)))
-	(print value)
-	(anext value))
+;	(print value)
+	
+	(feed value))
       (info))))
+
+
+;;wherever there is one whitespace, there can be many
+(defun feed (char)
+  (block nil
+    (when (whitespace-p *last-char*)
+      (when (whitespace-p char)
+	;;eat nothing, go home
+	;;whitespace often occurs in clumps
+	(return)) 
+      ;;(when (char= char #\))) closing parens do not appear on lines of their own
+      )
+    (when (alphanumericp char)
+      (feed-char #\*)
+      (return))
+    (when (whitespace-p char)
+      (setf char #\Space))
+    (feed-char char)))
+
+(defparameter *last-char* #\Space)
+(defun feed-char (x)
+  (anext x)
+  (setf *last-char* x))
 
 (defun random-shit (x)
   (flet ((asym ()
