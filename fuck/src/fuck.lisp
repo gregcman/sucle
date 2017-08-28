@@ -698,7 +698,11 @@
 				   (error "unequal"))))))))))
     obj-ids))
 
+(defparameter *obj* nil)
+(defparameter *more-flat-changes* nil)
+(defparameter *info2* nil)
 (defun ouprint2 (object)
+  (setf *obj* object)
   (setf (fill-pointer obj-stream) 0)
   (setf (fill-pointer obj-stream2) 0)
   (setf (fill-pointer footrue) 0)
@@ -722,6 +726,12 @@
   (setf *differences* (compare-annots fooannot0 fooannot1))
   (setf (values *num-info* *extent-info*)
 	(splitter *differences* fooannot0))
+  (Setf *more-flat-changes* (delistify *num-info* obj-stream))
+  (setf *info2* (map (quote vector)
+		     (lambda (x y)
+		       (if x x y))
+		     *more-flat-changes*
+		     *num-info*))
   (let ((more-data (parallel-walk footrue *num-info* fooannot0)))
     (values footrue ;;;;the pretty printed text
 	    more-data ;;;;mirror of text, where index maps to num-info
@@ -730,9 +740,76 @@
 	    obj-stream;;;;the objects
 	    )))
 
+(defun delistify (&optional (info *num-info*) (objs obj-stream))
+  (declare (optimize (debug 3)))
+  (let* ((len (length info))
+	 (stack nil)
+	 (id (make-array (length objs) :initial-element nil))
+	 (changes (make-array len :initial-element nil)))
+    (dotimes (index len)
+      (let ((value (aref info index)))
+	(when (and value (listp value))
+	  (case (car value)
+	    (:start
+	     (let ((obj-index (cdr value)))
+	       ;;	       (print obj-index)
+	       (if (and stack (listp (aref objs obj-index)))
+		   (block nil
+		     (let ((first-obj-index (or (car stack) (return))))
+		       (when (listp (aref objs first-obj-index))
+			 (setf (aref id obj-index) first-obj-index)
+			 (setf (aref changes index) :start)))) ;;copy if list parent
+		   (push obj-index stack)))) ;;push only if there is not a parent list
+	    (:end
+	     (If (eql (car stack) ;;the stack
+		      ;;the ending, no reason to pop if not equal because of above where
+		      ;;nested lists are consolidated above
+		      (cdr value))
+		 (pop stack)
+		 (setf (aref changes index) :end)))))
+	(when (integerp value)
+	  (let ((destroy? (aref id value)))
+	    (when destroy?
+	      (setf (aref changes index) destroy?))))))
+    changes))
 
-
-
+(defun eat-parens (&optional (info *info2*) (objs obj-stream) (chars fooannot0))
+  (declare (optimize (debug 3)))
+  (let* ((len (length info))
+	 (eaters (make-array (length objs) :initial-element nil))
+	 (eater-last-object (make-array (length objs) :initial-element nil))
+	 (max-object -1))
+    (dotimes (index len)
+      (let ((value (aref info index)))
+	(when (and value (listp value))
+	  (case (car value)
+	    (:start
+	     (let ((obj-index (cdr value)))
+	       (let ((maybe-list (aref objs obj-index)))
+		 (when (listp maybe-list)
+		   (let ((eater (make-pareneater)))
+		     (reset-pareneater maybe-list eater)
+		     (setf (aref eaters obj-index) eater))))
+	       (setf max-object index)))))
+	(flet ((feed-em (p c)
+		 #+nil
+		 (progn
+		   (terpri)
+		   (print c)
+		   (print (top p))
+		   (terpri))
+		 (feed c p)))
+	  (when (integerp value)
+	    (print (aref chars index))
+	    (let ((eater (aref eaters value)))
+	      (when eater
+		(let ((last-feeding-time (aref eater-last-object value)))
+		  (when last-feeding-time
+		    (when (not (= max-object last-feeding-time))
+		      (feed-em eater #\*))))
+		(let ((char (aref chars index)))
+		  (feed-em eater char))
+		(setf (aref eater-last-object value) max-object)))))))))
 
 
 (defstruct pareneater
@@ -841,9 +918,14 @@
       (when (whitespace-p char)
 	;;eat nothing, go home
 	;;whitespace often occurs in clumps
-	(return)) 
-       ;;(when (char= char #\))) closing parens do not appear on lines of their own
+	(return))
+      ;;(when (char= char #\))) closing parens do not appear on lines of their own
       )
+    (when (char= #\( (pareneater-lastchar p))
+      (when (whitespace-p char)
+	;;eat nothing, go home
+	;;whitespace can occur after opening parens, not closing
+	(return)))
     (when (alphanumericp char)
       (feed-char #\* p)
       (return))
