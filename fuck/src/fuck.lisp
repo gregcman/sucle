@@ -538,28 +538,6 @@
 (defparameter *object-stream* nil)
 (defparameter *numeral-start* nil)
 
-(defun encode-num-char (num stream)
-  (write num :stream stream :pretty nil :readably t))
-(defparameter *original* *print-pprint-dispatch*)
-(defparameter *moar* (copy-pprint-dispatch *print-pprint-dispatch*))
-(defun pprint-atomic (stream object)
-  (let ((objs *object-stream*)
-	(nums *numeral-start*))
-    (when objs
-      (write-char (aref nums 0) stream)
-      (encode-num-char (fill-pointer objs) stream)
-      (write-char (aref nums 1) stream)
-      (vector-push-extend object objs)
-      (funcall (pprint-dispatch object *original*) stream object)
-      (write-char (aref nums 2) stream))))
-(let ((*print-pprint-dispatch* *moar*))
-  (set-pprint-dispatch (quote t)
-		       (quote pprint-atomic) 0))
-(defun ourprint (object char-buffer object-buffer)
-  (let ((*print-pprint-dispatch* *moar*)
-	(*object-stream* object-buffer))
-    (write object :stream char-buffer)))
-
 (defun make-char-buffer ()
   (make-array 0 :fill-pointer 0 :adjustable t :element-type (quote character)))
 
@@ -573,36 +551,42 @@
 (defparameter *num-info* nil)
 (defparameter *extent-info* nil)
 
-(defun ouprint2 (object)
-  (setf (fill-pointer obj-stream) 0)
-  (setf (fill-pointer obj-stream2) 0)
-  (setf (fill-pointer footrue) 0)
-  (setf (fill-pointer fooannot0) 0)
-  (setf (fill-pointer fooannot1) 0)
-  (let ((*print-case* :downcase)
-	(*print-readably* t))
-    (with-output-to-string (str footrue)
-      (write object :stream str))
-    (let ((*numeral-start* "123"))
-      (with-output-to-string (str fooannot0)
-	(ourprint object str obj-stream)))
-    (let ((*numeral-start* "456"))
-      (with-output-to-string (str fooannot1)
-	(ourprint object str obj-stream2))))
-  (dotimes (x (length obj-stream))
-    (unless (eq (aref obj-stream x)
-		(aref obj-stream2 x))
-      (error "object-streams unequal")))
-  (setf *differences* (compare-annots fooannot0 fooannot1))
-  (setf (values *num-info* *extent-info*)
-	(splitter *differences* fooannot0))
-  (let ((more-data (parallel-walk footrue *num-info* fooannot0)))
-    (values footrue ;;;;the pretty printed text
-	    more-data ;;;;mirror of text, where index maps to num-info
-	    *num-info* ;;;;maps to the objects and object extent info
-	    *extent-info* ;;;;extent info
-	    obj-stream;;;;the objects
-	    )))
+
+(defun encode-num-char (num stream)
+  (write num :stream stream :pretty nil :readably t))
+(defun pprint-fun-call (stream list &rest noise)
+  (declare (ignore noise))
+  (funcall (formatter "~:<~^~W~^ ~:_~:I~@{~W~^ ~:_~}~:>")
+           stream
+           list))
+(defparameter *original* *print-pprint-dispatch*)
+(defparameter *moar* (copy-pprint-dispatch *print-pprint-dispatch*))
+(set-pprint-dispatch (quote (cons (member function quote)))
+		     (quote pprint-fun-call)
+		     1
+		     *original*)
+
+(defun pprint-atomic (stream object)
+  (let ((objs *object-stream*)
+	(nums *numeral-start*))
+    (when objs
+      (progn
+	(pprint-indent :block most-negative-fixnum stream)
+	(pprint-newline :fill stream))
+      (write-char (aref nums 0) stream)
+      (encode-num-char (fill-pointer objs) stream)
+      (write-char (aref nums 1) stream)
+      (vector-push-extend object objs)
+      (let ((func (pprint-dispatch object *original*)))
+	(funcall func stream object))
+      (write-char (aref nums 2) stream))))
+(let ((*print-pprint-dispatch* *moar*))
+  (set-pprint-dispatch (quote t)
+		       (quote pprint-atomic) 0))
+(defun ourprint (object char-buffer object-buffer)
+  (let ((*print-pprint-dispatch* *moar*)
+	(*object-stream* object-buffer))
+    (write object :stream char-buffer)))
 
 (defun compare-annots (&optional (foo0 fooannot0) (foo1 fooannot1))
   (let* ((len (length foo0))
@@ -676,19 +660,12 @@
 	 (text-index 0)
 	 (len (length text))
 	 (annot-len (length annot))
-	 (obj-ids (make-array len :initial-element nil))
-	 (astack nil))
+	 (obj-ids (make-array len :initial-element nil)))
     (labels ((next-annot-char ()
 	       (let ((value (aref walk-info annot-index)))
-		 (if (integerp value)
-		     (return-from next-annot-char)
-		     (progn
-		       (when (listp value)
-			 (case (car value)
-			   (:start (push (cdr value) astack))
-			   (:end (pop astack))))
-		       (incf annot-index)
-		       (next-annot-char))))))
+		 (unless (integerp value)
+		     (incf annot-index)
+		     (next-annot-char)))))
       (loop
 	 (when (or (>= text-index len)
 		   (>= annot-index annot-len))
@@ -698,7 +675,7 @@
 	 ;;	   (next-text-alpha)
 	 (let ((textchar (aref text text-index))
 	       (annot-char (aref annot annot-index)))
-;;	   (print (list text-index annot-index textchar annot-char))
+;;	   (print (list topstack text-index annot-index textchar annot-char))
 	   (cond ((char= textchar annot-char)
 		  (setf (aref obj-ids text-index)
 			annot-index)
@@ -716,39 +693,140 @@
 			    (incf annot-index))
 			(if text-white
 			    (incf text-index)
-			    (error "unequal")))))))))
+			    (progn (incf annot-index)
+ ;;;fail robustly when someone uses a per-line-prefix in pprint-logical-block
+				   (error "unequal"))))))))))
     obj-ids))
 
-#+nil
-(labels ((next-annot-alpha ()
-	   (if (whitespace-p (aref annot annot-index))
-	       (progn (progn (incf annot-index)
-			     (next-annot-char))
-		      (next-annot-alpha))
-	       annot-index))
-	 (next-text-alpha ()
-	   (if (whitespace-p (aref text text-index))
-	       (progn (incf text-index)
-		      (next-text-alpha))
-	       text-index))))
+(defun ouprint2 (object)
+  (setf (fill-pointer obj-stream) 0)
+  (setf (fill-pointer obj-stream2) 0)
+  (setf (fill-pointer footrue) 0)
+  (setf (fill-pointer fooannot0) 0)
+  (setf (fill-pointer fooannot1) 0)
+  (let ((*print-case* :downcase)
+	(*print-readably* t)
+	(*read-eval* nil))
+    (with-output-to-string (str footrue)
+      (write object :stream str))
+    (let ((*numeral-start* "123"))
+      (with-output-to-string (str fooannot0)
+	(ourprint object str obj-stream)))
+    (let ((*numeral-start* "456"))
+      (with-output-to-string (str fooannot1)
+	(ourprint object str obj-stream2))))
+  (dotimes (x (length obj-stream))
+    (unless (eq (aref obj-stream x)
+		(aref obj-stream2 x))
+      (error "object-streams unequal")))
+  (setf *differences* (compare-annots fooannot0 fooannot1))
+  (setf (values *num-info* *extent-info*)
+	(splitter *differences* fooannot0))
+  (let ((more-data (parallel-walk footrue *num-info* fooannot0)))
+    (values footrue ;;;;the pretty printed text
+	    more-data ;;;;mirror of text, where index maps to num-info
+	    *num-info* ;;;;maps to the objects and object extent info
+	    *extent-info* ;;;;extent info
+	    obj-stream;;;;the objects
+	    )))
 
-#+nil
-(defconstant +largest-char+ 128)
-#+nil
- (loop
-     (multiple-value-bind (small code) (floor num (- +largest-char+ 4))
-       (write-char (code-char (+ 4 code)) stream)
-       (when (zerop small)
-	 (return))
-       (setf num small)))
 
-#+nil
-(set-pprint-dispatch (quote (cons (member yolo)))
-		     (if t
-			 nil
-			 (lambda (stream object)
-			   (pprint-logical-block (stream nil :per-line-prefix "asdfasdf")
-			     (dolist (x object)
-			       (pprint-indent :current -3)
-			       (pprint-newline :linear)
-			       (write x :stream stream))))))
+
+
+(defparameter *cells*
+  (quote ((a) ((b) (c)) (d) ((e)) f (g) (h ((i) j (k) l (m) (n) o)) p)))
+(defparameter buf (make-array 0 :fill-pointer t :element-type (quote character)))
+"((A) ((B) (C)) (D) ((E)) F (G) (H ((I) J (K) L (M) (N) O)) P)"
+(progn
+  (setf (fill-pointer buf) 0)
+  (with-output-to-string (stream buf)
+    (write *cells* :stream stream :pretty t)))
+
+(defparameter *stack* nil)
+(defun top ()
+  (first (stack)))
+(defun (setf top) (x)
+  (setf (first (stack)) x))
+(defun poop ()
+  (pop (stack)))
+(defun puush (x)
+  (push x (stack)))
+
+(defun stack ()
+  (first *stack-stack*))
+(defun (setf stack) (x)
+  (setf (first *stack-stack*) x))
+
+(defparameter *stack-stack* nil)
+(defun stack-puush (&optional (x nil x-supplied-p))
+  (when x-supplied-p
+    (setf x (list x)))
+  (push x *stack-stack*))
+(defun stack-poop ()
+  (pop *stack-stack*))
+
+(defun pop-cdrs ()
+  (loop
+     (if (or (not (topside))
+	     (eq (topside) 'car))
+	 (return)
+	 (poop))))
+(defparameter *last* 'cdr)
+(defun anext (char)
+  (setf
+   *last*
+   (cond
+     ((char= #\( char)
+      
+      (stack-puush (car (top)))
+      ;;;new frame for new list
+      
+      'car)
+     ((alphanumericp char)
+
+      (case *last*
+	(car ;;;top is the base
+	 (puush (car (top))))
+	(cdr ;;;top is cdr, underneath is base, but need to advance
+	 (poop)
+	 (setf (top) (cdr (top)))
+	 (puush (car (top)))))
+      
+      'car)
+     ((char= #\Space char)
+
+      (case *last*
+	(car (poop) ;;;top is car, under is base
+	     (puush (cdr (top))))
+	(cdr (stack-poop) ;;;old list goes away, stuff under
+	     (puush (cdr (top)))))
+      
+      'cdr)
+     ((char= #\) char)
+      (case *last*
+	(car
+	 (poop) ;;;top is car, under is base
+	 (puush (cdr (top))))
+	(cdr
+	 (stack-poop)
+	 (puush (cdr (top)))))
+      
+      'cdr))))
+
+(defun print-stack (x)
+  (dolist (a x)
+    (print a)))
+
+(defun test ()
+  (setf *last* 'cdr)
+  (setf *stack-stack* (list (list (list *cells*))))
+  (flet ((info ()
+	   (if t
+	       (print (top))
+	       (print-stack *stack-stack*))))
+    (info)
+    (dotimes (x (length buf))
+      (let ((value (aref buf x)))
+;;	(print value)
+	(anext value))
+      (info))))
