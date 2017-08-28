@@ -733,103 +733,145 @@
 
 
 
+
+
+(defstruct pareneater
+  (stack-stack nil)
+  (last nil)
+  (parent nil)
+  (period? nil)
+  (parens 0)
+  (lastchar #\Space))
+;;(defparameter *stack* nil)
+(defun stack (p)
+  (first (pareneater-stack-stack p)))
+(defun (setf stack) (x p)
+  (setf (first (pareneater-stack-stack p)) x))
+(defun top (p)
+  (first (stack p)))
+(defun (setf top) (x p)
+  (setf (first (stack p)) x))
+(defun poop (p)
+  (pop (stack p)))
+(defun puush (x p)
+  (push x (stack p)))
+
+;;(defparameter *stack-stack* nil)
+(defun stack-puush (x p)
+  (push (list x) (pareneater-stack-stack p)))
+(defun stack-poop (p)
+  (pop (pareneater-stack-stack p)))
+
+;;(defparameter *last* 'cdr)
+;;(defparameter *period?* nil)
+;;(defparameter *parens* 0)
+(defun anext (char p)
+  (symbol-macrolet ((parens (pareneater-parens p))
+		    (period? (pareneater-period? p))
+		    (last (pareneater-last p))
+		    (parent (pareneater-parent p)))
+    (block nil
+      (case char
+	(#\.
+	 (setf period? parens)
+	 (return))
+	(#\(
+	 (incf parens)
+	 (setf parent (top p))
+	 (stack-puush (car (top p)) p)
+	 ;;new frame for new list
+	 
+	 (setf
+	  last 'car))
+	(#\*
+	 (when period?
+	   (return))
+	 (case last
+	   ;;top is the base
+	   (car)
+	   ;;top is cdr, underneath is base, but need to advance
+	   (cdr 
+	    (poop p)
+	    (setf (top p) (cdr (top p)))))
+	 (setf parent (top p))
+	 (puush (car (top p)) p)
+	 
+	 (setf
+	  last 'car))
+	(#\Space
+	 (when period?
+	   (return))
+	 (case last
+	   ;;top is car, under is base
+	   (car (poop p))
+	   ;;old list goes away, stuff under
+	   (cdr (stack-poop p)))
+	 (setf parent (top p))
+	 (puush (cdr (top p)) p)
+	 (setf
+	  last 'cdr))
+	(#\) 
+	 (unless period?      
+	   (case last
+	     (car
+	      (poop p) ;;;top is car, under is base
+	      (setf parent (top p))
+	      (puush (cdr (top p)) p))
+	     (cdr
+	      (stack-poop p)
+	      (setf parent (top p))
+	      (setf (top p) (cdr (top p)))))       
+	   (setf
+	    last 'cdr))
+	 (when (eql period? parens)
+	   (setf period? nil))
+	 (decf parens))))))
+
+
+;;(defparameter *last-char* #\Space)
+(defun feed-char (x p)
+  (anext x p)
+  (setf (pareneater-lastchar p) x))
+
+
+;;wherever there is one whitespace, there can be many
+(defun feed (char p)
+  (block nil
+    (when (whitespace-p (pareneater-lastchar p))
+      (when (whitespace-p char)
+	;;eat nothing, go home
+	;;whitespace often occurs in clumps
+	(return)) 
+       ;;(when (char= char #\))) closing parens do not appear on lines of their own
+      )
+    (when (alphanumericp char)
+      (feed-char #\* p)
+      (return))
+    (when (whitespace-p char)
+      (setf char #\Space))
+    (feed-char char p)))
+
+(defun reset-pareneater (list p)
+  (setf (pareneater-last p) 'cdr)
+  (setf (pareneater-parent p) nil)
+  (setf (pareneater-period? p) nil)
+  (setf (pareneater-parens p) 0)
+  (setf (pareneater-stack-stack p) (list (list (list list))))
+  (setf (pareneater-lastchar p) #\Space))
+
 (defparameter *cells*
   (case 1
     (0 (quote ((a) ((b) (c)) (d) ((e)) f (g) (h ((i) j (k) l (m) (n) o)) p)))
     (1 (quote ((a) ((b) . c) (d) ((e)) f (g) (h ((i) j (k) l (m) (n) . o)) . p)))))
 (defparameter buf (make-array 0 :fill-pointer t :element-type (quote character)))
 "((A) ((B) (C)) (D) ((E)) F (G) (H ((I) J (K) L (M) (N) O)) P)"
-
+(defparameter *paren-eater* (make-pareneater))
 (defun ttest (x)
   (Setf *cells* x)
   (progn
     (setf (fill-pointer buf) 0)
     (with-output-to-string (stream buf)
       (write x :stream stream :pretty t))))
-
-(defparameter *stack* nil)
-(defun top ()
-  (first (stack)))
-(defun (setf top) (x)
-  (setf (first (stack)) x))
-(defun poop ()
-  (pop (stack)))
-(defun puush (x)
-  (push x (stack)))
-
-(defun stack ()
-  (first *stack-stack*))
-(defun (setf stack) (x)
-  (setf (first *stack-stack*) x))
-
-(defparameter *stack-stack* nil)
-(defun stack-puush (&optional (x nil x-supplied-p))
-  (when x-supplied-p
-    (setf x (list x)))
-  (push x *stack-stack*))
-(defun stack-poop ()
-  (pop *stack-stack*))
-
-(defparameter *last* 'cdr)
-(defparameter *period?* nil)
-(defparameter *parens* 0)
-(defun anext (char)
-  (block nil
-    (case char
-      (#\.
-       (setf *period?* *parens*)
-       (return))
-      (#\(
-       (incf *parens*)
-       (setf *parent* (top))
-       (stack-puush (car (top)))
-       ;;new frame for new list
-       
-       (setf
-	*last* 'car))
-      (#\*
-       (when *period?*
-	 (return))
-       (case *last*
-	 ;;top is the base
-	 (car)
-	 ;;top is cdr, underneath is base, but need to advance
-	 (cdr 
-	  (poop)
-	  (setf (top) (cdr (top)))))
-       (setf *parent* (top))
-       (puush (car (top)))
-       
-       (setf
-	*last* 'car))
-      (#\Space
-       (when *period?*
-	 (return))
-       (case *last*
-	 ;;top is car, under is base
-	 (car (poop))
-	 ;;old list goes away, stuff under
-	 (cdr (stack-poop)))
-       (setf *parent* (top))
-       (puush (cdr (top)))
-       (setf
-	*last* 'cdr))
-      (#\) 
-       (unless *period?*      
-	 (case *last*
-	   (car
-	    (poop) ;;;top is car, under is base
-	    (setf *parent* (top))
-	    (puush (cdr (top))))
-	   (cdr
-	    (stack-poop)
-	    (setf *parent* (top))
-	    (setf (top) (cdr (top)))))       
-	 (setf
-	  *last* 'cdr))
-       (when (eql *period?* *parens*)
-	 (setf *period?* nil))
-       (decf *parens*)))))
 
 (defun print-stack (x)
   (terpri)
@@ -838,48 +880,23 @@
   (dolist (a x)
     (print a)))
 
-(defun test ()
-  (setf *last* 'cdr)
-  (setf *parent* nil)
-  (setf *period?* nil)
-  (setf *parens* 0)
-  (setf *stack-stack* (list (list (list *cells*))))
-  (setf *last-char* #\Space)
+(defun test (&optional (p *paren-eater*))
+  (reset-pareneater *cells* p)
   (flet ((info ()
 	   (if t
-	       (print (top); (cons *last* *parent*)
+	       (print (if t (top p)	;
+			  (cons (pareneater-last p)
+				(pareneater-parent p)))
 		      )
-	       (print-stack *stack-stack*))))
+	       (print-stack (pareneater-stack-stack p)))))
     (info)
     (dotimes (x (length buf))
       (let ((value (aref buf x)))
-;	(print value)
+					;	(print value)
 	
-	(feed value))
+	(feed value p))
       (info))))
 
-
-;;wherever there is one whitespace, there can be many
-(defun feed (char)
-  (block nil
-    (when (whitespace-p *last-char*)
-      (when (whitespace-p char)
-	;;eat nothing, go home
-	;;whitespace often occurs in clumps
-	(return)) 
-      ;;(when (char= char #\))) closing parens do not appear on lines of their own
-      )
-    (when (alphanumericp char)
-      (feed-char #\*)
-      (return))
-    (when (whitespace-p char)
-      (setf char #\Space))
-    (feed-char char)))
-
-(defparameter *last-char* #\Space)
-(defun feed-char (x)
-  (anext x)
-  (setf *last-char* x))
 
 (defun random-shit (x)
   (flet ((asym ()
