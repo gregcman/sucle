@@ -57,5 +57,6 @@
 (defun plain-setblock (i j k blockid new-light-value &optional (new-sky-light-value 0))
   (when (setf (world:getblock i j k) blockid)
     (setf (world:getlight i j k) new-light-value)
-    (setf (world:skygetlight i j k) new-sky-light-value)))
+    (setf (world:skygetlight i j k) new-sky-light-value)
+    (block-dirtify i j k)))
 

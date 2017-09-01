@@ -9,8 +9,9 @@
     (defparameter *block-height* nil)
     (defparameter *block-width* nil)
     (setf (values *block-height* *block-width*)
-	  (case 0
+	  (case 4
 	    (0 (values 16.0 9.0))
+	    (4 (values 16.0 8.0))
 	    (1 (values 11.0 6.0))
 	    (2 (values 16.0 16.0))))
     (setf *block-height* (* *block-height* 2.0)
@@ -56,7 +57,7 @@
 						     (:fgcolor . "fgcolor")
 						     (:bgcolor . "bgcolor")
 						     )))
-       (let* ((solidshader program)
+       (let* (;;(solidshader program)
 	      (solidshader-uniforms table))
 	 (progn
 	   (gl:use-program program)
@@ -77,16 +78,15 @@
   (bornfnc
    :font-image
    (lambda ()
-     (flip-image
-      (load-png
-       (img-path "font/font.png")))))
+     (load-png
+      (img-path "font/shitty.png"))))
   (bornfnc
    :font
    (lambda ()
      (prog1
 	 (lovely-shader-and-texture-uploader:pic-texture
 	  (get-stuff :font-image *stuff* *backup*)
-	  :rgba)
+	  :luminance)
        (lovely-shader-and-texture-uploader::apply-tex-params
 	lovely-shader-and-texture-uploader::*default-tex-params*)))))
 #+nil
@@ -116,13 +116,15 @@
 	 (etouq
 	  (with-vec-params
 	      `((offset ,@(vec-slots :rectangle
-				     '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)))))
+				     '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)
+				       ))))
 	    '(tilemap-lookup)
 	    '(progn
 	      (setf (cffi:mem-aref a :float (+ offset 0)) x0)
 	      (setf (cffi:mem-aref a :float (+ offset 1)) y0)
 	      (setf (cffi:mem-aref a :float (+ offset 2)) x1)
-	      (setf (cffi:mem-aref a :float (+ offset 3)) y1))))))
+	      (setf (cffi:mem-aref a :float (+ offset 3)) y1)
+	      )))))
      a)))
 (bornfnc
  :terminal256color-lookup
@@ -142,6 +144,7 @@
  (lambda ()
    (cffi:foreign-alloc :uint8 :count (* 256 256 4))))
 (progn
+  #+nil
   (bornfnc
    :items-image
    (lambda ()
@@ -160,9 +163,11 @@
    :text-scratch
    (lambda ()
      (prog1
-	 (lovely-shader-and-texture-uploader::pic-texture
-	  (get-stuff :items-image *stuff* *backup*)
-	  :rgba)
+	 (let ((tex (gl:gen-texture)))
+	   (gl:bind-texture :texture-2d tex)
+	   (gl:tex-image-2d :texture-2d 0 :rgba 256 256 0
+			    :rgba :unsigned-byte (cffi:null-pointer))
+	   tex)
        (lovely-shader-and-texture-uploader::apply-tex-params
 	lovely-shader-and-texture-uploader::*default-tex-params*))))
   (bornfnc
@@ -200,7 +205,7 @@
 	(dobox ((xcell 0 upwidth)
 		(ycell 0 upheight))
 	   ;;;texcoords
-	       (etouq (ngorp (preach 'etex (axis-aligned-quads:duaq 3 nil '(0f0 1f0 0f0 1f0)))))
+	       (etouq (ngorp (preach 'etex (axis-aligned-quads:duaq 3 nil '(0f0 0.0626 0f0 0.0625)))))
 	       (let ((xactual (- (* xwidth xcell) 1.0))
 		     (yactual (- (* ywidth ycell) 1.0)))
 		 (let* ((x1 (float xactual))
@@ -280,3 +285,61 @@
 (defun glinnit ()
   (setf e:*resize-hook* #'on-resize))
 
+
+#+nil
+((bornfnc
+	:items-image
+	(lambda ()
+	  (flip-image
+	   (load-png
+	    (img-path "font/fuckme.png")))))
+
+       #+nil
+       (dotimes (y 16)
+	 (terpri)
+	 (dotimes (x 16)
+	   (princ (code-char (+ (* y 16) x)))))
+
+ (defparameter *woy*
+   (lovely-shader-and-texture-uploader::array-flatten
+    (get-stuff :items-image *stuff* *backup*)))
+
+ (defparameter *color-hash* (make-hash-table :test 'equalp))
+
+ (dobox ((x 0 (length *woy*) :inc 3))
+	(etouq (with-vec-params (quote ((x r g b)))
+		 (quote (aplayground::*woy*))
+		 (quote
+		  (progn
+		    (incf (gethash (Vector r g b) *color-hash* 0))
+		    (sandbox::goto r g b)
+		    (sandbox::what345 r g b 4
+				      ))))))
+
+ (defparameter *colors* (make-array '(256 128) :element-type '(unsigned-byte 8)))
+ (dobox ((x 0 (length *woy*) :inc 3))
+	(etouq (with-vec-params (quote ((x r g b)))
+		 (quote (aplayground::*woy*))
+		 (quote
+		  (progn
+		    (setf (row-major-aref *colors* (/ x 3))
+			  (floor (* 255 (alpha (vector r g b))))))))))
+ (opticl:write-png-file (img-path "font/shitty.png") *colors*)
+
+ (map 'vector *woy*)
+
+ (defun alpha (x)
+   (let ((tot (+ (distance x #(255 193 193))
+		 (distance x #(0 0 205)))))
+     (/ (distance x #(0 0 205))
+	tot)))
+
+ (defun average (x)
+   (/ (reduce #'+ x)
+      (length x)))
+
+ (defun distance (x y)
+   (sqrt (reduce #'+
+		 (map 'vector (lambda (x) (* x x))
+		      (map 'vector #'- x y)))))
+ )

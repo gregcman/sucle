@@ -34,7 +34,7 @@
   (merge-pathnames name dir-mc-assets))
 
 (defparameter *camera* nil) ;;global camera
-(defparameter *fog-ratio* (or 0.0 0.75))
+(defparameter *fog-ratio* 0.75)
 
 (defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
@@ -63,9 +63,9 @@
       (let ((avector (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
 	(flet ((fractionalize (x)
 		 (clamp x 0.0 1.0)))
-	  (let ((x (fractionalize (* time (or 0.0 0.68))))
-		(y (fractionalize (* time (or 0.0 0.8))))
-		(z (fractionalize (* time (or 0.0 1.0)))))
+	  (let ((x (fractionalize (* time (or 1.0 0.0 0.68))))
+		(y (fractionalize (* time (or (/ 139 255.0) 0.0 0.8))))
+		(z (fractionalize (* time (or (/ 139 255.0) (/ 205 255.0) 1.0)))))
 	    (gl:clear-color x y z 1.0)
 	    (setf (aref avector 0) x
 		  (aref avector 1) y
@@ -205,6 +205,11 @@
        (aplayground::flip-image
 	(aplayground::load-png 
 	 (img-path #P"terrain.png")))))
+    (aplayground::bornfnc
+     :grass-png
+     (lambda ()
+       (aplayground::load-png 
+	(img-path #P"misc/grasscolor.png"))))
     (aplayground::bornfnc
      :terrain
      (lambda ()

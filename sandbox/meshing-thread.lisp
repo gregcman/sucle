@@ -54,9 +54,10 @@
 		 (RETURN-FROM NIL (PROGN NIL)))))))
       (gl:end-list)
       ourlist)))
-
+;;(defparameter *faces* 0)
 (defun getmeshersfinishedshit ()
   (multiple-value-bind (shape len coords) (sb-thread:join-thread mesher-thread)
+ ;;   (incf *faces* len)
     (when coords
       (when shape
 	(let ((old-call-list (get-chunk-display-list coords)))

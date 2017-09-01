@@ -242,7 +242,10 @@
   (height :int)
   (pixels :pointer))
 
-(cffi:defcfun "glfwSetCursor" :void
+(cffi:defcfun ("glfwSetCursor" %glfw::set-cursor) :void
   (window :pointer)
   (cursor :pointer))
+
+(cffi:defcfun ("glfwGetTimerFrequency" %glfw::get-timer-frequency) :uint64)
+(cffi:defcfun ("glfwGetTimerValue" %glfw::get-timer-value) :uint64)
 

@@ -33,7 +33,7 @@
 (defparameter gravity nil)
 (defparameter fly t)
 
-(defparameter *hotbar-selection* 2)
+(defparameter *hotbar-selection* 3)
 
 (defparameter onground nil)
 
@@ -290,9 +290,9 @@
 (defun what345 (x y z w)
   (declare (optimize (speed 3) (safety 0))
 	   (type fixnum x y z w))
-  (dobox ((x0 -1 2)
-	  (z0 -1 2))
-	 (setblock-with-update (+ x x0) y (+ z z0) w 0)))
+  (dobox ((x0 -0 1)
+	  (z0 -0 1))
+	 (plain-setblock (+ x x0) y (+ z z0) w 0)))
 
 (defun collide-with-world ()
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
@@ -313,7 +313,7 @@
 
 (defun big-swing-fist (vx vy vz)
   (when (and (window:mice-locked-p) (skey-p :q))
-    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 10 vx) (* 10 vy) (* 10 vz)
+    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 100 vx) (* 100 vy) (* 100 vz)
 			 player-aabb+1
 			 
 			 (lambda (x y z)

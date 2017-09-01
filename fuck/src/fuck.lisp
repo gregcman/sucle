@@ -29,7 +29,7 @@
 	(accumulator 0))
 
     (when *sandbox-on*
-     ; (initbag)
+  ;;    (initbag)
       )
     (loop
        (if window:*status*
@@ -100,9 +100,14 @@
 	     (window::wrapper #'handoff-five)))
 	 :arguments  (list *standard-output*))))
 
+;;;time in microseconds
 (defun fine-time ()
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)
     (+ (* (expt 10 6) s) m)))
+
+(defun fine-time ()
+  (/ (%glfw::get-timer-value)
+     (/ (%glfw::get-timer-frequency) (expt 10 6))))
 
 (defun char-read (path)
   (with-open-file (stream path :element-type 'base-char)

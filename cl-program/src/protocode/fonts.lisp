@@ -1,4 +1,4 @@
-(in-package :sandbox)
+(in-package z:sandbox)
 
 (progno
  #:cl-freetype2)
@@ -6,24 +6,24 @@
  (:file "fonts"))
 (defparameter *face*
   (freetype2:new-face
-   (case 0
+   (case 1
      (0 "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf")
      (1 "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"))))
 
 (defparameter *face-bold*
   (freetype2:new-face
-   "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-B.ttf"))
+   (if t
+       "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+       "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-B.ttf")))
 
 (defun test78 ()
-  (freetype2:set-char-size *face* (* 8 64) 0 96 96)
-  (let ((height (round (freetype2::string-pixel-height *face* "█")))
-	(width (round (freetype2::string-pixel-width *face*  "█"))))
-    (setf (values *block-width* *block-height*)
-	  (values (* 2.0 width) (* 2.0 height)))
-    (setf *chunk-vertices-lookup* (generate-chunk-vertices-lookup))
+  (freetype2:set-char-size *face* (* 8 64) (* 10 64) 96 96)
+  (let ((height (ceiling (print (freetype2::string-pixel-height *face* "█"))))
+	(width (ceiling (print (freetype2::string-pixel-width *face*  "█")))))
+    (print (list width height))
     (let ((raster-array (make-array (list (* 16 height) (* 16 width) 4)
 				    :element-type '(unsigned-byte 8))))
-      (dobox ((char 0 256))
+      (fuktard:dobox ((char 0 256))
 	     (multiple-value-bind (array xoffset yoffset)
 		 (toy-string-to-array *face* (string (code-char char)))
 	       (multiple-value-bind (ybase xbase) (floor char 16)
@@ -32,7 +32,7 @@
 		 (incf xbase xoffset)
 		 (incf ybase yoffset)
 		 (destructuring-bind (height width) (array-dimensions array)
-		   (dobox ((y 0 height)
+		   (fuktard:dobox ((y 0 height)
 			   (x 0 width))
 			  (let ((ax (+ x xbase))
 				(ay (+ y ybase))
@@ -43,11 +43,8 @@
 					  ax
 					  channel)
 				    ans))))))))
-      (opticl:write-png-file (saves-path "achar.png")
-			     raster-array))
-    (remhash :font-image *stuff*)
-    (gldeletetextures (list (gethash :font *stuff*)))
-    (remhash :font *stuff*)))
+      (opticl:write-png-file "/home/imac/quicklisp/local-projects/symmetrical-umbrella/cl-program/src/res/font/achar2.png"
+			     raster-array))))
 
 "ii██"
 "ii██"

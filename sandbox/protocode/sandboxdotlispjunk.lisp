@@ -56,43 +56,6 @@
 (defun spawn ()
   (goto 64 80 -64))
 
-(defun goto (x y z)
-  (setf *xpos* x
-	*ypos* y
-	*zpos* z))
-
-(defun color-grasses ()
-  (get-image "terrain.png")
-  (modify-greens 64 192)
-  (modify-greens 80 192)
-  (modify-greens 0 240))
-
-(defun ubyte-mult (a b)
-  (truncate (* a b) 256))
-
-(defun multiply-into (vecinto other)
-  (macrolet ((aux (a b num)
-	       `(let ((at (aref ,a ,num))
-		      (bt (aref ,b ,num)))
-		  (setf (aref ,a ,num) (ubyte-mult at bt)))))
-    (aux vecinto other 0)
-    (aux vecinto other 1)
-    (aux vecinto other 2)
-    (aux vecinto other 3)))
-
-(progno #(113 174 70 255)  #(198 304 122 255))
-;;;grass is 0 240
-;;;leaves is [64 80] 192
-(defun modify-greens (xpos ypos &optional (color
-					   (case 3
-					     (0 #(1742848/8775 2673664/8775 1079296/8775 255))
-					     (1 (imagewise:getapixel 0 255 (get-image "misc/grasscolor.png")))
-					     (2 (imagewise:getapixel 0 0 (get-image "misc/grasscolor.png")))
-					     (3 (imagewise:getapixel 255 0 (get-image "misc/grasscolor.png"))))
-					   ) (terrain (get-image "terrain.png")))
-  (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
-	 (multiply-into (imagewise:getapixel y x terrain) color)))
-
 (defun reload-grasses ()
   (remhash "terrain.png" *g/image*)
   (color-grasses)
@@ -119,18 +82,6 @@
 	   (draw-box (+ minx fistx -0) (+  miny fisty -0) (+  minz fistz -0)
 		     (+ maxx fistx -0) (+  maxy fisty -0) (+  maxz fistz -0)))))
 
-(defun neighbors (x y z)
-  (let ((tot 0))
-    (macrolet ((aux (i j k)
-		 `(unless (zerop (world:getblock (+ x ,i) (+ y ,j) (+ z ,k)))
-		   (incf tot))))
-      (aux 1 0 0)
-      (aux -1 0 0)
-      (aux 0 1 0)
-      (aux 0 -1 0)
-      (aux 0 0 1)
-      (aux 0 0 -1))
-    tot))
 
 (defun aux-func2 (x dx)
   (if (zerop dx)
@@ -520,23 +471,6 @@
 	     (plain-setblock x y z 13 0 0))))
   )
 
-(defun edge-bench ()
-  (dobox ((x 0 128)
-	  (y 0 128)
-	  (z -128 0))
-	 (let ((blockid (world:getblock x y z)))
-	   (unless (zerop blockid)
-	     (when (= 4 (neighbors x y z))
-	       (plain-setblock x y z 58 0 0))))))
-
-(defun corner-obsidian ()
-  (dobox ((x 0 128)
-	  (y 0 128)
-	  (z -128 0))
-	 (let ((blockid (world:getblock x y z)))
-	   (unless (zerop blockid)
-	     (when (= 3 (neighbors x y z))
-	       (plain-setblock x y z 49 0 0))))))
 
 (defun fill-bottom ()
   (dobox ((x 0 128)
@@ -605,23 +539,6 @@
 	     (2 (setblock-with-update x y z 12 0))
 	     (3 (setblock-with-update x y z 24 0))))))
 
-(defun clearblock? (id)
-  (declare (type fixnum id))
-  (dobox ((x 0 128)
-	  (y 0 128)
-	  (z -128 0))
-	 (let ((blockid (world:getblock x y z)))
-	   (when (= blockid id)
-	     (plain-setblock x y z 0 0)))))
-
-(defun clearblock? (id)
-  (declare (type fixnum id))
-  (dobox ((x 0 128)
-	  (y 0 128)
-	  (z -128 0))
-	 (let ((blockid (world:getblock x y z)))
-	   (when (= blockid id)
-	     (plain-setblock x y z 0 0)))))
 
 (defun clcok? ()
   (dobox ((x 0 128)

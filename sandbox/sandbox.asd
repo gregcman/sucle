@@ -40,7 +40,7 @@
 			   ))
 
      (:file "camera-matrix") ;;matrices for cameras - view, projection
-     (:file "magic") ;;initial asset loading
+
      (:file "lovely-renderer") ;;generic rendering glue
      
      (:file "meshes");;;various types of functions to generate meshes

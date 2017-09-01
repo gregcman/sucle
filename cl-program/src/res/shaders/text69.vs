@@ -25,11 +25,12 @@ vec4 chardata = texture2D(indirection, INDIRECT);
 if (chardata.a == 0.0)
 {
 gl_Position = POS;
-int codeindex = int(255.0 * chardata.r);
-int fgindex = int(255.0 * chardata.g);
-int bgindex = int(255.0 * chardata.b);
+ivec3 scaleddata = ivec3(chardata.rgb * vec3(255.0));
+int codeindex = scaleddata.r;
+int fgindex = scaleddata.g;
+int bgindex = scaleddata.b;
 vec4 boxdata = texcoords[codeindex];
-FTEX = mix(boxdata.rg, boxdata.ba, TEX);
+FTEX = boxdata.rg + TEX;
 BG = bgcolor[bgindex];
 FG = fgcolor[fgindex];
 } else {
