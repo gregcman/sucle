@@ -102,14 +102,14 @@
 (defun modify-greens (xpos ypos
 		      &optional
 			(image (aplayground::get-stuff
-				     :grass-png aplayground::*stuff*
-				     aplayground::*backup*))
+				:grass-png aplayground::*stuff*
+				aplayground::*backup*))
 			(color
-			 (case 3
+			 (case 1
 			   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
-			   (1 (imagewise:getapixel 0 255 image))
+			   (1 (imagewise:getapixel 255 0 image))
 			   (2 (imagewise:getapixel 0 0 image))
-			   (3 (imagewise:getapixel 255 0 image)))
+			   (3 (imagewise:getapixel 255 255 image)))
 			 ) (terrain (aplayground::get-stuff
 				     :terrain-png aplayground::*stuff*
 				     aplayground::*backup*)))

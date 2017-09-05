@@ -19,74 +19,101 @@
   (unless *al-on?*
     (start-al)
     (setf *al-on?* t))
+
+  #+nil
+  (when *sandbox-on*
+       (initbag)
+    )
   (injection3)) 
 (defparameter barbar nil)
-(defconstant +million+ (expt 10 6))
 
 (defparameter *control-state* (window::make-control-state
 			       :curr window::*input-state*))
 
-(defun injection3 ()
-  (let ((ticks 0)
-	(dt (floor +million+ 60))
-	(current-time (fine-time))
-	(accumulator 0))
+(defstruct ticker
+  (ticks 0 :type fixnum)
+  (dt (floor 1000000 60) :type fixnum)
+  (current-time (fine-time) :type fixnum)
+  (accumulator 0 :type fixnum)
+  (bailout (floor 1000000 4) :type fixnum))
 
-    (when *sandbox-on*
-  ;;    (initbag)
+(defun tick-physics (ticker function)
+  (with-let-mapped-places ((accumulator (ticker-accumulator ticker))
+			   (ticks (ticker-ticks ticker)))
+    (let ((dt (ticker-dt ticker)))
+      (loop
+	 (if (>= accumulator dt)
+	     (progn
+	       (funcall function)
+	       (incf ticks dt)
+	       (decf accumulator dt))
+	     (return))))))
+
+(defun tick-update (ticker new-time)
+  (let* ((frame-time (- new-time (ticker-current-time ticker))))
+    (let ((bailout (ticker-bailout ticker)))
+      (if (> frame-time bailout)
+	  (setf frame-time bailout)))
+    (setf (ticker-current-time ticker) new-time)
+    (incf (ticker-accumulator ticker) frame-time)))
+
+(defun physss ()
+  (window:poll)
+  (window::update-control-state *control-state*)
+
+  #+nil
+  (when (and barbar *aplay-on*)
+    (aplayground::physics)
+    )
+  (when *sandbox-on*
+    (sandbox::thunkit *control-state*)))
+
+(defparameter *ticker* nil)
+
+(defun actual-stuuff ()
+  (when window:*status*
+    (throw :end (values)))
+  (let ((ticker *ticker*))
+    (tick-update ticker (fine-time))
+    (dotimes (x 2) (glfw:poll-events))
+    (tick-physics ticker (function physss))
+    (let ((fraction (/ (float (ticker-accumulator ticker))
+		       (float (ticker-dt ticker)))))
+      (gl:clear
+       :color-buffer-bit
+       :depth-buffer-bit)
+      (gl:viewport 0 0 e:*width* e:*height*)
+
+      (when *sandbox-on*
+	(progn
+	  (sandbox::render fraction)
+	  #+nil
+	  (progn
+	   (gl:bind-texture
+	    :texture-2d
+	    (aplayground::get-stuff
+	     :lady
+	     aplayground::*stuff*
+	     aplayground::*backup*
+	     
+	     ))
+	   (fuck::draw-baggins))))
+      #+nil
+      (when *aplay-on*
+	(aplayground::render)
+	)
       )
-    (loop
-       (if window:*status*
-	   (return)
-	   (let* ((new-time (fine-time))
-		  (frame-time (- new-time current-time)))
-	     (let ((quarter-million (* 0.25 +million+)))
-	       (if (> frame-time quarter-million)
-		   (setf frame-time quarter-million)))
-	     (setf current-time new-time)
-	     (incf accumulator frame-time)
-	     (dotimes (x 2) (glfw:poll-events))
-	     (block later
-	       (loop
-		  (if (>= accumulator dt)
-		      (progn
-			(window:poll)
-			(window::update-control-state *control-state*)
-			
-			(when (and barbar *aplay-on*)
-			  (aplayground::physics)
-			  )
-			(when *sandbox-on*
-			  (sandbox::thunkit *control-state*))
-			
-			(incf ticks dt)
-			(decf accumulator dt))
-		      (return-from later))))
-	     (let ((fraction (/ (float accumulator)
-				(float dt))))
-	       (gl:clear
-		:color-buffer-bit
-		:depth-buffer-bit)
-	       (gl:viewport 0 0 e:*width* e:*height*)
+    (window:update-display)))
 
-	       (when *sandbox-on*
-		 (progn
-		   (sandbox::render fraction)
-		   (progno
-		     (gl:bind-texture
-		      :texture-2d
-		      (aplayground::get-stuff
-		       :lady
-		       aplayground::*stuff*
-		       aplayground::*backup*
-		       
-		       ))
-		     (fuck::draw-baggins))))
-	       (when *aplay-on*
-		 (aplayground::render)
-		 )
-	       )
-	     (window:update-display))))))
+(defparameter *realthu-nk* (lambda () (throw :end (values))))
+
+(setf *realthu-nk* (function actual-stuuff))
+
+(defun injection3 ()
+  (setf *ticker* (make-ticker))
+  (catch (quote :end)
+    (loop
+       (funcall *realthu-nk*))))
 
 (defparameter *thread* nil)
 (defun main3 ()
@@ -106,6 +133,7 @@
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)
     (+ (* (expt 10 6) s) m)))
 
+#+nil
 (defun define-time ()
   (eval
    `(defun fine-time ()
