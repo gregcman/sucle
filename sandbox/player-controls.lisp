@@ -27,7 +27,7 @@
 (defparameter *zvel* 0.0)
 
 (defparameter air-friction 0.98)
-(defparameter walking-friction (* 0.6 0.9))
+(defparameter walking-friction (prog2 0.93 (* 0.6 0.9)))
 
 (defparameter noclip nil)
 (defparameter gravity nil)
@@ -55,47 +55,37 @@
       *yaw* 0.0
       *pitch* 0.0)
 
-(progn
-  (defun skey-p (enum)
-    (e:key-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
-	     ))
-  (defun skey-j-r (enum)
-    (e:key-j-r enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
-	       ))
-  (defun skey-j-p (enum)
-    (e:key-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
-	       ))
-  (defun smice-j-p (enum)
-    (e:mice-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
-		))
-  (defun smice-p (enum)
-    (e:mice-p enum
-		)))
+(eval-always
+ (import (quote (e::skey-p e::skey-j-p e::skey-j-r e::keyval e::mouseval))))
 
-(defun controls ()
+(defun controls (control-state)
   (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
-  (let ((speed (* 0.4 (expt tickscale 2))))
+  (let ((speed (prog2 0.03 (* 0.4 (expt tickscale 2)))))
     (when fly
       (setf speed 0.024)
-      (when (skey-p :space)
+      (when (skey-p (keyval :space) control-state)
 	(incf *yvel* speed))
-      (when (skey-p :left-shift)
+      (when (skey-p (keyval :left-shift) control-state)
 	(decf *yvel* speed)))
     (unless fly
       (when onground
-	(when (skey-p :space) ;;jumping
-	  (incf *yvel* (* (if t 0.49 0.42) (expt tickscale 1)))))
+	(when (skey-p (keyval :space) control-state) ;;jumping
+	  (incf *yvel* (prog2 0.32 (* 
+			    (if t 0.49 0.42) (expt tickscale 1))))))
       (unless onground
 	(setf speed (* speed 0.2))))    
     (let ((dir (complex 0 0)))
-      (when (skey-p :w) ;;w
+      (when (skey-p (keyval :w) control-state) ;;w
 	(incf dir #C(-1 0)))
-      (when (or (skey-p :a)) ;;a
+      (when (or (skey-p (keyval :a) control-state)) ;;a
 	(incf dir #C(0 1)))
-      (when (skey-p :s) ;;s
+      (when (skey-p (keyval :s) control-state) ;;s
 	(incf dir #C(1 0)))
-      (when (or (skey-p :d)) ;;d
+      (when (or (skey-p (keyval :d) control-state)) ;;d
 	(incf dir #C(0 -1)))
+      #+nil
+      (when (not (or fly onground))
+	(setf speed 0.001))
       (unless (zerop dir)
 	(let ((rot-dir (* dir (cis *yaw*))))
 	  (let ((normalized (/ rot-dir (complex-modulus rot-dir))))
@@ -133,10 +123,12 @@
 	  (y (* dy (translator 0.5))))
       (multiple-value-bind (dyaw dpitch)
 	  (if t (values x y) (%sphere-mouse-help x y))
-	(setf *yaw* (mod (+ *yaw* dyaw) two-pi))
-	(setf *pitch* (clamp (+ *pitch* dpitch)
-			     (* -0.99 half-pi)
-			     (* 0.99 half-pi)))))))
+	(unless (zerop dyaw)
+	  (setf *yaw* (mod (+ *yaw* dyaw) two-pi)))
+	(unless (zerop dpitch)
+	  (setf *pitch* (clamp (+ *pitch* dpitch)
+			       (* -0.99 half-pi)
+			       (* 0.99 half-pi))))))))
 
 (defun delta ()
   (let ((mouse-data (load-time-value (cons 0 0))))
@@ -176,12 +168,13 @@
 (defun remove-spurious-mouse-input ()
   (if (window:mice-locked-p)
       (case mousecapturestate
-	((nil) 
+	((nil)
 	 (delta) ;;toss spurious mouse movement 
 	 (setf mousecapturestate :justcaptured))
 	(:justcaptured (setq mousecapturestate t))
 	((t)))
-      (setq mousecapturestate nil)))
+      (when mousecapturestate
+	(setq mousecapturestate nil))))
 
 (defun hotbar-add (num)
   (setf *hotbar-selection* (truncate (mod (+ num *hotbar-selection*) 256))))
@@ -208,34 +201,34 @@
  (print (reduce #'+ foo))
  (/ 21450611.0 23824968.0)) 
 
-(defun physics ()
+(defun physics (control-state)
   ;;e to escape mouse
   (setf *xpos-old* *xpos*
 	*ypos-old* *ypos*
 	*zpos-old* *zpos*)
-  (when (skey-j-p :E) (window:toggle-mouse-capture))
+  (when (skey-j-p (keyval :E) control-state) (window:toggle-mouse-capture))
   (when (window:mice-locked-p)
-    (when (skey-j-p :v) (toggle noclip))
-    (when (skey-j-p :g) (toggle gravity))
-    (when (skey-j-p :t) (update-world-vao))
-    (when (skey-j-p :f) (toggle fly))
-    (when (skey-j-p :c) (toggle walkblock))
+    (when (skey-j-p (keyval :v) control-state) (toggle noclip))
+    (when (skey-j-p (keyval :g) control-state) (toggle gravity))
+    (when (skey-j-p (keyval :t) control-state) (update-world-vao))
+    (when (skey-j-p (keyval :f) control-state) (toggle fly))
+    (when (skey-j-p (keyval :c) control-state) (toggle walkblock))
     (when walkblock (
 		     what345
 		     (truncate *xpos*)
 		     (- (truncate *ypos*) 2)
 		     (- (truncate *zpos*) 1)
 		     *hotbar-selection*))
-    (when (skey-j-p :h) (time (let ((ans (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte)))
+    (when (skey-j-p (keyval :h) control-state) (time (let ((ans (gl:read-pixels 0 0 1000 1000 :rgba :unsigned-byte)))
 				(Setf foo ans))))
     (if fly
 	(setf air-friction 0.9)
 	(setf air-friction 0.98))
-    (controls)
+    (controls control-state)
     (let ((blockval (+ 0 *hotbar-selection*)))
       (progn
 	(when fist?
-	  (when (smice-j-p :left)
+	  (when (skey-j-p (mouseval :left) control-state)
 	    (setblock-with-update fist-side-x
 				  fist-side-y
 				  fist-side-z
@@ -245,10 +238,10 @@
 		(yop (floor fisty))
 		(zop (floor fistz)))
 	    (case 1
-	      (0 (when (smice-j-p :right)
+	      (0 (when (skey-j-p (mouseval :right) control-state)
 		   (print (list xop yop zop))
 		   (princ (world:skygetlight xop yop zop))))
-	      (1 (when (smice-j-p :right)
+	      (1 (when (skey-j-p (mouseval :right) control-state)
 		   (setblock-with-update (floor fistx)
 					 (floor fisty)
 					 (floor fistz)
@@ -263,11 +256,12 @@
       (cond (onground
 	     (setf *xvel* (* *xvel* walking-friction))
 	     (setf *zvel* (* *zvel* walking-friction)))
-	    (t (setf *xvel* (* *xvel* 0.9))
-	       (setf *zvel* (* *zvel* 0.9)))))
+	    (t (setf *xvel* (* *xvel* (prog2 1.0 0.9)))
+	       (setf *zvel* (* *zvel* (prog2 1.0 0.9)))
+	     )))
   (when (and gravity (not onground))
-    (decf *yvel* (* 0.08 (expt tickscale 2))))
-  (setf *yvel* (* *yvel* air-friction))
+    (decf *yvel* (prog2 0.0027222224 (* 0.08 (expt tickscale 2)))))
+  (setf *yvel* (* *yvel* (or air-friction 0.9900373 0.99692774)))
   (multiple-value-bind (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
        (cond ((plusp *xvel*) (when i+ (setf *xvel* 0.0))
 	      (minusp *xvel*) (when i- (setf *xvel* 0.0))))
@@ -283,7 +277,8 @@
       (let ((vx (- (* reach avx)))
 	    (vy (- (* reach avy)))
 	    (vz (- (* reach avz))))
-	(big-swing-fist vx vy vz)
+	(when (and (window:mice-locked-p) (skey-p (keyval :q) control-state))
+	  (big-swing-fist vx vy vz))
 	(standard-fist vx vy vz)))))
 
 
@@ -312,15 +307,14 @@
 (defparameter *fist-function* (constantly nil))
 
 (defun big-swing-fist (vx vy vz)
-  (when (and (window:mice-locked-p) (skey-p :q))
-    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 100 vx) (* 100 vy) (* 100 vz)
-			 player-aabb+1
-			 
-			 (lambda (x y z)
-			   (when (and (<= 0 x 127)
-				      (<= 0 y 127)
-				      (<= -128 z -1)) 
-			     (setblock-with-update x y z 0  (aref mc-blocks::lightvalue 0)))))))
+  (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 100 vx) (* 100 vy) (* 100 vz)
+		       player-aabb+1
+		       
+		       (lambda (x y z)
+			 (when (and (<= 0 x 127)
+				    (<= 0 y 127)
+				    (<= -128 z -1)) 
+			   (setblock-with-update x y z 0  (aref mc-blocks::lightvalue 0))))))
 
 (defun standard-fist (vx vy vz)
   (multiple-value-bind (frac type blockx blocky blockz)

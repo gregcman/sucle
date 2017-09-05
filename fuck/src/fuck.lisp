@@ -11,6 +11,7 @@
 	       (if (integerp v)
 		   (remhash k hash)))
 	     hash))
+;;  (define-time)
   (when *sandbox-on*
     (sandbox::initialization1))
   (when *aplay-on*
@@ -21,6 +22,9 @@
   (injection3)) 
 (defparameter barbar nil)
 (defconstant +million+ (expt 10 6))
+
+(defparameter *control-state* (window::make-control-state
+			       :curr window::*input-state*))
 
 (defun injection3 ()
   (let ((ticks 0)
@@ -41,22 +45,19 @@
 		   (setf frame-time quarter-million)))
 	     (setf current-time new-time)
 	     (incf accumulator frame-time)
+	     (dotimes (x 2) (glfw:poll-events))
 	     (block later
 	       (loop
 		  (if (>= accumulator dt)
 		      (progn
 			(window:poll)
-			(when (window:key-j-p :u)
-			  (al:source *source* :position (list sandbox::*xpos*
-							      sandbox::*ypos*
-							      sandbox::*zpos*))
-			  (alut-hello-world))
+			(window::update-control-state *control-state*)
 			
 			(when (and barbar *aplay-on*)
 			  (aplayground::physics)
 			  )
 			(when *sandbox-on*
-			  (sandbox::thunkit))
+			  (sandbox::thunkit *control-state*))
 			
 			(incf ticks dt)
 			(decf accumulator dt))
@@ -105,9 +106,18 @@
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)
     (+ (* (expt 10 6) s) m)))
 
-(defun fine-time ()
-  (/ (%glfw::get-timer-value)
-     (/ (%glfw::get-timer-frequency) (expt 10 6))))
+(defun define-time ()
+  (eval
+   `(defun fine-time ()
+      (/ (%glfw::get-timer-value)
+	 ,(/ (%glfw::get-timer-frequency) (float (expt 10 6)))))))
+
+#+nil
+(when (window:key-j-p :u)
+  (al:source *source* :position (list sandbox::*xpos*
+				      sandbox::*ypos*
+				      sandbox::*zpos*))
+  (alut-hello-world))
 
 (defun char-read (path)
   (with-open-file (stream path :element-type 'base-char)
@@ -564,7 +574,7 @@
   (funcall (formatter "~:<~^~W~^ ~:_~:I~@{~W~^ ~:_~}~:>")
            stream
            list))
-(defparameter *original* *print-pprint-dispatch*)
+(defparameter *original* (copy-pprint-dispatch *print-pprint-dispatch*))
 (defparameter *moar* (copy-pprint-dispatch *print-pprint-dispatch*))
 (set-pprint-dispatch (quote (cons (member function quote)))
 		     (quote pprint-fun-call)

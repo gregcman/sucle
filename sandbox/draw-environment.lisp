@@ -39,10 +39,15 @@
 (defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
 
+;;(defparameter *last-yaw* 0.0)
+;;(defparameter *last-pitch* 0.0)
 (defun render (partial-time)
   (declare (optimize (safety 3) (debug 3)))
   (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
   (remove-spurious-mouse-input)
+  #+nil
+  (setf *last-yaw* *yaw*
+	*last-pitch* *pitch*)
   (when (window:mice-locked-p)
     (glfw:poll-events)
     (look-around))
@@ -110,6 +115,8 @@
 		    (coerce *pitch* 'single-float)
 		    (coerce *yaw* 'single-float))
 
+ ;;   (princ " ")
+  ;;  (princ *pitch*)
   ;;  (alc:make-context-current fuck::*alc-context*)
    
     (al:listener :position vec)
@@ -136,7 +143,8 @@
   (gl:enable :depth-test)  
   (gl:depth-func :less)
   (gl:enable :cull-face)
-  (gl:cull-face :back)
+  (gl:cull-face :back
+		)
   (gl:bind-texture
    :texture-2d
    (aplayground::get-stuff

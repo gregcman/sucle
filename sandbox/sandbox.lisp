@@ -7,9 +7,9 @@
   (glinnit) ;opengl
   (physinnit) ;physics
   )
-(defun thunkit ()
-  (physics))
-(defparameter *save* (case 4
+(defun thunkit (control-state)
+  (physics control-state))
+(defparameter *save* (case 3
 		       (0 #P"terrarium2/")
 		       (1 #P"first/")
 		       (2 #P"second/")
@@ -126,7 +126,7 @@
 				     (y y0 y1)
 				     (z z0 z1))
 				    (funcall func x y z)))))))
-(defun dirts (&optional (box *box*))
+(defun invert (&optional (box *box*))
   (map-box (lambda (x y z)
 	     (let ((blockid (world:getblock x y z)))
 	       (if (= blockid 0)
@@ -135,6 +135,24 @@
 				   )
 		   (plain-setblock x y z 0 0)
 		   )))
+	   box))
+
+(defun grassify (&optional (box *box*))
+  (map-box (lambda (x y z)
+	     (let ((blockid (world:getblock x y z)))
+	       (when (= blockid 3)
+		 (let ((idabove (world:getblock x (1+ y) z)))
+		   (when (zerop idabove)
+		     (plain-setblock x y z 2 0))))))
+	   box))
+
+(defun dirts (&optional (box *box*))
+  (map-box (lambda (x y z)
+	     (let ((blockid (world:getblock x y z)))
+	       (when (= blockid 1)
+		 (when (or (zerop (world:getblock x (+ 2 y) z))
+			   (zerop (world:getblock x (+ 3 y) z)))
+		   (plain-setblock x y z 3 0)))))
 	   box))
 
 
@@ -170,6 +188,15 @@
 		 (let ((naybs (neighbors x y z)))
 		   (when (> 3 naybs)		     
 		     (plain-setblock x y z 0 0 0))))))
+	   box))
+
+(defun invert-light (&optional (box *box*))
+  (map-box (lambda (x y z)
+	     (when (zerop (world:getblock x y z))
+	       (let ((blockid (world:getlight x y z))
+		     (blockid2 (world:skygetlight x y z)))
+	;	 (Setf (world:getlight x y z) (- 15 blockid))
+		 (Setf (world:skygetlight x y z) (- 15 blockid2)))))
 	   box))
 
 

@@ -9,30 +9,29 @@
   (defun make-mouse-keyboard-input-array ()
     (make-array 128 :element-type 'bit)))
 
-(defparameter *mouse-array*
-  (make-array 8 :element-type '(unsigned-byte 8)
-	      :initial-contents '(11 12 14 15 16 33 34 35)))
+(eval-always
+ (progn
+   (defparameter *mouse-array*
+     (make-array 8 :element-type '(unsigned-byte 8)
+		 :initial-contents '(11 12 14 15 16 33 34 35)))
 
-(defparameter *key-array*
-  (make-array 349 :element-type '(unsigned-byte 8)
-	      :initial-contents
-	      '(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 32 0 0 0 0 0
-		0 39 0 0 0 0 44 45 46 47 48 49 50 51 52 53 54 55 56 57 0 59 0 61 0 0 0 65 66
-		67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92
-		93 0 0 96 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-		0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 94 95 0 0 0 0 0 0
-		0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-		0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-		0 0 0 0 0 0 0 0 0 27 10 9 8 58 127 30 31 29 28 60 62 126 122 0 0 0 0 0 0 0 0
-		0 0 123 124 125 64 63 0 0 0 0 0 97 98 99 100 101 102 103 104 105 106 107 108
-		109 110 111 112 113 114 115 116 117 118 119 120 121 0 0 0 0 0 17 18 19 20 21
-		22 23 24 25 26 37 40 42 41 43 13 38 0 0 0 0 1 2 3 4 5 6 7 36)))
+   (defparameter *key-array*
+     (make-array 349 :element-type '(unsigned-byte 8)
+		 :initial-contents
+		 '(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 32 0 0 0 0 0
+		   0 39 0 0 0 0 44 45 46 47 48 49 50 51 52 53 54 55 56 57 0 59 0 61 0 0 0 65 66
+		   67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92
+		   93 0 0 96 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+		   0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 94 95 0 0 0 0 0 0
+		   0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+		   0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+		   0 0 0 0 0 0 0 0 0 27 10 9 8 58 127 30 31 29 28 60 62 126 122 0 0 0 0 0 0 0 0
+		   0 0 123 124 125 64 63 0 0 0 0 0 97 98 99 100 101 102 103 104 105 106 107 108
+		   109 110 111 112 113 114 115 116 117 118 119 120 121 0 0 0 0 0 17 18 19 20 21
+		   22 23 24 25 26 37 40 42 41 43 13 38 0 0 0 0 1 2 3 4 5 6 7 36)))))
 
 (declaim (type mouse-keyboard-input-array *input-state* *input-prev* *difference-state*))
 (defparameter *input-state* (make-mouse-keyboard-input-array))
-(defparameter *input-prev* (make-mouse-keyboard-input-array))
-
-(defparameter *difference-state* (make-mouse-keyboard-input-array))
 
 (defparameter *scroll-x* nil)
 (defparameter *scroll-y* nil)
@@ -43,59 +42,22 @@
 (progn
   (defmacro def-key-callback (name (window key scancode action mod-keys) &body body)
     `(%glfw:define-glfw-callback ,name
-	 ((,window :pointer) (,key %glfw::key) (,scancode :int)
+	 ((,window :pointer) (,key :int ;%glfw::key
+			      ) (,scancode :int)
 	  (,action :int) (,mod-keys :unsigned-int))
        ,@body))
 
   (defmacro def-mouse-button-callback (name (window button action mod-keys) &body body)
     `(%glfw:define-glfw-callback ,name
-	 ((,window :pointer) (,button %glfw::mouse)
+	 ((,window :pointer) (,button :int
+					;%glfw::mouse
+			      )
 	  (,action :int) (,mod-keys :unsigned-int))
        ,@body))
   (defmacro def-char-callback (name (window char) &body body)
     `(%glfw:define-glfw-callback ,name
 	 ((,window :pointer) (,char :unsigned-int))
        ,@body)))
-
-;;;;various functions to test the state of the keyboard
-
-;;;"-p" stands for "press" or predicate
-;;;"-r" stands for "repeat"
-;;;"-j" stands for "just" as in "it was not pressed just a moment ago,
-;;;now it is"
-
-;;;for the keyboard
-
-(defun get-press-value (value)
-  (logand value +key-state-mask+))
-(defun get-mod-value (value)
-  (logand value +mod-state-mask+))
-
-(defun key-p (the-key)
-  (let ((value (key-enum-index the-key)))     
-    (not (zerop (sbit *input-state* value)))))
-(defun key-j-p (the-key)
-  (let ((value (key-enum-index the-key)))     
-    (and (not (zerop (sbit *input-state* value)))
-	 (not (zerop (sbit *difference-state* value))))))
-(defun key-j-r (the-key)
-  (let ((value (key-enum-index the-key)))     
-    (and (zerop (sbit *input-state* value))
-	 (not (zerop (sbit *difference-state* value))))))
-
-;;;for mice
-
-(defun mice-p (the-key)
-  (let ((value (mouse-enum-index the-key)))     
-    (not (zerop (sbit *input-state* value)))))
-(defun mice-j-p (the-key)
-  (let ((value (mouse-enum-index the-key)))     
-    (and (not (zerop (sbit *input-state* value)))
-	 (not (zerop (sbit *difference-state* value))))))
-(defun mice-j-r (the-key)
-  (let ((value (mouse-enum-index the-key)))     
-    (and (zerop (sbit *input-state* value))
-	 (not (zerop (sbit *difference-state* value))))))
 
 
 (defun mouse-enum-index (enum)
@@ -107,30 +69,53 @@
 	(cffi:foreign-enum-value (quote %glfw::key)
 				 enum)))
 
-;;;glfw callbacks which will update the hashes to contain nil t
-;;;+press+ or +release+ per key [each key is a symbol]
+(defstruct control-state ()
+  (prev (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
+  (curr (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
+  (diff (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array))
+
+(defparameter *control-state* (make-control-state :curr *input-state*))
+
+(defun reset-control-state (state)
+  (fill (control-state-curr state) 0)
+  (fill (control-state-prev state) 0)
+  (fill (control-state-diff state) 0))
+
+(defun update-control-state (state)
+  (window::array-step (control-state-curr state)
+		      (control-state-prev state)
+		      (control-state-diff state)))
+
+(defmacro mouseval (keyword)
+  (window::mouse-enum-index keyword))
+(defmacro keyval (keyword)
+  (window::key-enum-index keyword))
+
+(progn
+  (defun skey-p (value &optional (state *control-state*))
+    (not (zerop (sbit (control-state-curr state) value))))
+  (defun skey-j-p (value &optional (state *control-state*))
+    (and (not (zerop (sbit (control-state-curr state) value)))
+	 (not (zerop (sbit (control-state-diff state) value)))))
+  (defun skey-j-r (value &optional (state *control-state*))
+    (and (zerop (sbit (control-state-curr state) value))
+	 (not (zerop (sbit (control-state-diff state) value))))))
+
 
 (def-key-callback key-callback (window key scancode action mod-keys)
-  (setf (sbit *input-state*
-	      (key-enum-index key))
-	(if (zerop action)
-	    0
-	    1)))
+  (unless (= key -1)
+    (setf (sbit *input-state*
+		(aref (etouq *key-array*) key))
+	  (if (zerop action)
+	      0
+	      1))))
 (def-mouse-button-callback mouse-callback (window button action mod-keys)
   (setf (sbit *input-state*
-	      (mouse-enum-index button))
+	      (aref (etouq *mouse-array*) button))
 	(if (zerop action)
 	    0
 	    1)))
 (def-char-callback char-callback (window char))
-
-(defun make-fill-vector ()
-  (make-array 0
-	      :adjustable t
-	      :fill-pointer 0))
-
-(defparameter *buttons* (make-fill-vector))
-(defparameter *keys* (make-fill-vector))
 
 
 (glfw:def-scroll-callback scroll-callback (window x y)
@@ -146,9 +131,7 @@
 (defparameter *resize-hook* (constantly nil))
 
 (defun init ()
-  (fill *input-state* 0)
-  (fill *input-prev* 0)
-  (fill *difference-state* 0)
+  (reset-control-state *control-state*)
   (setf *scroll-x* 0.0
 	*scroll-y* 0.0)
 
@@ -161,7 +144,6 @@
 (defun poll ()
   (setq *status* (glfw:window-should-close-p))
   (poll-events)
-  (array-step *input-state* *input-prev* *difference-state*)
   *input-state*)
 
 (progn
