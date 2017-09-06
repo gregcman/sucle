@@ -122,7 +122,7 @@
     (let ((x (* dx (translator 0.5)))
 	  (y (* dy (translator 0.5))))
       (multiple-value-bind (dyaw dpitch)
-	  (if t (values x y) (%sphere-mouse-help x y))
+	  (if nil (values x y) (%sphere-mouse-help x y))
 	(unless (zerop dyaw)
 	  (setf *yaw* (mod (+ *yaw* dyaw) two-pi)))
 	(unless (zerop dpitch)
@@ -307,14 +307,15 @@
 (defparameter *fist-function* (constantly nil))
 
 (defun big-swing-fist (vx vy vz)
-  (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* 100 vx) (* 100 vy) (* 100 vz)
-		       player-aabb+1
-		       
-		       (lambda (x y z)
-			 (when (and (<= 0 x 127)
-				    (<= 0 y 127)
-				    (<= -128 z -1)) 
-			   (setblock-with-update x y z 0  (aref mc-blocks::lightvalue 0))))))
+  (let ((u 100))
+    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* u vx) (* u vy) (* u vz)
+			 player-aabb+1
+			 
+			 (lambda (x y z)
+			   (when (and (<= 0 x 127)
+				      (<= 0 y 127)
+				      (<= -128 z -1)) 
+			     (setblock-with-update x y z 0  (aref mc-blocks::lightvalue 0)))))))
 
 (defun standard-fist (vx vy vz)
   (multiple-value-bind (frac type blockx blocky blockz)

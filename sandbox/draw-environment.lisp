@@ -226,8 +226,12 @@
 	    (aplayground::get-stuff :terrain-png aplayground::*stuff*
 				    aplayground::*backup*)
 	    :rgba)
+	 (gl:generate-mipmap :texture-2d)
 	 (lovely-shader-and-texture-uploader::apply-tex-params
-	  lovely-shader-and-texture-uploader::*default-tex-params*))))
+	  (quote ((:texture-min-filter . :nearest-mipmap-nearest)
+		  (:texture-mag-filter . :nearest)
+		  (:texture-wrap-s . :repeat)
+		  (:texture-wrap-t . :repeat)))))))
     (aplayground::bornfnc
      :blockshader
      (lambda ()
