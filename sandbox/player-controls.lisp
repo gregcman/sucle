@@ -122,7 +122,7 @@
     (let ((x (* dx (translator 0.5)))
 	  (y (* dy (translator 0.5))))
       (multiple-value-bind (dyaw dpitch)
-	  (if nil (values x y) (%sphere-mouse-help x y))
+	  (if t (values x y) (%sphere-mouse-help x y))
 	(unless (zerop dyaw)
 	  (setf *yaw* (mod (+ *yaw* dyaw) two-pi)))
 	(unless (zerop dpitch)

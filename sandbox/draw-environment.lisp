@@ -44,13 +44,7 @@
 (defun render (partial-time)
   (declare (optimize (safety 3) (debug 3)))
   (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
-  (remove-spurious-mouse-input)
-  #+nil
-  (setf *last-yaw* *yaw*
-	*last-pitch* *pitch*)
-  (when (window:mice-locked-p)
-    (glfw:poll-events)
-    (look-around))
+
   (set-render-cam-pos *camera* partial-time)
   (update-matrices *camera*)
   (let* ((blockshader (aplayground::get-stuff
@@ -68,9 +62,9 @@
       (let ((avector (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
 	(flet ((fractionalize (x)
 		 (clamp x 0.0 1.0)))
-	  (let ((x (fractionalize (* time #.(nth 3 '(or 1.0 0.0 0.68)))))
-		(y (fractionalize (* time #.(nth 3 '(or (/ 139 255.0) 0.0 0.8)))))
-		(z (fractionalize (* time #.(nth 3 '(or (/ 139 255.0) (/ 205 255.0) 1.0))))))
+	  (let ((x (fractionalize (* time #.(nth 2 '(or 1.0 0.0 0.68)))))
+		(y (fractionalize (* time #.(nth 2 '(or (/ 139 255.0) 0.0 0.8)))))
+		(z (fractionalize (* time #.(nth 1 '(or 0.0 (/ 139 255.0) (/ 205 255.0) 1.0))))))
 	    (gl:clear-color x y z 1.0)
 	    (setf (aref avector 0) x
 		  (aref avector 1) y
@@ -226,9 +220,10 @@
 	    (aplayground::get-stuff :terrain-png aplayground::*stuff*
 				    aplayground::*backup*)
 	    :rgba)
-	 (gl:generate-mipmap :texture-2d)
+;	 (gl:generate-mipmap :texture-2d)
 	 (lovely-shader-and-texture-uploader::apply-tex-params
-	  (quote ((:texture-min-filter . :nearest-mipmap-nearest)
+	  (quote ((:texture-min-filter . :nearest;-mipmap-nearest
+				       )
 		  (:texture-mag-filter . :nearest)
 		  (:texture-wrap-s . :repeat)
 		  (:texture-wrap-t . :repeat)))))))

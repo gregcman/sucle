@@ -159,6 +159,18 @@
 (defun get-proc-address ()
   (function glfw:get-proc-address))
 
+(defmacro def-cursor-callback (name (window x y) &body body)
+    `(%glfw:define-glfw-callback ,name
+	 ((,window :pointer) (,x :double) (,y :double))
+       ,@body))
+
+(def-cursor-callback cursor-callback (window x y)
+  (Setf *mouse-x* x)
+  (setf *mouse-y* y))
+
+(defparameter *mouse-x* 0.0d0)
+(defparameter *mouse-y* 0.0d0)
+
 ;;Graphics calls on OS X must occur in the main thread
 
 (defparameter *iresizable* nil)
@@ -178,6 +190,7 @@
       (glfw:set-scroll-callback 'scroll-callback)
       (glfw:set-window-size-callback 'update-viewport)
       (glfw:set-char-callback 'char-callback)
+      (glfw:set-cursor-position-callback 'cursor-callback)
       (setf *width* *iwidth*
 	    *height* *iheight*)
       (funcall func))))
@@ -213,11 +226,17 @@
       (glfw:swap-interval 0))) ;;0 is off
 
 (defun get-mouse-position (&optional (window glfw:*window*))
+  (values (coerce *mouse-x* 'single-float)
+	  (coerce *mouse-y* 'single-float))
+  #+nil
   (cffi:with-foreign-objects ((x :int) (y :int))
     (cffi:foreign-funcall "glfwGetCursorPos"
 			  %glfw::window window :pointer x :pointer y :void)
-    (values (coerce (cffi:mem-ref x :double) 'single-float)
-	    (coerce (cffi:mem-ref y :double) 'single-float))))
+    (let ((xpos (coerce (cffi:mem-ref x :double) 'single-float))
+	  (ypos (coerce (cffi:mem-ref y :double) 'single-float)))
+      (values 
+       xpos
+       ypos))))
 
 (cffi:defcstruct |GLFWStruct|
   (width :int)

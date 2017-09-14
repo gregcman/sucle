@@ -52,8 +52,8 @@
 (defun tick-update (ticker new-time)
   (let* ((frame-time (- new-time (ticker-current-time ticker))))
     (let ((bailout (ticker-bailout ticker)))
-      (if (> frame-time bailout)
-	  (setf frame-time bailout)))
+      (when (> frame-time bailout)
+	(setf frame-time bailout)))
     (setf (ticker-current-time ticker) new-time)
     (incf (ticker-accumulator ticker) frame-time)))
 
@@ -75,7 +75,6 @@
     (throw :end (values)))
   (let ((ticker *ticker*))
     (tick-update ticker (fine-time))
-    (dotimes (x 2) (glfw:poll-events))
     (tick-physics ticker (function physss))
     (let ((fraction (/ (float (ticker-accumulator ticker))
 		       (float (ticker-dt ticker)))))
@@ -83,10 +82,15 @@
        :color-buffer-bit
        :depth-buffer-bit)
       (gl:viewport 0 0 e:*width* e:*height*)
-
+ ;;     (dotimes (x 5) (window:poll))
       (when *sandbox-on*
 	(progn
-	  (sandbox::render fraction)
+	  (window:poll)
+	  (sandbox::remove-spurious-mouse-input)
+	  (when (window:mice-locked-p)
+	    (sandbox::look-around))
+	  (sandbox::render fraction
+			   )
 	  #+nil
 	  (progn
 	   (gl:bind-texture
@@ -110,7 +114,8 @@
 (setf *realthu-nk* (function actual-stuuff))
 
 (defun injection3 ()
-  (setf *ticker* (make-ticker))
+  (setf *ticker* (make-ticker :dt (floor 1000000 10)
+		  ))
   (catch (quote :end)
     (loop
        (funcall *realthu-nk*))))
@@ -488,20 +493,21 @@
 
 
 (defparameter *music*
-  (case 4
-    (0 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/damage/hit3.ogg")
-    (1 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/streaming/cat.ogg")
-    (2 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/portal/portal.ogg")
-    (3 "/home/imac/quicklisp/local-projects/symmetrical-umbrella/sandbox/res/resources/sound3/ambient/weather/rain4.ogg")
-    (4 "/home/imac/Music/6PQv-Adele - Hello.mp3")
-    (5 "/home/imac/Music/Louis The Child ft. K.Flay - It's Strange [Premiere] (FIFA 16 Soundtrack) -  128kbps.mp3")
-    (6 "/home/imac/Music/Birdy_-_Keeping_Your_Head_Up_Official.mp3")))
+  (or "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/My Little Pony/Unknown Album/At the Gala.mp3" "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/Maroon 5/Songs About Jane/02 This Love.m4a" "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/Unknown Artist/Unknown Album/form this way.mp3" "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/Unknown Artist/Unknown Album/In Search of Diamonds (Minecraft  Music Video).mp3"
+      (case 4
+	(0 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/damage/hit3.ogg")
+	(1 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/streaming/cat.ogg")
+	(2 "/home/terminal256/src/symmetrical-umbrella/sandbox/res/resources/sound3/portal/portal.ogg")
+	(3 "/home/imac/quicklisp/local-projects/symmetrical-umbrella/sandbox/res/resources/sound3/ambient/weather/rain4.ogg")
+	(4 "/home/imac/Music/6PQv-Adele - Hello.mp3")
+	(5 "/home/imac/Music/Louis The Child ft. K.Flay - It's Strange [Premiere] (FIFA 16 Soundtrack) -  128kbps.mp3")
+	(6 "/home/imac/Music/Birdy_-_Keeping_Your_Head_Up_Official.mp3"))))
 (progn
   (defparameter dubs nil)
   (defparameter size nil)
   (defparameter ans nil))
 
-(defun test (&optional (music *music*))
+(defun alut-test (&optional (music *music*))
   (reset)
   (setf (values dubs size ans)
 	(cl-ffmpeg::get-sound-buff music 44100))

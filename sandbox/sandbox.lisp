@@ -347,3 +347,23 @@
       (aux 0 0 1)
       (aux 0 0 -1))
     tot))
+
+(defun clearblock3 (id other &optional (box *box*))
+  (declare (type (unsigned-byte 8) id))
+  (map-box (lambda (x y z)
+	     (let ((blockid (world:getblock x y z)))
+	       (when (= other blockid)
+		 (plain-setblock x y z id 0))))
+	   box))
+
+#(1 2 3 4 5 7 12 13 ;14
+  15 16 17 18 19 21 22 23 24 25 35 41 42 43 45 46 47 48 49
+   54 56 57 58 61 61 73 73 78 82 84 86 87 88 89 91 95)
+
+'("lockedchest" "litpumpkin" "lightgem" "hellsand" "hellrock" "pumpkin"
+ "jukebox" "clay" "snow" "oreRedstone" "oreRedstone" "furnace" "furnace"
+ "workbench" "blockDiamond" "oreDiamond" "chest" "obsidian" "stoneMoss"
+ "bookshelf" "tnt" "brick" "stoneSlab" "blockIron" "blockGold" "cloth"
+ "musicBlock" "sandStone" "dispenser" "blockLapis" "oreLapis" "sponge" "leaves"
+ "log" "oreCoal" "oreIron" "oreGold" "gravel" "sand" "bedrock" "wood"
+ "stonebrick" "dirt" "grass" "stone")
