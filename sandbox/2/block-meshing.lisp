@@ -1,7 +1,5 @@
 (in-package :sandbox)
 
-
-
 (defun dark-fun (darkness b0 b1 b2 b3 s0 s1 s2 s3)
   (let ((time daytime))
     (* darkness
@@ -46,73 +44,77 @@
       (and (/= blockid other-blockid)
 	   (not (aref mc-blocks::opaquecubelooukup other-blockid)))))
 
-(defmacro with-texture-translator ((x-name y-name) num-form &body body)
-  (let ((num-form-sym (gensym)))
-    `(progn
-       (let ((,num-form-sym ,num-form))
-	 (let ((,x-name (mod ,num-form-sym 16)))
-	   (let ((,y-name (- 15 (ash (- ,num-form-sym ,x-name) -4))))
-	     ,@body))))))
+(defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
+  (let ((id (gensym)))
+    `(let ((,id (* 4 ,num-form)))
+       ,(apply #'with-vec-params `((,id ,u0 ,v0 ,u1 ,v1)) `(,*16x16-tilemap*)
+	       body))))
 
+(eval-when (:compile-toplevel)
+  (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
 
 (defun rendergrass (id i j k)
   (let ((times 0))
-    (with-texture-translator (tu tv) 2
+    (with-texture-translator2 (u0 u1 v0 v1) 2
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
 	  (incf times 4)
-	  (side-j i j k tu tv))))
-    (with-texture-translator (tu tv) 0
+	  (side-j i j k u0 v0 u1 v1))))
+    (with-texture-translator2 (u0 u1 v0 v1) 0
       (let ((adj-id (world:getblock i (1+ j) k)))
 	(when (show-sidep id adj-id)
 	  (incf times 4)
-	  (side+j i j k tu tv))))
-    (with-texture-translator (tu tv) 3
+	  (side+j i j k u0 v0 u1 v1))))
+    (with-texture-translator2 (u0 u1 v0 v1) 3
       (let ((adj-id (world:getblock (1- i) j k)))
 	(when (show-sidep id adj-id)
 	  (incf times 4)
-	  (side-i i j k tu tv)))
+	  (side-i i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock (1+ i) j k)))
 	(when (show-sidep id adj-id)
 	  (incf times 4)
-	  (side+i i j k tu tv)))    
+	  (side+i i j k u0 v0 u1 v1)))    
       (let ((adj-id (world:getblock i j (1- k))))
 	(when (show-sidep id adj-id)
 	  (incf times 4)
-	  (side-k i j k tu tv)))
+	  (side-k i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock i j (1+ k))))
 	(when (show-sidep id adj-id)
 	  (incf times 4)
-	  (side+k i j k tu tv))))
+	  (side+k i j k u0 v0 u1 v1))))
     times))
 
+;;changing j-
+
 (defun renderstandardblock (id i j k)
-  (let ((times 0))
-    (with-texture-translator (tu tv) (aref mc-blocks::blockIndexInTexture id)
+  (let ((times 0)
+	(texid (aref mc-blocks::blockIndexInTexture id)))
+    (with-texture-translator2 (u0 u1 v0 v1) texid
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
-	  (incf times 1)
-	  (side-j i j k tu tv)))
+	  (incf times 4)
+	  (side-j i j k u0 v0 u1 v1))))
+    (with-texture-translator2 (u0 u1 v0 v1) texid
       (let ((adj-id (world:getblock i (1+ j) k)))
 	(when (show-sidep id adj-id)
 	  (incf times 1)
-	  (side+j i j k tu tv)))
+	  (side+j i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock (1- i) j k)))
 	(when (show-sidep id adj-id)
 	  (incf times 1)
-	  (side-i i j k tu tv)))
+	  (side-i i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock (1+ i) j k)))
 	(when (show-sidep id adj-id)
 	  (incf times 1)
-	  (side+i i j k tu tv)))    
+	  (side+i i j k u0 v0 u1 v1)))    
       (let ((adj-id (world:getblock i j (1- k))))
 	(when (show-sidep id adj-id)
 	  (incf times 1)
-	  (side-k i j k tu tv)))
+	  (side-k i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock i j (1+ k))))
 	(when (show-sidep id adj-id)
 	  (incf times 1)
-	  (side+k i j k tu tv))))
+	  (side+k i j k u0 v0 u1 v1))))
     (* 4 times)))
 
 (defmacro %edge-aux ((i j k)
@@ -198,43 +200,35 @@
 (defun light-gen? (f i)
   (expt (+ 0.7 (* 2 f)) (- 15 i)))
 
-;;;overworld f = 0.05
-;;;nether f = 0.1
-(defun light-gen (f i)
-  (+ f
-     (/ (* i (- 1 f))
-	(- 60 i i i))))
 
-(defparameter light-index-table
-  (let ((foo-array (make-array 16 :element-type 'single-float)))
-    (dotimes (x 16)
-      (setf (aref foo-array x)
-	    (light-gen 0.05 x)))
-    foo-array))
+
+(eval-when (:compile-toplevel)
+  ;;;overworld f = 0.05
+;;;nether f = 0.1
+  (defun light-gen (f i)
+    (+ f
+       (/ (* i (- 1 f))
+	  (- 60 i i i))))
+  (defparameter light-index-table
+    (let ((foo-array (make-array 16 :element-type 'single-float)))
+      (dotimes (x 16)
+	(setf (aref foo-array x)
+	      (light-gen 0.05 x)))
+      foo-array)))
 
 
 (declaim (inline lightfunc))
 (defun lightfunc (light)
-  (aref light-index-table light))
+  (aref (etouq light-index-table) light))
 
-
-(declaim (inline trans))
-(defun trans (foo foo-translator)
-  (/ (+ foo foo-translator) 16.0))
-
-(defmacro texface ((u0 v0)
-		   (u1 v1)
-		   (u2 v2)
-		   (u3 v3))
-  `(progn    
-     (etex (coerce (trans ,u0 u-offset) 'single-float))
-     (etex (coerce (trans ,v0 v-offset) 'single-float))     
-     (etex (coerce (trans ,u1 u-offset) 'single-float))
-     (etex (coerce (trans ,v1 v-offset) 'single-float))    
-     (etex (coerce (trans ,u2 u-offset) 'single-float))
-     (etex (coerce (trans ,v2 v-offset) 'single-float))   
-     (etex (coerce (trans ,u3 u-offset) 'single-float))
-     (etex (coerce (trans ,v3 v-offset) 'single-float))))
+(defmacro texface2 (u0 u1 v0 v1 &optional (start 1) (clockwise-winding nil))
+  (aplayground::ngorp
+   (aplayground::preach
+    'etex
+    (axis-aligned-quads:duaq
+     start
+     clockwise-winding
+     (list u0 u1 v0 v1)))))
 
 (defmacro squareface (light-edge-fnc
 		      skylight-edge-fnc
@@ -337,124 +331,95 @@
        (epos (coerce yp 'single-float))
        (epos (coerce zp 'single-float)) )))
 
-
+(defmacro face-header (name &body body)
+  `(defun ,name (i j k u0 v0 u1 v1)
+     (declare (type fixnum i j k)
+	      (type single-float u0 v0 u1 v1))
+     (let ((buf-params *bluffs*))
+       (declare (type simple-vector buf-params))
+       (aplayground::with-iterators (epos etex dark)
+	   buf-params iter-ator:wasabios 
+	 ,@body))))
 
 (with-unsafe-speed
-  (progn
-    (defun side-i (i j k u-offset v-offset)
-      (declare (type fixnum i j k u-offset v-offset))
-      (aplayground::with-iterators (epos etex dark)
-	  *bluffs* iter-ator:wasabios iter-ator:iter-ator
-	(posface (0 0 0)
-		 (0 0 1)
-		 (0 1 1)
-		 (0 1 0))
-	(texface (0 0)
-		 (1 0)
-		 (1 1)
-		 (0 1))
-	(squareface light-edge-i
-		    skylight-edge-i
-		    0.6
-		    (-1 -1 -1)
-		    (-1 -1 00)
-		    (-1 00 00)
-		    (-1 00 -1))))
-    (defun side+i (i j k u-offset v-offset)
-      (declare (type fixnum i j k u-offset v-offset))
-      (aplayground::with-iterators (epos etex dark)
-	  *bluffs* iter-ator:wasabios iter-ator:iter-ator
-	(posface (1 0 0)
-		 (1 1 0)
-		 (1 1 1)
-		 (1 0 1))
-	(texface (1 0)
-		 (1 1)
-		 (0 1)
-		 (0 0))
-	(squareface light-edge-i
-		    skylight-edge-i
-		    0.6
-		    (1 -1 -1)
-		    (1 00 -1)
-		    (1 00 00)
-		    (1 -1 00))))
-    (defun side-j (i j k u-offset v-offset)
-      (declare (type fixnum i j k u-offset v-offset))
-      (aplayground::with-iterators (epos etex dark)
-	  *bluffs* iter-ator:wasabios iter-ator:iter-ator
-	(posface (0 0 0)
-		 (1 0 0)
-		 (1 0 1)
-		 (0 0 1))
-	(texface (0 0)
-		 (1 0)
-		 (1 1)
-		 (0 1)) 
-	(squareface light-edge-j
-		    skylight-edge-j
-		    0.5		  
-		    (-1 -1 -1)		   
-		    (00 -1 -1)		  
-		    (00 -1 00)		   
-		    (-1 -1 00))))
-    (defun side+j (i j k u-offset v-offset)
-      (declare (type fixnum i j k u-offset v-offset))
-      (aplayground::with-iterators (epos etex dark)
-	  *bluffs* iter-ator:wasabios iter-ator:iter-ator
-	(posface (0 1 0)
-		 (0 1 1)
-		 (1 1 1)
-		 (1 1 0))
-	(texface (0 0)
-		 (1 0)
-		 (1 1)
-		 (0 1) )
-	(squareface light-edge-j
-		    skylight-edge-j
-		    1.0
-		    (-1 1 -1)
-		    (-1 1 00)
-		    (00 1 00)
-		    (00 1 -1))))
-    (defun side-k (i j k u-offset v-offset)
-      (declare (type fixnum i j k u-offset v-offset))
-      (aplayground::with-iterators (epos etex dark)
-	  *bluffs* iter-ator:wasabios iter-ator:iter-ator
-	(posface (0 0 0)
-		 (0 1 0)
-		 (1 1 0)
-		 (1 0 0))
-	(texface (1 0)
-		 (1 1)
-		 (0 1)
-		 (0 0))
-	(squareface light-edge-k
-		    skylight-edge-k
-		    0.8   
-		    (-1 -1 -1)
-		    (-1 00 -1)
-		    (00 00 -1)
-		    (00 -1 -1))))
-    (defun side+k (i j k u-offset v-offset)
-      (declare (type fixnum i j k u-offset v-offset))
-      (aplayground::with-iterators (epos etex dark)
-	  *bluffs* iter-ator:wasabios iter-ator:iter-ator
-	(posface (0 0 1)
-		 (1 0 1)
-		 (1 1 1)
-		 (0 1 1))
-	(texface (0 0)
-		 (1 0)
-		 (1 1)
-		 (0 1))
-	(squareface light-edge-k
-		    skylight-edge-k
-		    0.8     
-		    (-1 -1 1)
-		    (00 -1 1)    
-		    (00 00 1)    
-		    (-1 00 1))))))
+  (face-header side-i  
+    (posface (0 0 0)
+	     (0 0 1)
+	     (0 1 1)
+	     (0 1 0))
+    (texface2 u0 u1 v0 v1 3 nil)
+    (squareface light-edge-i
+		skylight-edge-i
+		0.6
+		(-1 -1 -1)
+		(-1 -1 00)
+		(-1 00 00)
+		(-1 00 -1)))
+  (face-header side+i  
+    (posface (1 0 0)
+	     (1 1 0)
+	     (1 1 1)
+	     (1 0 1))
+    (texface2 u0 u1 v0 v1 4 nil)
+    (squareface light-edge-i
+		skylight-edge-i
+		0.6
+		(1 -1 -1)
+		(1 00 -1)
+		(1 00 00)
+		(1 -1 00)))
+  (face-header side-j
+    (posface (0 0 0)
+	     (1 0 0)
+	     (1 0 1)
+	     (0 0 1))
+    (texface2 u0 u1 v0 v1 3 nil) 
+    (squareface light-edge-j
+		skylight-edge-j
+		0.5		  
+		(-1 -1 -1)		   
+		(00 -1 -1)		  
+		(00 -1 00)		   
+		(-1 -1 00)))
+  (face-header side+j 
+    (posface (0 1 0)
+	     (0 1 1)
+	     (1 1 1)
+	     (1 1 0))
+    (texface2 u0 u1 v0 v1 3 nil)
+    (squareface light-edge-j
+		skylight-edge-j
+		1.0
+		(-1 1 -1)
+		(-1 1 00)
+		(00 1 00)
+		(00 1 -1)))
+  (face-header side-k 
+    (posface (0 0 0)
+	     (0 1 0)
+	     (1 1 0)
+	     (1 0 0))
+    (texface2 u0 u1 v0 v1 4 nil)
+    (squareface light-edge-k
+		skylight-edge-k
+		0.8   
+		(-1 -1 -1)
+		(-1 00 -1)
+		(00 00 -1)
+		(00 -1 -1)))
+  (face-header side+k
+    (posface (0 0 1)
+	     (1 0 1)
+	     (1 1 1)
+	     (0 1 1))
+    (texface2 u0 u1 v0 v1 3 nil)
+    (squareface light-edge-k
+		skylight-edge-k
+		0.8     
+		(-1 -1 1)
+		(00 -1 1)    
+		(00 00 1)    
+		(-1 00 1))))
 
 ;;(defparameter shapebuffer-index 0)
 ;;(defparameter shapebuffer-vs (make-array (ash 2 20) :element-type 'single-float))
@@ -522,3 +487,59 @@
      (etex (coerce v 'single-float))	    
      (dark
       ))))
+#+nil
+(progno
+ (declaim (inline trans))
+ (defun trans (foo foo-translator)
+   (/ (+ foo foo-translator) 16.0))
+ (defmacro texface ((u0 v0)
+		    (u1 v1)
+		    (u2 v2)
+		    (u3 v3))
+   `(progn    
+      (etex (coerce (trans ,u0 u-offset) 'single-float))
+      (etex (coerce (trans ,v0 v-offset) 'single-float))     
+      (etex (coerce (trans ,u1 u-offset) 'single-float))
+      (etex (coerce (trans ,v1 v-offset) 'single-float))    
+      (etex (coerce (trans ,u2 u-offset) 'single-float))
+      (etex (coerce (trans ,v2 v-offset) 'single-float))   
+      (etex (coerce (trans ,u3 u-offset) 'single-float))
+      (etex (coerce (trans ,v3 v-offset) 'single-float))))
+ (defmacro with-texture-translator ((x-name y-name) num-form &body body)
+   (let ((num-form-sym (gensym)))
+     `(progn
+	(let ((,num-form-sym ,num-form))
+	  (let ((,x-name (mod ,num-form-sym 16)))
+	    (let ((,y-name (- 15 (ash (- ,num-form-sym ,x-name) -4))))
+	      ,@body)))))))
+
+#+nil
+(texface (0 0)
+	 (1 0)
+	 (1 1)
+	 (0 1))
+#+nil
+(texface (1 0)
+	 (1 1)
+	 (0 1)
+	 (0 0))
+#+nil
+(texface (0 0)
+	 (1 0)
+	 (1 1)
+	 (0 1))
+#+nil
+(texface (0 0)
+	 (1 0)
+	 (1 1)
+	 (0 1) )
+#+nil
+(texface (1 0)
+	 (1 1)
+	 (0 1)
+	 (0 0))
+#+nil
+(texface (0 0)
+	 (1 0)
+	 (1 1)
+	 (0 1))

@@ -31,15 +31,15 @@
   (defun set-active-texture (num)
     (gl:active-texture (+ num +gltexture0+))))
 
-(defmacro with-iterators ((&rest bufvars) buf func type &body body)
-  (let* ((syms (mapcar (lambda (x) (gensym (string x))) bufvars))
-	 (bindings (mapcar (lambda (x y) (list x y))
-			   bufvars syms))
-	 (decl `(declare (type ,type ,@syms))))
-    (with-vec-params syms `(,buf)
-		     decl
-		     `(,func ,bindings
-			     ,@body))))
+(defmacro with-iterators ((&rest bufvars) buf func &body body)
+  (let* ((syms (mapcar (lambda (x) (declare (ignorable x)) (gensym)) bufvars)))
+    (with-vec-params
+	syms `(,buf)
+	(let ((acc (cons 'progn body)))
+	  (dolist (sym syms) 
+	    (setf acc (list func
+			    (pop bufvars) sym acc)))
+	  acc))))
 
 (defparameter *buffer-vector-scratch* (make-array 16))
 (defun get-buf-param (iter attrib-order &optional (newarray *buffer-vector-scratch*))

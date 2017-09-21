@@ -10,7 +10,7 @@
 	(giveworktomesherthread achunk)))))
 
 (defun mesh-chunk (times bufs)
-  (aplayground::with-iterators (xyz uv dark) bufs iter-ator:wasabiis iter-ator:iter-ator
+  (aplayground::with-iterators (xyz uv dark) bufs iter-ator:wasabiis
     (dotimes (x times)
       (%gl:vertex-attrib-1f 8 (dark))
       (%gl:vertex-attrib-2f 2 (uv) (uv))
