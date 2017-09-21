@@ -159,11 +159,12 @@
 (defun get-proc-address ()
   (function glfw:get-proc-address))
 
+#+nil
 (defmacro def-cursor-callback (name (window x y) &body body)
     `(%glfw:define-glfw-callback ,name
 	 ((,window :pointer) (,x :double) (,y :double))
        ,@body))
-
+#+nil
 (def-cursor-callback cursor-callback (window x y)
   (Setf *mouse-x* x)
   (setf *mouse-y* y))
@@ -190,6 +191,7 @@
       (glfw:set-scroll-callback 'scroll-callback)
       (glfw:set-window-size-callback 'update-viewport)
       (glfw:set-char-callback 'char-callback)
+      #+nil
       (glfw:set-cursor-position-callback 'cursor-callback)
       (setf *width* *iwidth*
 	    *height* *iheight*)
@@ -226,9 +228,10 @@
       (glfw:swap-interval 0))) ;;0 is off
 
 (defun get-mouse-position (&optional (window glfw:*window*))
+  #+nil
   (values (coerce *mouse-x* 'single-float)
 	  (coerce *mouse-y* 'single-float))
-  #+nil
+ 
   (cffi:with-foreign-objects ((x :int) (y :int))
     (cffi:foreign-funcall "glfwGetCursorPos"
 			  %glfw::window window :pointer x :pointer y :void)
