@@ -27,7 +27,7 @@
 						      *load-truename*))))
 (defparameter dir-resource (merge-pathnames #P"res/" ourdir))
 (defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
-(defparameter dir-mc-assets (merge-pathnames "moreshit/" dir-resource))
+(defparameter dir-mc-assets (merge-pathnames "image/" dir-resource))
 (defun shader-path (name)
   (merge-pathnames name dir-shader))
 (defun img-path (name)
@@ -197,7 +197,7 @@
      :grass-png
      (lambda ()
        (aplayground::load-png 
-	(img-path #P"misc/grasscolor.png"))))
+	(img-path #P"grasscolor.png"))))
     (aplayground::bornfnc
      :terrain
      (lambda ()

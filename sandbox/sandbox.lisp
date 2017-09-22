@@ -22,7 +22,8 @@
 		       (9 #P"ahole/")
 		       (10 #P"maze-royale/")))
 
-(defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
+(defparameter *saves-dir* (merge-pathnames #P"sandbox-saves/"
+					   "/home/imac/Documents/lispysaves/saves/"))
 
 (defun save (filename &rest things)
   (let ((path (merge-pathnames filename *saves-dir*)))

@@ -1,1 +1,0 @@
-/Library/Developer/CommandLineTools/usr/bin/cc  -g -dynamiclib -Wl,-headerpad_max_install_names  -o libnbt.dylib -install_name @rpath/libnbt.dylib CMakeFiles/nbt.dir/buffer.c.o CMakeFiles/nbt.dir/nbt_loading.c.o CMakeFiles/nbt.dir/nbt_parsing.c.o CMakeFiles/nbt.dir/nbt_treeops.c.o CMakeFiles/nbt.dir/nbt_util.c.o /usr/lib/libz.dylib 

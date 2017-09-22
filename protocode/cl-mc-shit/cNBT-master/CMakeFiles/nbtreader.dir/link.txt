@@ -1,1 +1,0 @@
-/Library/Developer/CommandLineTools/usr/bin/cc  -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/nbtreader.dir/main.c.o  -o bin/nbtreader  libnbt.dylib -lz /usr/lib/libz.dylib -Wl,-rpath,/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master 

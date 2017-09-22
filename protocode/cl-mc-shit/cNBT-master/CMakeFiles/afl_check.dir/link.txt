@@ -1,1 +1,0 @@
-/Library/Developer/CommandLineTools/usr/bin/cc  -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/afl_check.dir/afl_check.c.o  -o bin/afl_check  libnbt.dylib -lz /usr/lib/libz.dylib -Wl,-rpath,/Users/gregmanabat/quicklisp/local-projects/symmetrical-umbrella/cl-mc-shit/cNBT-master 
