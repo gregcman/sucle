@@ -61,7 +61,7 @@
     (let ((time daytime))
       (let ((avector (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
 	(flet ((fractionalize (x)
-		 (clamp x 0.0 1.0)))
+		 (alexandria:clamp x 0.0 1.0)))
 	  (let ((x (fractionalize (* time #.(nth 2 '(or 1.0 0.0 0.68)))))
 		(y (fractionalize (* time #.(nth 2 '(or (/ 139 255.0) 0.0 0.8)))))
 		(z (fractionalize (* time #.(nth 1 '(or 0.0 (/ 139 255.0) (/ 205 255.0) 1.0))))))
@@ -87,6 +87,13 @@
 (defparameter *orientation* (make-array 6 :element-type 'single-float
 					:initial-contents
 					'(0.0 0.0 0.0 0.0 0.0 0.0)))
+
+(defun unit-pitch-yaw (result pitch yaw)
+  (let ((cos-pitch (cos pitch)))
+    (setf (aref result 0) (* cos-pitch (cos yaw))
+	  (aref result 1) (sin pitch)
+	  (aref result 2) (* cos-pitch (sin yaw))))
+  result)
 
 (defun set-render-cam-pos (camera partial)
   (let ((vec (camera-vec-position camera))
@@ -221,7 +228,7 @@
 		       ("texCoord" . 2)
 		       ("darkness" . 8)
 		       )))))
-	 (let ((table (aplayground::make-eq-hash)))
+	 (let ((table (make-hash-table :test 'eq)))
 	   (setf *blockshader-uniforms* table)
 	   (aplayground::cache-program-uniforms
 	    program
@@ -235,11 +242,70 @@
 	 program)))
     (aplayground::bornfnc
      :bs-vs
-     (lambda () (aplayground::file-string (shader-path "blockshader/transforms.vs"))))
+     (lambda () (alexandria:read-file-into-string (shader-path "blockshader/transforms.vs"))))
     (aplayground::bornfnc`
      :bs-frag
-     (lambda () (aplayground::file-string (shader-path "blockshader/basictexcoord.frag"))))))
+     (lambda () (alexandria:read-file-into-string (shader-path "blockshader/basictexcoord.frag"))))))
 (defparameter *blockshader-uniforms* nil)
+
+(in-package :sandbox)
+
+;;;various box sizes for different things
+
+;;;its a cubic meter
+(defun block-aabb ()
+  (aabbcc::make-aabb
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx 1.0
+   :maxy 1.0
+   :maxz 1.0))
+
+;;;a person's personal space
+(defun player-aabb ()
+  (aabbcc::make-aabb
+   :minx -0.3
+   :miny -1.5
+   :minz -0.3
+   :maxx 0.3
+   :maxy 0.12
+   :maxz 0.3))
+
+(defun player-aabb+1 ()
+  (aabbcc::make-aabb
+   :minx -0.3
+   :miny -0.5
+   :minz -0.3
+   :maxx 0.3
+   :maxy 1.12
+   :maxz 0.3))
+
+(defun chunk-aabb ()
+  (aabbcc::make-aabb
+   :minx -8.0
+   :miny -8.0
+   :minz -8.0
+   :maxx 8.0
+   :maxy 8.0
+   :maxz 8.0))
+(defparameter chunk-aabb (chunk-aabb))
+(defparameter player-aabb+1 (player-aabb+1))
+
+;;;a very small cubic fist
+(defun fist-aabb ()
+  (aabbcc::make-aabb
+   :minx -0.005
+   :miny -0.005
+   :minz -0.005
+   :maxx 0.005
+   :maxy 0.005
+   :maxz 0.005))
+
+(defparameter block-aabb (block-aabb))
+(defparameter player-aabb (player-aabb))
+(defparameter fist-aabb (fist-aabb))
+
 
 ;;matrix multiplication is associative
 #+nil(defparameter *temp-matrix* (cg-matrix:identity-matrix))

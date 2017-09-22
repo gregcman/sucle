@@ -46,7 +46,10 @@
 ;;a fifo queue with the added restriction that members must be unique
 (defstruct uniq-q
   (q (get-queue))
-  (hash (make-hash-table :test sandbox::*fixnum-compare*)))
+  (hash (make-hash-table
+	 :test
+	 #+sbcl 'eq
+	 #-sbcl 'eql)))
 
 (defun uniq-push (item uniq)
   (let ((hash (uniq-q-hash uniq)))

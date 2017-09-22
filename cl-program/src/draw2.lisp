@@ -1,8 +1,8 @@
 (in-package :aplayground)
 
-(defparameter *backup* (make-eq-hash))
-(defparameter *stuff* (make-eq-hash))
-(defparameter *other-stuff* (make-eq-hash))
+(defparameter *backup* (make-hash-table :test 'eq))
+(defparameter *stuff* (make-hash-table :test 'eq))
+(defparameter *other-stuff* (make-hash-table :test 'eq))
 
 (progn
   (progn
@@ -34,10 +34,10 @@
 
 (bornfnc
  :text-frag
- (lambda () (file-string (shader-path "ftex2f-bg4f-fg4f.frag"))))
+ (lambda () (alexandria:read-file-into-string (shader-path "ftex2f-bg4f-fg4f.frag"))))
 (bornfnc
  :text-indirect
- (lambda () (file-string (shader-path "text69.vs"))))
+ (lambda () (alexandria:read-file-into-string (shader-path "text69.vs"))))
 (bornfnc
  :other-text-shader
  (lambda ()
@@ -49,7 +49,7 @@
 		   ("TEX" . 8)
 		   ("INDIRECT" . 9)
 		   )))))
-     (let ((table (make-eq-hash)))
+     (let ((table (make-hash-table :test 'eq)))
        (setf *solidshader-uniforms* table)
        (cache-program-uniforms program table (quote ((:sampler-2d . "samptwodee")
 						     (:indirection . "indirection")
@@ -201,7 +201,7 @@
 	(ywidth (/ 2.0 height)))
     (let ((upwidth (ceiling width))
 	  (upheight (ceiling height)))
-      (with-iterators (epos etex eindirect) bufs iter-ator:wasabios iter-ator:iter-ator
+      (with-iterators (epos etex eindirect) bufs iter-ator:wasabios
 	(dobox ((xcell 0 upwidth)
 		(ycell 0 upheight))
 	   ;;;texcoords
@@ -239,7 +239,7 @@
 	    (mesh-test89 times buf)))
 	display-list))))
 (defun mesh-test89 (times bufs)
-  (with-iterators (xyz uv eindirect) bufs iter-ator:wasabiis iter-ator:iter-ator
+  (with-iterators (xyz uv eindirect) bufs iter-ator:wasabiis
     (dotimes (x times)
       (%gl:vertex-attrib-2f 8 (uv) (uv))
       (%gl:vertex-attrib-2f 9 (eindirect) (eindirect))
@@ -285,6 +285,13 @@
 (defun glinnit ()
   (setf e:*resize-hook* #'on-resize))
 
+(with-unsafe-speed
+  (progn
+    (defun least-significant-bit (x)
+      (declare (type fixnum x))
+      (the fixnum (- (the fixnum (logxor x (the fixnum (- x)))))))
+    (defun least-significant-power (x)
+      (logcount (the fixnum (1- (the fixnum (least-significant-bit x))))))))
 
 #+nil
 ((bornfnc

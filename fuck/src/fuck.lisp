@@ -2,6 +2,7 @@
 
 (defparameter *sandbox-on* t)
 (defparameter *aplay-on* nil)
+(defparameter barbar nil)
 
 (defun handoff-five ()
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
@@ -18,7 +19,6 @@
     (aplayground::glinnit))
 
   (injection3)) 
-(defparameter barbar nil)
 
 (defparameter *control-state* (window::make-control-state
 			       :curr window::*input-state*))
@@ -27,9 +27,9 @@
   (window:poll)
   (window::update-control-state *control-state*)
 
-  #+nil
+
   (when (and barbar *aplay-on*)
-    (aplayground::physics)
+    (aplayground::physics *control-state*)
     )
   (when *sandbox-on*
     (sandbox::thunkit *control-state*)))
@@ -56,10 +56,10 @@
 	    (sandbox::remove-spurious-mouse-input)
 	    (window:poll)
 	    (when (window:mice-locked-p)
-	      (sandbox::look-around))
+ 	      (sandbox::look-around))
 	    (sandbox::render fraction
 			     )))
-	#+nil
+
 	(when *aplay-on*
 	  (aplayground::render)
 	  )
@@ -68,7 +68,7 @@
   (setf *realthu-nk* (function actual-stuuff)))
 
 (defun injection3 ()
-  (setf *ticker* (make-ticker; :dt (floor 1000000 10)
+  (setf *ticker* (make-ticker :dt (floor 1000000 60)
 		  :current-time (fine-time)))
   (catch (quote :end)
     (loop
@@ -86,10 +86,11 @@
 	     (window::wrapper #'handoff-five)))
 	 :arguments  (list *standard-output*))))
 
+
 ;;;time in microseconds
 (defun fine-time ()
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)
-    (+ (* (expt 10 6) s) m)))
+    (+ (* (expt 10 6) (- s 1506020000)) m)))
 
 #+nil
 (defun define-time ()

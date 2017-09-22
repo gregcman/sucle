@@ -28,68 +28,28 @@
 		 :directory (pathname-directory *something*)))
 
 
-(defconstant +single-float-pi+ (coerce pi 'single-float))
-(defconstant +single-float-two-pi+ (coerce (* 2 pi) 'single-float))
-(defconstant +single-float-half-pi+ (coerce (/ pi 2) 'single-float))
+#+nil
+(progno
+ (defconstant +single-float-pi+ (coerce pi 'single-float))
+ (defconstant +single-float-two-pi+ (coerce (* 2 pi) 'single-float))
+ (defconstant +single-float-half-pi+ (coerce (/ pi 2) 'single-float)))
 
+#+nil
 (defun clamp (x min max)
   (max (min x max) min))
 
-(defparameter *temp-matrix* (cg-matrix:identity-matrix))
-(defparameter *temp-matrix2* (cg-matrix:identity-matrix))
-(defparameter *temp-matrix3* (cg-matrix:identity-matrix))
-(defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0))
+#+nil
+(progno
+ (defparameter *temp-matrix* (cg-matrix:identity-matrix))
+ (defparameter *temp-matrix2* (cg-matrix:identity-matrix))
+ (defparameter *temp-matrix3* (cg-matrix:identity-matrix))
+ (defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0)))
 
-(defun byte-read (path)
-   (with-open-file (stream path :element-type '(unsigned-byte 8))
-     (let* ((len (file-length stream))
-	    (data (make-array len :element-type '(unsigned-byte 8))))
-       (dotimes (n len)
-	 (setf (aref data n) (read-byte stream)))
-       data)))
-
-(defun file-string (path)
-  (with-open-file (stream path)
-    (let ((data (make-string (file-length stream))))
-      (read-sequence data stream)
-      data)))
- 
-(defun spill-hash (hash &optional (stream *standard-output*))
-  (loop for key being the hash-keys of hash
-     using (hash-value value)
-     do (format stream "~S ~S~%" key value)))
-
-(defun print-bits (n &optional (stream *standard-output*))
-  (format stream "~64,'0b" n)
-  n)
-
-(defun getapixel (h w image)
-  (destructuring-bind (height width c) (array-dimensions image)
-    (declare (ignore height))
-    (make-array 4 :element-type (array-element-type image)
-		:displaced-to image
-		:displaced-index-offset (* c (+ w (* h width))))))
 
 ;;;;load a png image from a path
 (defun load-png (filename)
   (opticl:read-png-file filename))
 
-(defun fmakunbounds (symbol-list)
-  (dolist (symbol symbol-list)
-    (fmakunbound symbol)))
-
-(defun makunbounds (symbol-list)
-  (dolist (symbol symbol-list)
-    (makunbound symbol)))
-
-(defmacro xfmakunbounds (&body symbols)
-  `(fmakunbounds (quote ,symbols)))
-
-(defmacro xmakunbounds (&body symbols)
-  `(makunbounds (quote ,symbols)))
-
-(defun complex-modulus (c)
-  (sqrt (realpart (* c (conjugate c)))))
 
 ;;;;flip an image in-place - three dimensions - does not conse
 (defun flip-image (image)
@@ -153,7 +113,7 @@
   (defun myload (filename)
     (let ((path (saves-path filename)))
       (conspack:tracking-refs ()
-	(conspack:decode (byte-read path))))))
+	(conspack:decode (alexandria:read-file-into-byte-vector path))))))
 (defun saves-path (path)
   (merge-pathnames path *saves-dir*))
 
@@ -161,6 +121,7 @@
 (defun quit ()
   (setf e:*status* t))
 
+#+nil
 (progn
   (progn
     (defun skey-p (enum)
@@ -179,12 +140,44 @@
       (e:mice-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
 		  ))))
 
+#+nil
 (defun make-eq-hash ()
   (make-hash-table :test (quote eq)))
 
+#+nil
 (progn
   (declaim (ftype (function (symbol t)) set-symbol-value))
   (with-unsafe-speed
     (defun set-symbol-value (symbol value)
       #+sbcl (sb-impl::%set-symbol-value symbol value)
       #-sbcl (set symbol value))))
+
+
+#+nil
+(defun byte-read (path)
+   (with-open-file (stream path :element-type '(unsigned-byte 8))
+     (let* ((len (file-length stream))
+	    (data (make-array len :element-type '(unsigned-byte 8))))
+       (dotimes (n len)
+	 (setf (aref data n) (read-byte stream)))
+       data)))
+
+#+nil
+(defun file-string (path)
+  (with-open-file (stream path)
+    (let ((data (make-string (file-length stream))))
+      (read-sequence data stream)
+      data)))
+
+
+#+nil
+(defun getapixel (h w image)
+  (destructuring-bind (height width c) (array-dimensions image)
+    (declare (ignore height))
+    (make-array 4 :element-type (array-element-type image)
+		:displaced-to image
+		:displaced-index-offset (* c (+ w (* h width))))))
+
+#+nil
+(defun complex-modulus (c)
+  (sqrt (realpart (* c (conjugate c)))))

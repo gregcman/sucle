@@ -1,21 +1,12 @@
 (asdf:defsystem #:sandbox
     :depends-on (#:cl-opengl
                  #:cg-matrix
-		 #:bordeaux-threads
-		 
-		 
-		 #:opticl
-		 
-		 #:window-glfw3
-		 #:pileup
+		 #:bordeaux-threads		 
 
-		 #:funland
-		 #:cl-mc-shit)
+		 #:window-glfw3
+		 #:funland)
     :serial t
     :components
-
-    ;;;;The module numbers roughly correspond to what gets loaded first
-    ;;;;The stuff at the beginning has no dependents
     
     ((:file "package")
      (:module other
@@ -23,10 +14,7 @@
 
      (:module one
 	      :pathname "1"
-	      :components (
-			   (:file "misc")
-			   (:file "imagewise");;images?
-			   
+	      :components (			   
 			   (:file "aabbcc") ;;box collisions			   
 			   (:file "vox")))
      (:module two
@@ -41,10 +29,7 @@
 
      (:file "camera-matrix") ;;matrices for cameras - view, projection
 
-     (:file "lovely-renderer") ;;generic rendering glue
-     
-     (:file "meshes");;;various types of functions to generate meshes
-     (:file "boxes") ;;various size boxes
+     (:file "lovely-renderer") ;;generic rendering glue 
      
      (:file "draw-environment") ;;;drawing environmental factors     
      (:file "meshing-thread");;send the meshing work to a separate thread

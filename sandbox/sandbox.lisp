@@ -77,8 +77,11 @@
 	  (setf (gethash position world:skylighthash)
 		(coerce sky '(simple-array (unsigned-byte 4) (*)))))
 	(return-from loadchunk t)))))  
-  
+
 (defun color-grasses ()
+  (aplayground::get-stuff
+   :terrain-png aplayground::*stuff*
+   aplayground::*backup*)
   (modify-greens 64 192)
   (modify-greens 80 192)
   (modify-greens 0 240))
@@ -96,6 +99,13 @@
     (aux vecinto other 2)
     (aux vecinto other 3)))
 
+(defun getapixel (h w image)
+  (destructuring-bind (height width c) (array-dimensions image)
+    (declare (ignore height))
+    (make-array 4 :element-type (array-element-type image)
+		:displaced-to image
+		:displaced-index-offset (* c (+ w (* h width))))))
+
 (progno #(113 174 70 255)  #(198 304 122 255))
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
@@ -105,16 +115,16 @@
 				:grass-png aplayground::*stuff*
 				aplayground::*backup*))
 			(color
-			 (case 3
+			 (case 1
 			   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
-			   (1 (imagewise:getapixel 255 0 image))
-			   (2 (imagewise:getapixel 0 0 image))
-			   (3 (imagewise:getapixel 255 255 image)))
+			   (1 (getapixel 255 0 image))
+			   (2 (getapixel 0 0 image))
+			   (3 (getapixel 255 255 image)))
 			 ) (terrain (aplayground::get-stuff
 				     :terrain-png aplayground::*stuff*
 				     aplayground::*backup*)))
   (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
-	 (multiply-into (imagewise:getapixel y x terrain) color)))
+	 (multiply-into (getapixel y x terrain) color)))
 
 (defparameter *box* #(0 128 0 128 -128 0))
 (with-unsafe-speed

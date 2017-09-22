@@ -28,7 +28,7 @@
 (defparameter *running* nil)
 (defparameter foobar (make-array 0 :adjustable t :element-type 'character :fill-pointer 0))
 
-(defun physics ()
+(defun physics (control-state)
   (incf *ticks*)
   (etouq
    (with-vec-params
@@ -51,7 +51,7 @@
 			 cy0 (floor y0 *block-height*)
 			 cx1 (floor x1 *block-width*)
 			 cy1 (floor y1 *block-height*))))))))))
-  (when (skey-j-p :escape)
+  (when (e::skey-j-p (e::keyval :escape) control-state)
     (setf e:*status* t))
   (etouq
    (with-vec-params
@@ -59,7 +59,7 @@
 				     (cx1 :x1) (cy0 :y0))))
      (quote (*cursor-rectangle*))
      (quote
-      (when (smice-p :right)
+      (when (e::skey-p (e::mouseval :right) control-state)
 	(decf *camera-x* (- cx1 cx0))
 	(decf *camera-y* (- cy1 cy0))))))
   (etouq
@@ -82,7 +82,7 @@
 			(/ e:*width* *block-width*) (/ e:*height* *block-height*))
   ;;(time)
   (progn
-   (copy-array-buf)))
+    (copy-array-buf)))
 
 (with-unsafe-speed
   (defun copy-array-buf ()

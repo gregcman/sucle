@@ -34,8 +34,10 @@
   (defun set-char (value x y)
     (multiple-value-bind (chunk offset) (area2 x y (etouq *world*))
       (setf (aref chunk offset) value)))
-  (defun scwu (char x y)
-    (set-char char x y)))
+  (defun scwu (value x y)
+    (multiple-value-bind (chunk offset) (area2 x y (etouq *world*))
+      (setf (aref chunk offset) value)
+      (setf (aref chunk (* 16 16)) *ticks*))))
 
 
 #+nil

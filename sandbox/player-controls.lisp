@@ -11,6 +11,11 @@
 ;;70 is normal
 ;;110 is quake pro
 
+(defparameter float-pi (coerce pi 'single-float))
+(defun rad-deg (rad)
+  (* rad (/ 180.0 float-pi)))
+(defun deg-rad (deg)
+  (* deg (/ float-pi 180.0)))
 
 (defparameter *yaw* 0.0)
 (defparameter *pitch* 0.0)
@@ -59,7 +64,7 @@
  (import (quote (e::skey-p e::skey-j-p e::skey-j-r e::keyval e::mouseval))))
 
 (defun controls (control-state)
-  (setf net-scroll (clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
+  (setf net-scroll (alexandria:clamp (+ net-scroll e:*scroll-y*) -1.0 1.0))
   (let ((speed (prog2 0.03 (* 0.4 (expt tickscale 2)))))
     (when fly
       (setf speed 0.024)
@@ -88,7 +93,12 @@
 	(setf speed 0.001))
       (unless (zerop dir)
 	(let ((rot-dir (* dir (cis *yaw*))))
-	  (let ((normalized (/ rot-dir (complex-modulus rot-dir))))
+;;	  (print (type-of rot-dir))
+	  (let ((normalized (/ rot-dir ((lambda (x)
+					  (declare (optimize (speed 3) (safety 0))
+						   (type (complex single-float) x))
+					  (abs x))
+					rot-dir))))
 	    (incf *xvel* (* speed (realpart normalized)))
 	    (incf *zvel* (* speed (imagpart normalized)))))))
     (progno
@@ -116,19 +126,16 @@
 	e))))
 
 (defun look-around ()
-  (mouse-looking))
-(defun mouse-looking ()
   (multiple-value-bind (dx dy) (delta)
-    (let ((x (* dx (translator 0.5)))
-	  (y (* dy (translator 0.5))))
-      (multiple-value-bind (dyaw dpitch)
-	  (if t (values x y) (%sphere-mouse-help x y))
-	(unless (zerop dyaw)
-	  (setf *yaw* (mod (+ *yaw* dyaw) two-pi)))
-	(unless (zerop dpitch)
-	  (setf *pitch* (clamp (+ *pitch* dpitch)
-			       (* -0.99 half-pi)
-			       (* 0.99 half-pi))))))))
+    (let ((dyaw (* dx (translator 0.5)))
+	  (dpitch (* dy (translator 0.5))))
+      (unless (zerop dyaw)
+	(setf *yaw* (mod (+ *yaw* dyaw) two-pi)))
+      (unless (zerop dpitch)
+	(setf *pitch* (alexandria:clamp
+		       (+ *pitch* dpitch)
+		       (* -0.99 half-pi)
+		       (* 0.99 half-pi)))))))
 
 (defun delta ()
   (let ((mouse-data (load-time-value (cons 0 0))))
@@ -138,31 +145,6 @@
 			     (- newy (cdr mouse-data)))
 	(setf (car mouse-data) newx
 	      (cdr mouse-data) newy)))))
-
-
-(defun %sphere-mouse-help (x y)
-  (if (zerop x)
-      (if (zerop y)
-	  (values 0.0 0.0)
-	  (values 0.0 y))
-      (if (zerop y)
-	  (values x 0.0)
-	  (new-direction (coerce x 'single-float)
-			 (coerce y 'single-float)))))
-
-(defparameter *temp-matrix3* (cg-matrix:identity-matrix))
-
-(defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0))
-(defparameter *new-dir* (cg-matrix:vec 0.0 0.0 0.0))
-(defun new-direction (dx dy)
-  (let ((size (sqrt (+ (* dx dx) (* dy dy)))))
-    (let ((dir *x-unit*))
-      (let ((rot (cg-matrix:%rotate-around*
-		  *temp-matrix3*
-		  0.0 (/ (- dx) size) (/ dy size) size)))
-	(let ((new-dir (cg-matrix:%transform-direction *new-dir* dir rot)))
-	  (multiple-value-bind (p y) (extract-polar-coords new-dir)
-	    (values y p)))))))
 
 (defparameter mousecapturestate nil)
 (defun remove-spurious-mouse-input ()

@@ -15,7 +15,7 @@
   (defun n-bits (n)
     (1- (ash 1 n))))
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :load-toplevel)
   (defparameter
       *n-bits* 
     (let ((array (make-array +available-bits+)))
@@ -50,7 +50,7 @@
     (defun page (n size)
       (ash n (- size)))
     (defun offset (n size)
-      (let ((mask (aref +n-bits+ size)))
+      (let ((mask (aref (etouq *n-bits*) size)))
 	(declare (type fixnum mask))
 	(logand n mask)))))
 

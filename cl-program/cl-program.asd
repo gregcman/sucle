@@ -4,10 +4,9 @@
 		 #:bordeaux-threads
 
 		 #:alexandria
-		 #:opticl
-		 #:trivial-main-thread
-		 #:window-glfw3
 		 #:cl-conspack
+		 #:opticl
+		 #:window-glfw3
 		 
 		 #:funland
 		 #:fixed-leaf-hashed-array-tree)
