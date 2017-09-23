@@ -1,23 +1,12 @@
 (defpackage #:window
   (:use #:cl #:fuktard)
-  (:nicknames #:E) ;;capital e is the egyptian glyph for "window" 
   (:export
-   #:*keypress-hash*
-   #:*mousepress-hash*
    #:*scroll-x*
-   #:*scroll-y*
-   #:*chars*)
+   #:*scroll-y*)
   (:export
    #:key-p
-   #:key-r-or-p
    #:key-j-p
-   #:key-r
-   #:key-j-r
-   #:mice-p
-   #:mice-r-or-p
-   #:mice-j-p
-   #:mice-r
-   #:mice-j-r)
+   #:key-j-r)
   (:export
    #:get-proc-address
    #:init

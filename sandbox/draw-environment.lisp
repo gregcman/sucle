@@ -20,28 +20,18 @@
 	  (when ans
 	    (set-display-list name ans)))))))
 
-(defparameter *camera* nil) ;;global camera
 (defparameter *fog-ratio*  0.75)
 
-(defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
-(defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
-
 (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
-(defparameter *fogcolor* (cg-matrix:vec #.(nth 2 '(or 1.0 0.0 0.68))
-					#.(nth 2 '(or (/ 139 255.0) 0.0 0.8))
-					#.(nth 1 '(or 0.0 (/ 139 255.0) (/ 205 255.0) 1.0)))
-  )
+(defparameter *fogcolor* (apply #'cg-matrix:vec
+				(nth 0 '((0.68 0.8 1.0)))))
 
 (defun fractionalize (x)
   (alexandria:clamp x 0.0 1.0))
-(defun render (partial-time deps)
+(defun render (camera deps)
   (declare (optimize (safety 3) (debug 3)))
   (flet ((getfnc (name)
 	   (funcall deps name)))
-    (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
-
-    (set-render-cam-pos *camera* partial-time)
-    (update-matrices *camera*)
     (let* ((blockshader (getfnc :blockshader))
 	   (blockshader-uniforms *blockshader-uniforms*)
 	   (fogcolor (aplayground::getuniform blockshader-uniforms :fog-color))
@@ -50,6 +40,12 @@
 	   (pmv (aplayground::getuniform blockshader-uniforms :pmv))
 	   (cam-pos (aplayground::getuniform blockshader-uniforms :cam-pos)))
       (gl:use-program blockshader)
+      (gl:uniformfv cam-pos (camera-vec-position camera))
+      (gl:uniform-matrix-4fv
+       pmv
+       (camera-matrix-projection-view-player camera)
+       nil)
+      
       (let ((time daytime)
 	    (avector *avector*))
 	(map-into avector
@@ -57,15 +53,11 @@
 		    (fractionalize (* time x)))
 		  *fogcolor*)
 	(gl:clear-color (aref avector 0) (aref avector 1) (aref avector 2) 1.0)
-	(gl:uniformfv fogcolor avector)
-	(gl:uniformfv cam-pos (camera-vec-position *camera*))
-	(gl:uniformf foglet (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
-	(gl:uniformf aratio (/ 1.0 *fog-ratio*)))
-      (gl:disable :blend)
-      (gl:uniform-matrix-4fv
-       pmv
-       (camera-matrix-projection-view-player *camera*)
-       nil))
+	(gl:uniformfv fogcolor avector))
+      (gl:uniformf foglet (/ -1.0 (camera-frustum-far camera) *fog-ratio*))
+      (gl:uniformf aratio (/ 1.0 *fog-ratio*))
+      
+      (gl:disable :blend))
   ;;;static geometry with no translation whatsoever
     ;; (sandbox::bind-default-framebuffer)
     (gl:bind-texture
@@ -74,7 +66,9 @@
     (draw-chunk-meshes)
     (designatemeshing)))
 
+#+nil
 (defparameter *velocity* (cg-matrix:vec 0.0 0.0 0.0))
+#+nil
 (defparameter *orientation* (make-array 6 :element-type 'single-float
 					:initial-contents
 					'(0.0 0.0 0.0 0.0 0.0 0.0)))
@@ -86,6 +80,9 @@
 	  (aref result 2) (* cos-pitch (sin yaw))))
   result)
 
+
+(defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
+(defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
 (defun set-render-cam-pos (camera partial)
   (let ((vec (camera-vec-position camera))
 	(cev (camera-vec-noitisop camera))
@@ -103,11 +100,11 @@
     (cg-matrix:%vec-lerp vec prev curr partial)
     (cg-matrix:%vec* cev vec -1.0)
     
-    (unit-pitch-yaw (camera-vec-forward *camera*)
+    (unit-pitch-yaw (camera-vec-forward camera)
 		    (coerce *pitch* 'single-float)
 		    (coerce *yaw* 'single-float))
     
-    (setf (camera-fov *camera*) defaultfov)
+    (setf (camera-fov camera) defaultfov)
     ))
 
 (defun draw-chunk-meshes ()
@@ -187,7 +184,6 @@
 		   (1 (getapixel 255 0 image))
 		   (2 (getapixel 0 0 image))
 		   (3 (getapixel 255 255 image)))))
-      (aplayground::getfnc :terrain-png)
       (modify-greens 64 192 :color color :terrain terrain)
       (modify-greens 80 192 :color color :terrain terrain)
       (modify-greens 0 240 :color color :terrain terrain)))
@@ -236,7 +232,7 @@
 		 (aplayground::load-png 
 		  (img-path #P"terrain.png")))))
 	   (color-grasses
-	    (aplayground::getfnc :grass-png)
+	    (getfnc :grass-png)
 	    image)
 	   image)))
       (bornfnc
@@ -294,7 +290,6 @@
 
 
 (defun glinnit ()
-  (setf *camera* (make-camera))
   (setf mesher-thread nil))
 
 (defparameter *blockshader-uniforms* nil)

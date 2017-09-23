@@ -271,14 +271,6 @@
 (defun glinnit ()
   (setf e:*resize-hook* #'on-resize))
 
-(with-unsafe-speed
-  (progn
-    (defun least-significant-bit (x)
-      (declare (type fixnum x))
-      (the fixnum (- (the fixnum (logxor x (the fixnum (- x)))))))
-    (defun least-significant-power (x)
-      (logcount (the fixnum (1- (the fixnum (least-significant-bit x))))))))
-
 #+nil
 ((bornfnc
 	:items-image

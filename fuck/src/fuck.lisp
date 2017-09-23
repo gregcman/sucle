@@ -5,9 +5,9 @@
   (defparameter *backup* (make-hash-table :test 'eq))
   (defparameter *stuff* (make-hash-table :test 'eq))
   (defun bornfnc (name func)
-    (aplayground::namexpr *backup* name func))
+    (namexpr *backup* name func))
   (defun getfnc (name)
-    (aplayground::get-stuff name *stuff* *backup*)))
+    (get-stuff name *stuff* *backup*)))
 
 (progn
   (defun namexpr (hash name func)
@@ -28,7 +28,7 @@
 (defparameter *sandbox-on* t)
 
 (defun handoff-five ()
-  (setf %gl:*gl-get-proc-address* (e:get-proc-address))
+  (setf %gl:*gl-get-proc-address* (window:get-proc-address))
   (let ((hash *stuff*))
     (maphash (lambda (k v)
 	       (if (integerp v)
@@ -56,6 +56,9 @@
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))
 
+(defparameter *camera* (sandbox::make-camera))
+
+
 (progn
   (defun actual-stuuff ()
     (when window:*status*
@@ -65,7 +68,7 @@
       (tick-physics ticker (function physss))
       (let ((fraction (float (/ (ticker-accumulator ticker)
 				(ticker-dt ticker)))))
-	(gl:viewport 0 0 e:*width* e:*height*)
+	(gl:viewport 0 0 window:*width* window:*height*)
 	(gl:clear
 	 :color-buffer-bit
 	 :depth-buffer-bit)
@@ -76,7 +79,11 @@
 	    (window:poll)
 	    (when (window:mice-locked-p)
  	      (sandbox::look-around))
-	    (sandbox::render fraction
+	    (setf (sandbox::camera-aspect-ratio *camera*)
+		  (/ window:*width* window:*height* 1.0))
+	    (sandbox::set-render-cam-pos *camera* fraction)
+	    (sandbox::update-matrices *camera*)
+	    (sandbox::render *camera*
 			     #'getfnc))))
       (window:update-display)))
   (setf *realthu-nk* (function actual-stuuff)))
@@ -115,4 +122,11 @@
 
 
 
+
+#+nil
+(dotimes (x 128)
+  (when (e::skey-j-p x *control-state*)
+    (let ((char (code-char x)))
+      (when (typep char 'standard-char)
+	(princ char)))))
 

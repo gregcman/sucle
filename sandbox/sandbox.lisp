@@ -372,3 +372,69 @@
 	     (/ (floor (* (+ zoffset z) (/ 1.0 8.0))) 8.0)))
 	 (sandbox::plain-setblock x y z 0 15)
 	 (sandbox::plain-setblock x y z 1 0))) sandbox::*box*))
+
+
+(with-unsafe-speed
+  (progn
+    (defun least-significant-bit (x)
+      (declare (type fixnum x))
+      (the fixnum (- (the fixnum (logxor x (the fixnum (- x)))))))
+    (defun least-significant-power (x)
+      (logcount (the fixnum (1- (the fixnum (least-significant-bit x))))))))
+
+
+(defstruct dlink content position prev next)
+
+(defun disconnect-dlink (dlink)
+  (let ((next (dlink-next dlink))
+	(prev (dlink-prev dlink)))
+    (link-links prev next)))
+
+(defun link-links (prev next)
+  (when (dlink-p prev)
+    (setf (dlink-next prev) next))
+  (when (dlink-p next)
+    (setf (dlink-prev next) prev)))
+
+(defstruct wotut
+  (node-array (make-array 64))
+  top)
+
+(defun clear-wotut (wotut)
+  (setf (wotut-top wotut) nil))
+
+(defun add-item (ticks item wotut)
+  (let ((position (least-significant-power ticks)))
+    (let ((nodes (wotut-node-array wotut)))
+      (let ((old (aref nodes position))
+	    (top (wotut-top wotut)))
+	(if (dlink-p old)
+	    (disconnect-dlink old)
+	    (let ((new (make-dlink)))
+	      (setf old new)
+	      (setf (aref nodes position) new)))
+	(setf (dlink-next old) nil)
+	(setf (dlink-content old) item)
+	(setf (dlink-position old) ticks)
+	(link-links top old)
+	(setf (wotut-top wotut) old)))))
+
+(set-pprint-dispatch 'dlink (lambda (stream obj)
+			      (princ "[" stream)
+			      (labels ((recforward (dlink)
+					 (write (dlink-content dlink) :stream stream)
+					 (let ((next (dlink-next dlink)))
+					   (when (dlink-p next)
+					     (write-char #\Space stream)
+					     (recforward next)))))
+				(recforward obj))
+			      (princ "|" stream)
+			      (labels ((recbackwards (dlink)
+					 (write (dlink-content dlink) :stream stream)
+					 (let ((prev (dlink-prev dlink)))
+					   (when (dlink-p prev)
+					     (write-char #\Space stream)
+					     (recbackwards prev)))))
+				(recbackwards obj))
+			      (princ "]" stream)
+			      ))
