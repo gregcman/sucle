@@ -43,7 +43,7 @@
     (set-render-cam-pos *camera* partial-time)
     (update-matrices *camera*)
     (let* ((blockshader (getfnc :blockshader))
-	   (blockshader-uniforms (getfnc :blockshader-uniforms))
+	   (blockshader-uniforms *blockshader-uniforms*)
 	   (fogcolor (aplayground::getuniform blockshader-uniforms :fog-color))
 	   (aratio (aplayground::getuniform blockshader-uniforms :aratio))
 	   (foglet (aplayground::getuniform blockshader-uniforms :foglet))
@@ -180,6 +180,48 @@
 (defun img-path (name)
   (merge-pathnames name dir-mc-assets))
 
+(progn
+  (defun color-grasses (image terrain)
+    (let ((color (case 0
+		   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
+		   (1 (getapixel 255 0 image))
+		   (2 (getapixel 0 0 image))
+		   (3 (getapixel 255 255 image)))))
+      (aplayground::getfnc :terrain-png)
+      (modify-greens 64 192 :color color :terrain terrain)
+      (modify-greens 80 192 :color color :terrain terrain)
+      (modify-greens 0 240 :color color :terrain terrain)))
+
+  (defun ubyte-mult (a b)
+    (truncate (* a b) 256))
+
+  (defun multiply-into (vecinto other)
+    (macrolet ((aux (a b num)
+		 `(let ((at (aref ,a ,num))
+			(bt (aref ,b ,num)))
+		    (setf (aref ,a ,num) (ubyte-mult at bt)))))
+      (aux vecinto other 0)
+      (aux vecinto other 1)
+      (aux vecinto other 2)
+      (aux vecinto other 3)))
+
+  (defun getapixel (h w image)
+    (destructuring-bind (height width c) (array-dimensions image)
+      (declare (ignore height))
+      (make-array 4 :element-type (array-element-type image)
+		  :displaced-to image
+		  :displaced-index-offset (* c (+ w (* h width))))))
+
+  (progno #(113 174 70 255)  #(198 304 122 255))
+;;;grass is 0 240
+;;;leaves is [64 80] 192
+  (defun modify-greens (xpos ypos
+			&key
+			  (color #(0 0 0 0))
+			  (terrain (error "no image")))
+    (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
+	   (multiply-into (getapixel y x terrain) color))))
+
 (defun build-deps (getfnc setfnc)
   (flet ((bornfnc (name func)
 	   (funcall setfnc name func))
@@ -189,9 +231,14 @@
       (bornfnc
        :terrain-png
        (lambda ()
-	 (aplayground::flip-image
-	  (aplayground::load-png 
-	   (img-path #P"terrain.png")))))
+	 (let ((image
+		(aplayground::flip-image
+		 (aplayground::load-png 
+		  (img-path #P"terrain.png")))))
+	   (color-grasses
+	    (aplayground::getfnc :grass-png)
+	    image)
+	   image)))
       (bornfnc
        :grass-png
        (lambda ()
@@ -222,11 +269,6 @@
 			 ("texCoord" . 2)
 			 ("darkness" . 8)
 			 )))))
-	   program)))
-      (bornfnc
-       :blockshader-uniforms
-       (lambda ()
-	 (let ((program (getfnc :blockshader)))
 	   (let ((table (make-hash-table :test 'eq)))
 	     (aplayground::cache-program-uniforms
 	      program
@@ -237,7 +279,8 @@
 		      (:cam-pos . "cameraPos")
 		      (:foglet . "foglet")
 		      )))
-	     table))))
+	     (Setf *blockshader-uniforms* table))
+	   program)))
       (bornfnc
        :bs-vs
        (lambda ()
@@ -249,10 +292,11 @@
 	 (alexandria:read-file-into-string
 	  (shader-path "blockshader/basictexcoord.frag")))))))
 
+
 (defun glinnit ()
   (setf *camera* (make-camera))
   (setf mesher-thread nil))
-#+nil
+
 (defparameter *blockshader-uniforms* nil)
 
 (in-package :sandbox)

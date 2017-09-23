@@ -9,7 +9,7 @@
   )
 (defun thunkit (control-state)
   (physics control-state))
-(defparameter *save* (case 11
+(defparameter *save* (case 0
 		       (0 #P"terrarium2/")
 		       (1 #P"first/")
 		       (2 #P"second/")
@@ -80,47 +80,7 @@
 		(coerce sky '(simple-array (unsigned-byte 4) (*)))))
 	(return-from loadchunk t)))))  
 
-(defun color-grasses ()
-  (aplayground::getfnc :terrain-png)
-  (modify-greens 64 192)
-  (modify-greens 80 192)
-  (modify-greens 0 240))
 
-(defun ubyte-mult (a b)
-  (truncate (* a b) 256))
-
-(defun multiply-into (vecinto other)
-  (macrolet ((aux (a b num)
-	       `(let ((at (aref ,a ,num))
-		      (bt (aref ,b ,num)))
-		  (setf (aref ,a ,num) (ubyte-mult at bt)))))
-    (aux vecinto other 0)
-    (aux vecinto other 1)
-    (aux vecinto other 2)
-    (aux vecinto other 3)))
-
-(defun getapixel (h w image)
-  (destructuring-bind (height width c) (array-dimensions image)
-    (declare (ignore height))
-    (make-array 4 :element-type (array-element-type image)
-		:displaced-to image
-		:displaced-index-offset (* c (+ w (* h width))))))
-
-(progno #(113 174 70 255)  #(198 304 122 255))
-;;;grass is 0 240
-;;;leaves is [64 80] 192
-(defun modify-greens (xpos ypos
-		      &optional
-			(image (aplayground::getfnc :grass-png))
-			(color
-			 (case 1
-			   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
-			   (1 (getapixel 255 0 image))
-			   (2 (getapixel 0 0 image))
-			   (3 (getapixel 255 255 image)))
-			 ) (terrain (aplayground::getfnc :terrain-png)))
-  (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
-	 (multiply-into (getapixel y x terrain) color)))
 
 (defparameter *box* #(0 128 0 128 -128 0))
 (with-unsafe-speed

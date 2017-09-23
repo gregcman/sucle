@@ -1,18 +1,43 @@
 (in-package :fuck)
 
+
+(progn
+  (defparameter *backup* (make-hash-table :test 'eq))
+  (defparameter *stuff* (make-hash-table :test 'eq))
+  (defun bornfnc (name func)
+    (aplayground::namexpr *backup* name func))
+  (defun getfnc (name)
+    (aplayground::get-stuff name *stuff* *backup*)))
+
+(progn
+  (defun namexpr (hash name func)
+    (setf (gethash name hash) func))
+  (defmacro ensure (place otherwise)
+    (let ((value-var (gensym))
+	  (exists-var (gensym)))
+      `(or ,place
+	   (multiple-value-bind (,value-var ,exists-var) ,otherwise
+	     (if ,exists-var
+		 (values (setf ,place ,value-var) ,exists-var))))))
+  (defun get-stuff (name stuff otherwise)
+    (ensure (gethash name stuff)
+	    (let ((genfunc (gethash name otherwise)))
+	      (when (functionp genfunc)
+		(values (funcall genfunc) t))))))
+
 (defparameter *sandbox-on* t)
 
 (defun handoff-five ()
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
-  (let ((hash aplayground::*stuff*))
+  (let ((hash *stuff*))
     (maphash (lambda (k v)
 	       (if (integerp v)
 		   (remhash k hash)))
 	     hash))
   (window:set-vsync t)
   (when *sandbox-on*
-    (sandbox::build-deps #'aplayground::getfnc
-			 #'aplayground::bornfnc)
+    (sandbox::build-deps #'getfnc
+			 #'bornfnc)
     (sandbox::initialization1))
 
   (injection3)) 
@@ -52,7 +77,7 @@
 	    (when (window:mice-locked-p)
  	      (sandbox::look-around))
 	    (sandbox::render fraction
-			     #'aplayground::getfnc))))
+			     #'getfnc))))
       (window:update-display)))
   (setf *realthu-nk* (function actual-stuuff)))
 

@@ -9,14 +9,7 @@
 
    (defun ngorp (&rest forms)
      (cons (quote progn)
-	   (apply (function nconc) forms)))
-   (defun ensure (place otherwise)
-     (let ((value-var (gensym))
-	   (exists-var (gensym)))
-       `(or ,place
-	    (multiple-value-bind (,value-var ,exists-var) ,otherwise
-	      (if ,exists-var
-		  (values (setf ,place ,value-var) ,exists-var))))))))
+	   (apply (function nconc) forms)))))
 
 ;;;;load a png image from a path
 (defun load-png (filename)
@@ -40,24 +33,6 @@
 	      (rotatef (aref image (- height h 1) w)
 		       (aref image h w))))))
   image)
-
-(defun namexpr (hash name func)
-  (setf (gethash name hash) func))
-(defun get-stuff (name stuff otherwise)
-  (etouq
-   (ensure (quote (gethash name stuff))
-	   (quote (let ((genfunc (gethash name otherwise)))
-		    (when (functionp genfunc)
-		      (values (funcall genfunc) t)))))))
-
-(defparameter *backup* (make-hash-table :test 'eq))
-(defparameter *stuff* (make-hash-table :test 'eq))
-
-(defun bornfnc (name func)
-  (namexpr *backup* name func))
-
-(defun getfnc (name)
-  (get-stuff name *stuff* *backup*))
 
 (defun cache-program-uniforms (program table args)
   (dolist (arg args)
