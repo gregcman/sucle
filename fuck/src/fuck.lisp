@@ -11,6 +11,8 @@
 	     hash))
   (window:set-vsync t)
   (when *sandbox-on*
+    (sandbox::build-deps #'aplayground::getfnc
+			 #'aplayground::bornfnc)
     (sandbox::initialization1))
 
   (injection3)) 
@@ -50,7 +52,7 @@
 	    (when (window:mice-locked-p)
  	      (sandbox::look-around))
 	    (sandbox::render fraction
-			     ))))
+			     #'aplayground::getfnc))))
       (window:update-display)))
   (setf *realthu-nk* (function actual-stuuff)))
 

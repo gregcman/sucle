@@ -24,12 +24,14 @@
       (let ((old-call-list (get-chunk-display-list coords)))
 					;	(print len)
 	(aplayground::reset-attrib-buffer-iterators iter)
-	(let ((new (let ((list (gl:gen-lists 1)))
-		     (gl:new-list list :compile)
-		     (gl:with-primitives :quads
-		       (mesh-chunk len buf))
-		     (gl:end-list)
-		     list)))
+	(let ((new (if (zerop len)
+		       nil
+		       (let ((list (gl:gen-lists 1)))
+			 (gl:new-list list :compile)
+			 (gl:with-primitives :quads
+			   (mesh-chunk len buf))
+			 (gl:end-list)
+			 list))))
 	  (if new
 	      (set-chunk-display-list coords new)
 	      (remove-chunk-display-list coords)))

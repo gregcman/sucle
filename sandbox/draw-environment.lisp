@@ -20,69 +20,59 @@
 	  (when ans
 	    (set-display-list name ans)))))))
 
-(defparameter ourdir
-  (make-pathname :host (pathname-host #.(or *compile-file-truename*
-					    *load-truename*))
-		 :directory (pathname-directory #.(or *compile-file-truename*
-						      *load-truename*))))
-(defparameter dir-resource (merge-pathnames #P"res/" ourdir))
-(defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
-(defparameter dir-mc-assets (merge-pathnames "image/" dir-resource))
-(defun shader-path (name)
-  (merge-pathnames name dir-shader))
-(defun img-path (name)
-  (merge-pathnames name dir-mc-assets))
-
 (defparameter *camera* nil) ;;global camera
 (defparameter *fog-ratio*  0.75)
 
 (defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
 
-;;(defparameter *last-yaw* 0.0)
-;;(defparameter *last-pitch* 0.0)
-(defun render (partial-time)
-  (declare (optimize (safety 3) (debug 3)))
-  (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
+(defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
+(defparameter *fogcolor* (cg-matrix:vec #.(nth 2 '(or 1.0 0.0 0.68))
+					#.(nth 2 '(or (/ 139 255.0) 0.0 0.8))
+					#.(nth 1 '(or 0.0 (/ 139 255.0) (/ 205 255.0) 1.0)))
+  )
 
-  (set-render-cam-pos *camera* partial-time)
-  (update-matrices *camera*)
-  (let* ((blockshader (aplayground::getfnc
-		       :blockshader))
-	 (blockshader-uniforms *blockshader-uniforms*)
-	 (fogcolor (aplayground::getuniform blockshader-uniforms :fog-color))
-	 (aratio (aplayground::getuniform blockshader-uniforms :aratio))
-	 (foglet (aplayground::getuniform blockshader-uniforms :foglet))
-	 (pmv (aplayground::getuniform blockshader-uniforms :pmv))
-	 (cam-pos (aplayground::getuniform blockshader-uniforms :cam-pos)))
-    (gl:use-program blockshader)
-    (let ((time daytime))
-      (let ((avector (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-	(flet ((fractionalize (x)
-		 (alexandria:clamp x 0.0 1.0)))
-	  (let ((x (fractionalize (* time #.(nth 2 '(or 1.0 0.0 0.68)))))
-		(y (fractionalize (* time #.(nth 2 '(or (/ 139 255.0) 0.0 0.8)))))
-		(z (fractionalize (* time #.(nth 1 '(or 0.0 (/ 139 255.0) (/ 205 255.0) 1.0))))))
-	    (gl:clear-color x y z 1.0)
-	    (setf (aref avector 0) x
-		  (aref avector 1) y
-		  (aref avector 2) z)
-	    (gl:uniformfv fogcolor avector)
-	    (gl:uniformfv cam-pos (camera-vec-position *camera*))
-	    (gl:uniformf foglet (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
-	    (gl:uniformf aratio (/ 1.0 *fog-ratio*))))))
-    (gl:disable :blend)
-    (gl:uniform-matrix-4fv
-     pmv
-     (camera-matrix-projection-view-player *camera*)
-     nil))
+(defun fractionalize (x)
+  (alexandria:clamp x 0.0 1.0))
+(defun render (partial-time deps)
+  (declare (optimize (safety 3) (debug 3)))
+  (flet ((getfnc (name)
+	   (funcall deps name)))
+    (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
+
+    (set-render-cam-pos *camera* partial-time)
+    (update-matrices *camera*)
+    (let* ((blockshader (getfnc :blockshader))
+	   (blockshader-uniforms (getfnc :blockshader-uniforms))
+	   (fogcolor (aplayground::getuniform blockshader-uniforms :fog-color))
+	   (aratio (aplayground::getuniform blockshader-uniforms :aratio))
+	   (foglet (aplayground::getuniform blockshader-uniforms :foglet))
+	   (pmv (aplayground::getuniform blockshader-uniforms :pmv))
+	   (cam-pos (aplayground::getuniform blockshader-uniforms :cam-pos)))
+      (gl:use-program blockshader)
+      (let ((time daytime)
+	    (avector *avector*))
+	(map-into avector
+		  (lambda (x)
+		    (fractionalize (* time x)))
+		  *fogcolor*)
+	(gl:clear-color (aref avector 0) (aref avector 1) (aref avector 2) 1.0)
+	(gl:uniformfv fogcolor avector)
+	(gl:uniformfv cam-pos (camera-vec-position *camera*))
+	(gl:uniformf foglet (/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
+	(gl:uniformf aratio (/ 1.0 *fog-ratio*)))
+      (gl:disable :blend)
+      (gl:uniform-matrix-4fv
+       pmv
+       (camera-matrix-projection-view-player *camera*)
+       nil))
   ;;;static geometry with no translation whatsoever
-  ;; (sandbox::bind-default-framebuffer)
-  (gl:bind-texture
-   :texture-2d
-   (aplayground::getfnc :terrain))
-  (draw-chunk-meshes)
-  (designatemeshing))
+    ;; (sandbox::bind-default-framebuffer)
+    (gl:bind-texture
+     :texture-2d
+     (getfnc :terrain))
+    (draw-chunk-meshes)
+    (designatemeshing)))
 
 (defparameter *velocity* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *orientation* (make-array 6 :element-type 'single-float
@@ -177,6 +167,19 @@
 	(dz (- *zpos* z)))
     (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 
+(defparameter ourdir
+  (make-pathname :host (pathname-host #.(or *compile-file-truename*
+					    *load-truename*))
+		 :directory (pathname-directory #.(or *compile-file-truename*
+						      *load-truename*))))
+(defparameter dir-resource (merge-pathnames #P"res/" ourdir))
+(defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
+(defparameter dir-mc-assets (merge-pathnames "image/" dir-resource))
+(defun shader-path (name)
+  (merge-pathnames name dir-shader))
+(defun img-path (name)
+  (merge-pathnames name dir-mc-assets))
+
 (defun build-deps (getfnc setfnc)
   (flet ((bornfnc (name func)
 	   (funcall setfnc name func))
@@ -219,8 +222,12 @@
 			 ("texCoord" . 2)
 			 ("darkness" . 8)
 			 )))))
+	   program)))
+      (bornfnc
+       :blockshader-uniforms
+       (lambda ()
+	 (let ((program (getfnc :blockshader)))
 	   (let ((table (make-hash-table :test 'eq)))
-	     (setf *blockshader-uniforms* table)
 	     (aplayground::cache-program-uniforms
 	      program
 	      table
@@ -229,8 +236,8 @@
 		      (:aratio . "aratio")
 		      (:cam-pos . "cameraPos")
 		      (:foglet . "foglet")
-		      ))))
-	   program)))
+		      )))
+	     table))))
       (bornfnc
        :bs-vs
        (lambda ()
@@ -245,6 +252,7 @@
 (defun glinnit ()
   (setf *camera* (make-camera))
   (setf mesher-thread nil))
+#+nil
 (defparameter *blockshader-uniforms* nil)
 
 (in-package :sandbox)
@@ -271,6 +279,7 @@
    :maxy 0.12
    :maxz 0.3))
 
+#+nil
 (defun player-aabb+1 ()
   (aabbcc::make-aabb
    :minx -0.3
@@ -280,6 +289,7 @@
    :maxy 1.12
    :maxz 0.3))
 
+#+nil
 (defun chunk-aabb ()
   (aabbcc::make-aabb
    :minx -8.0
@@ -288,7 +298,9 @@
    :maxx 8.0
    :maxy 8.0
    :maxz 8.0))
+#+nil
 (defparameter chunk-aabb (chunk-aabb))
+#+nil
 (defparameter player-aabb+1 (player-aabb+1))
 
 ;;;a very small cubic fist

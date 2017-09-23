@@ -4,8 +4,6 @@
   (clrhash *g/call-list*)
   (clrhash *g/chunk-call-list*)
 
-  (build-deps #'aplayground::getfnc
-	      #'aplayground::bornfnc)
   (glinnit) ;opengl
   (physinnit) ;physics
   )
