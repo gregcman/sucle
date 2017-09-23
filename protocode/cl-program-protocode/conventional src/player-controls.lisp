@@ -1,6 +1,5 @@
 (in-package :aplayground)
 
-
 (defparameter *mouse-rectangle* (vector 0.0 0.0 0.0 0.0))
 (defparameter *cursor-rectangle* (vector 0.0 0.0 0.0 0.0))
 (progn
@@ -77,7 +76,7 @@
 		       py0 py1
 		       px1 (+ cx1 *camera-x*)
 		       py1 (+ cy1 *camera-y*)))))))))
-;;  (other-stuff)
+  ;;  (other-stuff)
   (uncentered-rectangle *cam-rectangle* *camera-x* *camera-y*
 			(/ e:*width* *block-width*) (/ e:*height* *block-height*))
   ;;(time)
@@ -174,8 +173,8 @@
 
 (defun clear-cam ()
   (map-box *cam-rectangle*
-	     (lambda (x y)
-	       (scwu nil x y))))
+	   (lambda (x y)
+	     (scwu nil x y))))
 (defun color-rgb (color)
   (labels ((c (r g b)
 	     (values (/ r 255.0) (/ g 255.0) (/ b 255.0)))

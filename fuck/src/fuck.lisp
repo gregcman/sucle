@@ -1,8 +1,6 @@
 (in-package :fuck)
 
 (defparameter *sandbox-on* t)
-(defparameter *aplay-on* nil)
-(defparameter barbar nil)
 
 (defun handoff-five ()
   (setf %gl:*gl-get-proc-address* (e:get-proc-address))
@@ -11,12 +9,9 @@
 	       (if (integerp v)
 		   (remhash k hash)))
 	     hash))
-  ;;  (define-time)
   (window:set-vsync t)
   (when *sandbox-on*
     (sandbox::initialization1))
-  (when *aplay-on*
-    (aplayground::glinnit))
 
   (injection3)) 
 
@@ -28,9 +23,6 @@
   (window::update-control-state *control-state*)
 
 
-  (when (and barbar *aplay-on*)
-    (aplayground::physics *control-state*)
-    )
   (when *sandbox-on*
     (sandbox::thunkit *control-state*)))
 
@@ -58,12 +50,7 @@
 	    (when (window:mice-locked-p)
  	      (sandbox::look-around))
 	    (sandbox::render fraction
-			     )))
-
-	(when *aplay-on*
-	  (aplayground::render)
-	  )
-	)
+			     ))))
       (window:update-display)))
   (setf *realthu-nk* (function actual-stuuff)))
 

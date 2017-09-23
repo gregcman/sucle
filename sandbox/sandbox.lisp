@@ -3,13 +3,15 @@
 (defun initialization1 ()
   (clrhash *g/call-list*)
   (clrhash *g/chunk-call-list*)
-  
+
+  (build-deps #'aplayground::getfnc
+	      #'aplayground::bornfnc)
   (glinnit) ;opengl
   (physinnit) ;physics
   )
 (defun thunkit (control-state)
   (physics control-state))
-(defparameter *save* (case 3
+(defparameter *save* (case 11
 		       (0 #P"terrarium2/")
 		       (1 #P"first/")
 		       (2 #P"second/")
@@ -20,7 +22,8 @@
 		       (7 #P"holymoly/")
 		       (8 #P"funkycoolclimb/")
 		       (9 #P"ahole/")
-		       (10 #P"maze-royale/")))
+		       (10 #P"maze-royale/")
+		       (11 #P"bloodcut/")))
 
 (defparameter *saves-dir* (merge-pathnames #P"sandbox-saves/"
 					   "/home/imac/Documents/lispysaves/saves/"))
@@ -80,9 +83,7 @@
 	(return-from loadchunk t)))))  
 
 (defun color-grasses ()
-  (aplayground::get-stuff
-   :terrain-png aplayground::*stuff*
-   aplayground::*backup*)
+  (aplayground::getfnc :terrain-png)
   (modify-greens 64 192)
   (modify-greens 80 192)
   (modify-greens 0 240))
@@ -112,18 +113,14 @@
 ;;;leaves is [64 80] 192
 (defun modify-greens (xpos ypos
 		      &optional
-			(image (aplayground::get-stuff
-				:grass-png aplayground::*stuff*
-				aplayground::*backup*))
+			(image (aplayground::getfnc :grass-png))
 			(color
 			 (case 1
 			   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 			   (1 (getapixel 255 0 image))
 			   (2 (getapixel 0 0 image))
 			   (3 (getapixel 255 255 image)))
-			 ) (terrain (aplayground::get-stuff
-				     :terrain-png aplayground::*stuff*
-				     aplayground::*backup*)))
+			 ) (terrain (aplayground::getfnc :terrain-png)))
   (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
 	 (multiply-into (getapixel y x terrain) color)))
 
@@ -378,3 +375,42 @@
  "musicBlock" "sandStone" "dispenser" "blockLapis" "oreLapis" "sponge" "leaves"
  "log" "oreCoal" "oreIron" "oreGold" "gravel" "sand" "bedrock" "wood"
  "stonebrick" "dirt" "grass" "stone")
+
+(defun platt (x y z)
+	(dobox ((x0 (1- x) (+ 2 x))
+		(z0 (1- z) (+ 2 z)))
+	       (let ((block (world:getblock x0 y z0)))
+		 (when (not (or (= block 2) (= block 5)
+				(= block 3)))
+		   (return-from platt nil))))
+	t)
+
+(defun platt2 (x y z)
+	(dobox ((x0 (1- x) (+ 2 x))
+		(z0 (1- z) (+ 2 z)))
+	       (let ((block (world:getblock x0 y z0)))
+		 (when (not (or (= block 5) (= block 4)))
+		   (return-from platt2 nil))))
+	t)
+
+(defun meep ()
+  (sandbox::map-box (lambda (x y z)
+		      (when (platt x y z)
+			(sandbox::plain-setblock x y z 5 0)))
+		    sandbox::*box*))
+(defun meep2 ()
+  (sandbox::map-box (lambda (x y z)
+		      (when (platt2 x y z)
+			(sandbox::plain-setblock x y z 4 0)))
+		    sandbox::*box*))
+
+(defun huhuhuh (xoffset yoffset zoffset)
+  (sandbox::map-box
+   (lambda (x y z)
+     (if (> (1- (/ (expt (/ y 64.0) 2) 2.0))
+	    (black-tie:simplex-noise-3d-single-float
+	     (/ (floor (/ (+ xoffset x) 8.0)) 8.0)
+	     (/ (floor (* (+ yoffset y) (/ 1.0 8.0))) 8.0)
+	     (/ (floor (* (+ zoffset z) (/ 1.0 8.0))) 8.0)))
+	 (sandbox::plain-setblock x y z 0 15)
+	 (sandbox::plain-setblock x y z 1 0))) sandbox::*box*))

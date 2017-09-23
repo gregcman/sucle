@@ -1,9 +1,5 @@
 (in-package :aplayground)
 
-(defparameter *backup* (make-hash-table :test 'eq))
-(defparameter *stuff* (make-hash-table :test 'eq))
-(defparameter *other-stuff* (make-hash-table :test 'eq))
-
 (progn
   (progn
     (defparameter *block-height* nil)
@@ -23,14 +19,6 @@
 	  (values
 	   (ceiling (/ e:*width* *block-width* 0.5))
 	   (ceiling (/ e:*height* *block-height* 0.5))))))
-
-(defun bornfnc (name func)
-  (namexpr *backup* name func))
-
-(defun cache-program-uniforms (program table args)
-  (dolist (arg args)
-    (setf (gethash (car arg) table)
-	  (gl:get-uniform-location program (cdr arg)))))
 
 (bornfnc
  :text-frag
@@ -272,9 +260,7 @@
 	  (gl:depth-func :always)
 	  (gl:disable :cull-face))
 	
-	(gl:call-list (get-stuff :fast-text-display-list *stuff* *backup*)))))
-  (defun getuniform (shader-info name)
-    (gethash name shader-info)))
+	(gl:call-list (get-stuff :fast-text-display-list *stuff* *backup*))))))
 
 
 ;;;fixme

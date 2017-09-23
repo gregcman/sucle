@@ -2,9 +2,8 @@
     :depends-on (#:cl-opengl
                  #:cg-matrix
 		 #:bordeaux-threads		 
-
-		 #:window-glfw3
-		 #:funland)
+		 #:funland
+		 #:black-tie)
     :serial t
     :components
     

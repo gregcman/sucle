@@ -289,15 +289,16 @@
 (defparameter *fist-function* (constantly nil))
 
 (defun big-swing-fist (vx vy vz)
-  (let ((u 100))
+  (let ((u 3))
     (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* u vx) (* u vy) (* u vz)
-			 player-aabb+1
+			 fist-aabb
 			 
 			 (lambda (x y z)
 			   (when (and (<= 0 x 127)
 				      (<= 0 y 127)
-				      (<= -128 z -1)) 
-			     (setblock-with-update x y z 0  (aref mc-blocks::lightvalue 0)))))))
+				      (<= -128 z -1))
+			     (let ((blockid 0))
+			       (setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))))
 
 (defun standard-fist (vx vy vz)
   (multiple-value-bind (frac type blockx blocky blockz)

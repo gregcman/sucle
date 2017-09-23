@@ -7,9 +7,6 @@
 	       (list value x))
 	     form))
 
-   (defun raps (times form)
-     (make-list times :initial-element form))
-
    (defun ngorp (&rest forms)
      (cons (quote progn)
 	   (apply (function nconc) forms)))
@@ -20,31 +17,6 @@
 	    (multiple-value-bind (,value-var ,exists-var) ,otherwise
 	      (if ,exists-var
 		  (values (setf ,place ,value-var) ,exists-var))))))))
-
-(defparameter *something* #.(or *compile-file-truename* *load-truename*))
-
-(defparameter ourdir
-  (make-pathname :host (pathname-host *something*)
-		 :directory (pathname-directory *something*)))
-
-
-#+nil
-(progno
- (defconstant +single-float-pi+ (coerce pi 'single-float))
- (defconstant +single-float-two-pi+ (coerce (* 2 pi) 'single-float))
- (defconstant +single-float-half-pi+ (coerce (/ pi 2) 'single-float)))
-
-#+nil
-(defun clamp (x min max)
-  (max (min x max) min))
-
-#+nil
-(progno
- (defparameter *temp-matrix* (cg-matrix:identity-matrix))
- (defparameter *temp-matrix2* (cg-matrix:identity-matrix))
- (defparameter *temp-matrix3* (cg-matrix:identity-matrix))
- (defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0)))
-
 
 ;;;;load a png image from a path
 (defun load-png (filename)
@@ -69,19 +41,8 @@
 		       (aref image h w))))))
   image)
 
-
-(defparameter dir-resource (merge-pathnames #P"res/" ourdir))
-(defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
-
-(defun shader-path (name)
-  (merge-pathnames name dir-shader))
-
-(defun img-path (name)
-  (merge-pathnames name dir-resource))
-
 (defun namexpr (hash name func)
   (setf (gethash name hash) func))
-
 (defun get-stuff (name stuff otherwise)
   (etouq
    (ensure (quote (gethash name stuff))
@@ -89,35 +50,99 @@
 		    (when (functionp genfunc)
 		      (values (funcall genfunc) t)))))))
 
-(progn
+(defparameter *backup* (make-hash-table :test 'eq))
+(defparameter *stuff* (make-hash-table :test 'eq))
 
-  (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
-  (defparameter *save-file* "file")
+(defun bornfnc (name func)
+  (namexpr *backup* name func))
 
-  (defun asave (thing &key (file *save-file*) (overwritep nil))
-    (save file thing overwritep))
+(defun getfnc (name)
+  (get-stuff name *stuff* *backup*))
 
-  (defun aload (&optional (file *save-file*))
-    (myload file))
+(defun cache-program-uniforms (program table args)
+  (dolist (arg args)
+    (setf (gethash (car arg) table)
+	  (gl:get-uniform-location program (cdr arg)))))
 
-  (defun save (filename thing &optional (overwritep nil))
-    (let ((path (saves-path filename)))
-      (with-open-file (stream path
-			      :direction :output
-			      :if-does-not-exist :create
-			      :if-exists (if overwritep :supersede :error)
-			      :element-type '(unsigned-byte 8))
-	(conspack:tracking-refs ()
-	  (conspack:encode thing :stream stream)))))
+(defun getuniform (shader-info name)
+  (gethash name shader-info))
 
-  (defun myload (filename)
-    (let ((path (saves-path filename)))
-      (conspack:tracking-refs ()
-	(conspack:decode (alexandria:read-file-into-byte-vector path))))))
-(defun saves-path (path)
-  (merge-pathnames path *saves-dir*))
+#+nil
+(defparameter *other-stuff* (make-hash-table :test 'eq))
+
+#+nil
+(defparameter *something* #.(or *compile-file-truename* *load-truename*))
+#+nil
+(defparameter ourdir
+  (make-pathname :host (pathname-host *something*)
+		 :directory (pathname-directory *something*)))
 
 
+#+nil
+  (defun raps (times form)
+     (make-list times :initial-element form))
+
+#+nil
+(progno
+ (defconstant +single-float-pi+ (coerce pi 'single-float))
+ (defconstant +single-float-two-pi+ (coerce (* 2 pi) 'single-float))
+ (defconstant +single-float-half-pi+ (coerce (/ pi 2) 'single-float)))
+
+#+nil
+(defun clamp (x min max)
+  (max (min x max) min))
+
+#+nil
+(progno
+ (defparameter *temp-matrix* (cg-matrix:identity-matrix))
+ (defparameter *temp-matrix2* (cg-matrix:identity-matrix))
+ (defparameter *temp-matrix3* (cg-matrix:identity-matrix))
+ (defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0)))
+
+
+#+nil
+(progno
+ (defparameter dir-resource (merge-pathnames #P"res/" ourdir))
+ (defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
+
+ (defun shader-path (name)
+   (merge-pathnames name dir-shader))
+
+ (defun img-path (name)
+   (merge-pathnames name dir-resource)))
+
+
+
+#+nil
+(progno
+ (progn
+   (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
+   (defparameter *save-file* "file")
+
+   (defun asave (thing &key (file *save-file*) (overwritep nil))
+     (save file thing overwritep))
+
+   (defun aload (&optional (file *save-file*))
+     (myload file))
+
+   (defun save (filename thing &optional (overwritep nil))
+     (let ((path (saves-path filename)))
+       (with-open-file (stream path
+			       :direction :output
+			       :if-does-not-exist :create
+			       :if-exists (if overwritep :supersede :error)
+			       :element-type '(unsigned-byte 8))
+	 (conspack:tracking-refs ()
+	   (conspack:encode thing :stream stream)))))
+
+   (defun myload (filename)
+     (let ((path (saves-path filename)))
+       (conspack:tracking-refs ()
+	 (conspack:decode (alexandria:read-file-into-byte-vector path))))))
+ (defun saves-path (path)
+   (merge-pathnames path *saves-dir*)))
+
+#+nil
 (defun quit ()
   (setf e:*status* t))
 

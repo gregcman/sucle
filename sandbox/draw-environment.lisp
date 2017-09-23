@@ -47,10 +47,8 @@
 
   (set-render-cam-pos *camera* partial-time)
   (update-matrices *camera*)
-  (let* ((blockshader (aplayground::get-stuff
-		       :blockshader
-		       aplayground::*stuff*
-		       aplayground::*backup*))
+  (let* ((blockshader (aplayground::getfnc
+		       :blockshader))
 	 (blockshader-uniforms *blockshader-uniforms*)
 	 (fogcolor (aplayground::getuniform blockshader-uniforms :fog-color))
 	 (aratio (aplayground::getuniform blockshader-uniforms :aratio))
@@ -79,7 +77,10 @@
      (camera-matrix-projection-view-player *camera*)
      nil))
   ;;;static geometry with no translation whatsoever
- ;; (sandbox::bind-default-framebuffer)
+  ;; (sandbox::bind-default-framebuffer)
+  (gl:bind-texture
+   :texture-2d
+   (aplayground::getfnc :terrain))
   (draw-chunk-meshes)
   (designatemeshing))
 
@@ -123,22 +124,17 @@
   (gl:enable :depth-test)  
   (gl:depth-func :less)
   (gl:enable :cull-face)
-  (gl:cull-face :back
-		)
-  (gl:bind-texture
-   :texture-2d
-   (aplayground::get-stuff
-    :terrain
-    aplayground::*stuff*
-    aplayground::*backup*))
+  (gl:cull-face :back)
   (let ((call-list
-	 (aplayground::get-stuff
-	  :world
-	  aplayground::*stuff*
-	  aplayground::*backup*
-	  )))
-    (when call-list
-      (gl:call-list call-list))))
+	 (get-display-list :world)))
+    (if call-list    
+	(gl:call-list call-list)
+	(let ((new (gl:gen-lists 1)))
+	  (gl:new-list new :compile)
+	  (draw-world)
+	  (gl:end-list)
+	  (set-display-list :world new)
+	  (gl:call-list new)))))
 (defun draw-world ()
   (maphash
    (lambda (key display-list)
@@ -181,71 +177,74 @@
 	(dz (- *zpos* z)))
     (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 
+(defun build-deps (getfnc setfnc)
+  (flet ((bornfnc (name func)
+	   (funcall setfnc name func))
+	 (getfnc (name)
+	   (funcall getfnc name)))
+    (progn
+      (bornfnc
+       :terrain-png
+       (lambda ()
+	 (aplayground::flip-image
+	  (aplayground::load-png 
+	   (img-path #P"terrain.png")))))
+      (bornfnc
+       :grass-png
+       (lambda ()
+	 (aplayground::load-png 
+	  (img-path #P"grasscolor.png"))))
+      (bornfnc
+       :terrain
+       (lambda ()
+	 (prog1
+	     (lovely-shader-and-texture-uploader:pic-texture
+	      (getfnc :terrain-png)
+	      :rgba)
+					;	 (gl:generate-mipmap :texture-2d)
+	   (lovely-shader-and-texture-uploader::apply-tex-params
+	    (quote ((:texture-min-filter . :nearest;-mipmap-nearest
+					 )
+		    (:texture-mag-filter . :nearest)
+		    (:texture-wrap-s . :repeat)
+		    (:texture-wrap-t . :repeat)))))))
+      (bornfnc
+       :blockshader
+       (lambda ()
+	 (let ((program
+		(lovely-shader-and-texture-uploader:make-shader-program-from-strings
+		 (getfnc :bs-vs)
+		 (getfnc :bs-frag)
+		 (quote (("position" . 0)	
+			 ("texCoord" . 2)
+			 ("darkness" . 8)
+			 )))))
+	   (let ((table (make-hash-table :test 'eq)))
+	     (setf *blockshader-uniforms* table)
+	     (aplayground::cache-program-uniforms
+	      program
+	      table
+	      (quote ((:pmv . "projectionmodelview")
+		      (:fog-color . "fogcolor")
+		      (:aratio . "aratio")
+		      (:cam-pos . "cameraPos")
+		      (:foglet . "foglet")
+		      ))))
+	   program)))
+      (bornfnc
+       :bs-vs
+       (lambda ()
+	 (alexandria:read-file-into-string
+		   (shader-path "blockshader/transforms.vs"))))
+      (bornfnc
+       :bs-frag
+       (lambda ()
+	 (alexandria:read-file-into-string
+	  (shader-path "blockshader/basictexcoord.frag")))))))
+
 (defun glinnit ()
   (setf *camera* (make-camera))
-  (setf mesher-thread nil)
-
-  (aplayground::bornfnc :world #'draw-world)
-  (progn
-    (aplayground::bornfnc
-     :terrain-png
-     (lambda ()
-       (aplayground::flip-image
-	(aplayground::load-png 
-	 (img-path #P"terrain.png")))))
-    (aplayground::bornfnc
-     :grass-png
-     (lambda ()
-       (aplayground::load-png 
-	(img-path #P"grasscolor.png"))))
-    (aplayground::bornfnc
-     :terrain
-     (lambda ()
-       (prog1
-	   (lovely-shader-and-texture-uploader:pic-texture
-	    (aplayground::get-stuff :terrain-png aplayground::*stuff*
-				    aplayground::*backup*)
-	    :rgba)
-;	 (gl:generate-mipmap :texture-2d)
-	 (lovely-shader-and-texture-uploader::apply-tex-params
-	  (quote ((:texture-min-filter . :nearest;-mipmap-nearest
-				       )
-		  (:texture-mag-filter . :nearest)
-		  (:texture-wrap-s . :repeat)
-		  (:texture-wrap-t . :repeat)))))))
-    (aplayground::bornfnc
-     :blockshader
-     (lambda ()
-       (let ((program
-	      (lovely-shader-and-texture-uploader:make-shader-program-from-strings
-	       (aplayground::get-stuff :bs-vs
-				      aplayground::*stuff*
-				      aplayground::*backup*)
-	       (aplayground::get-stuff :bs-frag
-				       aplayground::*stuff*
-				       aplayground::*backup*)
-	       (quote (("position" . 0)	
-		       ("texCoord" . 2)
-		       ("darkness" . 8)
-		       )))))
-	 (let ((table (make-hash-table :test 'eq)))
-	   (setf *blockshader-uniforms* table)
-	   (aplayground::cache-program-uniforms
-	    program
-	    table
-	    (quote ((:pmv . "projectionmodelview")
-		    (:fog-color . "fogcolor")
-		    (:aratio . "aratio")
-		    (:cam-pos . "cameraPos")
-		    (:foglet . "foglet")
-		    ))))
-	 program)))
-    (aplayground::bornfnc
-     :bs-vs
-     (lambda () (alexandria:read-file-into-string (shader-path "blockshader/transforms.vs"))))
-    (aplayground::bornfnc`
-     :bs-frag
-     (lambda () (alexandria:read-file-into-string (shader-path "blockshader/basictexcoord.frag"))))))
+  (setf mesher-thread nil))
 (defparameter *blockshader-uniforms* nil)
 
 (in-package :sandbox)

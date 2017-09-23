@@ -2,12 +2,7 @@
   :depends-on (
 	       #:funland
 	       
-;	       #:cl-openal
-;	       #:cl-alc
-;	       #:cl-ffmpeg
-;	       #:cl-mesh
-
-
+	       #:window-glfw3
 	       #:cl-program
 	       #:sandbox
 	       
@@ -20,7 +15,6 @@
 	    :serial t
 	    :components
 	    ((:file "package")
-	   ;  (:file "cl-ffmpeg")
 	     (:file "tick-governor")
 	     (:file "fuck")))))
 
