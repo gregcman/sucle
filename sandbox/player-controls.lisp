@@ -239,9 +239,10 @@
 	    (t (*= *xvel* 0.9)
 	       (*= *zvel* 0.9)
 	       )))
-  (when (and onground gravity)
+  (when (and (not onground)
+	     gravity)
     (decf *yvel* (* 0.08 (expt tickscale 2))))
- ; (*= *yvel* air-friction)
+  (*= *yvel* air-friction)
   )
 
 (defun compute-fist (control-state)
@@ -258,7 +259,7 @@
 	(when (and (window:mice-locked-p)
 		   (skey-p (keyval :q) control-state))
 	  (big-swing-fist vx vy vz))
-	(standard-fist vx vy vz)))))
+ 	(standard-fist vx vy vz)))))
 
 (defparameter *fist-function* (constantly nil))
 (defun big-swing-fist (vx vy vz)
@@ -285,31 +286,50 @@
 
 (defun block-touches (px py pz aabb)
   (let (x- x+ y- y+ z- z+)
-    (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around px py pz aabb)
-      (dobox ((x minx maxx)
-	      (y miny maxy)
-	      (z minz maxz))
-	     (when (aref mc-blocks::iscollidable (world:getblock x y z))
-	       (multiple-value-bind (i+ i- j+ j- k+ k-)
-		   (aabbcc::aabb-contact px py pz aabb x y z block-aabb)
-		 (if i+ (setq x+ t))
-		 (if i- (setq x- t))
-		 (if j+ (setq y+ t))
-		 (if j- (setq y- t))
-		 (if k+ (setq z+ t))
-		 (if k- (setq z- t))))))
+    (get-blocks-around
+     px py pz aabb
+     (lambda (x y z)
+       (when (aref mc-blocks::iscollidable (world:getblock x y z))
+;	 (plain-setblock x y z (+ 2 (random 4)) 0)
+	 (multiple-value-bind (i+ i- j+ j- k+ k-)
+	     (aabbcc::aabb-contact px py pz aabb x y z block-aabb)
+	   (if i+ (setq x+ t))
+	   (if i- (setq x- t))
+	   (if j+ (setq y+ t))
+	   (if j- (setq y- t))
+	   (if k+ (setq z+ t))
+	   (if k- (setq z- t))))))
     (values x- x+ y- y+ z- z+)))
 
-(defun get-blocks-around (px py pz aabb)
-  (declare (ignorable aabb))
-  (let ((minx (- (truncate px) 2))
-	(miny (- (truncate py) 2))
-	(minz (- (truncate pz) 2)))
-    (let ((maxx (+ minx 5))
-	  (maxy (+ miny 4))
-	  (maxz (+ minz 5)))
-      (values minx miny minz maxx maxy maxz))))
-
+(defun floor5 (x)
+  (1- (ceiling x)))
+(defun get-blocks-around (aabb-posx aabb-posy aabb-posz aabb func)
+  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
+	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz)) aabb
+    (let ((minx (+ minx aabb-posx))
+	  (maxx (+ maxx aabb-posx))
+	  (miny (+ miny aabb-posy))
+	  (maxy (+ maxy aabb-posy))
+	  (minz (+ minz aabb-posz))
+	  (maxz (+ maxz aabb-posz)))
+      (dobox ((j (floor miny)
+		 (ceiling maxy))
+	      (k (floor minz)
+		 (ceiling maxz)))
+	     (funcall func (floor5 minx) j k)
+	     (funcall func (floor maxx) j k))
+      (dobox ((i (floor minx)
+		 (ceiling maxx))
+	      (k (floor minz)
+		 (ceiling maxz)))
+	     (funcall func i (floor5 miny) k)
+	     (funcall func i (floor maxy) k))
+      (dobox ((j (floor miny)
+		 (ceiling maxy))
+	      (i (floor minx)
+		 (ceiling maxx)))
+	     (funcall func i j (floor5 minz))
+	     (funcall func i j (floor maxz))))))
 
 (defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
@@ -421,7 +441,7 @@
 	(flet ((collide-block (x y z)
 	;	 (incf total)
 		 (when (aref mc-blocks::iscollidable (world:getblock x y z))
-		   (plain-setblock x y z (+ 2 (random 4)) 0)
+;;		   (plain-setblock x y z (+ 2 (random 4)) 0)
 		   (multiple-value-bind (minimum type)
 		       (aabbcc::aabb-collide
 			aabb
@@ -456,6 +476,26 @@
 	  (values
 	   tot-min
 	   xclamp yclamp zclamp))))))
+
+
+#+nil
+(multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around px py pz aabb)
+      (dobox ((x minx maxx)
+	      (y miny maxy)
+	      (z minz maxz))))
+
+#+nil
+(defun get-blocks-around (px py pz aabb)
+  (declare (ignorable aabb))
+  (let ((minx (- (truncate px) 2))
+	(miny (- (truncate py) 2))
+	(minz (- (truncate pz) 2)))
+    (let ((maxx (+ minx 5))
+	  (maxy (+ miny 4))
+	  (maxz (+ minz 5)))
+ ;     (print (list (-  maxx minx) (- maxy miny) (- maxz minz)))
+      (values minx miny minz maxx maxy maxz))))
+
 
 #+nil
 (defmacro with-collidable-blocks ((xvar yvar zvar) (px py pz aabb vx vy vz) &body body)
