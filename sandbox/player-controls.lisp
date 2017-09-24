@@ -58,8 +58,16 @@
 (eval-always
  (import (quote (window::skey-p window::skey-j-p window::skey-j-r window::keyval window::mouseval))))
 
+(defparameter *old-scroll-y* 0.0)
+
 (defun controls (control-state)
-  (setf net-scroll (alexandria:clamp (+ net-scroll window:*scroll-y*) -1.0 1.0))
+  (let ((new-scroll window::*scroll-y*))
+    (setf *old-scroll-y* net-scroll)
+    (setf net-scroll new-scroll)
+    (let ((value (- new-scroll *old-scroll-y*)))
+      (unless (zerop value)
+	;(print value)
+	)))
   (let ((speed (* 0.4 (expt tickscale 2))))
     (when fly
       (setf speed 0.024)
@@ -184,6 +192,8 @@
 (define-modify-macro *= (&rest args)
   *)
 
+(defparameter *paused* nil)
+
 (defun physics (control-state)
   (setf *xpos-old* *xpos*
 	*ypos-old* *ypos*
@@ -192,14 +202,10 @@
   (when (window:mice-locked-p)
     (when (skey-j-p (keyval :v) control-state) (toggle noclip))
     (when (skey-j-p (keyval :t) control-state) (update-world-vao))
+    (when (skey-j-p (keyval :x) control-state) (toggle *paused*))
     (when (skey-j-p (keyval :f) control-state)
       (toggle fly)
       (toggle gravity))
-
-    (if fly
-	(setf air-friction 0.9)
-	(setf air-friction 0.98))
-    (controls control-state)
     (when fist?
       (when (skey-j-p (mouseval :left) control-state)
 	(funcall *left-fist-fnc*
@@ -211,8 +217,18 @@
 		 (floor fistx)
 		 (floor fisty)
 		 (floor fistz)))))
-  (collide-with-world)
-  
+  (unless *paused*
+    (controls control-state)
+    (collide-with-world) 
+    (world-forces)
+    
+    (contact-handle)
+    (compute-fist control-state)))
+
+(defun world-forces ()
+  (if fly
+      (setf air-friction 0.9)
+      (setf air-friction 0.98))
   (if fly
       (progn
 	(*= *xvel* air-friction)
@@ -222,18 +238,13 @@
 	     (*= *zvel* walking-friction))
 	    (t (*= *xvel* 0.9)
 	       (*= *zvel* 0.9)
-	     )))
-  (when (and gravity (not onground))
+	       )))
+  (when (and onground gravity)
     (decf *yvel* (* 0.08 (expt tickscale 2))))
-  (*= *yvel* air-friction)
-  (multiple-value-bind (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
-       (cond ((plusp *xvel*) (when i+ (setf *xvel* 0.0))
-	      (minusp *xvel*) (when i- (setf *xvel* 0.0))))
-       (cond ((plusp *yvel*) (when j+ (setf *yvel* 0.0))
-	      (minusp *yvel*) (when j- (setf *yvel* 0.0))))
-       (cond ((plusp *zvel*) (when k+ (setf *zvel* 0.0))
-	      (minusp *zvel*) (when k- (setf *zvel* 0.0))))
-       (setf onground j-))
+ ; (*= *yvel* air-friction)
+  )
+
+(defun compute-fist (control-state)
   (let ((look-vec (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
     (unit-pitch-yaw look-vec
 		    (coerce *pitch* 'single-float)
@@ -244,7 +255,103 @@
       (let ((vx (- (* reach avx)))
 	    (vy (- (* reach avy)))
 	    (vz (- (* reach avz))))
+	(when (and (window:mice-locked-p)
+		   (skey-p (keyval :q) control-state))
+	  (big-swing-fist vx vy vz))
 	(standard-fist vx vy vz)))))
+
+(defparameter *fist-function* (constantly nil))
+(defun big-swing-fist (vx vy vz)
+  (let ((u 3))
+    (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* u vx) (* u vy) (* u vz)
+			 fist-aabb
+			 
+			 (lambda (x y z)
+			   (when (and (<= 0 x 127)
+				      (<= 0 y 127)
+				      (<= -128 z -1))
+			     (let ((blockid 0))
+			       (setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))))
+
+(defun contact-handle ()
+  (multiple-value-bind (i- i+ j- j+ k- k+) (block-touches *xpos* *ypos* *zpos* player-aabb)
+      (cond ((plusp *xvel*) (when i+ (setf *xvel* 0.0))
+	     (minusp *xvel*) (when i- (setf *xvel* 0.0))))
+      (cond ((plusp *yvel*) (when j+ (setf *yvel* 0.0))
+	     (minusp *yvel*) (when j- (setf *yvel* 0.0))))
+      (cond ((plusp *zvel*) (when k+ (setf *zvel* 0.0))
+	     (minusp *zvel*) (when k- (setf *zvel* 0.0))))
+      (setf onground j-)))
+
+(defun block-touches (px py pz aabb)
+  (let (x- x+ y- y+ z- z+)
+    (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around px py pz aabb)
+      (dobox ((x minx maxx)
+	      (y miny maxy)
+	      (z minz maxz))
+	     (when (aref mc-blocks::iscollidable (world:getblock x y z))
+	       (multiple-value-bind (i+ i- j+ j- k+ k-)
+		   (aabbcc::aabb-contact px py pz aabb x y z block-aabb)
+		 (if i+ (setq x+ t))
+		 (if i- (setq x- t))
+		 (if j+ (setq y+ t))
+		 (if j- (setq y- t))
+		 (if k+ (setq z+ t))
+		 (if k- (setq z- t))))))
+    (values x- x+ y- y+ z- z+)))
+
+(defun get-blocks-around (px py pz aabb)
+  (declare (ignorable aabb))
+  (let ((minx (- (truncate px) 2))
+	(miny (- (truncate py) 2))
+	(minz (- (truncate pz) 2)))
+    (let ((maxx (+ minx 5))
+	  (maxy (+ miny 4))
+	  (maxz (+ minz 5)))
+      (values minx miny minz maxx maxy maxz))))
+
+
+(defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
+(defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
+(defun set-render-cam-pos (camera partial)
+  (let ((vec (camera-vec-position camera))
+	(cev (camera-vec-noitisop camera))
+	(prev *pos-previous*)
+	(curr *pos-current*))
+
+    (setf (aref prev 0) *xpos-old*)
+    (setf (aref prev 1) *ypos-old*)
+    (setf (aref prev 2) *zpos-old*)
+    
+    (setf (aref curr 0) *xpos*)
+    (setf (aref curr 1) *ypos*)
+    (setf (aref curr 2) *zpos*)
+
+    (cg-matrix:%vec-lerp vec prev curr partial)
+    (cg-matrix:%vec* cev vec -1.0)
+    
+    (unit-pitch-yaw (camera-vec-forward camera)
+		    (coerce *pitch* 'single-float)
+		    (coerce *yaw* 'single-float))
+    
+    (setf (camera-fov camera) defaultfov)
+    ))
+
+#+nil
+(defun cg-matrix-distance (a b)
+  (declare (type cg-matrix:vec a b))
+  (sqrt (+ (* (aref a 0)
+	      (aref b 0))
+	   (* (aref a 1)
+	      (aref b 1))
+	   (* (aref a 2)
+	      (aref b 2)))))
+
+(defun distance-to-player (x y z)
+  (let ((dx (- *xpos* x))
+	(dy (- *ypos* y))
+	(dz (- *zpos* z)))
+    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 
 (defun collide-with-world ()
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
@@ -304,6 +411,53 @@
       (values 1 nil nil nil)
       (blocktocontact player-aabb px py pz vx vy vz)))
 
+
+(locally (declare (optimize (debug 3)))
+  (defun blocktocontact (aabb px py pz vx vy vz)
+    (let ((tot-min 1)
+;	  (total 0)
+	  )
+      (let (xyz? xy? xz? yz? x? y? z?)
+	(flet ((collide-block (x y z)
+	;	 (incf total)
+		 (when (aref mc-blocks::iscollidable (world:getblock x y z))
+		   (plain-setblock x y z (+ 2 (random 4)) 0)
+		   (multiple-value-bind (minimum type)
+		       (aabbcc::aabb-collide
+			aabb
+			px py pz
+			block-aabb
+			x
+			y
+			z
+			vx vy vz)
+		     (unless (> minimum tot-min)
+		       (when (< minimum tot-min)
+			 (setq tot-min minimum)
+			 (macrolet ((null! (&rest args)
+				      (let (acc)
+					(dolist (arg args)
+					  (push `(setf ,arg nil) acc))
+					`(progn ,@acc))))
+			   (null! xyz? xy? yz? xz? x? y? z?)))
+		       (case type
+			 (:xyz (setf xyz? t))
+			 (:xy (setf xy? t))
+			 (:xz (setf xz? t))
+			 (:yz (setf yz? t))
+			 (:x (setf x? t))
+			 (:y (setf y? t))
+			 (:z (setf z? t))))))))
+	  (aabb-collect-blocks px py pz vx vy vz aabb
+			       #'collide-block))
+;	(princ " ") (princ total)
+	(multiple-value-bind (xclamp yclamp zclamp)
+	    (aabbcc::type-collapser vx vy vz xyz? xy? xz? yz? x? y? z?)
+	  (values
+	   tot-min
+	   xclamp yclamp zclamp))))))
+
+#+nil
 (defmacro with-collidable-blocks ((xvar yvar zvar) (px py pz aabb vx vy vz) &body body)
   `(multiple-value-bind (minx miny minz maxx maxy maxz)
        (get-blocks-around ,px ,py ,pz ,aabb ,vx ,vy ,vz)
@@ -312,160 +466,12 @@
 	     (,zvar minz maxz))
 	    ,@body)))
 
-(defmacro null! (&rest args)
-  (let (acc)
-    (dolist (arg args)
-      (push `(setf ,arg nil) acc))
-    `(progn ,@acc)))
-
-(defun blocktocontact (aabb px py pz vx vy vz)
-  (let ((tot-min 1))
-    (let (xyz? xy? xz? yz? x? y? z?)
-      (with-collidable-blocks (x y z) (px py pz aabb vx vy vz)
-	(when (aref mc-blocks::iscollidable (world:getblock x y z))
-	  (multiple-value-bind (minimum type)
-	      (aabbcc::aabb-collide
-	       aabb
-	       px py pz
-	       block-aabb
-	       x
-	       y
-	       z
-	       vx vy vz)
-	    (unless (> minimum tot-min)
-	      (when (< minimum tot-min)
-		(setq tot-min minimum)
-		(null! xyz? xy? yz? xz? x? y? z?))
-	      (case type
-		(:xyz (setf xyz? t))
-		(:xy (setf xy? t))
-		(:xz (setf xz? t))
-		(:yz (setf yz? t))
-		(:x (setf x? t))
-		(:y (setf y? t))
-		(:z (setf z? t)))))))
-      (multiple-value-bind (xclamp yclamp zclamp)
-	  (aabbcc::type-collapser vx vy vz xyz? xy? xz? yz? x? y? z?)
-	(values
-	 tot-min
-	 xclamp yclamp zclamp)))))
-
-(defun block-touches (px py pz aabb)
-  (let (x- x+ y- y+ z- z+)
-    (multiple-value-bind (minx miny minz maxx maxy maxz) (get-blocks-around px py pz player-aabb 0 0 0)
-       (dobox ((x minx maxx)
-	      (y miny maxy)
-	      (z minz maxz))
-	     (when (aref mc-blocks::iscollidable (world:getblock x y z))
-	       (multiple-value-bind (i+ i- j+ j- k+ k-)
-		   (aabbcc::aabb-contact px py pz aabb x y z block-aabb)
-		 (if i+ (setq x+ t))
-		 (if i- (setq x- t))
-		 (if j+ (setq y+ t))
-		 (if j- (setq y- t))
-		 (if k+ (setq z+ t))
-		 (if k- (setq z- t))))))
-    (values x- x+ y- y+ z- z+)))
-
-(defun get-blocks-around (px py pz aabb vx vy vz)
-  (declare (ignorable aabb vx vy vz))
-  (let ((minx (- (truncate px) 2))
-	(miny (- (truncate py) 2))
-	(minz (- (truncate pz) 2)))
-    (let ((maxx (+ minx 5))
-	  (maxy (+ miny 4))
-	  (maxz (+ minz 5)))
-      (values minx miny minz maxx maxy maxz))))
-
-(defun smallest (i j k)
-  (if (< i j)
-      (if (< i k) ;;i < j j is out
-	  (values i t nil nil)	  ;;; i < k and i < j
-	  (if (= i k)
-	      (values i t nil t) ;;;tied for smallest
-	      (values k nil nil t)	     ;;; k < i <j
-	      ))
-      (if (< j k) ;;i>=j
-	  (if (= i j)
-	      (values i t t nil)
-	      (values j nil t nil)) ;;j<k and i<=j k is nout
-	  (if (= i k)
-	      (values i t t t)
-	      (if (= k j)
-		  (values k nil t t)
-		  (values k nil nil t))) ;;i>=j>=k 
-	  )))
-
-(defun aux-func (x dx)
-  (if (zerop dx)
-      nil
-      (if (plusp dx)
-	  (floor (1+ x))
-	  (ceiling (1- x)))))
-
-
-(defun aabb-collect-blocks (px py pz dx dy dz aabb func)
-  (declare (ignorable aabb))
-  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
-	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz)) aabb
-    (let ((total 1))
-      (let ((pluspdx (plusp dx))
-	    (pluspdy (plusp dy))
-	    (pluspdz (plusp dz))
-	    (zeropdx (zerop dx))
-	    (zeropdy (zerop dy))
-	    (zeropdz (zerop dz)))
-	(declare (ignorable pluspdx pluspdy pluspdz zeropdx zeropdy zeropdz))
-	(let ((xoffset (if zeropdx 0 (if pluspdx maxx minx)))
-	      (yoffset (if zeropdy 0 (if pluspdy maxy miny)))
-	      (zoffset (if zeropdz 0 (if pluspdz maxz minz))))
-	  (let ((x (+ px xoffset))
-		(y (+ py yoffset))
-		(z (+ pz zoffset)))
-	    (tagbody
-	     rep
-	       (let ((i-next (aux-func x dx))
-		     (j-next (aux-func y dy))
-		     (k-next (aux-func z dz)))
-		 (multiple-value-bind (ratio i? j? k?) (smallest (if i-next
-						     (/ (- i-next x) dx)
-						     most-positive-single-float)
-						 (if j-next
-						     (/ (- j-next y) dy)
-						     most-positive-single-float)
-						 (if k-next
-						     (/ (- k-next z) dz)
-						     most-positive-single-float))	 
-		      (let ((newx (if i? i-next (+ x (* dx ratio))))
-			    (newy (if j? j-next (+ y (* dy ratio))))
-			    (newz (if k? k-next (+ z (* dz ratio)))))
-			(let ((aabb-posx (- newx xoffset))
-			      (aabb-posy (- newy yoffset))
-			      (aabb-posz (- newz zoffset)))
-			  (when i?
-			    (dobox ((j (floor (+ aabb-posy miny))
-				       (ceiling (+ aabb-posy maxy)))
-				    (k (floor (+ aabb-posz minz))
-				       (ceiling (+ aabb-posz maxz))))
-				   (funcall func (if pluspdx newx (1- newx)) j k)))
-			  (when j?
-			    (dobox ((i (floor (+ aabb-posx minx))
-				       (ceiling (+ aabb-posx maxx)))
-				    (k (floor (+ aabb-posz minz))
-				       (ceiling (+ aabb-posz maxz))))
-				   (funcall func i (if pluspdy newy (1- newy)) k)))
-			  (when k?
-			    (dobox ((j (floor (+ aabb-posy miny))
-				       (ceiling (+ aabb-posy maxy)))
-				    (i (floor (+ aabb-posx minx))
-				       (ceiling (+ aabb-posx maxx))))
-				   (funcall func i j (if pluspdz newz (1- newz))))))
-			(setf x newx y newy z newz))
-		      (decf total ratio)
-		      (when (minusp total) (go end))
-		      (go rep)))
-	     end)))))))
-
+#+nil
+(multiple-value-bind (minx miny minz maxx maxy maxz)
+	  (get-blocks-around px py pz aabb)
+	(dobox ((x minx maxx)
+		(y miny maxy)
+		(z minz maxz))))
 
 #+nil
 (defun player-pos ()
@@ -546,30 +552,5 @@
 		 (princ (world:skygetlight xop yop zop))))
 	    (1 ))
 
-#+nil
-(progno
- (let ((look-vec (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-   (unit-pitch-yaw look-vec
-		   (coerce *pitch* 'single-float)
-		   (coerce *yaw* 'single-float))
-   (let ((avx (aref look-vec 0))
-	 (avy (aref look-vec 1))
-	 (avz (aref look-vec 2)))
-     (let ((vx (- (* reach avx)))
-	   (vy (- (* reach avy)))
-	   (vz (- (* reach avz))))
-       (when (and (window:mice-locked-p) (skey-p (keyval :q) control-state))
-	 (big-swing-fist vx vy vz))
-       (standard-fist vx vy vz))))
- (defparameter *fist-function* (constantly nil))
- (defun big-swing-fist (vx vy vz)
-   (let ((u 3))
-     (aabb-collect-blocks (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) (* u vx) (* u vy) (* u vz)
-			  fist-aabb
-			  
-			  (lambda (x y z)
-			    (when (and (<= 0 x 127)
-				       (<= 0 y 127)
-				       (<= -128 z -1))
-			      (let ((blockid 0))
-				(setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid)))))))))
+
+

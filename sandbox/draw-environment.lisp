@@ -81,32 +81,6 @@
   result)
 
 
-(defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
-(defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
-(defun set-render-cam-pos (camera partial)
-  (let ((vec (camera-vec-position camera))
-	(cev (camera-vec-noitisop camera))
-	(prev *pos-previous*)
-	(curr *pos-current*))
-
-    (setf (aref prev 0) *xpos-old*)
-    (setf (aref prev 1) *ypos-old*)
-    (setf (aref prev 2) *zpos-old*)
-    
-    (setf (aref curr 0) *xpos*)
-    (setf (aref curr 1) *ypos*)
-    (setf (aref curr 2) *zpos*)
-
-    (cg-matrix:%vec-lerp vec prev curr partial)
-    (cg-matrix:%vec* cev vec -1.0)
-    
-    (unit-pitch-yaw (camera-vec-forward camera)
-		    (coerce *pitch* 'single-float)
-		    (coerce *yaw* 'single-float))
-    
-    (setf (camera-fov camera) defaultfov)
-    ))
-
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)  
   (gl:depth-func :less)
@@ -153,16 +127,9 @@
     (dolist (x (sort list #'< :key (lambda (x)
 				(multiple-value-bind (i j k) (world:unhashfunc x)
 				  (distance-to-player (- i 8)
-						      
 						      (- k 8)
 						      (- j 8))))))
       (dirty-push x))))
-
-(defun distance-to-player (x y z)
-  (let ((dx (- *xpos* x))
-	(dy (- *ypos* y))
-	(dz (- *zpos* z)))
-    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 
 (defparameter ourdir
   (make-pathname :host (pathname-host #.(or *compile-file-truename*
@@ -328,7 +295,7 @@
    :maxy 1.12
    :maxz 0.3))
 
-#+nil
+
 (defun chunk-aabb ()
   (aabbcc::make-aabb
    :minx -8.0
@@ -337,7 +304,7 @@
    :maxx 8.0
    :maxy 8.0
    :maxz 8.0))
-#+nil
+
 (defparameter chunk-aabb (chunk-aabb))
 #+nil
 (defparameter player-aabb+1 (player-aabb+1))
@@ -356,10 +323,36 @@
 (defparameter player-aabb (player-aabb))
 (defparameter fist-aabb (fist-aabb))
 
-
+#+nil
 ;;matrix multiplication is associative
+(defparameter *temp-matrix2* (cg-matrix:identity-matrix))
 #+nil(defparameter *temp-matrix* (cg-matrix:identity-matrix))
- ;;;opengl stored matrices the transpose of sb-cga
+;;;opengl stored matrices the transpose of sb-cga
+#+nil
+(defun draw-fist (camera)
+  (gl:line-width 30.0)
+  (set-matrix
+   "projectionmodelview"
+   (cg-matrix:%transpose-matrix
+    *temp-matrix*
+    (cg-matrix:%matrix*
+     *temp-matrix2*
+     (camera-matrix-projection-view-player camera)
+     (cg-matrix:%translate*
+      *temp-matrix*
+      (coerce fist-side-x 'single-float)
+      (coerce fist-side-y 'single-float)
+      (coerce fist-side-z 'single-float)))))
+  (gl:color 0.0 0.0 0.0)
+  (gl:disable :cull-face :blend)
+  (gl:polygon-mode :front-and-back :line)
+  (let ((fist-pos (load-time-value
+		   (make-array 3 :element-type (quote single-float)
+			       :initial-contents (quote
+						  (0.0 0.0 0.0))))))   
+    (set-vec3 "fogcolor" fist-pos))
+  (ldrawlist :selected-box)
+  (gl:polygon-mode :front-and-back :fill))
 
 
 #+nil
@@ -446,35 +439,6 @@
    (setf (aref *vec4* 1) (aref vec3 1))
    (setf (aref *vec4* 2) (aref vec3 2))
    *vec4*))
-
-#+nil
-(defparameter *temp-matrix2* (cg-matrix:identity-matrix))
-;;;opengl stored matrices the transpose of sb-cga
-#+nil
-(defun draw-fist (camera)
-  (gl:line-width 30.0)
-  (set-matrix
-   "projectionmodelview"
-   (cg-matrix:%transpose-matrix
-    *temp-matrix*
-    (cg-matrix:%matrix*
-     *temp-matrix2*
-     (camera-matrix-projection-view-player camera)
-     (cg-matrix:%translate*
-      *temp-matrix*
-      (coerce fist-side-x 'single-float)
-      (coerce fist-side-y 'single-float)
-      (coerce fist-side-z 'single-float)))))
-  (gl:color 0.0 0.0 0.0)
-  (gl:disable :cull-face :blend)
-  (gl:polygon-mode :front-and-back :line)
-  (let ((fist-pos (load-time-value
-		   (make-array 3 :element-type (quote single-float)
-			       :initial-contents (quote
-						  (0.0 0.0 0.0))))))   
-    (set-vec3 "fogcolor" fist-pos))
-  (ldrawlist :selected-box)
-  (gl:polygon-mode :front-and-back :fill))
 
 
 #+nil

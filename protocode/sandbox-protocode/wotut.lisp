@@ -1,0 +1,81 @@
+(in-package :sandbox)
+
+(with-unsafe-speed
+  (progn
+    (defun least-significant-bit (x)
+      (declare (type fixnum x))
+      (the fixnum (- (the fixnum (logxor x (the fixnum (- x)))))))
+    (defun least-significant-power (x)
+      (logcount (the alexandria:positive-fixnum (1- (the fixnum (least-significant-bit x))))))))
+
+
+(defstruct dlink content position prev next)
+
+(defun disconnect-dlink (dlink)
+  (let ((next (dlink-next dlink))
+	(prev (dlink-prev dlink)))
+    (link-links prev next)))
+
+(defun link-links (prev next)
+  (when (dlink-p prev)
+    (setf (dlink-next prev) next))
+  (when (dlink-p next)
+    (setf (dlink-prev next) prev)))
+
+(defstruct wotut
+  (node-array (make-array 64))
+  (top (make-dlink :position t :content t)))
+
+(defun link-link-link (prev curr next)
+  (link-links prev curr)
+  (link-links curr next))
+
+(defun find-last (value link)
+  (let ((prev nil)
+	ans)
+    (block out
+      (do ((dlink link (dlink-prev dlink)))
+	  ((not (dlink-p dlink)))
+	(let ((pos (dlink-position dlink)))
+	  (when (and (not (eq t pos))
+		     (> value pos))
+	    (setf ans dlink)
+	    (return-from out)))
+	(setf prev dlink)))
+    (values ans prev)))
+
+(defun add-item (ticks item wotut)
+  (let ((position (least-significant-power ticks)))
+    (let ((nodes (wotut-node-array wotut)))
+      (let ((old (aref nodes position)))
+	(if (dlink-p old)
+	    (disconnect-dlink old)
+	    (let ((new (make-dlink)))
+	      (setf old new)
+	      (setf (aref nodes position) new)))
+	(setf (dlink-content old) item)
+	(setf (dlink-position old) ticks)
+	(multiple-value-bind (top after)
+	    (find-last ticks (wotut-top wotut))
+	  (link-link-link top old after))))))
+
+(set-pprint-dispatch 'dlink (lambda (stream obj)
+			      (princ "[" stream)
+			      (labels ((recforward (dlink)
+					 (write (dlink-content dlink) :stream stream)
+					 (let ((next (dlink-next dlink)))
+					   (when (dlink-p next)
+					     (write-char #\Space stream)
+					     (recforward next)))))
+				(recforward obj))
+			      (princ "|" stream)
+			      (labels ((recbackwards (dlink)
+					 (write (dlink-content dlink) :stream stream)
+					 (let ((prev (dlink-prev dlink)))
+					   (when (dlink-p prev)
+					     (write-char #\Space stream)
+					     (recbackwards prev)))))
+				(recbackwards obj))
+			      (princ "]" stream)
+			      ))
+
