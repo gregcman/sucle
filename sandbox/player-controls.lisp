@@ -10,6 +10,12 @@
 (defparameter *xpos* 0.0)
 (defparameter *ypos* 0.0)
 (defparameter *zpos* 0.0)
+
+(defun goto (x y z)
+  (setf *xpos* (float x)
+	*ypos* (float y)
+	*zpos* (float z)))
+
 (defparameter *xvel* 0.0)
 (defparameter *yvel* 0.0)
 (defparameter *zvel* 0.0)

@@ -272,11 +272,6 @@
     (sandbox::clearblock? 58 box)
     (dotimes (x 3) (sandbox::bonder box))))
 
-(defun goto (x y z)
-  (setf *xpos* (float x)
-	*ypos* (float y)
-	*zpos* (float z)))
-
 (defun huuh ()
   (world:clearworld)
   (sandbox::seed 1 10000)
