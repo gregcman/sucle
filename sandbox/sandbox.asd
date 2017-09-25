@@ -36,7 +36,8 @@
      (:module phys
 	      :serial t
 	      :components ((:file "voxel-trace")
-			   (:file "fists")))
+			   (:file "fists")
+			   (:file "collide-and-contact")))
      (:file "player-controls") ;;moving the player around
 
 					;  (:file "wotut")

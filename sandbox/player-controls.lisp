@@ -98,11 +98,16 @@
 	  (full (getf data 'full))
 	  (collide (getf data 'collide))
 	  (collect (getf data 'collect)))
+      (declare (type (function (number number number aabbcc::aabb)
+			       (values single-float symbol))
+		     collide)
+	       (type (function (single-float symbol))
+		     collect))
       (funcall
        set-test
        (lambda (x y z)
 	 (when (aref mc-blocks::iscollidable (world:getblock x y z))
-;;	   (plain-setblock x y z 1 0)
+	   ;;	   (plain-setblock x y z 1 0)
 	   (multiple-value-bind (minimum type)
 	       (funcall collide x y z block-aabb)
 	     (funcall collect minimum type)))))
@@ -116,6 +121,21 @@
 	 fun
 	 *xpos* *ypos* *zpos* *xvel* *yvel* *zvel*)))
 
+(defun wotow2 ()
+  (let ((data (make-contact-suite)))
+    (let ((full (getf data 'full))
+	  (set-fun (getf data 'set-fun))
+	  (add (getf data 'add)))
+      (funcall
+       set-fun
+       (lambda (x y z)
+	 (when (aref mc-blocks::iscollidable (world:getblock x y z))
+					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
+	   (funcall add x y z block-aabb))))
+      full)))
+
+(defparameter *contact-handler* (wotow2))
+
 (defun physics (control-state)
   (setf *xpos-old* *xpos*
 	*ypos-old* *ypos*
@@ -128,12 +148,19 @@
     (when (window::skey-j-p (window::keyval :f) control-state)
       (toggle fly)
       (toggle gravity)))
-  (let ((aabb player-aabb))
+  (let ((aabb player-aabb)
+	(noclip noclip))
     (unless *paused*
       (controls control-state)
-      (collide-with-world *world-collision-fun*) 
-      (world-forces)   
-      (contact-handle *xpos* *ypos* *zpos* aabb #'block-touches)
+      (collide-with-world (if noclip
+			      (lambda (&rest args)
+				(declare (ignore args))
+				(values 1 nil nil nil))
+			      *world-collision-fun*)) 
+      (world-forces)
+      (contact-handle (if noclip
+			  #b000000
+			  (funcall *contact-handler* *xpos* *ypos* *zpos* aabb)))
       (compute-fist control-state))))
 
 (define-modify-macro *= (&rest args)
@@ -200,23 +227,43 @@
 	(dz (- *zpos* z)))
     (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 
-(defun contact-handle (x y z aabb touch-fnc)
-  (multiple-value-bind (i- i+ j- j+ k- k+) (funcall touch-fnc x y z aabb)
-      (cond ((plusp *xvel*) (when i+ (setf *xvel* 0.0))
-	     (minusp *xvel*) (when i- (setf *xvel* 0.0))))
-      (cond ((plusp *yvel*) (when j+ (setf *yvel* 0.0))
-	     (minusp *yvel*) (when j- (setf *yvel* 0.0))))
-      (cond ((plusp *zvel*) (when k+ (setf *zvel* 0.0))
-	     (minusp *zvel*) (when k- (setf *zvel* 0.0))))
-      (setf onground j-)))
+(defun contact-handle (acc)
+  (multiple-value-bind (i+ i- j+ j- k+ k-)
+      (values (logtest acc #b100000)
+	      (logtest acc #b010000)
+	      (logtest acc #b001000)
+	      (logtest acc #b000100)
+	      (logtest acc #b000010)
+	      (logtest acc #b000001))
+    (cond ((plusp *xvel*) (when i+ (setf *xvel* 0.0))
+	   (minusp *xvel*) (when i- (setf *xvel* 0.0))))
+    (cond ((plusp *yvel*) (when j+ (setf *yvel* 0.0))
+	   (minusp *yvel*) (when j- (setf *yvel* 0.0))))
+    (cond ((plusp *zvel*) (when k+ (setf *zvel* 0.0))
+	   (minusp *zvel*) (when k- (setf *zvel* 0.0))))
+    (setf onground j-)))
 
+#+nil
+(defun block-touches (px py pz aabb)
+  (let ((acc 0))
+    (get-blocks-around
+     px py pz aabb
+     (lambda (x y z)
+       (when (aref mc-blocks::iscollidable (world:getblock x y z))
+					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
+	 (logiorf
+	  acc
+	  (aabbcc::aabb-contact px py pz aabb x y z block-aabb)))))
+    acc))
+
+#+nil
 (defun block-touches (px py pz aabb)
   (let (x- x+ y- y+ z- z+)
     (get-blocks-around
      px py pz aabb
      (lambda (x y z)
        (when (aref mc-blocks::iscollidable (world:getblock x y z))
-;	 (plain-setblock x y z (+ 2 (random 4)) 0)
+					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
 	 (multiple-value-bind (i+ i- j+ j- k+ k-)
 	     (aabbcc::aabb-contact px py pz aabb x y z block-aabb)
 	   (if i+ (setq x+ t))
@@ -225,99 +272,7 @@
 	   (if j- (setq y- t))
 	   (if k+ (setq z+ t))
 	   (if k- (setq z- t))))))
-    (values x- x+ y- y+ z- z+)))
-
-(defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
-  (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
-      (aabbcc::step-motion aabb-gen-fnc
-			   x y z dx dy dz)
-    (multiple-value-bind (new-dx new-dy new-dz) (aabbcc::clamp-vec
-				  dx dy dz
-				  xclamp yclamp zclamp)
-      (values new-x new-y new-z new-dx new-dy new-dz))))
-
-(defstruct touch-collector
-  (acc #b0000000)
-  (min-ratio 1.0))
-(defun reset-touch-collector (taco)
-  (setf (touch-collector-acc taco) #b0000000)
-  (setf (touch-collector-min-ratio taco) 1.0))
-(define-modify-macro logiorf (&rest args)
-  logior)
-(defun collect-touch (minimum type touch-collector)
-  (let ((tot-min (touch-collector-min-ratio touch-collector)))
-    (unless (> minimum tot-min)
-      (with-let-mapped-places ((acc (touch-collector-acc touch-collector)))
-	(when (< minimum tot-min)
-	  (setf (touch-collector-min-ratio touch-collector) minimum)
-	  (setf acc #b0000000))
-	(case type
-	  (:xyz (logiorf acc #b1000000))
-	  (:xy  (logiorf acc #b0100000))
-	  (:xz  (logiorf acc #b0010000))
-	  (:yz  (logiorf acc #b0001000))
-	  (:x   (logiorf acc #b0000100))
-	  (:y   (logiorf acc #b0000010))
-	  (:z   (logiorf acc #b0000001)))))))
-
-(defun collapse-touch (dx dy dz touch-collector)
-  (let ((acc (touch-collector-acc touch-collector)))
-    (aabbcc::type-collapser
-     dx dy dz 
-     (logtest acc #b1000000)
-     (logtest acc #b0100000)
-     (logtest acc #b0010000)
-     (logtest acc #b0001000)
-     (logtest acc #b0000100)
-     (logtest acc #b0000010)
-     (logtest acc #b0000001))))
-
-(defun make-collision-suite (&key (aabb player-aabb) (test (constantly nil)))
-  (let ((px 0.0)
-	(py 0.0)
-	(pz 0.0)
-	(vx 0.0)
-	(vy 0.0)
-	(vz 0.0))
-    (let ((taco (make-touch-collector)))
-      (labels
-	  ((set-aabb (new-aabb);;;
-	     (setf aabb new-aabb))
-	   (set-test (new-test);;;
-	     (setf test new-test))
-	   (head (dpx dpy dpz dvx dvy dvz)
-	     (setf (values px py pz vx vy vz)
-		   (values dpx dpy dpz dvx dvy dvz)))
-	   (reset ()
-	     (reset-touch-collector taco))
-	   (collect (min type);;;
-	     (collect-touch min type taco))
-	   (collide (foox fooy fooz fooaabb);;;
-	     (aabbcc::aabb-collide
-	      aabb
-	      px py pz
-	      fooaabb
-	      foox fooy fooz
-	      vx vy vz))
-	   (tail ()
-	     (aabb-collect-blocks
-	      px py pz vx vy vz aabb
-	      test)
-	     (multiple-value-bind (xclamp yclamp zclamp)
-		 (collapse-touch vx vy vz taco)
-	       (values
-		(touch-collector-min-ratio taco)
-		xclamp yclamp zclamp)))
-	   (full (px py pz vx vy vz);;;
-	     (head px py pz vx vy vz)
-	     (reset)
-	     (tail)))
-	(list 'set-aabb #'set-aabb
-	      'set-test #'set-test
-	      'collect #'collect
-	      'collide #'collide
-	      'full #'full)))))
-
+    (values x+ x- y+ y- z+ z-)))
 
 #+nil
 (xyz? xy? xz? yz? x? y? z?)
@@ -442,11 +397,6 @@
 		 (print (list xop yop zop))
 		 (princ (world:skygetlight xop yop zop))))
 	    (1 ))
-
-#+nil
-(if noclip
-      (values 1 nil nil nil))
-
 
 #+nil
 (defparameter *hotbar-selection* 3)

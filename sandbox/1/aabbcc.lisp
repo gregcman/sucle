@@ -254,13 +254,13 @@ edge, or no case"
       ((touch ((aface bface) (max0 may0 max1 may1 mbx0 mby0 mbx1 mby1))
 	      `(and (= ,aface ,bface)
 		    (eq t (r-intersect ,max0 ,may0 ,max1 ,may1 ,mbx0 ,mby0 ,mbx1 ,mby1)))))
-    (values
-     (touch (ax1 bx0) (ay0 az0 ay1 az1 by0 bz0 by1 bz1)) ;;plusx
-     (touch (ax0 bx1) (ay0 az0 ay1 az1 by0 bz0 by1 bz1)) ;;-x
-     (touch (ay1 by0) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1)) ;;plusy
-     (touch (ay0 by1) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1)) ;;-y
-     (touch (az1 bz0) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)) ;;+z
-     (touch (az0 bz1) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)))));; -Z
+    (logior
+     (if (touch (ax1 bx0) (ay0 az0 ay1 az1 by0 bz0 by1 bz1)) #b100000 0) ;;plusx
+     (if (touch (ax0 bx1) (ay0 az0 ay1 az1 by0 bz0 by1 bz1)) #b010000 0)   ;;-x
+     (if (touch (ay1 by0) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1)) #b001000 0) ;;plusy
+     (if (touch (ay0 by1) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1)) #b000100 0)   ;;-y
+     (if (touch (az1 bz0) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)) #b000010 0)	;;+z
+     (if (touch (az0 bz1) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)) #b000001 0))))	;; -Z
 
 ;;less used items below
 

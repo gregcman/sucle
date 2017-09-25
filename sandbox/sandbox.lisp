@@ -371,5 +371,5 @@
 	     (/ (floor (/ (+ xoffset x) 8.0)) 8.0)
 	     (/ (floor (* (+ yoffset y) (/ 1.0 8.0))) 8.0)
 	     (/ (floor (* (+ zoffset z) (/ 1.0 8.0))) 8.0)))
-	 (sandbox::plain-setblock x y z 0 15)
+	 (sandbox::plain-setblock x y z 0 0 15)
 	 (sandbox::plain-setblock x y z 1 0))) sandbox::*box*))
