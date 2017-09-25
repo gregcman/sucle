@@ -9,6 +9,9 @@
 						 xclamp yclamp zclamp)
       (values new-x new-y new-z new-dx new-dy new-dz))))
 
+(defun untouched (ratio)
+  (= ratio 69.0))
+
 (defstruct touch-collector
   (acc #b0000000)
   (min-ratio 1.0))
@@ -19,19 +22,22 @@
   logior)
 (defun collect-touch (minimum type touch-collector)
   (let ((tot-min (touch-collector-min-ratio touch-collector)))
-    (unless (> minimum tot-min)
-      (with-let-mapped-places ((acc (touch-collector-acc touch-collector)))
-	(when (< minimum tot-min)
-	  (setf (touch-collector-min-ratio touch-collector) minimum)
-	  (setf acc #b0000000))
-	(case type
-	  (:xyz (logiorf acc #b1000000))
-	  (:xy  (logiorf acc #b0100000))
-	  (:xz  (logiorf acc #b0010000))
-	  (:yz  (logiorf acc #b0001000))
-	  (:x   (logiorf acc #b0000100))
-	  (:y   (logiorf acc #b0000010))
-	  (:z   (logiorf acc #b0000001)))))))
+    (if (> minimum tot-min)
+	(values nil nil)
+	(with-let-mapped-places ((acc (touch-collector-acc touch-collector)))
+	  (let ((is-minimum? (< minimum tot-min)))
+	    (when is-minimum?
+	      (setf (touch-collector-min-ratio touch-collector) minimum)
+	      (setf acc #b0000000))
+	    (case type
+	      (:xyz (logiorf acc #b1000000))
+	      (:xy  (logiorf acc #b0100000))
+	      (:xz  (logiorf acc #b0010000))
+	      (:yz  (logiorf acc #b0001000))
+	      (:x   (logiorf acc #b0000100))
+	      (:y   (logiorf acc #b0000010))
+	      (:z   (logiorf acc #b0000001)))
+	    (values is-minimum? t))))))
 
 (defun collapse-touch (dx dy dz touch-collector)
   (let ((acc (touch-collector-acc touch-collector)))

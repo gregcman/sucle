@@ -4,7 +4,7 @@
   (clrhash *g/call-list*)
   (clrhash *g/chunk-call-list*)
 
-  (glinnit) ;opengl
+  (setf mesher-thread nil)
   (clean-dirty)
   )
 

@@ -256,9 +256,6 @@
 	  (shader-path "blockshader/basictexcoord.frag")))))))
 
 
-(defun glinnit ()
-  (setf mesher-thread nil))
-
 (defparameter *blockshader-uniforms* nil)
 
 (in-package :sandbox)
@@ -518,3 +515,7 @@
    (src-text :ss-vs (shader-path "solidshader/transforms.vs"))
    #+nil
    (src-text :ss-frag (shader-path "solidshader/basictexcoord.frag"))))
+
+#+nil
+(defun glinnit ()
+  )

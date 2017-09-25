@@ -1,87 +1,97 @@
 (in-package :sandbox)
 
-(defparameter fist-side-x nil)
-(defparameter fist-side-y nil)
-(defparameter fist-side-z nil)
+(defstruct fister
+  (selected-block (vector 0 0 0))
+  (normal-block (vector 0 0 0))
+  (exists nil)
+  (position (vector 0 0 0))
+  fun
+  fun-reset
+  fun-flush)
 
-(defparameter fist? nil)
-(defparameter fist-side nil)
-(defparameter fistx 0.0)
-(defparameter fisty 0.0)
-(defparameter fistz 0.0)
+(defun gen-fister ()
+  (let ((fist (make-fister)))
+    (setf (values (fister-fun-flush fist)
+		  (fister-fun-reset fist)
+		  (fister-fun fist))
+	  (generate-fist-suite))
+    fist))
 
-(defparameter reach 4.0)
+(defmacro setvec3d (vec x y z)
+  (let ((a (gensym)))
+    `(let ((,a ,vec))
+       (setf (aref ,a 0) ,x
+	     (aref ,a 1) ,y
+	     (aref ,a 2) ,z))))
 
-(defparameter *block-value* 1)
-(defparameter *right-fist-fnc*
-  (lambda (x y z)
-    (let ((blockval *block-value*))
-      (setblock-with-update
-       x
-       y
-       z
-       blockval
-       (aref mc-blocks::lightvalue blockval)))))
+(defun standard-fist (fist px py pz vx vy vz)
+  (funcall (fister-fun-reset fist))
+  (let ((frac
+	 (funcall (fister-fun fist) px py pz vx vy vz)))
+    (multiple-value-bind (exists? blockx blocky blockz)
+	(funcall (fister-fun-flush fist))
+      (if exists?
+	  (progn
+	    (setvec3d (fister-selected-block fist)
+		      blockx
+		      blocky
+		      blockz)
+	    (let ((a (+ px (* frac vx)))
+		  (b (+ py (* frac vy)))
+		  (c (+ pz (* frac vz))))
+	      (setvec3d (fister-position fist)
+			a 
+			b
+			c)
+	      (setvec3d (fister-normal-block fist)
+			(floor a) 
+			(floor b)
+			(floor c)))
+	    (setf (fister-exists fist) t))
+	  (setf (fister-exists fist) nil)))))
 
-(defparameter *left-fist-fnc*
-  (lambda (x y z)
-    (setblock-with-update x y z 0 0)))
+(defun generate-fist-suite ()
+  (let ((ansx nil)
+	(ansy nil)
+	(ansz nil)
+	(exists? nil))
+    (values
+     (lambda ()
+       (values exists? ansx ansy ansz))
+     (lambda ()
+       (setf exists? nil))
+     (configure-collision-handler
+      (lambda (collect set-aabb)
+	(funcall set-aabb fist-aabb)
+	(lambda (x y z)
+	  (unless (zerop (world:getblock x y z))
+	    (multiple-value-bind (first? is-minimum?)
+		(funcall collect x y z block-aabb)
+	      (declare (ignorable first? is-minimum?))       
+	      (when (and is-minimum? first?)
+		(setf exists? t)
+		(setq ansx x
+		      ansy y
+		      ansz z))))))))))
 
-(defun compute-fist (control-state)
-  (when fist?
-    (when (window::skey-j-p (window::mouseval :left) control-state)
-      (funcall *left-fist-fnc*
-	       fist-side-x
-	       fist-side-y
-	       fist-side-z))
-    (when (window::skey-j-p (window::mouseval :right) control-state)
-      (funcall *right-fist-fnc*
-	       (floor fistx)
-	       (floor fisty)
-	       (floor fistz))))
-  (let ((look-vec (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-    (unit-pitch-yaw look-vec
-		    (coerce *pitch* 'single-float)
-		    (coerce *yaw* 'single-float))
-    (let ((avx (aref look-vec 0))
-	  (avy (aref look-vec 1))
-	  (avz (aref look-vec 2)))
-      (let ((vx (- (* reach avx)))
-	    (vy (- (* reach avy)))
-	    (vz (- (* reach avz))))
-	(when (and (window:mice-locked-p)
-		   (window::skey-p (window::keyval :q) control-state))
-	  (big-swing-fist vx vy vz))
- 	(standard-fist vx vy vz)))))
+(defun use-fist (fist left-p right-p left-fun right-fun)
+  (let ((fist? (fister-exists fist))
+	(selected-block (fister-selected-block fist))
+	(normal-block (fister-normal-block fist)))
+    (when fist?
+      (when left-p
+	(funcall left-fun
+		 (aref selected-block 0)
+		 (aref selected-block 1)
+		 (aref selected-block 2)))
+      (when right-p
+	(funcall right-fun
+		 (aref normal-block 0)
+		 (aref normal-block 1)
+		 (aref normal-block 2))))))
 
-(defparameter *fist-function* (constantly nil))
-(defun big-swing-fist (vx vy vz)
-  (let ((u 3))
-    (aabb-collect-blocks
-     *xpos* *ypos* *zpos* (* u vx) (* u vy) (* u vz)
-     fist-aabb
-     
-     (lambda (x y z)
-       (when (and (<= 0 x 127)
-		  (<= 0 y 127)
-		  (<= -128 z -1))
-	 (let ((blockid 0))
-	   (setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))))
 
-(defun standard-fist (vx vy vz)
-  (multiple-value-bind (frac type blockx blocky blockz)
-       (punch-func (+ *xpos* -0.0) (+ *ypos* 0.0) (+ *zpos* -0.0) vx vy vz)
-       (if frac
-	   (setf fist? t
-		 fist-side type
-		 fist-side-x blockx
-		 fist-side-y blocky
-		 fist-side-z blockz
-		 fistx (+ *xpos* (* frac vx))
-		 fisty (+ *ypos* (* frac vy))
-		 fistz (+ *zpos* (* frac vz)))
-	   (setf fist? nil))))
-
+#+nil
 (defun punch-func (px py pz vx vy vz)
   (let ((tot-min 2)
 	(type :nothing)
@@ -105,3 +115,26 @@
 					ansy y
 					ansz z))))))
      (values (if (= 2 tot-min) nil tot-min) type ansx ansy ansz)))
+
+#+nil
+(defparameter fist-side nil)
+
+#+nil
+
+(defparameter *fist-function* (constantly nil))
+
+#+nil
+(progno
+ (defparameter *world-fist-collision-fun* nil)
+ (defparameter *world-fist-collision-fun-reset* nil)
+ (defparameter *world-fist-collision-fun-flush* nil)
+ (setf (values
+	*world-fist-collision-fun-flush*
+	*world-fist-collision-fun-reset*
+	*world-fist-collision-fun*)
+       )
+
+ (defparameter *selected-block* (vector 0 0 0))
+ (defparameter *normal-block* (vector 0 0 0))
+ (defparameter fist? nil)
+ (defparameter *fist-position* (vector 0 0 0)))
