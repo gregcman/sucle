@@ -75,10 +75,15 @@
 	(when *sandbox-on*
 	  (progn
 	    (dotimes (x 4) (window:poll))
-	    (sandbox::remove-spurious-mouse-input)
+	    (remove-spurious-mouse-input)
 	    (window:poll)
 	    (when (window:mice-locked-p)
- 	      (sandbox::look-around))
+ 	      (multiple-value-bind (newyaw newpitch)
+		  (look-around sandbox::*yaw* sandbox::*pitch*)
+		(when newyaw
+		  (setf sandbox::*yaw* newyaw))
+		(when newpitch
+		  (setf sandbox::*pitch* newpitch))))
 	    (setf (sandbox::camera-aspect-ratio *camera*)
 		  (/ window:*width* window:*height* 1.0))
 	    (sandbox::set-render-cam-pos *camera* fraction)

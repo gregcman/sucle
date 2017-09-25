@@ -28,17 +28,18 @@
 
      (:file "camera-matrix") ;;matrices for cameras - view, projection
 
-     (:file "lovely-renderer") ;;generic rendering glue 
+     (:file "lovely-renderer") ;;generic rendering glue
+     
+     (:file "draw-environment") ;;;drawing environmental factors     
+     (:file "meshing-thread");;send the meshing work to a separate thread
 
      (:module phys
 	      :serial t
 	      :components ((:file "voxel-trace")
-			   ))
-     (:file "draw-environment") ;;;drawing environmental factors     
-     (:file "meshing-thread");;send the meshing work to a separate thread
+			   (:file "fists")))
      (:file "player-controls") ;;moving the player around
 
-   ;  (:file "wotut")
+					;  (:file "wotut")
      (:file "sync") ;;keeping various parts up to date
      (:file "sandbox") ;;timer for physics and rendering threads
      ))

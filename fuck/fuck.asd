@@ -16,5 +16,6 @@
 	    :components
 	    ((:file "package")
 	     (:file "tick-governor")
+	     (:file "eyes")
 	     (:file "fuck")))))
 

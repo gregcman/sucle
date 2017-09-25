@@ -21,7 +21,8 @@
 		       (8 #P"funkycoolclimb/")
 		       (9 #P"ahole/")
 		       (10 #P"maze-royale/")
-		       (11 #P"bloodcut/")))
+		       (11 #P"bloodcut/")
+		       (12 #P"wasteland/")))
 
 (defparameter *saves-dir* (merge-pathnames #P"sandbox-saves/"
 					   "/home/imac/Documents/lispysaves/saves/"))

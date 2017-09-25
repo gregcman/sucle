@@ -1,37 +1,11 @@
 (in-package :sandbox)
 
-(defun smallest (i j k)
-  (if (< i j)
-      (if (< i k) ;;i < j j is out
-	  (values i t nil nil)	  ;;; i < k and i < j
-	  (if (= i k)
-	      (values i t nil t) ;;;tied for smallest
-	      (values k nil nil t)	     ;;; k < i <j
-	      ))
-      (if (< j k) ;;i>=j
-	  (if (= i j)
-	      (values i t t nil)
-	      (values j nil t nil)) ;;j<k and i<=j k is nout
-	  (if (= i k)
-	      (values i t t t)
-	      (if (= k j)
-		  (values k nil t t)
-		  (values k nil nil t))) ;;i>=j>=k
-	  )))
-
-;;			 (print (list fooi fooj fook))
-#+nil
-(smallest 
- fooi fooj fook
- )
-
 (defun aux-func (x dx)
   (if (zerop dx)
       nil
       (if (plusp dx)
 	  (floor (1+ x))
 	  (ceiling (1- x)))))
-
 
 
 (defun aux-func2 (x dx)
@@ -100,6 +74,8 @@
 			   (j? nil)
 			   (k? nil)
 			   (ratio nil))
+		       ;;;;find the shortest distance to the next axis-aligned surface,
+		       ;;;;setting the ? vars to true if they are the closest
 		       (let ((fooi (if i-next
 				       (/ (- i-next x) dx)
 				       nil))
@@ -163,13 +139,69 @@
 			     k-next (aux-func z dz)))
 		     (go rep)))))))))))
 
+(defun floor5 (x)
+  (1- (ceiling x)))
+(defun get-blocks-around (aabb-posx aabb-posy aabb-posz aabb func)
+  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
+	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz)) aabb
+    (let ((minx (+ minx aabb-posx))
+	  (maxx (+ maxx aabb-posx))
+	  (miny (+ miny aabb-posy))
+	  (maxy (+ maxy aabb-posy))
+	  (minz (+ minz aabb-posz))
+	  (maxz (+ maxz aabb-posz)))
+      (dobox ((j (floor miny)
+		 (ceiling maxy))
+	      (k (floor minz)
+		 (ceiling maxz)))
+	     (funcall func (floor5 minx) j k)
+	     (funcall func (floor maxx) j k))
+      (dobox ((i (floor minx)
+		 (ceiling maxx))
+	      (k (floor minz)
+		 (ceiling maxz)))
+	     (funcall func i (floor5 miny) k)
+	     (funcall func i (floor maxy) k))
+      (dobox ((j (floor miny)
+		 (ceiling maxy))
+	      (i (floor minx)
+		 (ceiling maxx)))
+	     (funcall func i j (floor5 minz))
+	     (funcall func i j (floor maxz))))))
+
+#+nil
 (defparameter *bar* nil)
 #+nil
 ()
 
 					;		       (print (list xoffset yoffset zoffset))
-#+nil
 
 					;	       (print "asdfasdfa")
 
 					;		     (print (list i? j? k?))
+
+#+nil
+(defun smallest (i j k)
+  (if (< i j)
+      (if (< i k) ;;i < j j is out
+	  (values i t nil nil)	  ;;; i < k and i < j
+	  (if (= i k)
+	      (values i t nil t) ;;;tied for smallest
+	      (values k nil nil t)	     ;;; k < i <j
+	      ))
+      (if (< j k) ;;i>=j
+	  (if (= i j)
+	      (values i t t nil)
+	      (values j nil t nil)) ;;j<k and i<=j k is nout
+	  (if (= i k)
+	      (values i t t t)
+	      (if (= k j)
+		  (values k nil t t)
+		  (values k nil nil t))) ;;i>=j>=k
+	  )))
+
+;;			 (print (list fooi fooj fook))
+#+nil
+(smallest 
+ fooi fooj fook
+ )
