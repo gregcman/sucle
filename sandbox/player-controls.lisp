@@ -86,61 +86,39 @@
 (defparameter tickscale nil)
 (defparameter tick-delay nil)
 
-(world:setup-hashes)
-
-(defun physinnit ()
-  (clean-dirty)
+(progn    
   (setf ticks/sec 60.0)
   (setf tickscale (/ 20.0 ticks/sec))
   (setf tick-delay (/ 1000000.0 ticks/sec)))
+
+(world:setup-hashes)
 
 (defparameter net-scroll 0)
 
 (defparameter *paused* nil)
 
-(defun wotow (aabb)
-  (let ((data (make-collision-suite :aabb aabb)))
-    (let ((set-test (getf data 'set-test))
-	  (full (getf data 'full))
-	  (collide (getf data 'collide))
-	  (collect (getf data 'collect)))
-      (declare (type (function (number number number aabbcc::aabb)
-			       (values single-float symbol))
-		     collide)
-	       (type (function (single-float symbol))
-		     collect))
-      (funcall
-       set-test
-       (lambda (x y z)
-	 (when (aref mc-blocks::iscollidable (world:getblock x y z))
-	   ;;	   (plain-setblock x y z 1 0)
-	   (multiple-value-bind (minimum type)
-	       (funcall collide x y z block-aabb)
-	     (funcall collect minimum type)))))
-      full)))
+(defparameter *world-collision-fun*
+  (configure-collision-handler
+   (lambda (collect set-aabb)
+     (funcall set-aabb player-aabb)
+     (lambda (x y z)
+       (when (aref mc-blocks::iscollidable (world:getblock x y z))
+	 ;;	   (plain-setblock x y z 1 0)
+	 (funcall collect x y z block-aabb))))))
 
-(defparameter *world-collision-fun* (wotow player-aabb))
+(defparameter *contact-handler*
+  (configure-contact-handler
+   (lambda (collect)
+     (lambda (x y z)
+       (when (aref mc-blocks::iscollidable (world:getblock x y z))
+					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
+	 (funcall collect x y z block-aabb))))))
 
 (defun collide-with-world (fun)
   (setf (values *xpos* *ypos* *zpos* *xvel* *yvel* *zvel*)
 	(collide-world2
 	 fun
 	 *xpos* *ypos* *zpos* *xvel* *yvel* *zvel*)))
-
-(defun wotow2 ()
-  (let ((data (make-contact-suite)))
-    (let ((full (getf data 'full))
-	  (set-fun (getf data 'set-fun))
-	  (add (getf data 'add)))
-      (funcall
-       set-fun
-       (lambda (x y z)
-	 (when (aref mc-blocks::iscollidable (world:getblock x y z))
-					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
-	   (funcall add x y z block-aabb))))
-      full)))
-
-(defparameter *contact-handler* (wotow2))
 
 (defun physics (control-state)
   (setf *xpos-old* *xpos*
@@ -454,3 +432,7 @@
 		(touch-collector-min-ratio taco)
 		xclamp yclamp zclamp))))
 	 *xpos* *ypos* *zpos* *xvel* *yvel* *zvel*)))
+
+#+nil
+(defun physinnit ()
+  )

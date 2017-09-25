@@ -51,7 +51,7 @@
 
 
   (when *sandbox-on*
-    (sandbox::thunkit *control-state*)))
+    (sandbox::physics *control-state*)))
 
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))

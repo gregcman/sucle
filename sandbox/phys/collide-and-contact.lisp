@@ -67,15 +67,15 @@
 		   (values dpx dpy dpz dvx dvy dvz)))
 	   (reset ()
 	     (reset-touch-collector taco))
-	   (collect (min type);;;
-	     (collect-touch min type taco))
-	   (collide (foox fooy fooz fooaabb);;;
-	     (aabbcc::aabb-collide
-	      aabb
-	      px py pz
-	      fooaabb
-	      foox fooy fooz
-	      vx vy vz))
+	   (add (foox fooy fooz fooaabb);;;
+	     (multiple-value-bind (minimum type)
+		 (aabbcc::aabb-collide
+		  aabb
+		  px py pz
+		  fooaabb
+		  foox fooy fooz
+		  vx vy vz)
+	       (collect-touch minimum type taco)))
 	   (tail ()
 	     (aabb-collect-blocks
 	      px py pz vx vy vz aabb
@@ -91,9 +91,22 @@
 	     (tail)))
 	(list 'set-aabb #'set-aabb
 	      'set-test #'set-test
-	      'collect #'collect
-	      'collide #'collide
+	      'add #'add
 	      'full #'full)))))
+
+(defun configure-collision-handler
+    (fun &optional (data (make-collision-suite)))
+  (let ((set-test (getf data 'set-test))
+	(full (getf data 'full))
+	(add (getf data 'add))
+	(set-aabb (getf data 'set-aabb)))
+    (declare (type (function (number number number aabbcc::aabb)
+			     (values single-float symbol))
+		   add))
+    (funcall
+     set-test
+     (funcall fun add set-aabb))
+    full))
 
 (defun make-contact-suite ()
   (let ((px 0.0)
@@ -122,3 +135,13 @@
 	  (list 'full #'run
 		'add #'add
 		'set-fun #'set-fun))))))
+
+(defun configure-contact-handler
+    (fun &optional (data (make-contact-suite)))
+  (let ((full (getf data 'full))
+	(set-fun (getf data 'set-fun))
+	(add (getf data 'add)))
+    (funcall
+     set-fun
+     (funcall fun add))
+    full))
