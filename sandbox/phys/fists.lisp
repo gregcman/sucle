@@ -9,12 +9,12 @@
   fun-reset
   fun-flush)
 
-(defun gen-fister ()
+(defun gen-fister (fist-aabb fun)
   (let ((fist (make-fister)))
     (setf (values (fister-fun-flush fist)
 		  (fister-fun-reset fist)
 		  (fister-fun fist))
-	  (generate-fist-suite))
+	  (generate-fist-suite fist-aabb fun))
     fist))
 
 (defmacro setvec3d (vec x y z)
@@ -50,29 +50,35 @@
 	    (setf (fister-exists fist) t))
 	  (setf (fister-exists fist) nil)))))
 
-(defun generate-fist-suite ()
+(defun generate-fist-suite (fist-aabb fun)
   (let ((ansx nil)
 	(ansy nil)
 	(ansz nil)
-	(exists? nil))
-    (values
-     (lambda ()
-       (values exists? ansx ansy ansz))
-     (lambda ()
-       (setf exists? nil))
-     (configure-collision-handler
-      (lambda (collect set-aabb)
-	(funcall set-aabb fist-aabb)
-	(lambda (x y z)
-	  (unless (zerop (world:getblock x y z))
-	    (multiple-value-bind (first? is-minimum?)
-		(funcall collect x y z block-aabb)
-	      (declare (ignorable first? is-minimum?))       
-	      (when (and is-minimum? first?)
-		(setf exists? t)
-		(setq ansx x
-		      ansy y
-		      ansz z))))))))))
+	(exists? nil)
+	(collect-fun nil)
+	(exit (gensym)))
+    (labels ((collect (x y z aabb)
+	       (multiple-value-bind (first? is-minimum?)
+		   (funcall collect-fun x y z aabb)
+		 (declare (ignorable first? is-minimum?))       
+		 (when (and is-minimum? first?)
+		   (setf exists? t)
+		   (setq ansx x
+			 ansy y
+			 ansz z)
+		   (throw exit nil)))))
+      (let ((derived-fun (funcall fun #'collect)))
+	(values
+	 (lambda ()
+	   (values exists? ansx ansy ansz))
+	 (lambda ()
+	   (setf exists? nil))
+	 (configure-collision-handler
+	  (lambda (&key collect set-aabb set-exit)
+	    (setf collect-fun collect)
+	    (funcall set-aabb fist-aabb)
+	    (funcall set-exit exit)
+	    derived-fun)))))))
 
 (defun use-fist (fist left-p right-p left-fun right-fun)
   (let ((fist? (fister-exists fist))

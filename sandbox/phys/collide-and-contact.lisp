@@ -52,7 +52,7 @@
      (logtest acc #b0000001))))
 
 (defun make-collision-suite (&key
-			       (aabb player-aabb)
+			       (aabb nil)
 			       (test (lambda (x y z)
 				       (declare (ignore x y z)))))
   (declare (type (function (fixnum fixnum fixnum)) test))
@@ -61,11 +61,14 @@
 	(pz 0.0)
 	(vx 0.0)
 	(vy 0.0)
-	(vz 0.0))
+	(vz 0.0)
+	(early-exit nil))
     (let ((taco (make-touch-collector)))
       (labels
 	  ((set-aabb (new-aabb);;;
 	     (setf aabb new-aabb))
+	   (set-exit (exit);;;
+	     (setf early-exit exit))
 	   (set-test (new-test);;;
 	     (setf test new-test))
 	   (head (dpx dpy dpz dvx dvy dvz)
@@ -73,7 +76,7 @@
 		   (values dpx dpy dpz dvx dvy dvz)))
 	   (reset ()
 	     (reset-touch-collector taco))
-	   (add (foox fooy fooz fooaabb);;;
+	   (collect (foox fooy fooz fooaabb);;;
 	     (multiple-value-bind (minimum type)
 		 (aabbcc::aabb-collide
 		  aabb
@@ -83,9 +86,10 @@
 		  vx vy vz)
 	       (collect-touch minimum type taco)))
 	   (tail ()
-	     (aabb-collect-blocks
-	      px py pz vx vy vz aabb
-	      test)
+	     (catch early-exit
+	       (aabb-collect-blocks
+		px py pz vx vy vz aabb
+		test))
 	     (multiple-value-bind (xclamp yclamp zclamp)
 		 (collapse-touch vx vy vz taco)
 	       (values
@@ -96,29 +100,34 @@
 	     (reset)
 	     (tail)))
 	(list 'set-aabb #'set-aabb
+	      'set-exit #'set-exit
 	      'set-test #'set-test
-	      'add #'add
+	      'collect #'collect
 	      'full #'full)))))
 
 (defun configure-collision-handler
     (fun &optional (data (make-collision-suite)))
   (let ((set-test (getf data 'set-test))
 	(full (getf data 'full))
-	(add (getf data 'add))
-	(set-aabb (getf data 'set-aabb)))
+	(collect (getf data 'collect))
+	(set-aabb (getf data 'set-aabb))
+	(set-exit (getf data 'set-exit)))
     (declare (type (function (number number number aabbcc::aabb)
 			     (values single-float symbol))
-		   add))
+		   collect))
     (funcall
      set-test
-     (funcall fun add set-aabb))
+     (funcall fun
+	      :collect collect
+	      :set-aabb set-aabb
+	      :set-exit set-exit))
     full))
 
 (defun make-contact-suite ()
   (let ((px 0.0)
 	(py 0.0)
 	(pz 0.0)
-	(aabb player-aabb))
+	(aabb nil))
     (let ((fun (constantly nil)))
       (let ((acc 0))
 	(labels

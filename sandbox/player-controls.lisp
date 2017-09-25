@@ -55,13 +55,41 @@
 
 (defparameter *paused* nil)
 
+(defparameter *block-aabb*
+  (aabbcc::make-aabb
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx 1.0
+   :maxy 1.0
+   :maxz 1.0))
+
+(defparameter *player-aabb*
+  (aabbcc::make-aabb
+   :minx -0.3
+   :miny -1.5
+   :minz -0.3
+   :maxx 0.3
+   :maxy 0.12
+   :maxz 0.3))
+
+(defparameter *fist-aabb*
+     ;;;a very small cubic fist
+   (aabbcc::make-aabb
+    :minx -0.005
+    :miny -0.005
+    :minz -0.005
+    :maxx 0.005
+    :maxy 0.005
+    :maxz 0.005))
+
 (defparameter *world-collision-fun*
   (configure-collision-handler
-   (lambda (collect set-aabb)
-     (funcall set-aabb player-aabb)
+   (lambda (&key collect set-aabb &allow-other-keys)
+     (funcall set-aabb *player-aabb*)
      (lambda (x y z)
        (when (aref mc-blocks::iscollidable (world:getblock x y z))
-	 (funcall collect x y z block-aabb))))))
+	 (funcall collect x y z *block-aabb*))))))
 
 (defparameter *contact-handler*
   (configure-contact-handler
@@ -69,7 +97,7 @@
      (lambda (x y z)
        (when (aref mc-blocks::iscollidable (world:getblock x y z))
 					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
-	 (funcall collect x y z block-aabb))))))
+	 (funcall collect x y z *block-aabb*))))))
 
 (defun collide-with-world (fun)
   (setf (values *xpos* *ypos* *zpos* *xvel* *yvel* *zvel*)
@@ -77,7 +105,14 @@
 	 fun
 	 *xpos* *ypos* *zpos* *xvel* *yvel* *zvel*)))
 
-(defparameter *fist* (gen-fister))
+(defparameter *fist*
+  (gen-fister
+   *fist-aabb*
+   (lambda (collect)
+     (lambda (x y z)
+       (unless (zerop (world:getblock x y z))
+	 (funcall collect x y z *block-aabb*))))))
+
 (defun physics (control-state)
   (setf *xpos-old* *xpos*
 	*ypos-old* *ypos*
@@ -90,7 +125,7 @@
     (when (window::skey-j-p (window::keyval :f) control-state)
       (toggle fly)
       (toggle gravity)))
-  (let ((aabb player-aabb)
+  (let ((aabb *player-aabb*)
 	(noclip noclip))
     (unless *paused*
       (let ((new-scroll window::*scroll-y*))
@@ -186,7 +221,7 @@
   (let ((u 3))
     (aabb-collect-blocks
      px py pz (* u vx) (* u vy) (* u vz)
-     fist-aabb   
+     *fist-aabb*   
      (lambda (x y z)
        (when (and (<= 0 x 127)
 		  (<= 0 y 127)
