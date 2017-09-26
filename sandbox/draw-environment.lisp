@@ -24,7 +24,9 @@
 
 (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *fogcolor* (apply #'cg-matrix:vec
-				(nth 0 '((0.68 0.8 1.0)))))
+				(nth 1 '((0.68 0.8 1.0)
+					 (0.3 0.1 0.0)))))
+(defparameter *daytime* 1.0)
 
 (defun fractionalize (x)
   (alexandria:clamp x 0.0 1.0))
@@ -46,7 +48,7 @@
        (camera-matrix-projection-view-player camera)
        nil)
       
-      (let ((time daytime)
+      (let ((time *daytime*)
 	    (avector *avector*))
 	(map-into avector
 		  (lambda (x)
@@ -111,7 +113,12 @@
   (defun remove-chunk-display-list (name)
     (remhash name *g/chunk-call-list*)))
 
-(defun update-world-vao ()
+(defun distance-to (x0 y0 z0 x1 y1 z1)
+  (let ((dx (- x1 x0))
+	(dy (- y1 y0))
+	(dz (- z1 z0)))
+    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
+(defun update-world-vao (x y z)
   (clean-dirty)
   (maphash (lambda (k v)
 	     (declare (ignorable k))
@@ -124,11 +131,13 @@
        (declare (ignore v))
        (push k list))
      world::chunkhash)
-    (dolist (x (sort list #'< :key (lambda (x)
-				(multiple-value-bind (i j k) (world:unhashfunc x)
-				  (distance-to-player (- i 8)
-						      (- k 8)
-						      (- j 8))))))
+    (dolist (x (sort list #'< :key
+		     (lambda (position)
+		       (multiple-value-bind (i j k) (world:unhashfunc position)
+			 (distance-to x y z
+				      (- i 8)
+				      (- k 8)
+				      (- j 8))))))
       (dirty-push x))))
 
 (defparameter ourdir

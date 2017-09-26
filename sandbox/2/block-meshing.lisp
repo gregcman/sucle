@@ -1,7 +1,7 @@
 (in-package :sandbox)
 
 (defun dark-fun (darkness b0 b1 b2 b3 s0 s1 s2 s3)
-  (let ((time daytime))
+  (let ((time *daytime*))
     (* darkness
        0.25
        (+ (max b0 (* time s0))

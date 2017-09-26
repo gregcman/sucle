@@ -45,13 +45,21 @@
 (defparameter *control-state* (window::make-control-state
 			       :curr window::*input-state*))
 
+
+(defparameter *yaw* 0.0)
+(defparameter *pitch* 0.0)
+
 (defun physss ()
   (window:poll)
   (window::update-control-state *control-state*)
 
 
   (when *sandbox-on*
-    (sandbox::physics *control-state*)))
+    (sandbox::meta-controls *control-state*)
+    (sandbox::physics *control-state* *yaw*)
+    (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
+      (cg-matrix:%vec* backwardsbug (sandbox::camera-vec-forward *camera*) -4.0)
+      (sandbox::use-fists *control-state* backwardsbug))))
 
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))
@@ -77,24 +85,34 @@
 	    (dotimes (x 4) (window:poll))
 	    (remove-spurious-mouse-input)
 	    (window:poll)
-	    (when (window:mice-locked-p)
- 	      (multiple-value-bind (newyaw newpitch)
-		  (look-around sandbox::*yaw* sandbox::*pitch*)
-		(when newyaw
-		  (setf sandbox::*yaw* newyaw))
-		(when newpitch
-		  (setf sandbox::*pitch* newpitch))))
-	    (setf (sandbox::camera-aspect-ratio *camera*)
-		  (/ window:*width* window:*height* 1.0))
-	    (sandbox::set-render-cam-pos *camera* fraction)
-	    (sandbox::update-matrices *camera*)
-	    (sandbox::render *camera*
-			     #'getfnc))))
+	    (let ((camera *camera*))
+	      (when (window:mice-locked-p)
+		(multiple-value-bind (newyaw newpitch)
+		    (look-around *yaw* *pitch*)
+		  (when newyaw
+		    (setf *yaw* newyaw))
+		  (when newpitch
+		    (setf *pitch* newpitch))))
+	      (sandbox::unit-pitch-yaw (sandbox::camera-vec-forward camera)
+				       (coerce *pitch* 'single-float)
+				       (coerce *yaw* 'single-float))
+	      (setf (sandbox::camera-aspect-ratio camera)
+		    (/ window:*width* window:*height* 1.0))
+	      (sandbox::set-render-cam-pos camera fraction)
+	      (let ((defaultfov
+		     (load-time-value ((lambda (deg)
+					 (* deg (coerce (/ pi 180.0) 'single-float)))
+				       70))))
+		(setf (sandbox::camera-fov camera)
+		      defaultfov))
+	      (sandbox::update-matrices camera)
+	      (sandbox::render camera
+			       #'getfnc)))))
       (window:update-display)))
   (setf *realthu-nk* (function actual-stuuff)))
 
 (defun injection3 ()
-  (setf *ticker* (make-ticker :dt (floor 1000000 60)
+  (setf *ticker* (make-ticker :dt (floor 1000000 20)
 		  :current-time (fine-time)))
   (catch (quote :end)
     (loop
@@ -135,3 +153,15 @@
       (when (typep char 'standard-char)
 	(princ char)))))
 
+
+#+nil
+((defparameter *old-scroll-y* 0.0)
+ (defparameter net-scroll 0)
+ (let ((new-scroll window::*scroll-y*))
+   (setf *old-scroll-y* net-scroll)
+   (setf net-scroll new-scroll)
+   #+nil
+   (let ((value (- new-scroll *old-scroll-y*)))
+     (unless (zerop value)
+					;(print value)
+       ))))
