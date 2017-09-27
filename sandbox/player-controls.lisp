@@ -14,8 +14,6 @@
 (defparameter gravity nil)
 (defparameter fly t)
 
-(defparameter onground nil)
-
 (defparameter tickscale (/ 20.0 20))
 
 (world:setup-hashes)
@@ -70,66 +68,66 @@
     (step-farticle farticle)
     (let ((vel (farticle-velocity farticle))
 	  (pos (farticle-position farticle)))
-      (with-vec-params4
-	  (px py pz) pos
-	  (contact-handle (if noclip
-			      #b000000
-			      (funcall *contact-handler* px py pz *player-aabb*))
-			  vel))
-      (let ((speed (* 0.4 (expt tickscale 2))))
-	(with-vec-params42
-	    (xvel yvel zvel) vel
-	    (progn
-	      (if fly
-		  (progn
-		    (setf speed 0.024)
-		    (when (window::skey-p (window::keyval :space) control-state)
-		      (incf yvel speed))
-		    (when (window::skey-p (window::keyval :left-shift) control-state)
-		      (decf yvel speed)))
-		  
-		  (if onground
-		      (when (window::skey-p (window::keyval :space) control-state) ;;jumping
-			(incf yvel (* 0.49 (expt tickscale 1))))
-		      (setf speed (* speed 0.2))))
-	      (when dir
-		(let ((dir (+ dir yaw)))
-		  (incf xvel (* speed (sin dir)))
-		  (incf zvel (* speed (cos dir))))))))
-      (let ((fun (if noclip
-		     (lambda (&rest args)
-		       (declare (ignore args))
-		       (values 1 nil nil nil))
-		     *world-collision-fun*)))
-	(with-vec-params42
-	    (vx vy vz) vel
-	    (with-vec-params42 (px py pz) pos
-			       (setf (values px py pz vx vy vz)
-				     (collide-world2
-				      fun
-				      px py pz vx vy vz)))))
-      (let ((air-friction 0.98)
-	    (walking-friction (* 0.6 0.9)))
-	(with-vec-params42
-	    (xvel yvel zvel) vel
-	    (progn
-	      (if fly
-		  (progn
-		    (setf air-friction 0.9)
-		    (*= xvel air-friction)
-		    (*= zvel air-friction))
-		  (progn
-		    (setf air-friction 0.98)
-		    (cond (onground
-			   (*= xvel walking-friction)
-			   (*= zvel walking-friction))
-			  (t (*= xvel 0.9)
-			     (*= zvel 0.9)
-			     ))))
-	      (when (and (not onground)
-			 gravity)
-		(decf yvel (* 0.08 (expt tickscale 2))))
-	      (*= yvel air-friction)))))))
+      (let ((contact-state (if noclip
+			       #b000000
+			       (with-vec-params4
+				   (px py pz) pos
+				   (funcall *contact-handler* px py pz *player-aabb*)))))
+	(let ((onground (logtest contact-state #b000100)))
+	  (contact-handle contact-state vel)
+	  (let ((speed (* 0.4 (expt tickscale 2))))
+	    (with-vec-params42
+		(xvel yvel zvel) vel
+		(progn
+		  (if fly
+		      (progn
+			(when (window::skey-p (window::keyval :space) control-state)
+			  (incf yvel speed))
+			(when (window::skey-p (window::keyval :left-shift) control-state)
+			  (decf yvel speed)))
+		      
+		      (if onground
+			  (when (window::skey-p (window::keyval :space) control-state) ;;jumping
+			    (incf yvel (* 0.49 (expt tickscale 1))))
+			  (setf speed (* speed 0.2))))
+		  (when dir
+		    (let ((dir (+ dir yaw)))
+		      (incf xvel (* speed (sin dir)))
+		      (incf zvel (* speed (cos dir))))))))
+	  (let ((fun (if noclip
+			 (lambda (&rest args)
+			   (declare (ignore args))
+			   (values 1 nil nil nil))
+			 *world-collision-fun*)))
+	    (with-vec-params42
+		(vx vy vz) vel
+		(with-vec-params42 (px py pz) pos
+				   (setf (values px py pz vx vy vz)
+					 (collide-world2
+					  fun
+					  px py pz vx vy vz)))))
+	  (let ((air-friction 0.98)
+		(walking-friction (* 0.6 0.9)))
+	    (with-vec-params42
+		(xvel yvel zvel) vel
+		(progn
+		  (if fly
+		      (progn
+			(setf air-friction 0.9)
+			(*= xvel air-friction)
+			(*= zvel air-friction))
+		      (progn
+			(setf air-friction 0.98)
+			(cond (onground
+			       (*= xvel walking-friction)
+			       (*= zvel walking-friction))
+			      (t (*= xvel 0.9)
+				 (*= zvel 0.9)
+				 ))))
+		  (when (and (not onground)
+			     gravity)
+		    (decf yvel (* 0.08 (expt tickscale 2))))
+		  (*= yvel air-friction)))))))))
 
 (defun meta-controls (control-state pos)
   (when (window::skey-j-p (window::keyval :E) control-state)
@@ -209,7 +207,6 @@
 
 
 (defun contact-handle (acc vel)
-  (setf onground (logtest acc #b000100))
   (multiple-value-bind (i+ i- j+ j- k+ k-)
       (values (logtest acc #b100000)
 	      (logtest acc #b010000)
@@ -563,3 +560,6 @@
 ((defparameter *position* (cg-matrix:vec 0.0 0.0 0.0))
  (defparameter *position-old* (cg-matrix:vec 0.0 0.0 0.0))
  (defparameter *velocity* (vector 0.0 0.0 0.0)))
+
+#+nil
+(defparameter onground nil)

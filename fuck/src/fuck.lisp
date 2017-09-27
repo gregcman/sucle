@@ -61,16 +61,13 @@
 	nil
 	(atan y x))))
 
-(defparameter *yaw* 0.0)
-(defparameter *pitch* 0.0)
-
-(defparameter *player-farticle* (sandbox::make-farticle))
-
 (defparameter *farticles*
   (let ((array (make-array 10)))
     (map-into array (lambda () (sandbox::make-farticle)))
     array))
 
+(defparameter *player-farticle* (aref *farticles* 0))
+(defparameter *neck* (make-necking))
 
 (defun num-key-jp (control-state)
   (let ((ans nil))
@@ -108,7 +105,7 @@
       (when (window::skey-j-p (window::keyval :x) control-state)
 	(toggle *paused*))
       (unless *paused*
-	(sandbox::physics control-state *yaw*
+	(sandbox::physics control-state (necking-yaw *neck*)
 			  (wasd-mover
 			   (window::skey-p (window::keyval :w) control-state)
 			   (window::skey-p (window::keyval :a) control-state)
@@ -150,20 +147,12 @@
 	    (window:poll)
 	    (let ((camera *camera*))
 	      (when (window:mice-locked-p)
-		(multiple-value-bind (newyaw newpitch)
-		    (multiple-value-call
-			#'look-around
-		      *yaw* *pitch*
-		      (delta))
-		  (when newyaw
-		    (setf *yaw* newyaw))
-		  (when newpitch
-		    (setf *pitch* newpitch))))
-	      (sandbox::unit-pitch-yaw (sandbox::camera-vec-forward camera)
-				       (coerce *pitch* 'single-float)
-				       (coerce *yaw* 'single-float))
+		(multiple-value-call #'look-around *neck* (delta2)))
+	      (necktovec *neck*
+			 (sandbox::camera-vec-forward camera))
 	      (setf (sandbox::camera-aspect-ratio camera)
-		    (/ window:*width* window:*height* 1.0))
+		    (coerce (/ window:*width* window:*height*)
+			    'single-float))
 	      (let* ((player-farticle *player-farticle*)
 		     (pos (sandbox::farticle-position player-farticle))
 		     (old (sandbox::farticle-position-old player-farticle)))
@@ -235,3 +224,21 @@
      (unless (zerop value)
 					;(print value)
        ))))
+
+#+nil
+(multiple-value-bind (newyaw newpitch)
+		    (multiple-value-call
+			#'look-around
+		      *yaw* *pitch*
+		      (delta))
+		  (when newyaw
+		    (setf *yaw* newyaw))
+		  (when newpitch
+		    (setf *pitch* newpitch)))
+#+nil
+	      (sandbox::unit-pitch-yaw 
+				       (coerce *pitch* 'single-float)
+				       (coerce *yaw* 'single-float))
+#+nil
+((defparameter *yaw* 0.0)
+ (defparameter *pitch* 0.0))

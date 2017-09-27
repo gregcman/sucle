@@ -80,6 +80,7 @@
 ;;;
 ;;;
 ;;;
+#+nil
 (defun spec-projection-matrix (near far left right top bottom)
   (let ((near-2 (* 2 near))
 	(top-bottom (- top bottom))

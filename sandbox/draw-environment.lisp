@@ -75,14 +75,6 @@
 					:initial-contents
 					'(0.0 0.0 0.0 0.0 0.0 0.0)))
 
-(defun unit-pitch-yaw (result pitch yaw)
-  (let ((cos-pitch (cos pitch)))
-    (setf (aref result 0) (* cos-pitch (sin yaw))
-	  (aref result 1) (sin pitch)
-	  (aref result 2) (* cos-pitch (cos yaw))))
-  result)
-
-
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)  
   (gl:depth-func :less)
