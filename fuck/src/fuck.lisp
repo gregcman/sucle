@@ -45,27 +45,63 @@
 (defparameter *control-state* (window::make-control-state
 			       :curr window::*input-state*))
 
+(defun wasd-mover (w? a? s? d?)
+  (let ((x 0)
+	(y 0))
+    (when w?
+      (decf x))
+    (when a?
+      (decf y))
+    (when s?
+      (incf x))
+    (when d?
+      (incf y))
+    (if (and (zerop x)
+	     (zerop y))
+	nil
+	(atan y x))))
 
 (defparameter *yaw* 0.0)
 (defparameter *pitch* 0.0)
 
+(defparameter *player-farticle* (sandbox::make-farticle))
+
+(defparameter *paused* nil)
 (defun physss ()
   (window:poll)
   (window::update-control-state *control-state*)
 
 
   (when *sandbox-on*
-    (sandbox::meta-controls *control-state*)
-    (sandbox::physics *control-state* *yaw*)
-    (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-      (cg-matrix:%vec* backwardsbug (sandbox::camera-vec-forward *camera*) -4.0)
-      (sandbox::use-fists *control-state* backwardsbug))))
+    (let* ((player-farticle *player-farticle*)
+	   (pos (sandbox::farticle-position player-farticle))
+	   (control-state *control-state*))
+      (sandbox::meta-controls control-state
+			      pos)
+      (when (window::skey-j-p (window::keyval :x) control-state)
+	(toggle *paused*))
+      (unless *paused*
+	(sandbox::physics control-state *yaw*
+			  (wasd-mover
+			   (window::skey-p (window::keyval :w) control-state)
+			   (window::skey-p (window::keyval :a) control-state)
+			   (window::skey-p (window::keyval :s) control-state)
+			   (window::skey-p (window::keyval :d) control-state))
+			  player-farticle)
+	(let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
+	  (cg-matrix:%vec* backwardsbug (sandbox::camera-vec-forward *camera*) -4.0)
+	  (sandbox::use-fists control-state backwardsbug
+			      pos))))))
 
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))
 
 (defparameter *camera* (sandbox::make-camera))
-
+(defun set-render-cam-pos (camera partial curr prev)
+  (let ((vec (sandbox::camera-vec-position camera))
+	(cev (sandbox::camera-vec-noitisop camera)))
+    (cg-matrix:%vec-lerp vec prev curr partial)
+    (cg-matrix:%vec* cev vec -1.0)))
 
 (progn
   (defun actual-stuuff ()
@@ -88,7 +124,10 @@
 	    (let ((camera *camera*))
 	      (when (window:mice-locked-p)
 		(multiple-value-bind (newyaw newpitch)
-		    (look-around *yaw* *pitch*)
+		    (multiple-value-call
+			#'look-around
+		      *yaw* *pitch*
+		      (delta))
 		  (when newyaw
 		    (setf *yaw* newyaw))
 		  (when newpitch
@@ -98,7 +137,11 @@
 				       (coerce *yaw* 'single-float))
 	      (setf (sandbox::camera-aspect-ratio camera)
 		    (/ window:*width* window:*height* 1.0))
-	      (sandbox::set-render-cam-pos camera fraction)
+	      (let* ((player-farticle *player-farticle*)
+		     (pos (sandbox::farticle-position player-farticle))
+		     (old (sandbox::farticle-position-old player-farticle)))
+		
+		(set-render-cam-pos camera fraction pos old))
 	      (let ((defaultfov
 		     (load-time-value ((lambda (deg)
 					 (* deg (coerce (/ pi 180.0) 'single-float)))

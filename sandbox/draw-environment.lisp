@@ -77,9 +77,9 @@
 
 (defun unit-pitch-yaw (result pitch yaw)
   (let ((cos-pitch (cos pitch)))
-    (setf (aref result 0) (* cos-pitch (cos yaw))
+    (setf (aref result 0) (* cos-pitch (sin yaw))
 	  (aref result 1) (sin pitch)
-	  (aref result 2) (* cos-pitch (sin yaw))))
+	  (aref result 2) (* cos-pitch (cos yaw))))
   result)
 
 
@@ -155,7 +155,7 @@
 
 (progn
   (defun color-grasses (image terrain)
-    (let ((color (case 0
+    (let ((color (case 1
 		   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 		   (1 (getapixel 255 0 image))
 		   (2 (getapixel 0 0 image))

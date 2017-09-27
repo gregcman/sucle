@@ -1,20 +1,14 @@
 (in-package :sandbox)
 
-(defparameter *xpos* 0.0)
-(defparameter *ypos* 0.0)
-(defparameter *zpos* 0.0)
+(defstruct farticle
+  (position (cg-matrix:vec 0.0 0.0 0.0))
+  (position-old (cg-matrix:vec 0.0 0.0 0.0))
+  (velocity (vector 0.0 0.0 0.0)))
 
-#+nil
-(defun goto (x y z)
-  (setf *xpos* (float x)
-	*ypos* (float y)
-	*zpos* (float z)))
-
-(defparameter *velocity* (vector 0.0 0.0 0.0))
-
-(defparameter *xpos-old* 0.0)
-(defparameter *ypos-old* 0.0)
-(defparameter *zpos-old* 0.0)
+(defun step-farticle (p)
+  (let ((old (farticle-position-old p))
+	(curr (farticle-position p)))
+    (cg-matrix:%copy-vec old curr)))
 
 (defparameter noclip nil)
 (defparameter gravity nil)
@@ -25,10 +19,6 @@
 (defparameter tickscale (/ 20.0 20))
 
 (world:setup-hashes)
-
-
-
-(defparameter *paused* nil)
 
 (defparameter *block-aabb*
   (aabbcc::make-aabb
@@ -68,86 +58,89 @@
   (with-vec-params args (list buf)
 		   body))
 
-(defun collide-with-world (fun)
-  (let ((vel *velocity*))
-    (with-vec-params4
-	(x y z) vel
-	(setf (values *xpos* *ypos* *zpos* x y z)
-	      (collide-world2
-	       fun
-	       *xpos* *ypos* *zpos* x y z)))))
+(defmacro with-vec-params42 ((&rest args) buf body)
+  (with-vec-params args (list buf 'symbol-macrolet)
+		   body))
 
-(defun physics (control-state yaw)
+(define-modify-macro *= (&rest args)
+  *)
+
+(defun physics (control-state yaw dir farticle)
   (let ((noclip noclip))
-    (unless *paused*
-      (setf *xpos-old* *xpos*
-	    *ypos-old* *ypos*
-	    *zpos-old* *zpos*)
-      (let ((vel *velocity*))
-	(contact-handle (if noclip
-			    #b000000
-			    (funcall *contact-handler* *xpos* *ypos* *zpos* *player-aabb*))
-			*velocity*)
-	(symbol-macrolet ((xvel (aref vel 0))
-			  (yvel (aref vel 1))
-			  (zvel (aref vel 2)))
-	  (let ((speed (* 0.4 (expt tickscale 2))))
-	    (cond (fly
-		   (setf speed 0.024)
-		   (when (window::skey-p (window::keyval :space) control-state)
-		     (incf yvel speed))
-		   (when (window::skey-p (window::keyval :left-shift) control-state)
-		     (decf yvel speed)))
-		  (t
-		   (if onground
-		       (when (window::skey-p (window::keyval :space) control-state) ;;jumping
-			 (incf yvel (* 0.49 (expt tickscale 1))))
-		       (setf speed (* speed 0.2)))))    
-	    (let ((dir
-		   (wasd-mover (window::skey-p (window::keyval :w) control-state)
-			       (window::skey-p (window::keyval :a) control-state)
-			       (window::skey-p (window::keyval :s) control-state)
-			       (window::skey-p (window::keyval :d) control-state) ) ))
+    (step-farticle farticle)
+    (let ((vel (farticle-velocity farticle))
+	  (pos (farticle-position farticle)))
+      (with-vec-params4
+	  (px py pz) pos
+	  (contact-handle (if noclip
+			      #b000000
+			      (funcall *contact-handler* px py pz *player-aabb*))
+			  vel))
+      (let ((speed (* 0.4 (expt tickscale 2))))
+	(with-vec-params42
+	    (xvel yvel zvel) vel
+	    (progn
+	      (if fly
+		  (progn
+		    (setf speed 0.024)
+		    (when (window::skey-p (window::keyval :space) control-state)
+		      (incf yvel speed))
+		    (when (window::skey-p (window::keyval :left-shift) control-state)
+		      (decf yvel speed)))
+		  
+		  (if onground
+		      (when (window::skey-p (window::keyval :space) control-state) ;;jumping
+			(incf yvel (* 0.49 (expt tickscale 1))))
+		      (setf speed (* speed 0.2))))
 	      (when dir
-		(let ((heading (+ yaw
-				  (- dir)
-				  (coerce (* pi 1.5)
-					  'single-float))))
-		  (incf xvel (* speed (cos heading)))
-		  (incf zvel (* speed (sin heading)))))))))
-      (collide-with-world (if noclip
-			      (lambda (&rest args)
-				(declare (ignore args))
-				(values 1 nil nil nil))
-			      *world-collision-fun*)) 
-      (world-forces *velocity*))))
+		(let ((dir (+ dir yaw)))
+		  (incf xvel (* speed (sin dir)))
+		  (incf zvel (* speed (cos dir))))))))
+      (let ((fun (if noclip
+		     (lambda (&rest args)
+		       (declare (ignore args))
+		       (values 1 nil nil nil))
+		     *world-collision-fun*)))
+	(with-vec-params42
+	    (vx vy vz) vel
+	    (with-vec-params42 (px py pz) pos
+			       (setf (values px py pz vx vy vz)
+				     (collide-world2
+				      fun
+				      px py pz vx vy vz)))))
+      (let ((air-friction 0.98)
+	    (walking-friction (* 0.6 0.9)))
+	(with-vec-params42
+	    (xvel yvel zvel) vel
+	    (progn
+	      (if fly
+		  (progn
+		    (setf air-friction 0.9)
+		    (*= xvel air-friction)
+		    (*= zvel air-friction))
+		  (progn
+		    (setf air-friction 0.98)
+		    (cond (onground
+			   (*= xvel walking-friction)
+			   (*= zvel walking-friction))
+			  (t (*= xvel 0.9)
+			     (*= zvel 0.9)
+			     ))))
+	      (when (and (not onground)
+			 gravity)
+		(decf yvel (* 0.08 (expt tickscale 2))))
+	      (*= yvel air-friction)))))))
 
-(defun wasd-mover (w? a? s? d?)
-  (let ((x 0)
-	(y 0))
-    (when w?
-      (incf y))
-    (when a?
-      (decf x))
-    (when s?
-      (decf y))
-    (when d?
-      (incf x))
-    (if (and (zerop x)
-	     (zerop y))
-	nil
-	(atan y x))))
-
-(defun meta-controls (control-state)
+(defun meta-controls (control-state pos)
   (when (window::skey-j-p (window::keyval :E) control-state)
     (window:toggle-mouse-capture))
   (when (window:mice-locked-p)
     (when (window::skey-j-p (window::keyval :v) control-state)
       (toggle noclip))
-    (when (window::skey-j-p (window::keyval :t) control-state)
-      (update-world-vao *xpos* *ypos* *zpos*))
-    (when (window::skey-j-p (window::keyval :x) control-state)
-      (toggle *paused*))
+    (with-vec-params4
+	(x y z) pos
+	(when (window::skey-j-p (window::keyval :t) control-state)
+	  (update-world-vao x y z)))
     (when (window::skey-j-p (window::keyval :f) control-state)
       (toggle fly)
       (toggle gravity))))
@@ -169,15 +162,22 @@
        (lambda (x y z)
 	 (unless (zerop (world:getblock x y z))
 	   (funcall collect x y z *block-aabb*))))))
-  (defun use-fists (control-state look-vec)
+  (defun use-fists (control-state look-vec pos)
     (let ((fist *fist*))
-      (standard-fist fist
-		     *xpos* *ypos* *zpos*
-		     (aref look-vec 0) (aref look-vec 1) (aref look-vec 2))
-      (when (window:mice-locked-p)
-	(when (window::skey-p (window::keyval :q) control-state)
-	  (big-swing-fist *xpos* *ypos* *zpos*
-			  (aref look-vec 0) (aref look-vec 1) (aref look-vec 2))))
+      (with-vec-params4
+	  (px py pz) pos
+	  (with-vec-params4
+	      (vx vy vz) look-vec
+	      (progn
+		(standard-fist
+		 fist
+		 px py pz
+		 vx vy vz)
+		(when (window:mice-locked-p)
+		  (when (window::skey-p (window::keyval :q) control-state)
+		    (big-swing-fist
+		     px py pz
+		     vx vy vz))))))
       (use-fist fist
 		(window::skey-j-p (window::mouseval :left) control-state)
 		(window::skey-j-p (window::mouseval :right) control-state)
@@ -208,55 +208,6 @@
 	     (setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid)))))))))
 
 
-
-(defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
-(defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
-(defun set-render-cam-pos (camera partial)
-  (let ((vec (camera-vec-position camera))
-	(cev (camera-vec-noitisop camera))
-	(prev *pos-previous*)
-	(curr *pos-current*))
-
-    (setf (aref prev 0) *xpos-old*)
-    (setf (aref prev 1) *ypos-old*)
-    (setf (aref prev 2) *zpos-old*)
-    
-    (setf (aref curr 0) *xpos*)
-    (setf (aref curr 1) *ypos*)
-    (setf (aref curr 2) *zpos*)
-
-    (cg-matrix:%vec-lerp vec prev curr partial)
-    (cg-matrix:%vec* cev vec -1.0)))
-
-(define-modify-macro *= (&rest args)
-  *)
-(defun world-forces (vel)
-  (let ((air-friction 0.98)
-	(walking-friction (* 0.6 0.9)))
-    (with-vec-params4
-	(xvel yvel zvel) vel
-	(progn
-	  (if fly
-	      (progn
-		(setf air-friction 0.9)
-		(*= xvel air-friction)
-		(*= zvel air-friction))
-	      (progn
-		(setf air-friction 0.98)
-		(cond (onground
-		       (*= xvel walking-friction)
-		       (*= zvel walking-friction))
-		      (t (*= xvel 0.9)
-			 (*= zvel 0.9)
-			 ))))
-	  (when (and (not onground)
-		     gravity)
-	    (decf yvel (* 0.08 (expt tickscale 2))))
-	  (*= yvel air-friction)
-	  (setf (aref vel 0) xvel
-		(aref vel 1) yvel
-		(aref vel 2) zvel)))))
-
 (defun contact-handle (acc vel)
   (setf onground (logtest acc #b000100))
   (multiple-value-bind (i+ i- j+ j- k+ k-)
@@ -266,18 +217,30 @@
 	      (logtest acc #b000100)
 	      (logtest acc #b000010)
 	      (logtest acc #b000001))
-    (let ((xvel (aref vel 0))
-	  (yvel (aref vel 1))
-	  (zvel (aref vel 2)))
-      (when (or (and (plusp xvel) i+)
-		(and (minusp xvel) i-))
-	(setf (aref vel 0) 0.0))
-      (when (or (and (plusp yvel) j+) 
-		(and (minusp yvel) j-))
-	(setf (aref vel 1) 0.0))
-      (when (or (and (plusp zvel) k+) 
-		(and (minusp zvel) k-))
-	(setf (aref vel 2) 0.0)))))
+    (with-vec-params42
+	(xvel yvel zvel) vel
+	(etouq 
+	 (cons
+	  'progn
+	  (mapcar
+	   (lambda (args)
+	     (apply
+	      (lambda (axis plus minus)
+		(alexandria:with-gensyms (var)
+		  `(let ((,var ,axis))
+		     (when (or (and (plusp ,var) ,plus)
+			       (and (minusp ,var) ,minus))
+		       (setf ,axis 0.0)))))
+	      args))
+	   '((xvel i+ i-)
+	     (yvel j+ j-)
+	     (zvel k+ k-))))))))
+
+#+nil
+(defun collide-with-world (fun)
+  (let ((vel *velocity*)
+	(pos *position*))
+    ))
 
 #+nil
 (defun contact-handle (acc)
@@ -564,3 +527,39 @@
 							   (type (complex single-float) x))
 						  (abs x))
 						rot-dir))))))
+
+#+nil
+   (setf *xpos-old* *xpos*
+	  *ypos-old* *ypos*
+	  *zpos-old* *zpos*)
+
+#+nil
+(progno
+ (defparameter *xpos* 0.0)
+ (defparameter *ypos* 0.0)
+ (defparameter *zpos* 0.0)
+
+ (defparameter *xpos-old* 0.0)
+ (defparameter *ypos-old* 0.0)
+ (defparameter *zpos-old* 0.0)
+
+ ((setf (aref prev 0) *xpos-old*)
+  (setf (aref prev 1) *ypos-old*)
+  (setf (aref prev 2) *zpos-old*)
+  
+  (setf (aref curr 0) *xpos*)
+  (setf (aref curr 1) *ypos*)
+  (setf (aref curr 2) *zpos*))
+
+ (defparameter *pos-previous* (cg-matrix:vec 0.0 0.0 0.0))
+ (defparameter *pos-current* (cg-matrix:vec 0.0 0.0 0.0))
+
+ #+nil
+ (defun goto (x y z)
+   (setf *xpos* (float x)
+	 *ypos* (float y)
+	 *zpos* (float z))))
+#+nil
+((defparameter *position* (cg-matrix:vec 0.0 0.0 0.0))
+ (defparameter *position-old* (cg-matrix:vec 0.0 0.0 0.0))
+ (defparameter *velocity* (vector 0.0 0.0 0.0)))

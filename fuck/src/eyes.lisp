@@ -1,6 +1,5 @@
 (in-package :fuck)
 
-(defparameter mouse-sensitivity (coerce (* 60.0 pi 1/180) 'single-float))
 (defconstant two-pi (coerce (* 2 pi) 'single-float))
 (defconstant half-pi (coerce (/ pi 2) 'single-float))
 
@@ -17,20 +16,19 @@
 	(declare (type single-float a b c d e))
 	e))))
 
-(defun look-around (yaw pitch)
-  (multiple-value-bind (dx dy) (delta)
-    (let ((dyaw (* dx (translator 0.5)))
-	  (dpitch (* dy (translator 0.5))))
-      (let ((yaw0? (zerop dyaw))
-	    (pitch0? (zerop dpitch)))
-	(values
-	 (if yaw0? nil
-	     (mod (+ yaw dyaw) two-pi))
-	 (if pitch0? nil
-	     (alexandria:clamp
-	      (+ pitch dpitch)
-	      (* -0.99 half-pi)
-	      (* 0.99 half-pi))))))))
+(defun look-around (yaw pitch dx dy)
+  (let ((dyaw (- (* dx (translator 0.5))))
+	(dpitch (* dy (translator 0.5))))
+    (let ((yaw0? (zerop dyaw))
+	  (pitch0? (zerop dpitch)))
+      (values
+       (if yaw0? nil
+	   (mod (+ yaw dyaw) two-pi))
+       (if pitch0? nil
+	   (alexandria:clamp
+	    (+ pitch dpitch)
+	    (* -0.99 half-pi)
+	    (* 0.99 half-pi)))))))
 
 (defun delta ()
   (let ((mouse-data (load-time-value (cons 0 0))))
@@ -52,3 +50,6 @@
 	((t)))
       (when mousecapturestate
 	(setq mousecapturestate nil))))
+
+#+nil
+(defparameter mouse-sensitivity (coerce (* 60.0 pi 1/180) 'single-float))
