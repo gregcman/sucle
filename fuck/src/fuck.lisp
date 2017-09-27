@@ -66,6 +66,30 @@
 
 (defparameter *player-farticle* (sandbox::make-farticle))
 
+(defparameter *farticles*
+  (let ((array (make-array 10)))
+    (map-into array (lambda () (sandbox::make-farticle)))
+    array))
+
+
+(defun num-key-jp (control-state)
+  (let ((ans nil))
+    (macrolet ((k (number-key)
+		 (let ((symb (intern (write-to-string number-key) :keyword)))
+		   `(when (window::skey-j-p (window::keyval ,symb) control-state)
+		      (setf ans ,number-key)))))
+      (k 1)
+      (k 2)
+      (k 3)
+      (k 4)
+      (k 5)
+      (k 6)
+      (k 7)
+      (k 8)
+      (k 9)
+      (k 0))
+    ans))
+
 (defparameter *paused* nil)
 (defun physss ()
   (window:poll)
@@ -76,6 +100,9 @@
     (let* ((player-farticle *player-farticle*)
 	   (pos (sandbox::farticle-position player-farticle))
 	   (control-state *control-state*))
+      (let ((num (num-key-jp *control-state*)))
+	(when num
+	  (setf *player-farticle* (aref *farticles* num))))
       (sandbox::meta-controls control-state
 			      pos)
       (when (window::skey-j-p (window::keyval :x) control-state)
