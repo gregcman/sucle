@@ -39,6 +39,7 @@
 			   (:file "fists")
 			   (:file "collide-and-contact")))
      (:file "player-controls") ;;moving the player around
+     (:file "test")
 
 					;  (:file "wotut")
      (:file "sync") ;;keeping various parts up to date

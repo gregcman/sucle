@@ -111,11 +111,11 @@
 			   (window::skey-p (window::keyval :a) control-state)
 			   (window::skey-p (window::keyval :s) control-state)
 			   (window::skey-p (window::keyval :d) control-state))
-			  player-farticle)
-	(let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-	  (cg-matrix:%vec* backwardsbug (sandbox::camera-vec-forward *camera*) -4.0)
-	  (sandbox::use-fists control-state backwardsbug
-			      pos))))))
+			  player-farticle))
+      (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
+	(cg-matrix:%vec* backwardsbug (sandbox::camera-vec-forward *camera*) -4.0)
+	(sandbox::use-fists control-state backwardsbug
+			    pos)))))
 
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))

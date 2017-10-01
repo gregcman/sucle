@@ -36,13 +36,33 @@
    :maxy 0.12
    :maxz 0.3))
 
+(defun ahook ()
+  (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
+    (flet ((add-x-y-z (x y z)
+	     (vector-push-extend x vec)
+	     (vector-push-extend y vec)
+	     (vector-push-extend z vec)))
+      (lambda (bladd)
+	(lambda (px py pz vx vy vz aabb)
+	  (setf (fill-pointer vec) 0)
+	  (aabb-collect-blocks
+	   px py pz vx vy vz aabb
+	   #'add-x-y-z)
+	  (dobox
+	   ((index 0 (fill-pointer vec) :inc 3))
+	   (let ((x (aref vec (+ 0 index)))
+		 (y (aref vec (+ 1 index)))
+		 (z (aref vec (+ 2 index))))
+	     (when (aref mc-blocks::iscollidable
+			 (world:getblock x y z))
+	       (let ((foox x)
+		     (fooy y)
+		     (fooz z)
+		     (fooaabb *block-aabb*))
+		 (funcall bladd foox fooy fooz fooaabb))))))))))
+
 (defparameter *world-collision-fun*
-  (configure-collision-handler
-   (lambda (&key collect set-aabb &allow-other-keys)
-     (funcall set-aabb *player-aabb*)
-     (lambda (x y z)
-       (when (aref mc-blocks::iscollidable (world:getblock x y z))
-	 (funcall collect x y z *block-aabb*))))))
+  (collide-fucks *player-aabb* (list (ahook))))
 
 (defparameter *contact-handler*
   (configure-contact-handler
@@ -143,68 +163,6 @@
       (toggle fly)
       (toggle gravity))))
 
-(progn
-  (defparameter *fist-aabb*
-     ;;;a very small cubic fist
-    (aabbcc::make-aabb
-     :minx -0.005
-     :miny -0.005
-     :minz -0.005
-     :maxx 0.005
-     :maxy 0.005
-     :maxz 0.005))
-  (defparameter *fist*
-    (gen-fister
-     *fist-aabb*
-     (lambda (collect)
-       (lambda (x y z)
-	 (unless (zerop (world:getblock x y z))
-	   (funcall collect x y z *block-aabb*))))))
-  (defun use-fists (control-state look-vec pos)
-    (let ((fist *fist*))
-      (with-vec-params4
-	  (px py pz) pos
-	  (with-vec-params4
-	      (vx vy vz) look-vec
-	      (progn
-		(standard-fist
-		 fist
-		 px py pz
-		 vx vy vz)
-		(when (window:mice-locked-p)
-		  (when (window::skey-p (window::keyval :q) control-state)
-		    (big-swing-fist
-		     px py pz
-		     vx vy vz))))))
-      (use-fist fist
-		(window::skey-j-p (window::mouseval :left) control-state)
-		(window::skey-j-p (window::mouseval :right) control-state)
-		*left-fist-fnc*
-		*right-fist-fnc*)))
-  (defparameter *right-fist-fnc*
-    (lambda (x y z)
-      (let ((blockval 1))
-	(setblock-with-update
-	 x
-	 y
-	 z
-	 blockval
-	 (aref mc-blocks::lightvalue blockval)))))
-  (defparameter *left-fist-fnc*
-    (lambda (x y z)
-      (setblock-with-update x y z 0 0)))
-  (defun big-swing-fist (px py pz vx vy vz)
-    (let ((u 3))
-      (aabb-collect-blocks
-       px py pz (* u vx) (* u vy) (* u vz)
-       *fist-aabb*   
-       (lambda (x y z)
-	 (when (and (<= 0 x 127)
-		    (<= 0 y 127)
-		    (<= -128 z -1))
-	   (let ((blockid 0))
-	     (setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid)))))))))
-
 
 (defun contact-handle (acc vel)
   (multiple-value-bind (i+ i- j+ j- k+ k-)
@@ -232,6 +190,69 @@
 	   '((xvel i+ i-)
 	     (yvel j+ j-)
 	     (zvel k+ k-))))))))
+
+(defparameter *fist-aabb*
+     ;;;a very small cubic fist
+  (aabbcc::make-aabb
+   :minx -0.005
+   :miny -0.005
+   :minz -0.005
+   :maxx 0.005
+   :maxy 0.005
+   :maxz 0.005))
+
+(defun gen-fister (fist-aabb funs)
+  (let ((fist (make-fister)))
+    (setf (fister-fun fist)
+	  (collide-fucks fist-aabb funs))
+    fist))
+(defparameter *fist*
+  (gen-fister *fist-aabb* (list (ahook))))
+
+(defun use-fists (control-state look-vec pos)
+  (let ((fist *fist*))
+    (with-vec-params4
+	(px py pz) pos
+	(with-vec-params4
+	    (vx vy vz) look-vec
+	    (progn
+	      (standard-fist
+	       fist
+	       px py pz
+	       vx vy vz)
+	      (when (window:mice-locked-p)
+		(when (window::skey-p (window::keyval :q) control-state)
+		  (big-swing-fist
+		   px py pz
+		   vx vy vz))))))
+    (use-fist fist
+	      (window::skey-j-p (window::mouseval :left) control-state)
+	      (window::skey-j-p (window::mouseval :right) control-state)
+	      *left-fist-fnc*
+	      *right-fist-fnc*)))
+(defparameter *right-fist-fnc*
+  (lambda (x y z)
+    (let ((blockval 1))
+      (setblock-with-update
+       x
+       y
+       z
+       blockval
+       (aref mc-blocks::lightvalue blockval)))))
+(defparameter *left-fist-fnc*
+  (lambda (x y z)
+    (setblock-with-update x y z 0 0)))
+(defun big-swing-fist (px py pz vx vy vz)
+  (let ((u 3))
+    (aabb-collect-blocks
+     px py pz (* u vx) (* u vy) (* u vz)
+     *fist-aabb*   
+     (lambda (x y z)
+       (when (and (<= 0 x 127)
+		  (<= 0 y 127)
+		  (<= -128 z -1))
+	 (let ((blockid 0))
+	   (setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))))
 
 #+nil
 (defun collide-with-world (fun)

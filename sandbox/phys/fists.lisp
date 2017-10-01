@@ -1,21 +1,12 @@
 (in-package :sandbox)
 
+
 (defstruct fister
   (selected-block (vector 0 0 0))
   (normal-block (vector 0 0 0))
   (exists nil)
   (position (vector 0 0 0))
-  fun
-  fun-reset
-  fun-flush)
-
-(defun gen-fister (fist-aabb fun)
-  (let ((fist (make-fister)))
-    (setf (values (fister-fun-flush fist)
-		  (fister-fun-reset fist)
-		  (fister-fun fist))
-	  (generate-fist-suite fist-aabb fun))
-    fist))
+  fun)
 
 (defmacro setvec3d (vec x y z)
   (let ((a (gensym)))
@@ -25,31 +16,46 @@
 	     (aref ,a 2) ,z))))
 
 (defun standard-fist (fist px py pz vx vy vz)
-  (funcall (fister-fun-reset fist))
-  (let ((frac
-	 (funcall (fister-fun fist) px py pz vx vy vz)))
-    (multiple-value-bind (exists? blockx blocky blockz)
-	(funcall (fister-fun-flush fist))
-      (if exists?
-	  (progn
-	    (setvec3d (fister-selected-block fist)
-		      blockx
-		      blocky
-		      blockz)
-	    (let ((a (+ px (* frac vx)))
-		  (b (+ py (* frac vy)))
-		  (c (+ pz (* frac vz))))
-	      (setvec3d (fister-position fist)
-			a 
-			b
-			c)
-	      (setvec3d (fister-normal-block fist)
-			(floor a) 
-			(floor b)
-			(floor c)))
-	    (setf (fister-exists fist) t))
-	  (setf (fister-exists fist) nil)))))
+  (multiple-value-bind (frac xclamp yclamp zclamp)
+      (funcall (fister-fun fist) px py pz vx vy vz)
+    (progn
+      (let ((a (+ px (* frac vx)))
+	    (b (+ py (* frac vy)))
+	    (c (+ pz (* frac vz))))
+	(let ((dx (if xclamp (if (plusp vx) 1 -1) 0))
+	      (dy (if yclamp (if (plusp vy) 1 -1) 0))
+	      (dz (if zclamp (if (plusp vz) 1 -1) 0)))
+	  (setvec3d (fister-selected-block fist)
+		    (floor (+ dx a))
+		    (floor (+ dy b))
+		    (floor (+ dz c))))
+	(setvec3d (fister-position fist)
+		  a 
+		  b
+		  c)
+	(setvec3d (fister-normal-block fist)
+		  (floor a) 
+		  (floor b)
+		  (floor c)))
+      (setf (fister-exists fist) t))))
 
+(defun use-fist (fist left-p right-p left-fun right-fun)
+  (let ((fist? (fister-exists fist))
+	(selected-block (fister-selected-block fist))
+	(normal-block (fister-normal-block fist)))
+    (when fist?
+      (when left-p
+	(funcall left-fun
+		 (aref selected-block 0)
+		 (aref selected-block 1)
+		 (aref selected-block 2)))
+      (when right-p
+	(funcall right-fun
+		 (aref normal-block 0)
+		 (aref normal-block 1)
+		 (aref normal-block 2))))))
+
+#+nil
 (defun generate-fist-suite (fist-aabb fun)
   (let ((ansx nil)
 	(ansy nil)
@@ -80,22 +86,12 @@
 	    (funcall set-exit exit)
 	    derived-fun)))))))
 
-(defun use-fist (fist left-p right-p left-fun right-fun)
-  (let ((fist? (fister-exists fist))
-	(selected-block (fister-selected-block fist))
-	(normal-block (fister-normal-block fist)))
-    (when fist?
-      (when left-p
-	(funcall left-fun
-		 (aref selected-block 0)
-		 (aref selected-block 1)
-		 (aref selected-block 2)))
-      (when right-p
-	(funcall right-fun
-		 (aref normal-block 0)
-		 (aref normal-block 1)
-		 (aref normal-block 2))))))
 
+#+nil
+(lambda (collect)
+  (lambda (x y z)
+    (unless (zerop (world:getblock x y z))
+      (funcall collect x y z *block-aabb*))))
 
 #+nil
 (defun punch-func (px py pz vx vy vz)
