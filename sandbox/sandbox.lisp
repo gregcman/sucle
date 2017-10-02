@@ -8,7 +8,7 @@
   (clean-dirty)
   )
 
-(defparameter *save* (case 0
+(defparameter *save* (case 12
 		       (0 #P"terrarium2/")
 		       (1 #P"first/")
 		       (2 #P"second/")

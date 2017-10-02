@@ -37,6 +37,7 @@
 	      :serial t
 	      :components ((:file "voxel-trace")
 			   (:file "fists")
+			   (:file "neck")
 			   (:file "collide-and-contact")))
      (:file "player-controls") ;;moving the player around
      (:file "test")

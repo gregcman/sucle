@@ -61,14 +61,6 @@
 	nil
 	(atan y x))))
 
-(defparameter *farticles*
-  (let ((array (make-array 10)))
-    (map-into array (lambda () (sandbox::make-farticle)))
-    array))
-
-(defparameter *player-farticle* (aref *farticles* 0))
-(defparameter *neck* (make-necking))
-
 (defun num-key-jp (control-state)
   (let ((ans nil))
     (macrolet ((k (number-key)
@@ -87,35 +79,62 @@
       (k 0))
     ans))
 
+(defparameter *ents*
+  (let ((array (make-array 10)))
+    (dotimes (x (length array))
+      (setf (aref array x) (sandbox::gentity)))
+    array))
+
+(defparameter *ent* (aref *ents* 1))
+
 (defparameter *paused* nil)
 (defun physss ()
   (window:poll)
   (window::update-control-state *control-state*)
 
-
   (when *sandbox-on*
-    (let* ((player-farticle *player-farticle*)
+    (let* ((player-farticle (sandbox::entity-particle *ent*))
 	   (pos (sandbox::farticle-position player-farticle))
 	   (control-state *control-state*))
-      (let ((num (num-key-jp *control-state*)))
-	(when num
-	  (setf *player-farticle* (aref *farticles* num))))
       (sandbox::meta-controls control-state
-			      pos)
+			      *ent*)
       (when (window::skey-j-p (window::keyval :x) control-state)
 	(toggle *paused*))
+      (let ((num (num-key-jp *control-state*)))
+	(when num
+	  (setf *ent* (aref *ents* num))))
       (unless *paused*
-	(sandbox::physics control-state (necking-yaw *neck*)
-			  (wasd-mover
-			   (window::skey-p (window::keyval :w) control-state)
-			   (window::skey-p (window::keyval :a) control-state)
-			   (window::skey-p (window::keyval :s) control-state)
-			   (window::skey-p (window::keyval :d) control-state))
-			  player-farticle))
+	(setf (sandbox::entity-hips *ent*)
+	      (wasd-mover
+	       (window::skey-p (window::keyval :w) control-state)
+	       (window::skey-p (window::keyval :a) control-state)
+	       (window::skey-p (window::keyval :s) control-state)
+	       (window::skey-p (window::keyval :d) control-state)))
+;;	(sandbox::physentity *ent*)
+
+	(map nil (lambda (ent)
+		   (unless (eq ent *ent*)
+		     (setf (sandbox::entity-jump? ent) t)
+		     (if (sandbox::entity-hips ent)
+			 (incf (sandbox::entity-hips ent)
+			       (- (random 1.0) 0.5))
+			 (setf (sandbox::entity-hips ent) 1.0))
+		     )
+		   (sandbox::physentity ent)) *ents*))
       (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
 	(cg-matrix:%vec* backwardsbug (sandbox::camera-vec-forward *camera*) -4.0)
 	(sandbox::use-fists control-state backwardsbug
 			    pos)))))
+
+(defun seeder ()
+  (map nil
+       (lambda (ent)
+	 (let ((pos (sandbox::farticle-position (sandbox::entity-particle ent))))
+	   (setf (sandbox::entity-fly? ent) nil
+		 (sandbox::entity-gravity? ent) t)
+	   (setf (aref pos 0) 64.0
+		 (aref pos 1) 128.0
+		 (aref pos 2) -64.0))) *ents*))
 
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))
@@ -124,6 +143,7 @@
 (defun set-render-cam-pos (camera partial curr prev)
   (let ((vec (sandbox::camera-vec-position camera))
 	(cev (sandbox::camera-vec-noitisop camera)))
+
     (cg-matrix:%vec-lerp vec prev curr partial)
     (cg-matrix:%vec* cev vec -1.0)))
 
@@ -146,14 +166,16 @@
 	    (remove-spurious-mouse-input)
 	    (window:poll)
 	    (let ((camera *camera*))
-	      (when (window:mice-locked-p)
-		(multiple-value-call #'look-around *neck* (delta2)))
-	      (necktovec *neck*
-			 (sandbox::camera-vec-forward camera))
+	      (let ((neck (sandbox::entity-neck *ent*)))
+		(when (window:mice-locked-p)
+		  (multiple-value-call #'sandbox::look-around neck (delta2)))
+		(sandbox::necktovec
+		 neck
+		 (sandbox::camera-vec-forward camera)))
 	      (setf (sandbox::camera-aspect-ratio camera)
 		    (coerce (/ window:*width* window:*height*)
 			    'single-float))
-	      (let* ((player-farticle *player-farticle*)
+	      (let* ((player-farticle (sandbox::entity-particle *ent*))
 		     (pos (sandbox::farticle-position player-farticle))
 		     (old (sandbox::farticle-position-old player-farticle)))
 		
@@ -166,7 +188,8 @@
 		      defaultfov))
 	      (sandbox::update-matrices camera)
 	      (sandbox::render camera
-			       #'getfnc)))))
+			       #'getfnc
+			       fraction)))))
       (window:update-display)))
   (setf *realthu-nk* (function actual-stuuff)))
 
@@ -236,9 +259,25 @@
 		  (when newpitch
 		    (setf *pitch* newpitch)))
 #+nil
-	      (sandbox::unit-pitch-yaw 
-				       (coerce *pitch* 'single-float)
-				       (coerce *yaw* 'single-float))
+(sandbox::unit-pitch-yaw 
+ (coerce *pitch* 'single-float)
+ (coerce *yaw* 'single-float))
 #+nil
 ((defparameter *yaw* 0.0)
  (defparameter *pitch* 0.0))
+
+#+nil
+(sandbox::physics (necking-yaw *neck*)
+		  
+		  player-farticle)
+
+#+nil
+(defparameter *farticles*
+  (let ((array (make-array 10)))
+    (map-into array (lambda () (sandbox::make-farticle)))
+    array))
+
+#+nil
+((defparameter *player-farticle* (aref *farticles* 0))
+ (defparameter *neck* (make-necking))
+ )

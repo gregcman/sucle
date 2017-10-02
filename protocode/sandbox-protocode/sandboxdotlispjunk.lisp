@@ -613,11 +613,6 @@
     (dobox ((y0 y (+ y (+ 3 trunk-height))))
 	   (plain-setblock x y0 z 17 0 0))))
 
-(defun cactus (x y z)
-  (let ((trunk-height (+ 3 (random 1))))
-    (dobox ((y0 0 trunk-height))
-	   (plain-setblock (+ x 0) (+ y y0) (+ z 0) 81 0 0))))
-
 (defun testigan ()
   (dirt-sand)
   (dirts)

@@ -177,6 +177,17 @@
 	       (clearblock? 58)))
     (dotimes (x 3) (map-box #'sandbox::bonder box))))
 
+(defun dirt-sand (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (case blockid
+      (2 (plain-setblock x y z 12 0))
+      (3 (plain-setblock x y z 24 0)))))
+
+(defun cactus (x y z)
+  (let ((trunk-height (+ 1 (random 3))))
+    (dobox ((y0 0 trunk-height))
+	   (plain-setblock (+ x 0) (+ y y0) (+ z 0) 81 0 0))))
+
 (defun huuh (&optional (box *box*))
   (flet ((dayum (x)
 	   (map-box x box))
@@ -284,6 +295,43 @@
 	(sandbox::plain-setblock x y z 0 0 15)
 	(sandbox::plain-setblock x y z 1 0))))
 
+(defstruct octave
+  (x (random (ash 1 16)))
+  (y (random (ash 1 16)))
+  (z (random (ash 1 16)))
+  xscale
+  yscale
+  zscale
+  power)
+
+
+(defun random-octave (x y z w)
+  (make-octave :xscale (float (/ 1.0 x))
+	       :yscale (float (/ 1.0 y))
+	       :zscale (float (/ 1.0 z))
+	       :power (float w)))
+
+(defun octivate (x y z octave)
+  (* (octave-power octave)
+     (black-tie:simplex-noise-3d-single-float
+      (* (+ (octave-x octave) x) (octave-xscale octave))
+      (* (+ (octave-y octave) y) (octave-yscale octave))
+      (* (+ (octave-z octave) z) (octave-zscale octave)))))
+
+(defun huhuhuh2 (scale &rest octaves)
+  (lambda (x y z)
+    (let ((tot 0.0)
+	  (tot2 0.0))
+      (dolist (octave octaves)
+	(incf tot (octivate x 0 z octave)))
+      (dolist (octave octaves)
+	(incf tot2 (octivate x y z octave)))
+      (if (and (< (/ (- y 64) scale) tot)
+;	       (> 0.8 (/ tot tot2))
+	       )
+	  (sandbox::plain-setblock x y z 1 0)
+	  (sandbox::plain-setblock x y z 0 0 15)))))
+
 (defun clearblock? (id)
   (declare (type fixnum id))
   (lambda (x y z)
@@ -299,3 +347,21 @@
 	(plain-setblock x y z id 0)))))
 
 
+
+(defun enclose ()
+  (dobox ((x 0 128)
+	  (y 0 128))
+	 (plain-setblock x y 0 1 0)
+	 (plain-setblock x y 1 1 0)
+	 (plain-setblock x y -127 1 0)
+	 (plain-setblock x y -126 1 0))
+  (dobox ((z -127 1)
+	  (y 0 128))
+	 (plain-setblock 0 y z 1 0)
+	 (plain-setblock 1 y z 1 0)
+	 (plain-setblock 127 y z 1 0)
+	 (plain-setblock 126 y z 1 0))
+  (dobox ((z -127 1)
+	  (x 0 128)
+	  (y 0 64))
+	 (plain-setblock x y z 1 0)))

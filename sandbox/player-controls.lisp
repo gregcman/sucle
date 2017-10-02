@@ -10,67 +10,7 @@
 	(curr (farticle-position p)))
     (cg-matrix:%copy-vec old curr)))
 
-(defparameter noclip nil)
-(defparameter gravity nil)
-(defparameter fly t)
-
-(defparameter tickscale (/ 20.0 20))
-
 (world:setup-hashes)
-
-(defparameter *block-aabb*
-  (aabbcc::make-aabb
-   :minx 0.0
-   :miny 0.0
-   :minz 0.0
-   :maxx 1.0
-   :maxy 1.0
-   :maxz 1.0))
-
-(defparameter *player-aabb*
-  (aabbcc::make-aabb
-   :minx -0.3
-   :miny -1.5
-   :minz -0.3
-   :maxx 0.3
-   :maxy 0.12
-   :maxz 0.3))
-
-(defun ahook ()
-  (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
-    (flet ((add-x-y-z (x y z)
-	     (vector-push-extend x vec)
-	     (vector-push-extend y vec)
-	     (vector-push-extend z vec)))
-      (lambda (bladd)
-	(lambda (px py pz vx vy vz aabb)
-	  (setf (fill-pointer vec) 0)
-	  (aabb-collect-blocks
-	   px py pz vx vy vz aabb
-	   #'add-x-y-z)
-	  (dobox
-	   ((index 0 (fill-pointer vec) :inc 3))
-	   (let ((x (aref vec (+ 0 index)))
-		 (y (aref vec (+ 1 index)))
-		 (z (aref vec (+ 2 index))))
-	     (when (aref mc-blocks::iscollidable
-			 (world:getblock x y z))
-	       (let ((foox x)
-		     (fooy y)
-		     (fooz z)
-		     (fooaabb *block-aabb*))
-		 (funcall bladd foox fooy fooz fooaabb))))))))))
-
-(defparameter *world-collision-fun*
-  (collide-fucks *player-aabb* (list (ahook))))
-
-(defparameter *contact-handler*
-  (configure-contact-handler
-   (lambda (collect)
-     (lambda (x y z)
-       (when (aref mc-blocks::iscollidable (world:getblock x y z))
-					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
-	 (funcall collect x y z *block-aabb*))))))
 
 (defmacro with-vec-params4 ((&rest args) buf body)
   (with-vec-params args (list buf)
@@ -83,8 +23,14 @@
 (define-modify-macro *= (&rest args)
   *)
 
-(defun physics (control-state yaw dir farticle)
-  (let ((noclip noclip))
+(defun physics (yaw dir farticle
+		noclip gravity fly
+		is-jumping is-sneaking
+		contact-handler
+		world-collision-fun
+		configure-aabb-fun
+		aabb)
+  (let ((tickscale 1.0))
     (step-farticle farticle)
     (let ((vel (farticle-velocity farticle))
 	  (pos (farticle-position farticle)))
@@ -92,7 +38,7 @@
 			       #b000000
 			       (with-vec-params4
 				   (px py pz) pos
-				   (funcall *contact-handler* px py pz *player-aabb*)))))
+				   (funcall contact-handler px py pz aabb)))))
 	(let ((onground (logtest contact-state #b000100)))
 	  (contact-handle contact-state vel)
 	  (let ((speed (* 0.4 (expt tickscale 2))))
@@ -101,13 +47,13 @@
 		(progn
 		  (if fly
 		      (progn
-			(when (window::skey-p (window::keyval :space) control-state)
+			(when is-jumping
 			  (incf yvel speed))
-			(when (window::skey-p (window::keyval :left-shift) control-state)
+			(when is-sneaking
 			  (decf yvel speed)))
 		      
 		      (if onground
-			  (when (window::skey-p (window::keyval :space) control-state) ;;jumping
+			  (when is-jumping
 			    (incf yvel (* 0.49 (expt tickscale 1))))
 			  (setf speed (* speed 0.2))))
 		  (when dir
@@ -118,7 +64,9 @@
 			 (lambda (&rest args)
 			   (declare (ignore args))
 			   (values 1 nil nil nil))
-			 *world-collision-fun*)))
+			 (progn
+			   (funcall configure-aabb-fun aabb)
+			   world-collision-fun))))
 	    (with-vec-params42
 		(vx vy vz) vel
 		(with-vec-params42 (px py pz) pos
@@ -149,21 +97,6 @@
 		    (decf yvel (* 0.08 (expt tickscale 2))))
 		  (*= yvel air-friction)))))))))
 
-(defun meta-controls (control-state pos)
-  (when (window::skey-j-p (window::keyval :E) control-state)
-    (window:toggle-mouse-capture))
-  (when (window:mice-locked-p)
-    (when (window::skey-j-p (window::keyval :v) control-state)
-      (toggle noclip))
-    (with-vec-params4
-	(x y z) pos
-	(when (window::skey-j-p (window::keyval :t) control-state)
-	  (update-world-vao x y z)))
-    (when (window::skey-j-p (window::keyval :f) control-state)
-      (toggle fly)
-      (toggle gravity))))
-
-
 (defun contact-handle (acc vel)
   (multiple-value-bind (i+ i- j+ j- k+ k-)
       (values (logtest acc #b100000)
@@ -191,6 +124,135 @@
 	     (yvel j+ j-)
 	     (zvel k+ k-))))))))
 
+(defparameter *block-aabb*
+  (aabbcc::make-aabb
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx 1.0
+   :maxy 1.0
+   :maxz 1.0))
+
+(defparameter *player-aabb*
+  (aabbcc::make-aabb
+   :minx -0.3
+   :miny -1.5
+   :minz -0.3
+   :maxx 0.3
+   :maxy 0.12
+   :maxz 0.3))
+
+(defun ahook (bladd)
+  (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
+    (flet ((add-x-y-z (x y z)
+	     (vector-push-extend x vec)
+	     (vector-push-extend y vec)
+	     (vector-push-extend z vec)))
+      (lambda (px py pz vx vy vz aabb)
+	(setf (fill-pointer vec) 0)
+	(aabb-collect-blocks
+	 px py pz vx vy vz aabb
+	 #'add-x-y-z)
+	(dobox
+	 ((index 0 (fill-pointer vec) :inc 3))
+	 (let ((x (aref vec (+ 0 index)))
+	       (y (aref vec (+ 1 index)))
+	       (z (aref vec (+ 2 index))))
+	   (when (aref mc-blocks::iscollidable
+		       (world:getblock x y z))
+	     (let ((foox x)
+		   (fooy y)
+		   (fooz z)
+		   (fooaabb *block-aabb*))
+	       (funcall bladd foox fooy fooz fooaabb)))))))))
+
+(defun a-contact-fun (collect)
+  (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
+    (flet ((add-x-y-z (x y z)
+	     (vector-push-extend x vec)
+	     (vector-push-extend y vec)
+	     (vector-push-extend z vec)))
+      (lambda (px py pz aabb)
+	(setf (fill-pointer vec) 0)
+	(get-blocks-around px py pz aabb #'add-x-y-z)
+	(dobox
+	 ((index 0 (fill-pointer vec) :inc 3))
+	 (let ((x (aref vec (+ 0 index)))
+	       (y (aref vec (+ 1 index)))
+	       (z (aref vec (+ 2 index))))	     
+	   (when (aref mc-blocks::iscollidable (world:getblock x y z))
+;;	     (plain-setblock x y z (+ 2 (random 4)) 0)
+	     (funcall collect x y z *block-aabb*))))))))
+
+(defstruct entity
+  particle
+  neck
+  hips
+  aabb
+  contact
+  fly?
+  gravity?
+  clip?
+  jump?
+  sneak?
+  collision-fun
+  configure-collision-fun
+  contact-fun)
+
+(defun gentity ()
+  (multiple-value-bind (collisionfun config-fun)
+      (collide-fucks (list #'ahook))
+    (make-entity :configure-collision-fun config-fun
+		 :collision-fun collisionfun
+		 :contact-fun (configure-contact-handler (list #'a-contact-fun))
+		 :particle (make-farticle)
+		 :neck (make-necking)
+		 :aabb *player-aabb*
+		 :hips nil
+		 :contact #b000000
+		 :fly? t
+		 :gravity? nil
+		 :clip? t
+		 :jump? nil
+		 :sneak? nil)))
+
+(defun physentity (entity)
+  (physics
+   (necking-yaw (entity-neck entity))
+   (entity-hips entity)
+   (entity-particle entity)
+   (not (entity-clip? entity))
+   (entity-gravity? entity)
+   (entity-fly? entity)
+   (entity-jump? entity)
+   (entity-sneak? entity)
+   (entity-contact-fun entity)
+   (entity-collision-fun entity)
+   (entity-configure-collision-fun entity)
+   (entity-aabb entity)))
+
+(defun meta-controls (control-state entity)
+  (symbol-macrolet ((pos (farticle-position (entity-particle entity)))
+		    (is-jumping (entity-jump? entity))
+		    (is-sneaking (entity-sneak? entity))
+		    (fly (entity-fly? entity))
+		    (gravity (entity-gravity? entity))
+		    (noclip (entity-clip? entity)))
+    (setf is-jumping (window::skey-p (window::keyval :space) control-state))
+    (setf is-sneaking (window::skey-p (window::keyval :left-shift) control-state))
+    (when (window::skey-j-p (window::keyval :E) control-state)
+      (window:toggle-mouse-capture))
+    (when (window:mice-locked-p)
+      (when (window::skey-j-p (window::keyval :v) control-state)
+	(toggle noclip))
+      (with-vec-params4
+	  (x y z) pos
+	  (when (window::skey-j-p (window::keyval :t) control-state)
+	    (update-world-vao x y z)))
+      (when (window::skey-j-p (window::keyval :f) control-state)
+	(toggle fly)
+	(toggle gravity)))))
+
 (defparameter *fist-aabb*
      ;;;a very small cubic fist
   (aabbcc::make-aabb
@@ -203,11 +265,14 @@
 
 (defun gen-fister (fist-aabb funs)
   (let ((fist (make-fister)))
-    (setf (fister-fun fist)
-	  (collide-fucks fist-aabb funs))
+    (multiple-value-bind (fun set-aabb)
+	(collide-fucks funs)
+	(setf (fister-fun fist)
+	      fun)
+	(funcall set-aabb fist-aabb))
     fist))
 (defparameter *fist*
-  (gen-fister *fist-aabb* (list (ahook))))
+  (gen-fister *fist-aabb* (list #'ahook)))
 
 (defun use-fists (control-state look-vec pos)
   (let ((fist *fist*))
@@ -242,17 +307,20 @@
 (defparameter *left-fist-fnc*
   (lambda (x y z)
     (setblock-with-update x y z 0 0)))
+
+(defparameter *big-fist-fun*
+  (lambda (x y z)
+    (when (and (<= 0 x 127)
+	       (<= 0 y 127)
+	       (<= -128 z -1))
+      (let ((blockid 0))
+	(setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))
 (defun big-swing-fist (px py pz vx vy vz)
   (let ((u 3))
     (aabb-collect-blocks
      px py pz (* u vx) (* u vy) (* u vz)
      *fist-aabb*   
-     (lambda (x y z)
-       (when (and (<= 0 x 127)
-		  (<= 0 y 127)
-		  (<= -128 z -1))
-	 (let ((blockid 0))
-	   (setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))))
+     *big-fist-fun*)))
 
 #+nil
 (defun collide-with-world (fun)
@@ -584,3 +652,29 @@
 
 #+nil
 (defparameter onground nil)
+
+#+nil
+((defparameter noclip nil)
+ (defparameter gravity nil)
+ (defparameter fly t)
+ (defparameter *is-jumping* nil)
+ (defparameter *is-sneaking* nil))
+
+#+nil
+((defparameter *world-collision-fun* nil)
+ (defparameter *configure-aabb-fun* nil)
+ (setf (values *world-collision-fun*
+	       *configure-aabb-fun*)
+       
+       (defparameter *contact-handler*
+	 (configure-contact-handler
+	  ))))
+
+#+nil
+(or (aabbcc::make-aabb
+			    :minx -0.5
+			    :miny -0.5
+			    :minz -0.5
+			    :maxx 0.5
+			    :maxy 0.5
+			    :maxz 0.5))

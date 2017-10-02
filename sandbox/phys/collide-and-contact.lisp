@@ -56,7 +56,7 @@
 	(py 0.0)
 	(pz 0.0)
 	(aabb nil))
-    (let ((fun (constantly nil)))
+    (let ((funs nil))
       (let ((acc 0))
 	(labels
 	    ((run (npx npy npz naabb)
@@ -65,16 +65,15 @@
 		     pz npz
 		     aabb naabb)
 	       (setf acc 0)
-	       (get-blocks-around
-		px py pz aabb
-		fun)
+	       (dolist (fun funs)
+		 (funcall fun npx npy npz naabb))
 	       acc)
 	     (add (mx my mz maabb)
 	       (logiorf
 		acc
 		(aabbcc::aabb-contact px py pz aabb mx my mz maabb)))
 	     (set-fun (newfun)
-	       (setf fun newfun)))
+	       (setf funs newfun)))
 	  (list 'full #'run
 		'add #'add
 		'set-fun #'set-fun))))))
@@ -86,12 +85,13 @@
 	(add (getf data 'add)))
     (funcall
      set-fun
-     (funcall fun add))
+     (mapcar (lambda (func) (funcall func add)) fun))
     full))
 
 
-(defun collide-fucks (aabb some-hooks)
-  (let ((taco (make-touch-collector))
+(defun collide-fucks (some-hooks)
+  (let (aabb
+	(taco (make-touch-collector))
 	(blockvec (make-array 0 :adjustable t :fill-pointer 0)))
     (flet ((bladd-x-y-z (x y z aabb)
 	     (vector-push-extend x blockvec)
@@ -101,30 +101,32 @@
       (let ((hooks (mapcar (lambda (func)
 			    (funcall func #'bladd-x-y-z))
 			   some-hooks)))
-	(lambda (px py pz vx vy vz)
-	  (reset-touch-collector taco)
-	  (setf (fill-pointer blockvec) 0)
-	  (dolist (fun hooks)
-	    (funcall fun px py pz vx vy vz aabb))
-	  (dobox
-	   ((index 0 (fill-pointer blockvec) :inc 4))
-	   (let ((foox (aref blockvec (+ 0 index)))
-		 (fooy (aref blockvec (+ 1 index)))
-		 (fooz (aref blockvec (+ 2 index)))
-		 (fooaabb (aref blockvec (+ 3 index))))
-	     (multiple-value-bind (minimum type)
-		 (aabbcc::aabb-collide
-		  aabb
-		  px py pz
-		  fooaabb
-		  foox fooy fooz
-		  vx vy vz)
-	       (collect-touch minimum type taco))))
-	  (multiple-value-bind (xclamp yclamp zclamp)
-	      (collapse-touch vx vy vz taco)
-	    (values
-	     (touch-collector-min-ratio taco)
-	     xclamp yclamp zclamp)))))))
+	(values
+	 (lambda (px py pz vx vy vz)
+	   (reset-touch-collector taco)
+	   (setf (fill-pointer blockvec) 0)
+	   (dolist (fun hooks)
+	     (funcall fun px py pz vx vy vz aabb))
+	   (dobox
+	    ((index 0 (fill-pointer blockvec) :inc 4))
+	    (let ((foox (aref blockvec (+ 0 index)))
+		  (fooy (aref blockvec (+ 1 index)))
+		  (fooz (aref blockvec (+ 2 index)))
+		  (fooaabb (aref blockvec (+ 3 index))))
+	      (multiple-value-bind (minimum type)
+		  (aabbcc::aabb-collide
+		   aabb
+		   px py pz
+		   fooaabb
+		   foox fooy fooz
+		   vx vy vz)
+		(collect-touch minimum type taco))))
+	   (multiple-value-bind (xclamp yclamp zclamp)
+	       (collapse-touch vx vy vz taco)
+	     (values
+	      (touch-collector-min-ratio taco)
+	      xclamp yclamp zclamp)))
+	 (lambda (newaabb) (setf aabb newaabb)))))))
 
 #+nil
 (configure-collision-handler

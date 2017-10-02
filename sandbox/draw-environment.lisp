@@ -20,7 +20,7 @@
 	  (when ans
 	    (set-display-list name ans)))))))
 
-(defparameter *fog-ratio*  0.75)
+(defparameter *fog-ratio*  (or 0.0 0.75))
 
 (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *fogcolor* (apply #'cg-matrix:vec
@@ -30,7 +30,7 @@
 
 (defun fractionalize (x)
   (alexandria:clamp x 0.0 1.0))
-(defun render (camera deps)
+(defun render (camera deps partial)
   (declare (optimize (safety 3) (debug 3)))
   (flet ((getfnc (name)
 	   (funcall deps name)))
@@ -59,14 +59,53 @@
       (gl:uniformf foglet (/ -1.0 (camera-frustum-far camera) *fog-ratio*))
       (gl:uniformf aratio (/ 1.0 *fog-ratio*))
       
-      (gl:disable :blend))
+      (gl:disable :blend)
+
   ;;;static geometry with no translation whatsoever
-    ;; (sandbox::bind-default-framebuffer)
-    (gl:bind-texture
-     :texture-2d
-     (getfnc :terrain))
-    (draw-chunk-meshes)
+      ;; (sandbox::bind-default-framebuffer)
+      (gl:bind-texture
+       :texture-2d
+       (getfnc :terrain))
+      (draw-chunk-meshes)
+
+      (progn
+	(dotimes (x (length fuck::*ents*))
+	  (let ((aaah (aref fuck::*ents* x)))
+	    (unless (eq aaah fuck::*ent*)
+	      (gl:uniform-matrix-4fv
+	       pmv
+	       (cg-matrix:matrix* (camera-matrix-projection-view-player camera)
+				  (compute-entity-aabb-matrix aaah partial))
+	       nil)
+	      (gl:call-list (getfnc :box)))))))
     (designatemeshing)))
+
+(defun compute-entity-aabb-matrix (entity partial)
+  (let ((aabb (entity-aabb entity))
+	(pos (farticle-position (entity-particle entity)))
+	(posold (farticle-position-old (entity-particle entity))))
+    (let ((avgx (/ (+ (aabbcc::aabb-minx aabb)
+		      (aabbcc::aabb-maxx aabb))
+		   2.0))
+	  (avgy (/ (+ (aabbcc::aabb-miny aabb)
+		      (aabbcc::aabb-maxy aabb))
+		   2.0))
+	  (avgz (/ (+ (aabbcc::aabb-minz aabb)
+		      (aabbcc::aabb-maxz aabb))
+		   2.0))
+	  (difx (/ (- (aabbcc::aabb-minx aabb)
+		      (aabbcc::aabb-maxx aabb))
+		     -2.0))
+	  (dify (/ (- (aabbcc::aabb-miny aabb)
+		      (aabbcc::aabb-maxy aabb))
+		   -2.0))
+	  (difz (/ (- (aabbcc::aabb-minz aabb)
+		      (aabbcc::aabb-maxz aabb))
+		   -2.0)))
+      (let ((pos2 (cg-matrix:vec avgx avgy avgz)))
+	(cg-matrix:matrix* (cg-matrix:translate (cg-matrix:vec+ pos2
+								(cg-matrix:vec-lerp posold pos partial)))
+			   (cg-matrix:scale* difx dify difz))))))
 
 #+nil
 (defparameter *velocity* (cg-matrix:vec 0.0 0.0 0.0))
@@ -254,7 +293,11 @@
        :bs-frag
        (lambda ()
 	 (alexandria:read-file-into-string
-	  (shader-path "blockshader/basictexcoord.frag")))))))
+	  (shader-path "blockshader/basictexcoord.frag"))))
+      (bornfnc
+       :box
+       (lambda ()
+	 (draw-box -1.0 1.0 -1.0 1.0 -1.0 1.0))))))
 
 
 (defparameter *blockshader-uniforms* nil)
@@ -507,3 +550,57 @@
 #+nil
 (defun glinnit ()
   )
+
+(defun draw-box (minx maxx miny maxy minz maxz)
+  (let ((iter aplayground::*attrib-buffer-iterators*))
+    (aplayground::reset-attrib-buffer-iterators iter)
+    (let ((buf (aplayground::get-buf-param
+		iter
+		(etouq (vector 0 2 8)))))
+      (let ((len 0))
+	(aplayground::with-iterators (epos etex dark)
+	    buf iter-ator:wasabios
+	  (etouq
+	   (aplayground::ngorp
+	    (aplayground::preach
+	     'epos
+	     (nconc
+	      (axis-aligned-quads:quadi+
+	       'maxx
+	       '(miny maxy minz maxz))
+	      (axis-aligned-quads:quadi-
+	       'minx
+	       '(miny maxy minz maxz))
+	      (axis-aligned-quads:quadj+
+	       'maxy
+	       '(minx maxx minz maxz))
+	      (axis-aligned-quads:quadj-
+	       'miny
+	       '(minx maxx minz maxz))
+	      (axis-aligned-quads:quadk+
+	       'maxz
+	       '(minx maxx miny maxy))
+	      (axis-aligned-quads:quadk-
+	       'minz
+	       '(minx maxx miny maxy))))))
+	  (dotimes (x 6)
+	    (etouq
+	     (aplayground::ngorp
+	      (aplayground::preach
+	       'etex
+	       (axis-aligned-quads:duaq 1 t (let ((a (/ 0.0 16))
+						  (b (/ 15.0 16)))
+					      `(,a ,(+ a (/ 1.0 16.0))
+						   ,b
+						   
+						   ,(+ b (/ 1.0 16.0))))))))
+	    (dotimes (x 4)
+	      (dark 1.0)))
+	  (setf len 24))
+	(aplayground::reset-attrib-buffer-iterators iter)
+	(let ((list (gl:gen-lists 1)))
+	  (gl:new-list list :compile)
+	  (gl:with-primitives :quads
+	    (mesh-chunk len buf))
+	  (gl:end-list)
+	  list)))))
