@@ -110,8 +110,9 @@
 	       (window::skey-p (window::keyval :a) control-state)
 	       (window::skey-p (window::keyval :s) control-state)
 	       (window::skey-p (window::keyval :d) control-state)))
-;;	(sandbox::physentity *ent*)
+	(sandbox::physentity *ent*)
 
+	#+nil
 	(map nil (lambda (ent)
 		   (unless (eq ent *ent*)
 		     (setf (sandbox::entity-jump? ent) t)
@@ -139,7 +140,8 @@
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))
 
-(defparameter *camera* (sandbox::make-camera))
+(defparameter *camera* (sandbox::make-camera :frustum-far (* 256.0)
+					     :frustum-near (/ 1.0 8.0)))
 (defun set-render-cam-pos (camera partial curr prev)
   (let ((vec (sandbox::camera-vec-position camera))
 	(cev (sandbox::camera-vec-noitisop camera)))
@@ -211,6 +213,7 @@
 		 (*standard-output* stdo))
 	     (window::wrapper #'handoff-five)))
 	 :arguments  (list *standard-output*))))
+
 
 
 ;;;time in microseconds

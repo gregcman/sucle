@@ -20,11 +20,11 @@
 	  (when ans
 	    (set-display-list name ans)))))))
 
-(defparameter *fog-ratio*  (or 0.0 0.75))
+(defparameter *fog-ratio*  0.75)
 
 (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *fogcolor* (apply #'cg-matrix:vec
-				(nth 1 '((0.68 0.8 1.0)
+				(nth 0 '((0.68 0.8 1.0)
 					 (0.3 0.1 0.0)))))
 (defparameter *daytime* 1.0)
 
@@ -68,6 +68,7 @@
        (getfnc :terrain))
       (draw-chunk-meshes)
 
+      #+nil
       (progn
 	(dotimes (x (length fuck::*ents*))
 	  (let ((aaah (aref fuck::*ents* x)))
@@ -583,6 +584,13 @@
 	      (axis-aligned-quads:quadk-
 	       'minz
 	       '(minx maxx miny maxy))))))
+	  (flet ((wot (x)
+		   (dotimes (i 4)
+		     (dark x))))
+	    (etouq
+	     (aplayground::ngorp
+	      (aplayground::preach
+	       'wot '(0.6 0.6 1.0 0.5 0.8 0.8)))))
 	  (dotimes (x 6)
 	    (etouq
 	     (aplayground::ngorp
@@ -593,9 +601,7 @@
 					      `(,a ,(+ a (/ 1.0 16.0))
 						   ,b
 						   
-						   ,(+ b (/ 1.0 16.0))))))))
-	    (dotimes (x 4)
-	      (dark 1.0)))
+						   ,(+ b (/ 1.0 16.0)))))))))
 	  (setf len 24))
 	(aplayground::reset-attrib-buffer-iterators iter)
 	(let ((list (gl:gen-lists 1)))
