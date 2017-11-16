@@ -3,7 +3,7 @@
   :author "Gregorio Manabat"
   :maintainer "Gregorio Manabat"
 
-  :depends-on (#:glfw-3-2
+  :depends-on (#:cl-glfw3
 	       #:funland)
 
   :serial t
