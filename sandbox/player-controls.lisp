@@ -30,7 +30,7 @@
 		world-collision-fun
 		configure-aabb-fun
 		aabb)
-  (let ((tickscale 1.0))
+  (let ((tickscale (/ 1.0 3.0)))
     (step-farticle farticle)
     (let ((vel (farticle-velocity farticle))
 	  (pos (farticle-position farticle)))
@@ -239,17 +239,17 @@
 		    (gravity (entity-gravity? entity))
 		    (noclip (entity-clip? entity)))
     (setf is-jumping (window::skey-p (window::keyval :space) control-state))
-    (setf is-sneaking (window::skey-p (window::keyval :left-shift) control-state))
-    (when (window::skey-j-p (window::keyval :E) control-state)
+    (setf is-sneaking (window::skey-p (window::keyval :a) control-state))
+    (when (window::skey-j-p (window::keyval :r) control-state)
       (window:toggle-mouse-capture))
     (when (window:mice-locked-p)
       (when (window::skey-j-p (window::keyval :v) control-state)
 	(toggle noclip))
       (with-vec-params4
 	  (x y z) pos
-	  (when (window::skey-j-p (window::keyval :t) control-state)
+	  (when (window::skey-j-p (window::keyval :p) control-state)
 	    (update-world-vao x y z)))
-      (when (window::skey-j-p (window::keyval :f) control-state)
+      (when (window::skey-j-p (window::keyval :g) control-state)
 	(toggle fly)
 	(toggle gravity)))))
 

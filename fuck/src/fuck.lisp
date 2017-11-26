@@ -89,7 +89,6 @@
 
 (defparameter *paused* nil)
 (defun physss ()
-  (window:poll)
   (window::update-control-state *control-state*)
 
   (when *sandbox-on*
@@ -106,10 +105,10 @@
       (unless *paused*
 	(setf (sandbox::entity-hips *ent*)
 	      (wasd-mover
-	       (window::skey-p (window::keyval :w) control-state)
-	       (window::skey-p (window::keyval :a) control-state)
+	       (window::skey-p (window::keyval :e) control-state)
 	       (window::skey-p (window::keyval :s) control-state)
-	       (window::skey-p (window::keyval :d) control-state)))
+	       (window::skey-p (window::keyval :d) control-state)
+	       (window::skey-p (window::keyval :f) control-state)))
 	(sandbox::physentity *ent*)
 
 	#+nil
@@ -164,9 +163,8 @@
 	 :depth-buffer-bit)
 	(when *sandbox-on*
 	  (progn
-	    (dotimes (x 4) (window:poll))
-	    (remove-spurious-mouse-input)
 	    (window:poll)
+	    (remove-spurious-mouse-input)
 	    (let ((camera *camera*))
 	      (let ((neck (sandbox::entity-neck *ent*)))
 		(when (window:mice-locked-p)
@@ -196,7 +194,7 @@
   (setf *realthu-nk* (function actual-stuuff)))
 
 (defun injection3 ()
-  (setf *ticker* (make-ticker :dt (floor 1000000 20)
+  (setf *ticker* (make-ticker :dt (floor 1000000 60)
 		  :current-time (fine-time)))
   (catch (quote :end)
     (loop
