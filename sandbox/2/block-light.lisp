@@ -1,7 +1,7 @@
 (in-package :sandbox)
 
 (defun isOpaque (id)
-  (eq t (aref mc-blocks::opaquecubelooukup id)))
+  (eq t (aref mc-blocks:*opaquecubelooukup* id)))
 
 (defparameter *scratch-bfs* (q::make-uniq-q))
 (defparameter *scratch-bfs2* (q::make-uniq-q))
