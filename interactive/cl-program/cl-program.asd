@@ -13,10 +13,5 @@
     ((:module "auxiliary-functions"
 	      :components
 	      ((:file "rectangular-tilemap")
-	       (:file "axis-aligned-quads")))
-
-     (:module "src"
-	      :serial t
-	      :components
-	      ((:file "buffers")
-	       ))))
+	       (:file "axis-aligned-quads")
+	       (:file "util")))))

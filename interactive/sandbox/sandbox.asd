@@ -14,6 +14,7 @@
     
     ((:file "package")
      (:file "vox")
+     (:file "buffers")
      (:module two
 	      :serial t
 	      :pathname "2"

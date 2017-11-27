@@ -143,24 +143,6 @@
 (defun load-png (filename)
   (opticl:read-png-file filename))
 
-;;;;flip an image in-place - three dimensions - does not conse
-(defun flip-image (image)
-  (let ((dims (array-dimensions image)))
-    (let ((height (pop dims))
-	  (width (pop dims)))
-      (if dims
-	  (let ((components (car dims)))
-	    (dobox ((h 0 (- height (ash height -1)))
-		    (w 0 width)
-		    (c 0 components))
-		   (rotatef (aref image (- height h 1) w c)
-			    (aref image h w c))))
-	  (dobox ((h 0 (- height (ash height -1)))
-		  (w 0 width))
-	      (rotatef (aref image (- height h 1) w)
-		       (aref image h w))))))
-  image)
-
 (defun build-deps (getfnc setfnc)
   (flet ((bornfnc (name func)
 	   (funcall setfnc name func))
@@ -171,7 +153,7 @@
        :terrain-png
        (lambda ()
 	 (let ((image
-		(flip-image
+		(flip-image:flip-image
 		 (load-png 
 		  (img-path #P"terrain.png")))))
 	   (color-grasses

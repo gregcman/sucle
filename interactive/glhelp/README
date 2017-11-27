@@ -1,0 +1,5 @@
+files:
+glhelp - for common opengl needs
+cache - for opengl objects expressed as lispobjs
+
+for making the monolithic opengl library more bearable
