@@ -41,7 +41,7 @@
 (defun show-sidep (blockid other-blockid)
   (or (zerop other-blockid)
       (and (/= blockid other-blockid)
-	   (not (aref mc-blocks::opaquecubelooukup other-blockid)))))
+	   (not (aref mc-blocks:*opaquecubelooukup* other-blockid)))))
 
 (defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
   (let ((id (gensym)))
@@ -87,7 +87,7 @@
 
 (defun renderstandardblock (id i j k)
   (let ((times 0)
-	(texid (aref mc-blocks::blockIndexInTexture id)))
+	(texid (aref mc-blocks:*blockIndexInTexture* id)))
     (with-texture-translator2 (u0 u1 v0 v1) texid
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)

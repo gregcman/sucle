@@ -6,6 +6,7 @@
 		 #:terminal625-queue
 		 #:terminal625-rcclr
 		 #:terminal625-zeorp
+		 #:terminal625-mcblk
 		 #:terminal625-aabbc)
     :serial t
     :components
@@ -19,7 +20,6 @@
 	      :serial t
 	      :pathname "2"
 	      :components ((:file "world")
-			   (:file "blocks") ;;list of minecraft block values
 			   (:file "block-light") ;;lighting
 			   (:file "block-meshing");;turn world data into a mesh to render
 			   ))

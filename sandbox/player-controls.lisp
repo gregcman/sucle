@@ -158,7 +158,7 @@
 	 (let ((x (aref vec (+ 0 index)))
 	       (y (aref vec (+ 1 index)))
 	       (z (aref vec (+ 2 index))))
-	   (when (aref mc-blocks::iscollidable
+	   (when (aref mc-blocks:*iscollidable*
 		       (world:getblock x y z))
 	     (let ((foox x)
 		   (fooy y)
@@ -180,7 +180,7 @@
 	 (let ((x (aref vec (+ 0 index)))
 	       (y (aref vec (+ 1 index)))
 	       (z (aref vec (+ 2 index))))	     
-	   (when (aref mc-blocks::iscollidable (world:getblock x y z))
+	   (when (aref mc-blocks:*iscollidable* (world:getblock x y z))
 ;;	     (plain-setblock x y z (+ 2 (random 4)) 0)
 	     (funcall collect x y z *block-aabb*))))))))
 
@@ -303,7 +303,7 @@
        y
        z
        blockval
-       (aref mc-blocks::lightvalue blockval)))))
+       (aref mc-blocks:*lightvalue* blockval)))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
     (setblock-with-update x y z 0 0)))
@@ -314,7 +314,7 @@
 	       (<= 0 y 127)
 	       (<= -128 z -1))
       (let ((blockid 0))
-	(setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))
+	(setblock-with-update x y z blockid  (aref mc-blocks:*lightvalue* blockid))))))
 
 (defun big-swing-fist (px py pz vx vy vz)
   (let ((u 30))
