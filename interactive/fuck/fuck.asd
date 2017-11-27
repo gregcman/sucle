@@ -2,7 +2,7 @@
   :depends-on (
 	       #:funland
 	       
-	       #:window-glfw3
+	       #:terminal625-glfw3
 	       #:cl-program
 	       #:sandbox
 	       #:black-tie
