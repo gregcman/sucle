@@ -1,25 +1,4 @@
 (in-package :sandbox)
-
-(progn
-  (defparameter *g/call-list* (make-hash-table :test 'eq));;opengl call lists
-  (defun get-display-list (name)
-    (let ((display-list (gethash name *g/call-list*)))
-      (if display-list
-	  display-list
-	  (get-display-list-backup name))))
-  (defun set-display-list (name list-num)
-    (setf (gethash name *g/call-list*) list-num))
-  (defun remove-display-list (name)
-    (remhash name *g/call-list*)))
-(progn
-  (defparameter *g/call-list-backup* (make-hash-table :test 'eq))
-  (defun get-display-list-backup (name)
-    (let ((display-list-func (gethash name *g/call-list-backup*)))
-      (when (functionp display-list-func)
-	(let ((ans (funcall display-list-func name)))
-	  (when ans
-	    (set-display-list name ans)))))))
-
 (defparameter *fog-ratio*  0.75)
 
 (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
@@ -27,22 +6,26 @@
 				(nth 0 '((0.68 0.8 1.0)
 					 (0.3 0.1 0.0)))))
 (defparameter *daytime* 1.0)
-
+(defparameter *chunks-changed* t)
+(defparameter *world-display-list* nil)
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)  
   (gl:depth-func :less)
   (gl:enable :cull-face)
   (gl:cull-face :back)
-  (let ((call-list
-	 (get-display-list :world)))
+
+  (when *chunks-changed*
+    (let ((old-world *world-display-list*))
+      (when old-world (gl:delete-lists old-world 1)))
+    (let ((new (gl:gen-lists 1)))
+      (gl:new-list new :compile)
+      (draw-world)
+      (gl:end-list)
+      (setf *world-display-list* new))
+    (setf *chunks-changed* nil))
+  (let ((call-list *world-display-list*))
     (if call-list    
-	(gl:call-list call-list)
-	(let ((new (gl:gen-lists 1)))
-	  (gl:new-list new :compile)
-	  (draw-world)
-	  (gl:end-list)
-	  (set-display-list :world new)
-	  (gl:call-list new)))))
+	(gl:call-list call-list))))
 (defun draw-world ()
   (maphash
    (lambda (key display-list)

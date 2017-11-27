@@ -1,9 +1,9 @@
 (in-package #:sandbox)
 
 (defun initialization1 ()
-  (clrhash *g/call-list*)
+  (setf *world-display-list* nil)
   (clrhash *g/chunk-call-list*)
-
+  
   (setf mesher-thread nil)
   (clean-dirty)
   )

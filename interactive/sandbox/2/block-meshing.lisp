@@ -13,21 +13,19 @@
 
 (defun chunk-shape (chunk-position iter)
   (declare (optimize (debug 3)))
-  (let ((buf (aplayground::get-buf-param iter
-					 (etouq (vector 0 2 8)))))
-    (let ((times 0))
-      (let ((*bluffs* buf))
-	(multiple-value-bind (io ko jo) (world:unhashfunc chunk-position)
-	  (dobox ((i io (+ 16 io))
-		  (j jo (+ 16 jo))
-		  (k ko (+ 16 ko)))
-		 (let ((blockid (world:getblock i j k)))
-		   (unless (zerop blockid)
-		     (incf times
-			   (blockshape
-			    i j k
-			    blockid)))))))
-      (values buf times chunk-position iter))))
+  (let ((times 0))
+    (let ((*bluffs* iter))
+      (multiple-value-bind (io ko jo) (world:unhashfunc chunk-position)
+	(dobox ((i io (+ 16 io))
+		(j jo (+ 16 jo))
+		(k ko (+ 16 ko)))
+	       (let ((blockid (world:getblock i j k)))
+		 (unless (zerop blockid)
+		   (incf times
+			 (blockshape
+			  i j k
+			  blockid)))))))
+    (values times chunk-position iter)))
 
 
 (defun blockshape (i j k blockid)

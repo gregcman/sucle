@@ -1,14 +1,5 @@
 (in-package :sandbox)
 
-(defparameter mesher-thread nil)
-(defun designatemeshing ()
-  (unless (mesherthreadbusy)
-    (if mesher-thread
-	(getmeshersfinishedshit))
-    (let ((achunk (dirty-pop)))
-      (when achunk
-	(giveworktomesherthread achunk)))))
-
 (defun mesh-chunk (times bufs)
   (aplayground::with-iterators (xyz uv dark) bufs iter-ator:wasabiis
     (dotimes (x times)
@@ -16,43 +7,37 @@
       (%gl:vertex-attrib-2f 2 (uv) (uv))
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
 
-;;(defparameter *faces* 0)
-(defun getmeshersfinishedshit ()
-  (multiple-value-bind (buf len coords iter) (sb-thread:join-thread mesher-thread)
-    ;;   (incf *faces* len)
-    (when coords
-      (let ((old-call-list (get-chunk-display-list coords)))
-					;	(print len)
-	(aplayground::reset-attrib-buffer-iterators iter)
-	(let ((new (if (zerop len)
-		       nil
-		       (let ((list (gl:gen-lists 1)))
-			 (gl:new-list list :compile)
-			 (gl:with-primitives :quads
-			   (mesh-chunk len buf))
-			 (gl:end-list)
-			 list))))
-	  (if new
-	      (set-chunk-display-list coords new)
-	      (remove-chunk-display-list coords)))
-	(when old-call-list (gl:delete-lists old-call-list 1))
-	(let ((old-world (get-display-list :world)))
-	  (remove-display-list :world)
-	  (when old-world (gl:delete-lists old-world 1))))))
-  (setf mesher-thread nil))
+(defun update-chunk-mesh (len coords iter)
+  (when coords
+    (setf *chunks-changed* t)
+    (let ((old-call-list (get-chunk-display-list coords)))     
+      (when old-call-list (gl:delete-lists old-call-list 1)))
+    (if (zerop len)
+	(remove-chunk-display-list coords)	  
+	(set-chunk-display-list coords (let ((list (gl:gen-lists 1)))
+					 (gl:new-list list :compile)
+					 (gl:with-primitives :quads
+					   (aplayground::reset-attrib-buffer-iterators iter)
+					   (mesh-chunk len iter))
+					 (gl:end-list)
+					 list)))))
 
-(defun mesherthreadbusy ()
-  (not (or (eq nil mesher-thread)
-	   (not (bordeaux-threads:thread-alive-p mesher-thread)))))
-
-(defun giveworktomesherThread (thechunk)
-  (setf mesher-thread
-	(bordeaux-threads:make-thread
-	 (lambda ()
-	   (let ((iter aplayground::*attrib-buffer-iterators*))
-	     (aplayground::reset-attrib-buffer-iterators iter)
-	     (sb-thread:return-from-thread
-	      (chunk-shape thechunk iter)))))))
+(defparameter mesher-thread nil)
+(defun designatemeshing ()
+  (when (or (eq nil mesher-thread)
+	    (not (bordeaux-threads:thread-alive-p mesher-thread)))
+    (when mesher-thread
+      (multiple-value-call #'update-chunk-mesh (sb-thread:join-thread mesher-thread)) 
+      (setf mesher-thread nil))
+    (let ((thechunk (dirty-pop)))
+      (when thechunk
+	(setf mesher-thread
+	      (bordeaux-threads:make-thread
+	       (lambda ()
+		 (let ((iter aplayground::*attrib-buffer-iterators*))
+		   (aplayground::reset-attrib-buffer-iterators iter)
+		   (sb-thread:return-from-thread
+		    (chunk-shape thechunk iter))))))))))
 #+nil
 (defun getmeshersfinishedshit ()
   (multiple-value-bind (shape len coords) (sb-thread:join-thread mesher-thread)

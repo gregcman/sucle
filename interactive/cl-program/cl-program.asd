@@ -1,12 +1,5 @@
 (asdf:defsystem #:cl-program
-    :depends-on (#:cl-opengl
-
-		 #:alexandria
-		 #:opticl
-		 
-		 #:funland
-		 #:terminal625-flhat
-		 #:terminal625-zeorp)
+    :depends-on ()
     :serial t
     :components
     

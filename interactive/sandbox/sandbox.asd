@@ -6,8 +6,10 @@
 		 #:terminal625-queue
 		 #:terminal625-rcclr
 		 #:terminal625-zeorp
+		 #:terminal625-flhat
 		 #:terminal625-mcblk
 		 #:terminal625-aabbc
+		 #:opticl
 		 #:glhelp)
     :serial t
     :components

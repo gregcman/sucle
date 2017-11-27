@@ -279,7 +279,7 @@
 #+nil
 (defun define-time ()
   (eval
-   `(defun fine-time ()
+   (defun fine-time ()
       (/ (%glfw::get-timer-value)
 	 ,(/ (%glfw::get-timer-frequency) (float (expt 10 6)))))))
 
