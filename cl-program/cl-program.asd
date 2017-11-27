@@ -5,7 +5,8 @@
 		 #:opticl
 		 
 		 #:funland
-		 #:terminal625-flhat)
+		 #:terminal625-flhat
+		 #:terminal625-zeorp)
     :serial t
     :components
     

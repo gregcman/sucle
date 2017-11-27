@@ -18,6 +18,4 @@
 				  :components ((:file "defdestructure")))
 			 (:module "let-mapped-places"
 				  :components ((:file "let-mapped-places")))
-			 (:file "map-home-symbols")))
-   (:module "iter-ator"
-	    :components ((:file "iter-ator"))))) 
+			 (:file "map-home-symbols"))))) 

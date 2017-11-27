@@ -315,11 +315,19 @@
 	       (<= -128 z -1))
       (let ((blockid 0))
 	(setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))
+
 (defun big-swing-fist (px py pz vx vy vz)
   (let ((u 30))
     (aabb-collect-blocks
      px py pz (* u vx) (* u vy) (* u vz)
-     *fist-aabb*   
+     (load-time-value
+      (aabbcc::make-aabb
+       :minx -0.3
+       :miny -0.5
+       :minz -0.3
+       :maxx 0.3
+       :maxy 1.12
+       :maxz 0.3))   
      *big-fist-fun*)))
 
 #+nil

@@ -188,7 +188,7 @@
 
 (progn
   (defun color-grasses (image terrain)
-    (let ((color (case 1
+    (let ((color (case 3
 		   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 		   (1 (getapixel 255 0 image))
 		   (2 (getapixel 0 0 image))

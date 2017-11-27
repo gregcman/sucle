@@ -194,14 +194,15 @@
 		   (1 0 0))))))
 
 
+
+
+
+(eval-when (:compile-toplevel)
 ;;0.9 for nether???
 ;;0.8 for overworld(in-package :sandbox)???
 (defun light-gen? (f i)
   (expt (+ 0.7 (* 2 f)) (- 15 i)))
 
-
-
-(eval-when (:compile-toplevel)
   ;;;overworld f = 0.05
 ;;;nether f = 0.1
   (defun light-gen (f i)
@@ -212,7 +213,7 @@
     (let ((foo-array (make-array 16 :element-type 'single-float)))
       (dotimes (x 16)
 	(setf (aref foo-array x)
-	      (light-gen 0.05 x)))
+	      (light-gen? 0.05 x)))
       foo-array)))
 
 
