@@ -1,16 +1,29 @@
-;;;; aabbcc.lisp
 (defpackage #:aabbcc
-  (:use #:cl))
+  (:use #:cl)
+  (:export
+   #:aabb-minx
+   #:aabb-miny
+   #:aabb-minz
+   #:aabb-maxx
+   #:aabb-maxy
+   #:aabb-maxz)
+  (:export
+   #:type-collapser
+   #:aabb-collide
+   #:step-motion
+   #:clamp-vec
+   #:aabb-contact
+   #:make-aabb))
 (in-package #:aabbcc)
 
 
 (defstruct aabb
-  (minx)
-  (miny)
-  (minz)
-  (maxx)
-  (maxy)
-  (maxz))
+  (minx 0.0 :type single-float)
+  (miny 0.0 :type single-float)
+  (minz 0.0 :type single-float)
+  (maxx 0.0 :type single-float)
+  (maxy 0.0 :type single-float)
+  (maxz 0.0 :type single-float))
 
 (defun step-motion (get-collision-data px py pz vx vy vz &optional xclamp yclamp zclamp)
   (multiple-value-bind (ratio xc yc zc)

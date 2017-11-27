@@ -125,7 +125,7 @@
 	     (zvel k+ k-))))))))
 
 (defparameter *block-aabb*
-  (aabbcc::make-aabb
+  (aabbcc:make-aabb
    :minx 0.0
    :miny 0.0
    :minz 0.0
@@ -134,7 +134,7 @@
    :maxz 1.0))
 
 (defparameter *player-aabb*
-  (aabbcc::make-aabb
+  (aabbcc:make-aabb
    :minx -0.3
    :miny -1.5
    :minz -0.3
@@ -255,7 +255,7 @@
 
 (defparameter *fist-aabb*
      ;;;a very small cubic fist
-  (aabbcc::make-aabb
+  (aabbcc:make-aabb
    :minx -0.005
    :miny -0.005
    :minz -0.005
@@ -321,7 +321,7 @@
     (aabb-collect-blocks
      px py pz (* u vx) (* u vy) (* u vz)
      (load-time-value
-      (aabbcc::make-aabb
+      (aabbcc:make-aabb
        :minx -0.3
        :miny -0.5
        :minz -0.3
@@ -387,7 +387,7 @@
 					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
 	 (logiorf
 	  acc
-	  (aabbcc::aabb-contact px py pz aabb x y z block-aabb)))))
+	  (aabbcc:aabb-contact px py pz aabb x y z block-aabb)))))
     acc))
 
 #+nil
@@ -399,7 +399,7 @@
        (when (aref mc-blocks::iscollidable (world:getblock x y z))
 					;	 (plain-setblock x y z (+ 2 (random 4)) 0)
 	 (multiple-value-bind (i+ i- j+ j- k+ k-)
-	     (aabbcc::aabb-contact px py pz aabb x y z block-aabb)
+	     (aabbcc:aabb-contact px py pz aabb x y z block-aabb)
 	   (if i+ (setq x+ t))
 	   (if i- (setq x- t))
 	   (if j+ (setq y+ t))
@@ -564,7 +564,7 @@
 	     (reset-touch-collector taco)
 	     (flet ((add-it (x y z)
 		      (multiple-value-bind (minimum type)
-			  (aabbcc::aabb-collide
+			  (aabbcc:aabb-collide
 			   aabb
 			   px py pz
 			   block-aabb
@@ -679,7 +679,7 @@
 	  ))))
 
 #+nil
-(or (aabbcc::make-aabb
+(or (aabbcc:make-aabb
 			    :minx -0.5
 			    :miny -0.5
 			    :minz -0.5

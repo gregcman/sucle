@@ -32,23 +32,23 @@
   (let ((aabb (entity-aabb entity))
 	(pos (farticle-position (entity-particle entity)))
 	(posold (farticle-position-old (entity-particle entity))))
-    (let ((avgx (/ (+ (aabbcc::aabb-minx aabb)
-		      (aabbcc::aabb-maxx aabb))
+    (let ((avgx (/ (+ (aabbcc:aabb-minx aabb)
+		      (aabbcc:aabb-maxx aabb))
 		   2.0))
-	  (avgy (/ (+ (aabbcc::aabb-miny aabb)
-		      (aabbcc::aabb-maxy aabb))
+	  (avgy (/ (+ (aabbcc:aabb-miny aabb)
+		      (aabbcc:aabb-maxy aabb))
 		   2.0))
-	  (avgz (/ (+ (aabbcc::aabb-minz aabb)
-		      (aabbcc::aabb-maxz aabb))
+	  (avgz (/ (+ (aabbcc:aabb-minz aabb)
+		      (aabbcc:aabb-maxz aabb))
 		   2.0))
-	  (difx (/ (- (aabbcc::aabb-minx aabb)
-		      (aabbcc::aabb-maxx aabb))
+	  (difx (/ (- (aabbcc:aabb-minx aabb)
+		      (aabbcc:aabb-maxx aabb))
 		     -2.0))
-	  (dify (/ (- (aabbcc::aabb-miny aabb)
-		      (aabbcc::aabb-maxy aabb))
+	  (dify (/ (- (aabbcc:aabb-miny aabb)
+		      (aabbcc:aabb-maxy aabb))
 		   -2.0))
-	  (difz (/ (- (aabbcc::aabb-minz aabb)
-		      (aabbcc::aabb-maxz aabb))
+	  (difz (/ (- (aabbcc:aabb-minz aabb)
+		      (aabbcc:aabb-maxz aabb))
 		   -2.0)))
       (let ((pos2 (cg-matrix:vec avgx avgy avgz)))
 	(cg-matrix:matrix* (cg-matrix:translate (cg-matrix:vec+ pos2
@@ -267,7 +267,7 @@
 
 #+nil
 (defun player-aabb+1 ()
-  (aabbcc::make-aabb
+  (aabbcc:make-aabb
    :minx -0.3
    :miny -0.5
    :minz -0.3
@@ -277,7 +277,7 @@
 
 #+nil
 (defun chunk-aabb ()
-  (aabbcc::make-aabb
+  (aabbcc:make-aabb
    :minx -8.0
    :miny -8.0
    :minz -8.0

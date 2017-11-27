@@ -2,9 +2,9 @@
 
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
   (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
-      (aabbcc::step-motion aabb-gen-fnc
+      (aabbcc:step-motion aabb-gen-fnc
 			   x y z dx dy dz)
-    (multiple-value-bind (new-dx new-dy new-dz) (aabbcc::clamp-vec
+    (multiple-value-bind (new-dx new-dy new-dz) (aabbcc:clamp-vec
 						 dx dy dz
 						 xclamp yclamp zclamp)
       (values new-x new-y new-z new-dx new-dy new-dz))))
@@ -41,7 +41,7 @@
 
 (defun collapse-touch (dx dy dz touch-collector)
   (let ((acc (touch-collector-acc touch-collector)))
-    (aabbcc::type-collapser
+    (aabbcc:type-collapser
      dx dy dz 
      (logtest acc #b1000000)
      (logtest acc #b0100000)
@@ -71,7 +71,7 @@
 	     (add (mx my mz maabb)
 	       (logiorf
 		acc
-		(aabbcc::aabb-contact px py pz aabb mx my mz maabb)))
+		(aabbcc:aabb-contact px py pz aabb mx my mz maabb)))
 	     (set-fun (newfun)
 	       (setf funs newfun)))
 	  (list 'full #'run
@@ -114,7 +114,7 @@
 		  (fooz (aref blockvec (+ 2 index)))
 		  (fooaabb (aref blockvec (+ 3 index))))
 	      (multiple-value-bind (minimum type)
-		  (aabbcc::aabb-collide
+		  (aabbcc:aabb-collide
 		   aabb
 		   px py pz
 		   fooaabb
@@ -127,84 +127,3 @@
 	      (touch-collector-min-ratio taco)
 	      xclamp yclamp zclamp)))
 	 (lambda (newaabb) (setf aabb newaabb)))))))
-
-#+nil
-(configure-collision-handler
-   (lambda (&key collect set-aabb &allow-other-keys)
-     (funcall set-aabb *player-aabb*)
-     (lambda (x y z)
-       (when (aref mc-blocks::iscollidable (world:getblock x y z))
-	 (funcall collect x y z *block-aabb*)))))
-
-#+nil
-(progno
- (defun make-collision-suite (&key
-				(aabb nil)
-				(test (lambda (x y z)
-					(declare (ignore x y z)))))
-   (declare (type (function (fixnum fixnum fixnum)) test))
-   (let ((px 0.0)
-	 (py 0.0)
-	 (pz 0.0)
-	 (vx 0.0)
-	 (vy 0.0)
-	 (vz 0.0)
-	 (early-exit nil))
-     (let ((taco (make-touch-collector)))
-       (labels
-	   ((set-aabb (new-aabb);;;
-	      (setf aabb new-aabb))
-	    (set-exit (exit);;;
-	      (setf early-exit exit))
-	    (set-test (new-test);;;
-	      (setf test new-test))
-	    (head (dpx dpy dpz dvx dvy dvz)
-	      (setf (values px py pz vx vy vz)
-		    (values dpx dpy dpz dvx dvy dvz)))
-	    (reset ()
-	      (reset-touch-collector taco))
-	    (collect (foox fooy fooz fooaabb);;;
-	      (multiple-value-bind (minimum type)
-		  (aabbcc::aabb-collide
-		   aabb
-		   px py pz
-		   fooaabb
-		   foox fooy fooz
-		   vx vy vz)
-		(collect-touch minimum type taco)))
-	    (tail ()
-	      (catch early-exit
-		(aabb-collect-blocks
-		 px py pz vx vy vz aabb
-		 test))
-	      (multiple-value-bind (xclamp yclamp zclamp)
-		  (collapse-touch vx vy vz taco)
-		(values
-		 (touch-collector-min-ratio taco)
-		 xclamp yclamp zclamp)))
-	    (full (px py pz vx vy vz);;;
-	      (head px py pz vx vy vz)
-	      (reset)
-	      (tail)))
-	 (list 'set-aabb #'set-aabb
-	       'set-exit #'set-exit
-	       'set-test #'set-test
-	       'collect #'collect
-	       'full #'full)))))
- (defun configure-collision-handler
-     (fun &optional (data (make-collision-suite)))
-   (let ((set-test (getf data 'set-test))
-	 (full (getf data 'full))
-	 (collect (getf data 'collect))
-	 (set-aabb (getf data 'set-aabb))
-	 (set-exit (getf data 'set-exit)))
-     (declare (type (function (number number number aabbcc::aabb)
-			      (values single-float symbol))
-		    collect))
-     (funcall
-      set-test
-      (funcall fun
-	       :collect collect
-	       :set-aabb set-aabb
-	       :set-exit set-exit))
-     full)))
