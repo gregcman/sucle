@@ -12,10 +12,7 @@
     :components
     
     ((:file "package")
-     (:module one
-	      :pathname "1"
-	      :components (			   
-			   (:file "vox")))
+     (:file "vox")
      (:module two
 	      :serial t
 	      :pathname "2"
