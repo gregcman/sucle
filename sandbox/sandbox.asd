@@ -24,8 +24,6 @@
 			   (:file "block-meshing");;turn world data into a mesh to render
 			   ))
 
-     (:file "camera-matrix") ;;matrices for cameras - view, projection
-
      (:file "lovely-renderer") ;;generic rendering glue
      
      (:file "draw-environment") ;;;drawing environmental factors     

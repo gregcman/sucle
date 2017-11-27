@@ -7,6 +7,7 @@
 	       #:sandbox
 	       #:black-tie
 	       #:terminal625-tickr
+	       #:terminal625-camat
 	       )
   :serial t
   :components

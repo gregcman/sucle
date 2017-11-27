@@ -1,4 +1,18 @@
-(in-package :sandbox)
+(defpackage #:camat
+  (:use #:cl)
+  (:export
+   #:make-camera
+   #:camera-vec-forward
+   #:camera-vec-position
+   #:camera-vec-noitisop
+   #:camera-aspect-ratio
+   #:camera-fov
+   #:camera-frustum-far
+   #:camera-frustum-near
+   #:camera-matrix-projection-view-player)
+  (:export
+   #:update-matrices))
+(in-package #:camat)
 
 (defstruct camera
   (vec-position (cg-matrix:vec 0.0 0.0 0.0) :type cg-matrix:vec)
@@ -62,19 +76,34 @@
      0.0 0.0 0.0 1.0)))
 
 
+;;#b100 - projection
+;;#b010 - rotation
+;;#b001 - translation
+
 (defun update-matrices (camera)
-  (let ((projection-matrix (camera-matrix-projection camera))
-	(view-matrix (camera-matrix-view camera))
-	(projection-view-matrix (camera-matrix-projection-view camera))
-	(projection-view-player-matrix (camera-matrix-projection-view-player camera))
-	(player-matrix (camera-matrix-player camera))
-	(forward (camera-vec-forward camera))
-	(up (camera-vec-up camera)))
-    (projection-matrix projection-matrix camera)
-    (relative-lookat view-matrix forward up)
-    (cg-matrix:%translate player-matrix (camera-vec-noitisop camera))
-    (cg-matrix:%matrix* projection-view-matrix projection-matrix view-matrix)
-    (cg-matrix:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))
+  (let ((flags #b111))
+    (let ((translation? #b001)
+	  (rotation? #b010)
+	  (projection? #b100))
+      (let ((projection-matrix (camera-matrix-projection camera))
+	    (view-matrix (camera-matrix-view camera))
+	    (projection-view-matrix (camera-matrix-projection-view camera))
+	    (projection-view-player-matrix (camera-matrix-projection-view-player camera))
+	    (player-matrix (camera-matrix-player camera))
+	    (forward (camera-vec-forward camera))
+	    (up (camera-vec-up camera)))
+	(when (logtest projection? flags)
+	  (projection-matrix projection-matrix camera))
+	(when (logtest rotation? flags)
+	  (relative-lookat view-matrix forward up))
+	(let ((num (logior rotation? projection?)))
+	  (when (logtest num flags)
+	    (cg-matrix:%matrix* projection-view-matrix projection-matrix view-matrix)))
+	(when (logtest translation? flags)
+	  (cg-matrix:%translate player-matrix (camera-vec-noitisop camera)))
+	(let ((num (logior rotation? projection? translation?)))
+	  (when (logtest num flags)
+	    (cg-matrix:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))))))
 
 
 ;;;

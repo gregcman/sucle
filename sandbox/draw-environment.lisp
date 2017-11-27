@@ -28,60 +28,6 @@
 					 (0.3 0.1 0.0)))))
 (defparameter *daytime* 1.0)
 
-(defun fractionalize (x)
-    (alexandria:clamp x 0.0 1.0))
-(defun render (camera deps partial)
-  (declare (optimize (safety 3) (debug 3)))
-  (flet ((getfnc (name)
-	   (funcall deps name)))
-    (let* ((blockshader (getfnc :blockshader))
-	   (blockshader-uniforms *blockshader-uniforms*)
-	   (fogcolor (aplayground::getuniform blockshader-uniforms :fog-color))
-	   (aratio (aplayground::getuniform blockshader-uniforms :aratio))
-	   (foglet (aplayground::getuniform blockshader-uniforms :foglet))
-	   (pmv (aplayground::getuniform blockshader-uniforms :pmv))
-	   (cam-pos (aplayground::getuniform blockshader-uniforms :cam-pos)))
-      (gl:use-program blockshader)
-      (gl:uniformfv cam-pos (camera-vec-position camera))
-      (gl:uniform-matrix-4fv
-       pmv
-       (camera-matrix-projection-view-player camera)
-       nil)
-      
-      (let ((time *daytime*)
-	    (avector *avector*))
-	(map-into avector
-		  (lambda (x)
-		    (fractionalize (* time x)))
-		  *fogcolor*)
-	(gl:clear-color (aref avector 0) (aref avector 1) (aref avector 2) 1.0)
-	(gl:uniformfv fogcolor avector))
-      (gl:uniformf foglet (/ -1.0 (camera-frustum-far camera) *fog-ratio*))
-      (gl:uniformf aratio (/ 1.0 *fog-ratio*))
-      
-      (gl:disable :blend)
-
-  ;;;static geometry with no translation whatsoever
-      ;; (sandbox::bind-default-framebuffer)
-      (gl:bind-texture
-       :texture-2d
-       (getfnc :terrain))
-      (draw-chunk-meshes)
-
-
-      #+nil
-      (progno
-	(dotimes (x (length fuck::*ents*))
-	  (let ((aaah (aref fuck::*ents* x)))
-	    (unless (eq aaah fuck::*ent*)
-	      (gl:uniform-matrix-4fv
-	       pmv
-	       (cg-matrix:matrix* (camera-matrix-projection-view-player camera)
-				  (compute-entity-aabb-matrix aaah partial))
-	       nil)
-	      (gl:call-list (getfnc :box)))))))
-    (designatemeshing)))
-
 (defun compute-entity-aabb-matrix (entity partial)
   (let ((aabb (entity-aabb entity))
 	(pos (farticle-position (entity-particle entity)))

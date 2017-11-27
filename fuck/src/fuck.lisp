@@ -122,7 +122,7 @@
 		     )
 		   (sandbox::physentity ent)) *ents*))
       (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-	(cg-matrix:%vec* backwardsbug (sandbox::camera-vec-forward *camera*) -4.0)
+	(cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -4.0)
 	(sandbox::use-fists control-state backwardsbug
 			    pos)))))
 
@@ -139,11 +139,11 @@
 (defparameter *ticker* nil)
 (defparameter *realthu-nk* (lambda () (throw :end (values))))
 
-(defparameter *camera* (sandbox::make-camera :frustum-far (* 256.0)
+(defparameter *camera* (camat:make-camera :frustum-far (* 256.0)
 					     :frustum-near (/ 1.0 8.0)))
 (defun set-render-cam-pos (camera partial curr prev)
-  (let ((vec (sandbox::camera-vec-position camera))
-	(cev (sandbox::camera-vec-noitisop camera)))
+  (let ((vec (camat:camera-vec-position camera))
+	(cev (camat:camera-vec-noitisop camera)))
 
     (cg-matrix:%vec-lerp vec prev curr partial)
     (cg-matrix:%vec* cev vec -1.0)))
@@ -171,8 +171,8 @@
 		  (multiple-value-call #'sandbox::look-around neck (delta2)))
 		(sandbox::necktovec
 		 neck
-		 (sandbox::camera-vec-forward camera)))
-	      (setf (sandbox::camera-aspect-ratio camera)
+		 (camat:camera-vec-forward camera)))
+	      (setf (camat:camera-aspect-ratio camera)
 		    (coerce (/ window:*width* window:*height*)
 			    'single-float))
 	      (let* ((player-farticle (sandbox::entity-particle *ent*))
@@ -184,14 +184,71 @@
 		     (load-time-value ((lambda (deg)
 					 (* deg (coerce (/ pi 180.0) 'single-float)))
 				       70))))
-		(setf (sandbox::camera-fov camera)
+		(setf (camat:camera-fov camera)
 		      defaultfov))
-	      (sandbox::update-matrices camera)
-	      (sandbox::render camera
-			       #'getfnc
-			       fraction)))))
+	      (camat:update-matrices camera)
+	      (render camera
+		      #'getfnc
+		      fraction)))))
       (window:update-display)))
   (setf *realthu-nk* (function actual-stuuff)))
+
+
+(progn
+  (defun fractionalize (x)
+    (alexandria:clamp x 0.0 1.0))
+  (defun render (camera deps partial)
+    (declare (ignorable partial))
+    (declare (optimize (safety 3) (debug 3)))
+    (flet ((getfnc (name)
+	     (funcall deps name)))
+      (let* ((blockshader (getfnc :blockshader))
+	     (blockshader-uniforms sandbox::*blockshader-uniforms*)
+	     (fogcolor (aplayground::getuniform blockshader-uniforms :fog-color))
+	     (aratio (aplayground::getuniform blockshader-uniforms :aratio))
+	     (foglet (aplayground::getuniform blockshader-uniforms :foglet))
+	     (pmv (aplayground::getuniform blockshader-uniforms :pmv))
+	     (cam-pos (aplayground::getuniform blockshader-uniforms :cam-pos)))
+	(gl:use-program blockshader)
+	(gl:uniformfv cam-pos (camat:camera-vec-position camera))
+	(gl:uniform-matrix-4fv
+	 pmv
+	 (camat:camera-matrix-projection-view-player camera)
+	 nil)
+	
+	(let ((time sandbox::*daytime*)
+	      (avector sandbox::*avector*))
+	  (map-into avector
+		    (lambda (x)
+		      (fractionalize (* time x)))
+		    sandbox::*fogcolor*)
+	  (gl:clear-color (aref avector 0) (aref avector 1) (aref avector 2) 1.0)
+	  (gl:uniformfv fogcolor avector))
+	(gl:uniformf foglet (/ -1.0 (camat:camera-frustum-far camera) sandbox::*fog-ratio*))
+	(gl:uniformf aratio (/ 1.0 sandbox::*fog-ratio*))
+	
+	(gl:disable :blend)
+
+  ;;;static geometry with no translation whatsoever
+	;; (sandbox::bind-default-framebuffer)
+	(gl:bind-texture
+	 :texture-2d
+	 (getfnc :terrain))
+	(sandbox::draw-chunk-meshes)
+
+
+	#+nil
+	(progno
+	 (dotimes (x (length fuck::*ents*))
+	   (let ((aaah (aref fuck::*ents* x)))
+	     (unless (eq aaah fuck::*ent*)
+	       (gl:uniform-matrix-4fv
+		pmv
+		(cg-matrix:matrix* (camera-matrix-projection-view-player camera)
+				   (compute-entity-aabb-matrix aaah partial))
+		nil)
+	       (gl:call-list (getfnc :box)))))))
+      (sandbox::designatemeshing))))
 
 (defun injection3 ()
   (setf *ticker* (tickr:make-ticker :dt (floor 1000000 60)
