@@ -1,3 +1,8 @@
+(defpackage #:aplayground
+  (:use 
+   #:cl
+   #:fuktard))
+
 (in-package :aplayground)
 
 (defun make-attrib-buffer-data ()
@@ -20,16 +25,6 @@
   (make-iterators *attrib-buffers* (make-attrib-buffer-data)))
 (defparameter *attrib-buffer-fill-pointer*
   (tally-buffer *attrib-buffer-iterators* (make-attrib-buffer-data)))
-
-(defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
-					   (:texture-mag-filter . :nearest)
-					   (:texture-wrap-s . :repeat)
-					   (:texture-wrap-t . :repeat))))
-
-(progn
-  (defconstant +gltexture0+ (cffi:foreign-enum-value (quote %gl:enum) :texture0))
-  (defun set-active-texture (num)
-    (gl:active-texture (+ num +gltexture0+))))
 
 (defmacro with-iterators ((&rest bufvars) buf func &body body)
   (let* ((syms (mapcar (lambda (x) (declare (ignorable x)) (gensym)) bufvars)))

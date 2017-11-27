@@ -222,8 +222,13 @@
   (aref (etouq light-index-table) light))
 
 (defmacro texface2 (u0 u1 v0 v1 &optional (start 1) (clockwise-winding nil))
-  (aplayground::ngorp
-   (aplayground::preach
+  ((lambda (&rest forms)
+     (cons (quote progn)
+	   (apply (function nconc) forms)))
+   ((lambda (value form)
+      (mapcar (lambda (x)
+		(list value x))
+	      form))
     'etex
     (axis-aligned-quads:duaq
      start

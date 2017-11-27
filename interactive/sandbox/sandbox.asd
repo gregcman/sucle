@@ -7,7 +7,8 @@
 		 #:terminal625-rcclr
 		 #:terminal625-zeorp
 		 #:terminal625-mcblk
-		 #:terminal625-aabbc)
+		 #:terminal625-aabbc
+		 #:glhelp)
     :serial t
     :components
     
@@ -20,9 +21,6 @@
 			   (:file "block-light") ;;lighting
 			   (:file "block-meshing");;turn world data into a mesh to render
 			   ))
-
-     (:file "lovely-renderer") ;;generic rendering glue
-     
      (:file "draw-environment") ;;;drawing environmental factors     
      (:file "meshing-thread");;send the meshing work to a separate thread
 

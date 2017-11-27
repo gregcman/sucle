@@ -28,40 +28,6 @@
 					 (0.3 0.1 0.0)))))
 (defparameter *daytime* 1.0)
 
-(defun compute-entity-aabb-matrix (entity partial)
-  (let ((aabb (entity-aabb entity))
-	(pos (farticle-position (entity-particle entity)))
-	(posold (farticle-position-old (entity-particle entity))))
-    (let ((avgx (/ (+ (aabbcc:aabb-minx aabb)
-		      (aabbcc:aabb-maxx aabb))
-		   2.0))
-	  (avgy (/ (+ (aabbcc:aabb-miny aabb)
-		      (aabbcc:aabb-maxy aabb))
-		   2.0))
-	  (avgz (/ (+ (aabbcc:aabb-minz aabb)
-		      (aabbcc:aabb-maxz aabb))
-		   2.0))
-	  (difx (/ (- (aabbcc:aabb-minx aabb)
-		      (aabbcc:aabb-maxx aabb))
-		     -2.0))
-	  (dify (/ (- (aabbcc:aabb-miny aabb)
-		      (aabbcc:aabb-maxy aabb))
-		   -2.0))
-	  (difz (/ (- (aabbcc:aabb-minz aabb)
-		      (aabbcc:aabb-maxz aabb))
-		   -2.0)))
-      (let ((pos2 (cg-matrix:vec avgx avgy avgz)))
-	(cg-matrix:matrix* (cg-matrix:translate (cg-matrix:vec+ pos2
-								(cg-matrix:vec-lerp posold pos partial)))
-			   (cg-matrix:scale* difx dify difz))))))
-
-#+nil
-(defparameter *velocity* (cg-matrix:vec 0.0 0.0 0.0))
-#+nil
-(defparameter *orientation* (make-array 6 :element-type 'single-float
-					:initial-contents
-					'(0.0 0.0 0.0 0.0 0.0 0.0)))
-
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)  
   (gl:depth-func :less)
@@ -173,6 +139,28 @@
     (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
 	   (multiply-into (getapixel y x terrain) color))))
 
+;;;;load a png image from a path
+(defun load-png (filename)
+  (opticl:read-png-file filename))
+
+;;;;flip an image in-place - three dimensions - does not conse
+(defun flip-image (image)
+  (let ((dims (array-dimensions image)))
+    (let ((height (pop dims))
+	  (width (pop dims)))
+      (if dims
+	  (let ((components (car dims)))
+	    (dobox ((h 0 (- height (ash height -1)))
+		    (w 0 width)
+		    (c 0 components))
+		   (rotatef (aref image (- height h 1) w c)
+			    (aref image h w c))))
+	  (dobox ((h 0 (- height (ash height -1)))
+		  (w 0 width))
+	      (rotatef (aref image (- height h 1) w)
+		       (aref image h w))))))
+  image)
+
 (defun build-deps (getfnc setfnc)
   (flet ((bornfnc (name func)
 	   (funcall setfnc name func))
@@ -183,8 +171,8 @@
        :terrain-png
        (lambda ()
 	 (let ((image
-		(aplayground::flip-image
-		 (aplayground::load-png 
+		(flip-image
+		 (load-png 
 		  (img-path #P"terrain.png")))))
 	   (color-grasses
 	    (getfnc :grass-png)
@@ -193,17 +181,17 @@
       (bornfnc
        :grass-png
        (lambda ()
-	 (aplayground::load-png 
+	 (load-png 
 	  (img-path #P"grasscolor.png"))))
       (bornfnc
        :terrain
        (lambda ()
 	 (prog1
-	     (lovely-shader-and-texture-uploader:pic-texture
+	     (glhelp:pic-texture
 	      (getfnc :terrain-png)
 	      :rgba)
 					;	 (gl:generate-mipmap :texture-2d)
-	   (lovely-shader-and-texture-uploader::apply-tex-params
+	   (glhelp:apply-tex-params
 	    (quote ((:texture-min-filter . :nearest;-mipmap-nearest
 					 )
 		    (:texture-mag-filter . :nearest)
@@ -213,15 +201,15 @@
        :blockshader
        (lambda ()
 	 (let ((program
-		(lovely-shader-and-texture-uploader:make-shader-program-from-strings
+		(glhelp:make-shader-program-from-strings
 		 (getfnc :bs-vs)
 		 (getfnc :bs-frag)
 		 (quote (("position" . 0)	
 			 ("texCoord" . 2)
 			 ("darkness" . 8)
 			 )))))
-	   (let ((table (make-hash-table :test 'eq)))
-	     (aplayground::cache-program-uniforms
+	   (let ((table (glhelp:make-uniform-cache)))
+	     (glhelp:cache-program-uniforms
 	      program
 	      table
 	      (quote ((:pmv . "projectionmodelview")
@@ -241,30 +229,16 @@
        :bs-frag
        (lambda ()
 	 (alexandria:read-file-into-string
-	  (shader-path "blockshader/basictexcoord.frag"))))
-      (bornfnc
-       :box
-       (lambda ()
-	 (draw-box -1.0 1.0 -1.0 1.0 -1.0 1.0))))))
+	  (shader-path "blockshader/basictexcoord.frag")))))))
 
 
 (defparameter *blockshader-uniforms* nil)
 
 #+nil
-(in-package :sandbox)
-
-;;;various box sizes for different things
-
-;;;its a cubic meter
-#+nil
-(defun block-aabb ()
-  )
-
-;;;a person's personal space
-#+nil
-(defun player-aabb ()
-  )
-
+(bornfnc
+ :box
+ (lambda ()
+   (draw-box -1.0 1.0 -1.0 1.0 -1.0 1.0)))
 #+nil
 (defun player-aabb+1 ()
   (aabbcc:make-aabb
@@ -284,20 +258,6 @@
    :maxx 8.0
    :maxy 8.0
    :maxz 8.0))
-
-#+nil
-(defparameter chunk-aabb (chunk-aabb))
-#+nil
-(defparameter player-aabb+1 (player-aabb+1))
-
-#+nil
-(defun fist-aabb ())
-
-#+nil
-(defparameter player-aabb (player-aabb))
-#+nil
-(defparameter *fist-aabb*
-  )
 
 #+nil
 ;;matrix multiplication is associative
@@ -496,64 +456,95 @@
    (src-text :ss-frag (shader-path "solidshader/basictexcoord.frag"))))
 
 #+nil
-(defun glinnit ()
-  )
+((defun draw-box (minx maxx miny maxy minz maxz)
+   (let ((iter aplayground::*attrib-buffer-iterators*))
+     (aplayground::reset-attrib-buffer-iterators iter)
+     (let ((buf (aplayground::get-buf-param
+		 iter
+		 (etouq (vector 0 2 8)))))
+       (let ((len 0))
+	 (aplayground::with-iterators (epos etex dark)
+	     buf iter-ator:wasabios
+	   (etouq
+	    (aplayground::ngorp
+	     (aplayground::preach
+	      'epos
+	      (nconc
+	       (axis-aligned-quads:quadi+
+		'maxx
+		'(miny maxy minz maxz))
+	       (axis-aligned-quads:quadi-
+		'minx
+		'(miny maxy minz maxz))
+	       (axis-aligned-quads:quadj+
+		'maxy
+		'(minx maxx minz maxz))
+	       (axis-aligned-quads:quadj-
+		'miny
+		'(minx maxx minz maxz))
+	       (axis-aligned-quads:quadk+
+		'maxz
+		'(minx maxx miny maxy))
+	       (axis-aligned-quads:quadk-
+		'minz
+		'(minx maxx miny maxy))))))
+	   (flet ((wot (x)
+		    (dotimes (i 4)
+		      (dark x))))
+	     (etouq
+	      (aplayground::ngorp
+	       (aplayground::preach
+		'wot '(0.6 0.6 1.0 0.5 0.8 0.8)))))
+	   (dotimes (x 6)
+	     (etouq
+	      (aplayground::ngorp
+	       (aplayground::preach
+		'etex
+		(axis-aligned-quads:duaq 1 t (let ((a (/ 0.0 16))
+						   (b (/ 15.0 16)))
+					       `(,a ,(+ a (/ 1.0 16.0))
+						    ,b
+						    
+						    ,(+ b (/ 1.0 16.0)))))))))
+	   (setf len 24))
+	 (aplayground::reset-attrib-buffer-iterators iter)
+	 (let ((list (gl:gen-lists 1)))
+	   (gl:new-list list :compile)
+	   (gl:with-primitives :quads
+	     (mesh-chunk len buf))
+	   (gl:end-list)
+	   list)))))
 
-(defun draw-box (minx maxx miny maxy minz maxz)
-  (let ((iter aplayground::*attrib-buffer-iterators*))
-    (aplayground::reset-attrib-buffer-iterators iter)
-    (let ((buf (aplayground::get-buf-param
-		iter
-		(etouq (vector 0 2 8)))))
-      (let ((len 0))
-	(aplayground::with-iterators (epos etex dark)
-	    buf iter-ator:wasabios
-	  (etouq
-	   (aplayground::ngorp
-	    (aplayground::preach
-	     'epos
-	     (nconc
-	      (axis-aligned-quads:quadi+
-	       'maxx
-	       '(miny maxy minz maxz))
-	      (axis-aligned-quads:quadi-
-	       'minx
-	       '(miny maxy minz maxz))
-	      (axis-aligned-quads:quadj+
-	       'maxy
-	       '(minx maxx minz maxz))
-	      (axis-aligned-quads:quadj-
-	       'miny
-	       '(minx maxx minz maxz))
-	      (axis-aligned-quads:quadk+
-	       'maxz
-	       '(minx maxx miny maxy))
-	      (axis-aligned-quads:quadk-
-	       'minz
-	       '(minx maxx miny maxy))))))
-	  (flet ((wot (x)
-		   (dotimes (i 4)
-		     (dark x))))
-	    (etouq
-	     (aplayground::ngorp
-	      (aplayground::preach
-	       'wot '(0.6 0.6 1.0 0.5 0.8 0.8)))))
-	  (dotimes (x 6)
-	    (etouq
-	     (aplayground::ngorp
-	      (aplayground::preach
-	       'etex
-	       (axis-aligned-quads:duaq 1 t (let ((a (/ 0.0 16))
-						  (b (/ 15.0 16)))
-					      `(,a ,(+ a (/ 1.0 16.0))
-						   ,b
-						   
-						   ,(+ b (/ 1.0 16.0)))))))))
-	  (setf len 24))
-	(aplayground::reset-attrib-buffer-iterators iter)
-	(let ((list (gl:gen-lists 1)))
-	  (gl:new-list list :compile)
-	  (gl:with-primitives :quads
-	    (mesh-chunk len buf))
-	  (gl:end-list)
-	  list)))))
+ (defun compute-entity-aabb-matrix (entity partial)
+   (let ((aabb (entity-aabb entity))
+	 (pos (farticle-position (entity-particle entity)))
+	 (posold (farticle-position-old (entity-particle entity))))
+     (let ((avgx (/ (+ (aabbcc:aabb-minx aabb)
+		       (aabbcc:aabb-maxx aabb))
+		    2.0))
+	   (avgy (/ (+ (aabbcc:aabb-miny aabb)
+		       (aabbcc:aabb-maxy aabb))
+		    2.0))
+	   (avgz (/ (+ (aabbcc:aabb-minz aabb)
+		       (aabbcc:aabb-maxz aabb))
+		    2.0))
+	   (difx (/ (- (aabbcc:aabb-minx aabb)
+		       (aabbcc:aabb-maxx aabb))
+		    -2.0))
+	   (dify (/ (- (aabbcc:aabb-miny aabb)
+		       (aabbcc:aabb-maxy aabb))
+		    -2.0))
+	   (difz (/ (- (aabbcc:aabb-minz aabb)
+		       (aabbcc:aabb-maxz aabb))
+		    -2.0)))
+       (let ((pos2 (cg-matrix:vec avgx avgy avgz)))
+	 (cg-matrix:matrix* (cg-matrix:translate (cg-matrix:vec+ pos2
+								 (cg-matrix:vec-lerp posold pos partial)))
+			    (cg-matrix:scale* difx dify difz)))))))
+
+#+nil
+(defparameter *velocity* (cg-matrix:vec 0.0 0.0 0.0))
+#+nil
+(defparameter *orientation* (make-array 6 :element-type 'single-float
+					:initial-contents
+					'(0.0 0.0 0.0 0.0 0.0 0.0)))
