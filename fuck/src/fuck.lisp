@@ -153,10 +153,10 @@
     (when window:*status*
       (throw :end (values)))
     (let ((ticker *ticker*))
-      (tick-update ticker (fine-time))
-      (tick-physics ticker (function physss))
-      (let ((fraction (float (/ (ticker-accumulator ticker)
-				(ticker-dt ticker)))))
+      (tickr:tick-update ticker (fine-time))
+      (tickr:tick-physics ticker (function physss))
+      (let ((fraction (float (/ (tickr:ticker-accumulator ticker)
+				(tickr:ticker-dt ticker)))))
 	(gl:viewport 0 0 window:*width* window:*height*)
 	(gl:clear
 	 :color-buffer-bit
@@ -194,7 +194,7 @@
   (setf *realthu-nk* (function actual-stuuff)))
 
 (defun injection3 ()
-  (setf *ticker* (make-ticker :dt (floor 1000000 60)
+  (setf *ticker* (tickr:make-ticker :dt (floor 1000000 60)
 		  :current-time (fine-time)))
   (catch (quote :end)
     (loop

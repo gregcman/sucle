@@ -6,7 +6,7 @@
 	       #:cl-program
 	       #:sandbox
 	       #:black-tie
-
+	       #:terminal625-tickr
 	       )
   :serial t
   :components
@@ -15,7 +15,6 @@
 	    :serial t
 	    :components
 	    ((:file "package")
-	     (:file "tick-governor")
 	     (:file "eyes")
 	     (:file "fuck")
 	     (:file "test")))))

@@ -29,7 +29,7 @@
 (defparameter *daytime* 1.0)
 
 (defun fractionalize (x)
-  (alexandria:clamp x 0.0 1.0))
+    (alexandria:clamp x 0.0 1.0))
 (defun render (camera deps partial)
   (declare (optimize (safety 3) (debug 3)))
   (flet ((getfnc (name)

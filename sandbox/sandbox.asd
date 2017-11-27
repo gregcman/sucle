@@ -5,7 +5,8 @@
 		 #:funland
 		 #:terminal625-queue
 		 #:terminal625-rcclr
-		 #:terminal625-zeorp)
+		 #:terminal625-zeorp
+		 #:terminal625-aabbc)
     :serial t
     :components
     
@@ -13,7 +14,6 @@
      (:module one
 	      :pathname "1"
 	      :components (			   
-			   (:file "aabbcc") ;;box collisions			   
 			   (:file "vox")))
      (:module two
 	      :serial t
