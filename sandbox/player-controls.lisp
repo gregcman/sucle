@@ -316,7 +316,7 @@
       (let ((blockid 0))
 	(setblock-with-update x y z blockid  (aref mc-blocks::lightvalue blockid))))))
 (defun big-swing-fist (px py pz vx vy vz)
-  (let ((u 3))
+  (let ((u 30))
     (aabb-collect-blocks
      px py pz (* u vx) (* u vy) (* u vz)
      *fist-aabb*   

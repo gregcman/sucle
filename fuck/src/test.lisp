@@ -2,7 +2,7 @@
 
 (defparameter *box* #(0 128 0 128 -128 0))
 (with-unsafe-speed
-  (defun map-box (func box)
+  (defun map-box (func &optional (box *box*))
     (declare (type (function (fixnum fixnum fixnum)) func)
 	     (type simple-vector box))
     (etouq

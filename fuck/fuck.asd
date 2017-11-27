@@ -5,7 +5,7 @@
 	       #:window-glfw3
 	       #:cl-program
 	       #:sandbox
-	       
+	       #:black-tie
 
 	       )
   :serial t
@@ -17,5 +17,6 @@
 	    ((:file "package")
 	     (:file "tick-governor")
 	     (:file "eyes")
-	     (:file "fuck")))))
+	     (:file "fuck")
+	     (:file "test")))))
 

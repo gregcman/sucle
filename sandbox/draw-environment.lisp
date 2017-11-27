@@ -68,8 +68,9 @@
        (getfnc :terrain))
       (draw-chunk-meshes)
 
+
       #+nil
-      (progn
+      (progno
 	(dotimes (x (length fuck::*ents*))
 	  (let ((aaah (aref fuck::*ents* x)))
 	    (unless (eq aaah fuck::*ent*)

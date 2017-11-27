@@ -1,16 +1,13 @@
 (asdf:defsystem #:sandbox
     :depends-on (#:cl-opengl
-                 #:cg-matrix
+                 #:terminal625-cgmat
 		 #:bordeaux-threads		 
 		 #:funland
-		 #:black-tie)
+		 #:terminal625-queue)
     :serial t
     :components
     
     ((:file "package")
-     (:module other
-	      :components ((:file "queue")))
-
      (:module one
 	      :pathname "1"
 	      :components (			   
@@ -40,9 +37,7 @@
 			   (:file "neck")
 			   (:file "collide-and-contact")))
      (:file "player-controls") ;;moving the player around
-     (:file "test")
 
-					;  (:file "wotut")
      (:file "sync") ;;keeping various parts up to date
      (:file "sandbox") ;;timer for physics and rendering threads
      ))
