@@ -9,86 +9,151 @@
 (defun just-main ()
   (let ((stdo *standard-output*))
     (lambda ()
-      (progv '(window::*iresizable*
-	       window::*iwidth*
-	       window::*iheight*
-	       *standard-output*)
-	  (list nil 720 480 stdo)
+      (progv (cons '*standard-output* *arguments*)
+	  (cons stdo *argument-values*)
 	(window::wrapper #'init)))))
 
-(progn
-  (defparameter *trampoline* (lambda () (throw :end (values))))
-  (defun call-trampoline ()
-    (catch (quote :end)
-      (loop
-	 (funcall *trampoline*)))))
+(defparameter *arguments* '(window::*iresizable*
+			    window::*iwidth*
+			    window::*iheight*))
+(defparameter *argument-values* (list nil 720 480))
 
 (progn
-  (defparameter *backup* (make-hash-table :test 'eq))
-  (defparameter *stuff* (make-hash-table :test 'eq))
-  (defun bornfnc (name func)
-    (namexpr *backup* name func))
-  (defun getfnc (name)
-    (get-stuff name *stuff* *backup*)))
+  (defparameter *trampoline* (lambda (exit-token) (throw exit-token (values))))
+  (defun call-trampoline ()
+    (let ((value (gensym)))
+      (catch value
+	(loop
+	   (funcall *trampoline* value))))))
 
 (progn
   (defun namexpr (hash name func)
     (setf (gethash name hash) func))
-  (defun get-stuff (name stuff otherwise)
+  (defun get-stuff (name stuff otherwise secondary)
     (multiple-value-bind (val exists-p) (gethash name stuff)
       (if exists-p
 	  val
 	  (let ((genfunc (gethash name otherwise)))
-	    (when (functionp genfunc)
-	      (setf (gethash name stuff) (funcall genfunc))))))))
+	    (cond ((functionp genfunc)
+		   (multiple-value-bind (value secondary-value) (funcall genfunc)
+		     (setf (gethash name stuff) value)
+		     (setf (gethash name secondary) secondary-value)
+		     value))
+		  (t (error "backup function not a function: ~a" genfunc))))))))
 
-(defparameter *sandbox-on* t)
-(defparameter *some-saves* 
-  #P "/home/imac/Documents/lispysaves/saves/sandbox-saves/")
-
-(defun call-with-path (path fun)
-  (let ((newpath (merge-pathnames path *some-saves*)))
-    (cond ((or (uiop:pathname-equal newpath *some-saves*) 
-	       (not (uiop:subpathp newpath *some-saves*))
-	       (not (uiop:directory-pathname-p newpath)))
-	   (error "SAVE DIR INVALID: ~a, ~a" path newpath))
-	  (t
-	   (ensure-directories-exist newpath)
-	   (funcall fun newpath)))))
-
-(defun msave (path)
-  (call-with-path path #'sandbox::save-world))
-
-(defun mload (path)
-  (call-with-path path #'sandbox::load-world))
-
-
-(defun init ()
-  (setf %gl:*gl-get-proc-address* (window:get-proc-address))
-  (setf window:*resize-hook* #'resize-screen)
-  (funcall window:*resize-hook* window:*width* window:*height*)
-  (let ((hash *stuff*))
+(progn
+  (defparameter *backup* (make-hash-table :test 'eq))
+  (defparameter *stuff* (make-hash-table :test 'eq))
+  (defparameter *secondary* (make-hash-table :test 'eq))
+  (defun bornfnc (name func)
+    (namexpr *backup* name func))
+  (defun getfnc (name)
+    (get-stuff name *stuff* *backup* *secondary*))
+  (defun map-stuffs (fun)
+    ;;;fun = (key value secondary-value)
     (maphash (lambda (k v)
-	       (if (integerp v)
-		   (remhash k hash)))
-	     hash))
-  (window:set-vsync t)
-  (when *sandbox-on*
-    (sandbox::build-deps #'getfnc
-			 #'bornfnc)
-    (setf sandbox::*world-display-list* nil)
-    (clrhash sandbox::*g/chunk-call-list*)
-  
-    (setf sandbox::mesher-thread nil)
-    (sandbox::clean-dirty)
-    )
-  (gl:enable :scissor-test)
-  (setf *ticker* (tickr:make-ticker :dt (floor 1000000 60)
-				    :current-time (microseconds)))
-  (call-trampoline))
+	       (funcall fun k v (gethash k *secondary*)))
+	     *stuff*))
+  (defun remove-stuff (k)
+    (remhash k *secondary*)
+    (remhash k *stuff*)))
+(defun scrub-old-gl ()
+  (map-stuffs
+   (lambda (k v secondary-value)
+     (declare (ignorable v))
+     (when (eq secondary-value :opengl)
+       (remove-stuff k)))))
+
+(progn
+  (defclass render-area ()
+    ((x :accessor render-area-x
+	:initform 0
+	:initarg :x)
+     (y :accessor render-area-y
+	:initform 0
+	:initarg :y)
+     (width :accessor render-area-width
+	    :initform 0
+	    :initarg :width)
+     (height :accessor render-area-height
+	     :initform 0
+	     :initarg :height)))
+  (defun set-render-area (render-area)
+    (with-slots (x y width height) render-area
+      (%set-render-area x y width height)))
+  (defun %set-render-area (x y width height)
+    (gl:viewport x y width height)
+    (gl:scissor x y width height)))
+
+;;;time in microseconds
+(defun microseconds ()
+  (multiple-value-bind (s m) (sb-ext:get-time-of-day)
+    (+ (* (expt 10 6) (- s 1506020000)) m)))
+(defun tick (ticker fun &optional (time (microseconds)))
+  (tickr:tick-update ticker time)
+  (tickr:tick-physics ticker fun)
+  (float (/ (tickr:ticker-accumulator ticker)
+	    (tickr:ticker-dt ticker))))
+
 
 (defparameter *control-state* (window::make-control-state
 			       :curr window::*input-state*))
+(defparameter *camera* (camat:make-camera
+			:frustum-far (* 256.0)
+			:frustum-near (/ 1.0 8.0)))
+(defparameter *render-area* (make-instance 'render-area))
+
+(defparameter *sandbox-on* t)
+(defparameter *ticker* nil)
+
+(defun clear-screen ()
+  (gl:clear
+   :color-buffer-bit
+   :depth-buffer-bit))
+
+(defmacro trampoline-bounce (exit-sym &rest specific-forms)
+  `(lambda (,exit-sym)
+     (when window:*status*
+       (throw ,exit-sym (values)))
+     (window:poll)
+     (window::update-control-state *control-state*)
+     (set-render-area *render-area*)
+     (clear-screen)
+     ,@specific-forms
+     (window:update-display)))
+
+(defun init ()
+  (setf %gl:*gl-get-proc-address* (window:get-proc-address))
+  (window:set-vsync t)
+  (gl:enable :scissor-test)
+  (progn
+    (setf window:*resize-hook*
+	  (lambda (width height)
+	    (let ((camera *camera*))
+	      (setf (camat:camera-aspect-ratio camera)
+		    (/ (coerce width 'single-float)
+		       (coerce height 'single-float))))
+	    (let ((render-area *render-area*))
+	      (setf (render-area-width render-area) width
+		    (render-area-height render-area) height))))
+    (funcall window:*resize-hook* window:*width* window:*height*))
+  (scrub-old-gl)
+  (setf *ticker*
+	(tickr:make-ticker
+	 :dt (floor 1000000 60)
+	 :current-time (microseconds)))
+  (dolist (x *pre-trampoline-hooks*) (funcall x))
+  (call-trampoline))
+(defparameter *pre-trampoline-hooks* nil)
+
+(defun sandbox-init ()
+  (sandbox::build-deps #'getfnc #'bornfnc)
+  (setf sandbox::*world-display-list* nil)
+  (clrhash sandbox::*g/chunk-call-list*)
+  
+  (setf sandbox::mesher-thread nil)
+  (sandbox::clean-dirty))
+(push 'sandbox-init *pre-trampoline-hooks*)
 
 (defun wasd-mover (w? a? s? d?)
   (let ((x 0)
@@ -141,43 +206,6 @@
       (sandbox::use-fists control-state backwardsbug
 			  pos))))
 
-(defparameter *ticker* nil)
-
-(defparameter *camera* (camat:make-camera :frustum-far (* 256.0)
-					  :frustum-near (/ 1.0 8.0)))
-
-(defclass render-area ()
-  ((x :accessor render-area-x
-      :initform 0
-      :initarg :x)
-   (y :accessor render-area-y
-      :initform 0
-      :initarg :y)
-   (width :accessor render-area-width
-	  :initform 0
-	  :initarg :width)
-   (height :accessor render-area-height
-	   :initform 0
-	   :initarg :height)))
-(defun set-render-area (render-area)
-  (with-slots (x y width height) render-area
-    (%set-render-area x y width height)))
-(defun %set-render-area (x y width height)
-  (gl:viewport x y width height)
-  (gl:scissor x y width height))
-
-(defparameter *render-area* (make-instance 'render-area))
-
-;;;time in microseconds
-(defun microseconds ()
-  (multiple-value-bind (s m) (sb-ext:get-time-of-day)
-    (+ (* (expt 10 6) (- s 1506020000)) m)))
-(defun tick (ticker fun time)
-  (tickr:tick-update ticker time)
-  (tickr:tick-physics ticker fun)
-  (float (/ (tickr:ticker-accumulator ticker)
-	    (tickr:ticker-dt ticker))))
-
 (defun farticle-to-camera (farticle camera fraction)
   (let ((curr (sandbox::farticle-position farticle))
 	(prev (sandbox::farticle-position-old farticle)))
@@ -201,49 +229,19 @@
      (* deg (coerce (/ pi 180.0) 'single-float)))
    70))
 
-(defun resize-screen (width height)
-  (let ((camera *camera*))
-    (setf (camat:camera-aspect-ratio camera)
-	  (/ (coerce width 'single-float)
-	     (coerce height 'single-float))))
-  (let ((render-area *render-area*))
-    (setf (render-area-width render-area) width
-	  (render-area-height render-area) height)))
-
-(defun clear-screen ()
-  (gl:clear
-   :color-buffer-bit
-   :depth-buffer-bit))
-
-(progn
-  (defun actual-stuuff ()
-    (when window:*status*
-      (throw :end (values)))
-    (window:poll)
-    (window::update-control-state *control-state*)
-    (remove-spurious-mouse-input)
-    (set-render-area *render-area*)
-    (clear-screen)
-    
-    (setf (camat:camera-fov *camera*) *fov*)
-    (when *sandbox-on*
-      (when (window:mice-locked-p)
-	(multiple-value-call #'change-entity-neck *ent* (delta2)))
-      (entity-to-camera *ent* *camera*
-			(tick *ticker* #'physss (microseconds)))
-      (camat:update-matrices *camera*)
-      
-      (set-sky-color)
-      (gl:disable :blend)
-      (let ((blockshader (getfnc :blockshader)))
-	(gl:use-program blockshader)
-	(camera-shader *camera*))
-      (gl:bind-texture :texture-2d (funcall #'getfnc :terrain))
-      (sandbox::draw-chunk-meshes)
-      
-      (sandbox::designatemeshing))
-    (window:update-display))
-  (setf *trampoline* #'actual-stuuff))
+(setf
+ *trampoline*
+ (trampoline-bounce
+  session
+  (remove-spurious-mouse-input)   
+  (setf (camat:camera-fov *camera*) *fov*)
+  (when *sandbox-on*
+    (when (window:mice-locked-p)
+      (multiple-value-call #'change-entity-neck *ent* (delta2)))
+    (entity-to-camera *ent* *camera*
+		      (tick *ticker* #'physss))
+    (camat:update-matrices *camera*)
+    (camera-shader *camera*))))
 
 (defun set-sky-color ()
   (let ((time sandbox::*daytime*)
@@ -257,10 +255,12 @@
 
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
+  (gl:use-program (getfnc :blockshader))
+  
   (glhelp:with-uniforms uniform sandbox::*blockshader-uniforms*
     (gl:uniformfv
-       (uniform :fog-color)
-       sandbox::*avector*)
+     (uniform :fog-color)
+     sandbox::*avector*)
     (gl:uniformf
      (uniform :foglet)
      (/ (/ -1.0 sandbox::*fog-ratio*)
@@ -273,7 +273,12 @@
     (gl:uniform-matrix-4fv
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
-     nil)))
+     nil))
+  (set-sky-color)
+  (gl:disable :blend)
+  (gl:bind-texture :texture-2d (funcall #'getfnc :terrain))
+  (sandbox::draw-chunk-meshes) 
+  (sandbox::designatemeshing))
 #+nil
 (#P"terrarium2/" #P"first/" #P"second/" #P"third/" #P"fourth/" #P"world/"
  #P"terrarium/" #P"holymoly/" #P"funkycoolclimb/" #P"ahole/" #P"maze-royale/"

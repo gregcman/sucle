@@ -17,6 +17,7 @@
 	    :components
 	    ((:file "package")
 	     (:file "eyes")
+	     (:file "other")
 	     (:file "fuck")
 	     (:file "test")))))
 

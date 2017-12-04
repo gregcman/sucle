@@ -153,10 +153,12 @@
       (bornfnc
        :terrain
        (lambda ()
-	 (prog1
-	     (glhelp:pic-texture
-	      (getfnc :terrain-png)
-	      :rgba)
+	 (multiple-value-prog1
+	     (values
+	      (glhelp:pic-texture
+	       (getfnc :terrain-png)
+	       :rgba)
+	      :opengl)
 					;	 (gl:generate-mipmap :texture-2d)
 	   (glhelp:apply-tex-params
 	    (quote ((:texture-min-filter . :nearest;-mipmap-nearest
@@ -182,7 +184,7 @@
 		    (:aratio . "aratio")
 		    (:cam-pos . "cameraPos")
 		    (:foglet . "foglet"))))
-	   program)))
+	   (values program :opengl))))
       (bornfnc
        :bs-vs
        (lambda ()
