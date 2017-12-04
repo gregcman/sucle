@@ -1,5 +1,20 @@
 (in-package :fuck)
 
+(defparameter *thread* nil)
+(defun main () 
+  (setf *thread*
+	(sb-thread:make-thread
+	 (just-main))))
+
+(defun just-main ()
+  (let ((stdo *standard-output*))
+    (lambda ()
+      (progv '(window::*iresizable*
+	       window::*iwidth*
+	       window::*iheight*
+	       *standard-output*)
+	  (list nil 720 480 stdo)
+	(window::wrapper #'init)))))
 
 (progn
   (defparameter *backup* (make-hash-table :test 'eq))
@@ -12,22 +27,40 @@
 (progn
   (defun namexpr (hash name func)
     (setf (gethash name hash) func))
-  (defmacro ensure (place otherwise)
-    (let ((value-var (gensym))
-	  (exists-var (gensym)))
-      `(or ,place
-	   (multiple-value-bind (,value-var ,exists-var) ,otherwise
-	     (if ,exists-var
-		 (values (setf ,place ,value-var) ,exists-var))))))
   (defun get-stuff (name stuff otherwise)
-    (ensure (gethash name stuff)
-	    (let ((genfunc (gethash name otherwise)))
-	      (when (functionp genfunc)
-		(values (funcall genfunc) t))))))
+    (multiple-value-bind (val exists-p) (gethash name stuff)
+      (if exists-p
+	  val
+	  (let ((genfunc (gethash name otherwise)))
+	    (when (functionp genfunc)
+	      (setf (gethash name stuff) (funcall genfunc))))))))
 
 (defparameter *sandbox-on* t)
+(defparameter *some-saves* 
+  #P "/home/imac/Documents/lispysaves/saves/sandbox-saves/")
 
-(defun handoff-five ()
+(defun call-with-path (path fun)
+  (let ((newpath (merge-pathnames path *some-saves*)))
+    (cond ((or (uiop:pathname-equal newpath *some-saves*) 
+	       (not (uiop:subpathp newpath *some-saves*))
+	       (not (uiop:directory-pathname-p newpath)))
+	   (error "SAVE DIR INVALID: ~a, ~a" path newpath))
+	  (t
+	   (ensure-directories-exist newpath)
+	   (funcall fun newpath)))))
+
+(defun msave (path)
+  (call-with-path path #'sandbox::save-world))
+
+(defun mload (path)
+  (call-with-path path #'sandbox::load-world))
+
+#+nil
+(#P"terrarium2/" #P"first/" #P"second/" #P"third/" #P"fourth/" #P"world/"
+ #P"terrarium/" #P"holymoly/" #P"funkycoolclimb/" #P"ahole/" #P"maze-royale/"
+ #P"bloodcut/" #P"wasteland/")
+
+(defun init ()
   (setf %gl:*gl-get-proc-address* (window:get-proc-address))
   (let ((hash *stuff*))
     (maphash (lambda (k v)
@@ -38,9 +71,22 @@
   (when *sandbox-on*
     (sandbox::build-deps #'getfnc
 			 #'bornfnc)
-    (sandbox::initialization1))
+    (setf sandbox::*world-display-list* nil)
+    (clrhash sandbox::*g/chunk-call-list*)
+  
+    (setf sandbox::mesher-thread nil)
+    (sandbox::clean-dirty)
+  )
+  (setf *ticker* (tickr:make-ticker :dt (floor 1000000 60)
+				    :current-time (microseconds)))
+  (call-trampoline))
 
-  (injection3)) 
+(progn
+  (defparameter *trampoline* (lambda () (throw :end (values))))
+  (defun call-trampoline ()
+    (catch (quote :end)
+      (loop
+	 (funcall *trampoline*)))))
 
 (defparameter *control-state* (window::make-control-state
 			       :curr window::*input-state*))
@@ -109,89 +155,75 @@
 	       (window::skey-p (window::keyval :s) control-state)
 	       (window::skey-p (window::keyval :d) control-state)
 	       (window::skey-p (window::keyval :f) control-state)))
-	(sandbox::physentity *ent*)
-
-	#+nil
-	(map nil (lambda (ent)
-		   (unless (eq ent *ent*)
-		     (setf (sandbox::entity-jump? ent) t)
-		     (if (sandbox::entity-hips ent)
-			 (incf (sandbox::entity-hips ent)
-			       (- (random 1.0) 0.5))
-			 (setf (sandbox::entity-hips ent) 1.0))
-		     )
-		   (sandbox::physentity ent)) *ents*))
+	(sandbox::physentity *ent*))
       (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
 	(cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -4.0)
 	(sandbox::use-fists control-state backwardsbug
 			    pos)))))
 
-(defun seeder ()
-  (map nil
-       (lambda (ent)
-	 (let ((pos (sandbox::farticle-position (sandbox::entity-particle ent))))
-	   (setf (sandbox::entity-fly? ent) nil
-		 (sandbox::entity-gravity? ent) t)
-	   (setf (aref pos 0) 64.0
-		 (aref pos 1) 128.0
-		 (aref pos 2) -64.0))) *ents*))
-
 (defparameter *ticker* nil)
-(defparameter *realthu-nk* (lambda () (throw :end (values))))
 
 (defparameter *camera* (camat:make-camera :frustum-far (* 256.0)
 					     :frustum-near (/ 1.0 8.0)))
-(defun set-render-cam-pos (camera partial curr prev)
-  (let ((vec (camat:camera-vec-position camera))
-	(cev (camat:camera-vec-noitisop camera)))
 
-    (cg-matrix:%vec-lerp vec prev curr partial)
-    (cg-matrix:%vec* cev vec -1.0)))
+;;;time in microseconds
+(defun microseconds ()
+  (multiple-value-bind (s m) (sb-ext:get-time-of-day)
+    (+ (* (expt 10 6) (- s 1506020000)) m)))
+
+(defun tick (ticker fun time)
+  (tickr:tick-update ticker time)
+  (tickr:tick-physics ticker fun)
+  (float (/ (tickr:ticker-accumulator ticker)
+	    (tickr:ticker-dt ticker))))
+
+(defun farticle-to-camera (farticle camera fraction)
+  (let ((curr (sandbox::farticle-position farticle))
+	(prev (sandbox::farticle-position-old farticle)))
+    (let ((vec (camat:camera-vec-position camera))
+	  (cev (camat:camera-vec-noitisop camera)))
+
+      (cg-matrix:%vec-lerp vec prev curr fraction)
+      (cg-matrix:%vec* cev vec -1.0))))
+(defun entity-to-camera (entity camera fraction)
+  (sandbox::necktovec (sandbox::entity-neck entity)
+		      (camat:camera-vec-forward camera))	  
+  (farticle-to-camera (sandbox::entity-particle entity)
+		      camera
+		      fraction))
+
+(defparameter *fov*
+  ((lambda (deg)
+     (* deg (coerce (/ pi 180.0) 'single-float)))
+   70))
 
 (progn
   (defun actual-stuuff ()
     (when window:*status*
       (throw :end (values)))
-    (let ((ticker *ticker*))
-      (tickr:tick-update ticker (fine-time))
-      (tickr:tick-physics ticker (function physss))
-      (let ((fraction (float (/ (tickr:ticker-accumulator ticker)
-				(tickr:ticker-dt ticker)))))
-	(gl:viewport 0 0 window:*width* window:*height*)
-	(gl:clear
-	 :color-buffer-bit
-	 :depth-buffer-bit)
+    (window:poll)
+    (remove-spurious-mouse-input)
+    (gl:viewport 0 0 window:*width* window:*height*)
+    (gl:clear
+     :color-buffer-bit
+     :depth-buffer-bit)
+    (let ((camera *camera*))
+      (setf (camat:camera-aspect-ratio camera)
+	    (coerce (/ window:*width* window:*height*)
+		    'single-float))
+      (setf (camat:camera-fov camera) *fov*)
+      (let ((fraction (tick *ticker* #'physss (microseconds))))
 	(when *sandbox-on*
-	  (progn
-	    (window:poll)
-	    (remove-spurious-mouse-input)
-	    (let ((camera *camera*))
-	      (let ((neck (sandbox::entity-neck *ent*)))
-		(when (window:mice-locked-p)
-		  (multiple-value-call #'sandbox::look-around neck (delta2)))
-		(sandbox::necktovec
-		 neck
-		 (camat:camera-vec-forward camera)))
-	      (setf (camat:camera-aspect-ratio camera)
-		    (coerce (/ window:*width* window:*height*)
-			    'single-float))
-	      (let* ((player-farticle (sandbox::entity-particle *ent*))
-		     (pos (sandbox::farticle-position player-farticle))
-		     (old (sandbox::farticle-position-old player-farticle)))
-		
-		(set-render-cam-pos camera fraction pos old))
-	      (let ((defaultfov
-		     (load-time-value ((lambda (deg)
-					 (* deg (coerce (/ pi 180.0) 'single-float)))
-				       70))))
-		(setf (camat:camera-fov camera)
-		      defaultfov))
-	      (camat:update-matrices camera)
-	      (render camera
-		      #'getfnc
-		      fraction)))))
-      (window:update-display)))
-  (setf *realthu-nk* (function actual-stuuff)))
+	  (let ((neck (sandbox::entity-neck *ent*)))
+	    (when (window:mice-locked-p)
+	      (multiple-value-call #'sandbox::look-around neck (delta2))))
+	  (entity-to-camera *ent* *camera* fraction)
+	  (camat:update-matrices camera)
+	  (render camera
+		  #'getfnc
+		  fraction))))
+    (window:update-display))
+  (setf *trampoline* #'actual-stuuff))
 
 
 (progn
@@ -234,108 +266,5 @@
 	(gl:bind-texture
 	 :texture-2d
 	 (getfnc :terrain))
-	(sandbox::draw-chunk-meshes)
-
-
-	#+nil
-	(progno
-	 (dotimes (x (length fuck::*ents*))
-	   (let ((aaah (aref fuck::*ents* x)))
-	     (unless (eq aaah fuck::*ent*)
-	       (gl:uniform-matrix-4fv
-		pmv
-		(cg-matrix:matrix* (camera-matrix-projection-view-player camera)
-				   (compute-entity-aabb-matrix aaah partial))
-		nil)
-	       (gl:call-list (getfnc :box)))))))
+	(sandbox::draw-chunk-meshes))
       (sandbox::designatemeshing))))
-
-(defun injection3 ()
-  (setf *ticker* (tickr:make-ticker :dt (floor 1000000 60)
-		  :current-time (fine-time)))
-  (catch (quote :end)
-    (loop
-       (funcall *realthu-nk*))))
-
-(defparameter *thread* nil)
-(defun main3 ()
-  (setf *thread*
-	(sb-thread:make-thread   
-	 (lambda (stdo)
-	   (let ((window::*iresizable* t)
-		 (window::*iwidth* 256)
-		 (window::*iheight* 256)
-		 (*standard-output* stdo))
-	     (window::wrapper #'handoff-five)))
-	 :arguments  (list *standard-output*))))
-
-
-
-;;;time in microseconds
-(defun fine-time ()
-  (multiple-value-bind (s m) (sb-ext:get-time-of-day)
-    (+ (* (expt 10 6) (- s 1506020000)) m)))
-
-#+nil
-(defun define-time ()
-  (eval
-   (defun fine-time ()
-      (/ (%glfw::get-timer-value)
-	 ,(/ (%glfw::get-timer-frequency) (float (expt 10 6)))))))
-
-
-
-
-#+nil
-(dotimes (x 128)
-  (when (e::skey-j-p x *control-state*)
-    (let ((char (code-char x)))
-      (when (typep char 'standard-char)
-	(princ char)))))
-
-
-#+nil
-((defparameter *old-scroll-y* 0.0)
- (defparameter net-scroll 0)
- (let ((new-scroll window::*scroll-y*))
-   (setf *old-scroll-y* net-scroll)
-   (setf net-scroll new-scroll)
-   #+nil
-   (let ((value (- new-scroll *old-scroll-y*)))
-     (unless (zerop value)
-					;(print value)
-       ))))
-
-#+nil
-(multiple-value-bind (newyaw newpitch)
-		    (multiple-value-call
-			#'look-around
-		      *yaw* *pitch*
-		      (delta))
-		  (when newyaw
-		    (setf *yaw* newyaw))
-		  (when newpitch
-		    (setf *pitch* newpitch)))
-#+nil
-(sandbox::unit-pitch-yaw 
- (coerce *pitch* 'single-float)
- (coerce *yaw* 'single-float))
-#+nil
-((defparameter *yaw* 0.0)
- (defparameter *pitch* 0.0))
-
-#+nil
-(sandbox::physics (necking-yaw *neck*)
-		  
-		  player-farticle)
-
-#+nil
-(defparameter *farticles*
-  (let ((array (make-array 10)))
-    (map-into array (lambda () (sandbox::make-farticle)))
-    array))
-
-#+nil
-((defparameter *player-farticle* (aref *farticles* 0))
- (defparameter *neck* (make-necking))
- )

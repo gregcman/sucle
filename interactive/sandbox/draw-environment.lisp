@@ -3,7 +3,8 @@
 
 (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *fogcolor* (apply #'cg-matrix:vec
-				(nth 0 '((0.68 0.8 1.0)
+				(nth 1 '((0.68 0.8 1.0)
+					 (0.05 0.1 0.2)
 					 (0.3 0.1 0.0)))))
 (defparameter *daytime* 1.0)
 (defparameter *chunks-changed* t)
@@ -68,11 +69,12 @@
 				      (- j 8))))))
       (dirty-push x))))
 
+(defparameter *ourdir-aux* #.(or *compile-file-truename*
+				 *load-truename*))
 (defparameter ourdir
-  (make-pathname :host (pathname-host #.(or *compile-file-truename*
-					    *load-truename*))
-		 :directory (pathname-directory #.(or *compile-file-truename*
-						      *load-truename*))))
+  (let ((value *ourdir-aux*))
+    (make-pathname :host (pathname-host value)
+		   :directory (pathname-directory value))))
 (defparameter dir-resource (merge-pathnames #P"res/" ourdir))
 (defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
 (defparameter dir-mc-assets (merge-pathnames "image/" dir-resource))

@@ -35,6 +35,24 @@
 	  (return-from find-top (values height obj)))))
     (values nil nil)))
 
+(defun enclose ()
+  (dobox ((x 0 128)
+	  (y 0 128))
+	 (plain-setblock x y -1   1 0)
+	 (plain-setblock x y -2   1 0)
+	 (plain-setblock x y -127 1 0)
+	 (plain-setblock x y -128 1 0))
+  (dobox ((z -128 0)
+	  (y 0 128))
+	 (plain-setblock 0   y z 1 0)
+	 (plain-setblock 1   y z 1 0)
+	 (plain-setblock 127 y z 1 0)
+	 (plain-setblock 126 y z 1 0))
+  (dobox ((z -128 0)
+	  (x 0 128)
+	  (y 0 64))
+	 (plain-setblock x y z 1 0)))
+
 (defun simple-relight (&optional (box *box*))
   (map-box (lambda (x y z)
 	     (let ((blockid (world:getblock x y z)))
@@ -167,6 +185,13 @@
       (aux 0 0 -1))
     tot))
 
+(defun testes (&optional (box *box*))
+  (map nil
+       (lambda (x) (map-box x box))
+       (list #'sandbox::edge-bench
+	     #'corner-obsidian
+	     (clearblock? 49)
+	     (clearblock? 58))))
 (defun testicle (&optional (box *box*))
   (dotimes (x 1)
     (map nil
@@ -346,22 +371,44 @@
       (unless (zerop blockid)
 	(plain-setblock x y z id 0)))))
 
+#+nil
+(defun define-time ()
+  (eval
+   (defun fine-time ()
+      (/ (%glfw::get-timer-value)
+	 ,(/ (%glfw::get-timer-frequency) (float (expt 10 6)))))))
+
+#+nil
+(defun seeder ()
+  (map nil
+       (lambda (ent)
+	 (let ((pos (sandbox::farticle-position (sandbox::entity-particle ent))))
+	   (setf (sandbox::entity-fly? ent) nil
+		 (sandbox::entity-gravity? ent) t)
+	   (setf (aref pos 0) 64.0
+		 (aref pos 1) 128.0
+		 (aref pos 2) -64.0))) *ents*))
+
+#+nil
+(map nil (lambda (ent)
+	   (unless (eq ent *ent*)
+	     (setf (sandbox::entity-jump? ent) t)
+	     (if (sandbox::entity-hips ent)
+		 (incf (sandbox::entity-hips ent)
+		       (- (random 1.0) 0.5))
+		 (setf (sandbox::entity-hips ent) 1.0))
+	     )
+	   (sandbox::physentity ent)) *ents*)
 
 
-(defun enclose ()
-  (dobox ((x 0 128)
-	  (y 0 128))
-	 (plain-setblock x y 0 1 0)
-	 (plain-setblock x y 1 1 0)
-	 (plain-setblock x y -127 1 0)
-	 (plain-setblock x y -126 1 0))
-  (dobox ((z -127 1)
-	  (y 0 128))
-	 (plain-setblock 0 y z 1 0)
-	 (plain-setblock 1 y z 1 0)
-	 (plain-setblock 127 y z 1 0)
-	 (plain-setblock 126 y z 1 0))
-  (dobox ((z -127 1)
-	  (x 0 128)
-	  (y 0 64))
-	 (plain-setblock x y z 1 0)))
+#+nil
+(progno
+ (dotimes (x (length fuck::*ents*))
+   (let ((aaah (aref fuck::*ents* x)))
+     (unless (eq aaah fuck::*ent*)
+       (gl:uniform-matrix-4fv
+	pmv
+	(cg-matrix:matrix* (camera-matrix-projection-view-player camera)
+			   (compute-entity-aabb-matrix aaah partial))
+	nil)
+       (gl:call-list (getfnc :box))))))

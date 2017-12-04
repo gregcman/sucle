@@ -1,75 +1,40 @@
 (in-package #:sandbox)
 
-(defun initialization1 ()
-  (setf *world-display-list* nil)
-  (clrhash *g/chunk-call-list*)
-  
-  (setf mesher-thread nil)
-  (clean-dirty)
-  )
+(defun save (path things)
+  (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
+    (dolist (thing things)
+      (print thing stream))))
 
-(defparameter *save* (case 3
-		       (0 #P"terrarium2/")
-		       (1 #P"first/")
-		       (2 #P"second/")
-		       (3 #P"third/")
-		       (4 #P"fourth/")
-		       (5 #P"world/")
-		       (6 #P"terrarium/")
-		       (7 #P"holymoly/")
-		       (8 #P"funkycoolclimb/")
-		       (9 #P"ahole/")
-		       (10 #P"maze-royale/")
-		       (11 #P"bloodcut/")
-		       (12 #P"wasteland/")))
+(defun myload (path)
+  (let ((things nil))
+    (with-open-file (stream path :direction :input :if-does-not-exist nil)
+      (tagbody rep
+	 (let ((thing (read stream nil nil)))
+	   (when thing
+	     (push thing things)
+	     (go rep)))))
+    (nreverse things)))
 
-(defparameter *saves-dir* (merge-pathnames #P"sandbox-saves/"
-					   "/home/imac/Documents/lispysaves/saves/"))
+(defun save2 (path thingfilename &rest things)
+  (save (merge-pathnames (format nil "~s" thingfilename) path) things))
 
-(defun save (filename &rest things)
-  (let ((path (merge-pathnames filename *saves-dir*)))
-    (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
-      (dolist (thing things)
-	(print thing stream)))))
+(defun myload2 (path thingfilename)
+  (myload (merge-pathnames (format nil "~s" thingfilename) path)))
 
-(defun save2 (thingfilename &rest things)
-  (apply #'save (merge-pathnames (format nil "~s" thingfilename) *save*) things))
+(defparameter *saves-dir* nil)
 
-(defun savechunk (position)
+(defun savechunk (path position)
   (let ((position-list (multiple-value-list (world:unhashfunc position))))
-    (save2 position-list
-	   (gethash position world:chunkhash)
-	   (gethash position world:lighthash)
-	   (gethash position world:skylighthash))))
+    (save2
+     path
+     position-list
+     (gethash position world:chunkhash)
+     (gethash position world:lighthash)
+     (gethash position world:skylighthash))))
 
-(defun save-world ()
-  (maphash (lambda (k v)
-	     (declare (ignorable v))
-	     (savechunk k))
-	   world:chunkhash))
-
-(defun looad-world ()
-  (let ((files (uiop:directory-files (merge-pathnames *save* *saves-dir*))))
-    (dolist (file files)
-      (loadchunk (apply #'world:chunkhashfunc (read-from-string (pathname-name file)))))))
-
-(defun myload2 (thingfilename)
-  (myload (merge-pathnames (format nil "~s" thingfilename) *save*)))
-
-(defun myload (filename)
-  (let ((path (merge-pathnames filename *saves-dir*)))
-    (let ((things nil))
-      (with-open-file (stream path :direction :input :if-does-not-exist nil)
-	(tagbody rep
-	   (let ((thing (read stream nil nil)))
-	     (when thing
-	       (push thing things)
-	       (go rep)))))
-      (nreverse things))))
-
-(defun loadchunk (position)
-  (let ((position-list (multiple-value-list (world:unhashfunc position))))
-    (let ((data (myload2 position-list)))
+(defun loadchunk (path position-list)
+  (let ((position (apply #'world:chunkhashfunc position-list)))
+    (let ((data (myload2 path position-list)))
       (when data 
 	(destructuring-bind (blocks light sky) data
 	  (setf (gethash position world:chunkhash)
@@ -78,7 +43,16 @@
 		(coerce light '(simple-array (unsigned-byte 4) (*))))
 	  (setf (gethash position world:skylighthash)
 		(coerce sky '(simple-array (unsigned-byte 4) (*)))))
-	(return-from loadchunk t)))))  
+	(return-from loadchunk t)))))
 
-
+(defun save-world (path)
+  (maphash (lambda (k v)
+	     (declare (ignorable v))
+	     (savechunk path k))
+	   world:chunkhash))
+(defun load-world (path)
+  (let ((files (uiop:directory-files path)))
+    (dolist (file files)
+      (loadchunk path (read-from-string (pathname-name file))))))
+ 
 
