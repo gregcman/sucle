@@ -1,12 +1,18 @@
 (in-package :glhelp)
 
-(defun make-uniform-cache ()
-  (make-hash-table :test 'eq))
-(defun cache-program-uniforms (program table args)
-  (dolist (arg args)
-    (setf (gethash (car arg) table)
-	  (gl:get-uniform-location program (cdr arg)))))
+(defun cache-program-uniforms (program uniforms)
+  (mapcar
+   (lambda (args)
+     (destructuring-bind (id . string) args
+       (cons
+	id
+	(gl:get-uniform-location program string))))
+   uniforms))
 (defun getuniform (shader-info name)
-  (gethash name shader-info))
+  (cdr (assoc name shader-info :test 'eq)))
+(defmacro with-uniforms (name uniforms &body body)
+  `(macrolet ((,name (id)
+		`(getuniform ,',uniforms ,id)))
+     . ,body))
 
-(export '(getuniform cache-program-uniforms make-uniform-cache))
+(export '(getuniform cache-program-uniforms make-uniform-cache with-uniforms))

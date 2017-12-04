@@ -117,7 +117,6 @@
 	    1)))
 (def-char-callback char-callback (window char))
 
-
 (glfw:def-scroll-callback scroll-callback (window x y)
   (declare (ignore window))
   (incf *scroll-x* (coerce x 'single-float))

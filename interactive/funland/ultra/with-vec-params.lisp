@@ -1,19 +1,28 @@
 (in-package :fuktard)
-(export (quote (with-vec-params with-vec-params2)))
+(export (quote (with-vec-params with-vec-params2 with-vec)))
+
+
 (defun with-vec-params (&rest args)
   (destructuring-bind ((&rest bufvars)
 		       (buf &optional (binder 'let)) &body body) args
-    (let ((param-data (with-vec-params2 bufvars)))
-      (let ((last (cdr (assoc :last param-data)))
-	    (letargs (cdr (assoc :letargs param-data))))
-	(let ((new-let-args (mapcar
-			     (lambda (x)
-			       `(,(pop x) (aref ,buf ,(pop x))))
-			     letargs)))
-	  (let ((new-last
-		 `(,binder ,new-let-args ,@body)))
-	    (setf (cdr last) (list new-last)))))
-      (cdr (assoc :head param-data)))))
+    (%%with-vec-params bufvars buf binder body)))
+
+(defmacro with-vec ((&rest bufvars)
+		       (buf &optional (binder 'let)) &body body)
+  (%%with-vec-params bufvars buf binder body))
+
+(defun %%with-vec-params (bufvars buf binder body)
+  (let ((param-data (with-vec-params2 bufvars)))
+    (let ((last (cdr (assoc :last param-data)))
+	  (letargs (cdr (assoc :letargs param-data))))
+      (let ((new-let-args (mapcar
+			   (lambda (x)
+			     `(,(pop x) (aref ,buf ,(pop x))))
+			   letargs)))
+	(let ((new-last
+	       `(,binder ,new-let-args ,@body)))
+	  (setf (cdr last) (list new-last)))))
+    (cdr (assoc :head param-data))))
 
 (defun with-vec-params2 (bufvars)
   (multiple-value-bind (letargsoffset letargs decl)

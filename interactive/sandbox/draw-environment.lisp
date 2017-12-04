@@ -173,19 +173,15 @@
 		 (getfnc :bs-frag)
 		 (quote (("position" . 0)	
 			 ("texCoord" . 2)
-			 ("darkness" . 8)
-			 )))))
-	   (let ((table (glhelp:make-uniform-cache)))
-	     (glhelp:cache-program-uniforms
-	      program
-	      table
-	      (quote ((:pmv . "projectionmodelview")
-		      (:fog-color . "fogcolor")
-		      (:aratio . "aratio")
-		      (:cam-pos . "cameraPos")
-		      (:foglet . "foglet")
-		      )))
-	     (Setf *blockshader-uniforms* table))
+			 ("darkness" . 8))))))    
+	   (Setf *blockshader-uniforms*
+		 (glhelp:cache-program-uniforms
+		  program
+		  '((:pmv . "projectionmodelview")
+		    (:fog-color . "fogcolor")
+		    (:aratio . "aratio")
+		    (:cam-pos . "cameraPos")
+		    (:foglet . "foglet"))))
 	   program)))
       (bornfnc
        :bs-vs
