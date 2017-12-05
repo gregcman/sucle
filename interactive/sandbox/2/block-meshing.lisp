@@ -196,10 +196,10 @@
 
 
 (eval-when (:compile-toplevel)
-;;0.9 for nether???
-;;0.8 for overworld(in-package :sandbox)???
-(defun light-gen? (f i)
-  (expt (+ 0.7 (* 2 f)) (- 15 i)))
+  ;;0.9 for nether???
+  ;;0.8 for overworld(in-package :sandbox)???
+  (defun light-gen? (f i)
+    (expt (+ 0.7 (* 2 f)) (- 15 i)))
 
   ;;;overworld f = 0.05
 ;;;nether f = 0.1

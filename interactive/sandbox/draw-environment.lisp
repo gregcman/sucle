@@ -3,7 +3,7 @@
 
 (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
 (defparameter *fogcolor* (apply #'cg-matrix:vec
-				(nth 1 '((0.68 0.8 1.0)
+				(nth 0 '((0.68 0.8 1.0)
 					 (0.05 0.1 0.2)
 					 (0.3 0.1 0.0)))))
 (defparameter *daytime* 1.0)
@@ -60,14 +60,14 @@
        (declare (ignore v))
        (push k list))
      world::chunkhash)
-    (dolist (x (sort list #'< :key
-		     (lambda (position)
-		       (multiple-value-bind (i j k) (world:unhashfunc position)
-			 (distance-to x y z
-				      (- i 8)
-				      (- k 8)
-				      (- j 8))))))
-      (dirty-push x))))
+    (map nil #'dirty-push
+	 (sort list #'< :key
+	       (lambda (position)
+		 (multiple-value-bind (i j k) (world:unhashfunc position)
+		   (distance-to x y z
+				(- i 8)
+				(- k 8)
+				(- j 8))))))))
 
 (defparameter *ourdir-aux* #.(or *compile-file-truename*
 				 *load-truename*))
@@ -85,7 +85,7 @@
 
 (progn
   (defun color-grasses (image terrain)
-    (let ((color (case 3
+    (let ((color (case 1
 		   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
 		   (1 (getapixel 255 0 image))
 		   (2 (getapixel 0 0 image))
@@ -114,7 +114,7 @@
 		  :displaced-to image
 		  :displaced-index-offset (* c (+ w (* h width))))))
 
-  (progno #(113 174 70 255)  #(198 304 122 255))
+;;  (progno #(113 174 70 255)  #(198 304 122 255))
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
   (defun modify-greens (xpos ypos
@@ -180,10 +180,11 @@
 		 (glhelp:cache-program-uniforms
 		  program
 		  '((:pmv . "projectionmodelview")
-		    (:fog-color . "fogcolor")
-		    (:aratio . "aratio")
-		    (:cam-pos . "cameraPos")
-		    (:foglet . "foglet"))))
+		  ;  (:fog-color . "fogcolor")
+		  ;  (:aratio . "aratio")
+		  ;  (:cam-pos . "cameraPos")
+		  ;  (:foglet . "foglet")
+		    )))
 	   (values program :opengl))))
       (bornfnc
        :bs-vs

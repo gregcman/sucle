@@ -24,7 +24,15 @@
     (let ((value (gensym)))
       (catch value
 	(loop
-	   (funcall *trampoline* value))))))
+	   (trampoline-bounce value *trampoline*))))))
+
+(defun trampoline-bounce (exit-sym fun)
+  (when window:*status*
+    (throw exit-sym (values)))
+  (window:poll)
+  (window::update-control-state *control-state*)
+  (funcall fun exit-sym)
+  (window:update-display))
 
 (progn
   (defun namexpr (hash name func)
@@ -106,22 +114,6 @@
 (defparameter *sandbox-on* t)
 (defparameter *ticker* nil)
 
-(defun clear-screen ()
-  (gl:clear
-   :color-buffer-bit
-   :depth-buffer-bit))
-
-(defmacro trampoline-bounce (exit-sym &rest specific-forms)
-  `(lambda (,exit-sym)
-     (when window:*status*
-       (throw ,exit-sym (values)))
-     (window:poll)
-     (window::update-control-state *control-state*)
-     (set-render-area *render-area*)
-     (clear-screen)
-     ,@specific-forms
-     (window:update-display)))
-
 (defun init ()
   (setf %gl:*gl-get-proc-address* (window:get-proc-address))
   (window:set-vsync t)
@@ -134,8 +126,8 @@
 		    (/ (coerce width 'single-float)
 		       (coerce height 'single-float))))
 	    (let ((render-area *render-area*))
-	      (setf (render-area-width render-area) width
-		    (render-area-height render-area) height))))
+	      (setf (render-area-width render-area) (- width 40)
+		    (render-area-height render-area) (- height 40)))))
     (funcall window:*resize-hook* window:*width* window:*height*))
   (scrub-old-gl)
   (setf *ticker*
@@ -202,7 +194,7 @@
 	     (window::skey-p (window::keyval :f) control-state)))
       (sandbox::physentity *ent*))
     (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -4.0)
+      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -128.0)
       (sandbox::use-fists control-state backwardsbug
 			  pos))))
 
@@ -229,10 +221,15 @@
      (* deg (coerce (/ pi 180.0) 'single-float)))
    70))
 
-(setf
- *trampoline*
- (trampoline-bounce
-  session
+(setf *trampoline* 'atick)
+(defun atick (session)
+  (declare (ignorable session))
+  (set-render-area *render-area*)
+  (gl:clear-color 0.0 0.0 0.0 0.0)
+  (gl:clear
+   :color-buffer-bit
+   :depth-buffer-bit
+   )
   (remove-spurious-mouse-input)   
   (setf (camat:camera-fov *camera*) *fov*)
   (when *sandbox-on*
@@ -241,8 +238,9 @@
     (entity-to-camera *ent* *camera*
 		      (tick *ticker* #'physss))
     (camat:update-matrices *camera*)
-    (camera-shader *camera*))))
+    (camera-shader *camera*)))
 
+#+nil
 (defun set-sky-color ()
   (let ((time sandbox::*daytime*)
 	(avector sandbox::*avector*))
@@ -258,23 +256,27 @@
   (gl:use-program (getfnc :blockshader))
   
   (glhelp:with-uniforms uniform sandbox::*blockshader-uniforms*
+    #+nil
     (gl:uniformfv
      (uniform :fog-color)
      sandbox::*avector*)
+    #+nil
     (gl:uniformf
      (uniform :foglet)
      (/ (/ -1.0 sandbox::*fog-ratio*)
 	(camat:camera-frustum-far camera)))
+    #+nil
     (gl:uniformf
      (uniform :aratio)
      (/ 1.0 sandbox::*fog-ratio*))
+    #+nil
     (gl:uniformfv (uniform :cam-pos)
 		  (camat:camera-vec-position camera))
     (gl:uniform-matrix-4fv
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
      nil))
-  (set-sky-color)
+ ;; (set-sky-color)
   (gl:disable :blend)
   (gl:bind-texture :texture-2d (funcall #'getfnc :terrain))
   (sandbox::draw-chunk-meshes) 

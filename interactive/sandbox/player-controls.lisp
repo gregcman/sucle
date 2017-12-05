@@ -12,14 +12,6 @@
 
 (world:setup-hashes)
 
-(defmacro with-vec-params4 ((&rest args) buf body)
-  (with-vec-params args (list buf)
-		   body))
-
-(defmacro with-vec-params42 ((&rest args) buf body)
-  (with-vec-params args (list buf 'symbol-macrolet)
-		   body))
-
 (define-modify-macro *= (&rest args)
   *)
 
@@ -36,30 +28,27 @@
 	  (pos (farticle-position farticle)))
       (let ((contact-state (if noclip
 			       #b000000
-			       (with-vec-params4
-				   (px py pz) pos
-				   (funcall contact-handler px py pz aabb)))))
+			       (with-vec (px py pz) (pos)
+				 (funcall contact-handler px py pz aabb)))))
 	(let ((onground (logtest contact-state #b000100)))
 	  (contact-handle contact-state vel)
 	  (let ((speed (* 0.4 (expt tickscale 2))))
-	    (with-vec-params42
-		(xvel yvel zvel) vel
-		(progn
-		  (if fly
-		      (progn
-			(when is-jumping
-			  (incf yvel speed))
-			(when is-sneaking
-			  (decf yvel speed)))
-		      
-		      (if onground
-			  (when is-jumping
-			    (incf yvel (* 0.49 (expt tickscale 1))))
-			  (setf speed (* speed 0.2))))
-		  (when dir
-		    (let ((dir (+ dir yaw)))
-		      (incf xvel (* speed (sin dir)))
-		      (incf zvel (* speed (cos dir))))))))
+	    (with-vec (xvel yvel zvel) (vel symbol-macrolet)
+	      (if fly
+		  (progn
+		    (when is-jumping
+		      (incf yvel speed))
+		    (when is-sneaking
+		      (decf yvel speed)))
+		  
+		  (if onground
+		      (when is-jumping
+			(incf yvel (* 0.49 (expt tickscale 1))))
+		      (setf speed (* speed 0.2))))
+	      (when dir
+		(let ((dir (+ dir yaw)))
+		  (incf xvel (* speed (sin dir)))
+		  (incf zvel (* speed (cos dir)))))))
 	  (let ((fun (if noclip
 			 (lambda (&rest args)
 			   (declare (ignore args))
@@ -67,35 +56,32 @@
 			 (progn
 			   (funcall configure-aabb-fun aabb)
 			   world-collision-fun))))
-	    (with-vec-params42
-		(vx vy vz) vel
-		(with-vec-params42 (px py pz) pos
-				   (setf (values px py pz vx vy vz)
-					 (collide-world2
-					  fun
-					  px py pz vx vy vz)))))
+	    (with-vec (vx vy vz) (vel symbol-macrolet)
+	      (with-vec (px py pz) (pos symbol-macrolet)
+		(setf (values px py pz vx vy vz)
+		      (collide-world2
+		       fun
+		       px py pz vx vy vz)))))
 	  (let ((air-friction 0.98)
 		(walking-friction (* 0.6 0.9)))
-	    (with-vec-params42
-		(xvel yvel zvel) vel
-		(progn
-		  (if fly
-		      (progn
-			(setf air-friction 0.9)
-			(*= xvel air-friction)
-			(*= zvel air-friction))
-		      (progn
-			(setf air-friction 0.98)
-			(cond (onground
-			       (*= xvel walking-friction)
-			       (*= zvel walking-friction))
-			      (t (*= xvel 0.9)
-				 (*= zvel 0.9)
-				 ))))
-		  (when (and (not onground)
-			     gravity)
-		    (decf yvel (* 0.08 (expt tickscale 2))))
-		  (*= yvel air-friction)))))))))
+	    (with-vec (xvel yvel zvel) (vel symbol-macrolet)
+	      (if fly
+		  (progn
+		    (setf air-friction 0.9)
+		    (*= xvel air-friction)
+		    (*= zvel air-friction))
+		  (progn
+		    (setf air-friction 0.98)
+		    (cond (onground
+			   (*= xvel walking-friction)
+			   (*= zvel walking-friction))
+			  (t (*= xvel 0.9)
+			     (*= zvel 0.9)
+			     ))))
+	      (when (and (not onground)
+			 gravity)
+		(decf yvel (* 0.08 (expt tickscale 2))))
+	      (*= yvel air-friction))))))))
 
 (defun contact-handle (acc vel)
   (multiple-value-bind (i+ i- j+ j- k+ k-)
@@ -105,24 +91,23 @@
 	      (logtest acc #b000100)
 	      (logtest acc #b000010)
 	      (logtest acc #b000001))
-    (with-vec-params42
-	(xvel yvel zvel) vel
-	(etouq 
-	 (cons
-	  'progn
-	  (mapcar
-	   (lambda (args)
-	     (apply
-	      (lambda (axis plus minus)
-		(alexandria:with-gensyms (var)
-		  `(let ((,var ,axis))
-		     (when (or (and (plusp ,var) ,plus)
-			       (and (minusp ,var) ,minus))
-		       (setf ,axis 0.0)))))
-	      args))
-	   '((xvel i+ i-)
-	     (yvel j+ j-)
-	     (zvel k+ k-))))))))
+    (with-vec (xvel yvel zvel) (vel symbol-macrolet)
+      (etouq 
+       (cons
+	'progn
+	(mapcar
+	 (lambda (args)
+	   (apply
+	    (lambda (axis plus minus)
+	      (alexandria:with-gensyms (var)
+		`(let ((,var ,axis))
+		   (when (or (and (plusp ,var) ,plus)
+			     (and (minusp ,var) ,minus))
+		     (setf ,axis 0.0)))))
+	    args))
+	 '((xvel i+ i-)
+	   (yvel j+ j-)
+	   (zvel k+ k-))))))))
 
 (defparameter *block-aabb*
   (aabbcc:make-aabb
@@ -245,10 +230,9 @@
     (when (window:mice-locked-p)
       (when (window::skey-j-p (window::keyval :v) control-state)
 	(toggle noclip))
-      (with-vec-params4
-	  (x y z) pos
-	  (when (window::skey-j-p (window::keyval :p) control-state)
-	    (update-world-vao x y z)))
+      (with-vec (x y z) (pos)
+	(when (window::skey-j-p (window::keyval :p) control-state)
+	  (update-world-vao x y z)))
       (when (window::skey-j-p (window::keyval :g) control-state)
 	(toggle fly)
 	(toggle gravity)))))
@@ -276,38 +260,43 @@
 
 (defun use-fists (control-state look-vec pos)
   (let ((fist *fist*))
-    (with-vec-params4
-	(px py pz) pos
-	(with-vec-params4
-	    (vx vy vz) look-vec
-	    (progn
-	      (standard-fist
-	       fist
-	       px py pz
-	       vx vy vz)
-	      (when (window:mice-locked-p)
-		(when (window::skey-p (window::keyval :q) control-state)
-		  (big-swing-fist
-		   px py pz
-		   vx vy vz))))))
+    (with-vec (px py pz) (pos)
+      (with-vec (vx vy vz) (look-vec)
+	(progn
+	  (standard-fist
+	   fist
+	   px py pz
+	   vx vy vz))))
     (use-fist fist
-	      (window::skey-j-p (window::mouseval :left) control-state)
-	      (window::skey-j-p (window::mouseval :right) control-state)
+	      (window::skey-p (window::mouseval :left) control-state)
+	      (window::skey-p (window::mouseval :right) control-state)
 	      *left-fist-fnc*
 	      *right-fist-fnc*)))
 (defparameter *right-fist-fnc*
-  (lambda (x y z)
-    (let ((blockval 1))
-      (setblock-with-update
-       x
-       y
-       z
-       blockval
-       (aref mc-blocks:*lightvalue* blockval)))))
+  (or
+   ;;  (atest::sheath 1 2)
+   (lambda (x y z)
+     (dobox ((x (- x 1) (+ x 2))
+	     (y (- y 1) (+ y 2))
+	     (z (- z 1) (+ z 2)))
+	    (atest::dirts x y z)
+	    (atest::grassify x y z)
+	    #+nil
+	    (let ((blockval 1))
+	      (plain-setblock
+	       x
+	       y
+	       z
+	       blockval
+	       (aref mc-blocks:*lightvalue* blockval)))))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
-    (setblock-with-update x y z 0 0)))
+    (dobox ((x (- x 1) (+ x 2))
+	    (y (- y 1) (+ y 2))
+	    (z (- z 1) (+ z 2)))
+	   (setblock-with-update x y z 0 0))))
 
+#+nil
 (defparameter *big-fist-fun*
   (lambda (x y z)
     (when (and (<= 0 x 127)
@@ -316,6 +305,7 @@
       (let ((blockid 0))
 	(setblock-with-update x y z blockid  (aref mc-blocks:*lightvalue* blockid))))))
 
+#+nil
 (defun big-swing-fist (px py pz vx vy vz)
   (let ((u 5))
     (aabb-collect-blocks
@@ -329,6 +319,13 @@
        :maxy 11.12
        :maxz 10.3))   
      *big-fist-fun*)))
+
+#+nil
+(when (window:mice-locked-p)
+  (when (window::skey-p (window::keyval :q) control-state)
+    (big-swing-fist
+     px py pz
+     vx vy vz)))
 
 #+nil
 (defun collide-with-world (fun)
