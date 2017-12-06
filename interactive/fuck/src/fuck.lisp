@@ -1,10 +1,12 @@
 (in-package :fuck)
 
 (defparameter *thread* nil)
-(defun main () 
-  (setf *thread*
-	(sb-thread:make-thread
-	 (just-main))))
+(defun main ()
+  (when (or (eq nil *thread*)
+	    (not (sb-thread:thread-alive-p *thread*)))
+    (setf *thread*
+	  (sb-thread:make-thread
+	   (just-main)))))
 
 (defun just-main ()
   (let ((stdo *standard-output*))
@@ -185,6 +187,9 @@
     (let ((num (num-key-jp *control-state*)))
       (when num
 	(setf *ent* (aref *ents* num))))
+    #+nil
+    (when (window::skey-j-p (window::keyval :j) control-state)
+       (atest::wowz))
     (unless *paused*
       (setf (sandbox::entity-hips *ent*)
 	    (wasd-mover
@@ -194,7 +199,7 @@
 	     (window::skey-p (window::keyval :f) control-state)))
       (sandbox::physentity *ent*))
     (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -128.0)
+      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -1.0)
       (sandbox::use-fists control-state backwardsbug
 			  pos))))
 
@@ -238,50 +243,20 @@
     (entity-to-camera *ent* *camera*
 		      (tick *ticker* #'physss))
     (camat:update-matrices *camera*)
-    (camera-shader *camera*)))
-
-#+nil
-(defun set-sky-color ()
-  (let ((time sandbox::*daytime*)
-	(avector sandbox::*avector*))
-    (map-into avector
-	      (lambda (x)
-		(max 0.0 (min (* time x) 1.0)))
-	      sandbox::*fogcolor*))
-  (with-vec (a b c) (sandbox::*avector*)
-    (gl:clear-color a b c 1.0)))
+    (camera-shader *camera*))
+  (gl:use-program (getfnc :noopshader))
+  )
 
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
   (gl:use-program (getfnc :blockshader))
   
   (glhelp:with-uniforms uniform sandbox::*blockshader-uniforms*
-    #+nil
-    (gl:uniformfv
-     (uniform :fog-color)
-     sandbox::*avector*)
-    #+nil
-    (gl:uniformf
-     (uniform :foglet)
-     (/ (/ -1.0 sandbox::*fog-ratio*)
-	(camat:camera-frustum-far camera)))
-    #+nil
-    (gl:uniformf
-     (uniform :aratio)
-     (/ 1.0 sandbox::*fog-ratio*))
-    #+nil
-    (gl:uniformfv (uniform :cam-pos)
-		  (camat:camera-vec-position camera))
     (gl:uniform-matrix-4fv
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
      nil))
- ;; (set-sky-color)
   (gl:disable :blend)
   (gl:bind-texture :texture-2d (funcall #'getfnc :terrain))
   (sandbox::draw-chunk-meshes) 
   (sandbox::designatemeshing))
-#+nil
-(#P"terrarium2/" #P"first/" #P"second/" #P"third/" #P"fourth/" #P"world/"
- #P"terrarium/" #P"holymoly/" #P"funkycoolclimb/" #P"ahole/" #P"maze-royale/"
- #P"bloodcut/" #P"wasteland/")

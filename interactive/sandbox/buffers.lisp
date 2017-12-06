@@ -5,47 +5,68 @@
 
 (in-package :aplayground)
 
-(defun fill-with-flhats (array)
-  (map-into array #'flhat:make-flhat))
-(defun make-iterators (buffer result)
-  (map-into result (lambda (x) (flhat:make-flhat-iterator x)) buffer))
-(defun reset-attrib-buffer-iterators (fill-data)
-  (dotimes (x (array-total-size fill-data))
-    (flhat:reset-iterator (aref fill-data x))))
-
-(defparameter *attrib-buffers* (fill-with-flhats (make-array 16 :element-type t :initial-element nil)))
-(defparameter *attrib-buffer-iterators*
-  (make-iterators *attrib-buffers* (make-array 16 :element-type t :initial-element nil)))
-
 (defmacro with-iterators ((&rest bufvars) buf func &body body)
-  (let* ((syms (mapcar (lambda (x) (declare (ignorable x)) (gensym)) bufvars)))
+  (let ((syms (mapcar (lambda (x) (declare (ignorable x)) (gensym)) bufvars)))
     (with-vec-params
 	syms `(,buf)
 	(let ((acc (cons 'progn body)))
-	  (dolist (sym syms) 
-	    (setf acc (list func
-			    (pop bufvars) sym acc)))
+	  (dolist (sym syms)
+	    (let ((value (pop bufvars)))
+	      (unless (consp value)
+		(setf value (list value)))
+	      (setf acc (list func value sym acc))))
 	  acc))))
 
-#+nil
-(defparameter *attrib-buffer-fill-pointer*
-  (tally-buffer *attrib-buffer-iterators* (make-attrib-buffer-data)))
+(in-package :sandbox)
 
-#+nil
-((defun tally-buffer (iterator-buffer result)
-   (map-into result (lambda (x) (iterator-count x)) iterator-buffer))
- (defun iterator-count (iterator)
-   (if (iter-ator:p-array iterator)
-       (1+ (flhat:iterator-position iterator))
-       0)))
+(defun reset-attrib-buffer-iterators (fill-data)
+  (dotimes (x (array-total-size fill-data))
+    (reset-my-iterator (aref fill-data x))))
 
-#+nil
-((defparameter *buffer-vector-scratch* (make-array 16))
- (defun get-buf-param (iter attrib-order &optional (newarray *buffer-vector-scratch*))
-   (let ((len (length attrib-order)))
-     (dotimes (x len)
-       (setf (aref newarray x)
-	     (aref iter (aref attrib-order x)))))
-   newarray))
+(defparameter *scratch-space* nil)
+(defun getmem ()
+  (let ((a *scratch-space*))
+    (cond ((consp a)
+	   (pop *scratch-space*)
+	   (setf (cdr a) nil)
+	   a)
+	  (t (list (make-array 256 :element-type 'single-float))))))
+(defun givemem (values)
+  (let* ((cons *scratch-space*)
+	 (ans (nconc cons values)))
+    (when (not (eq cons ans))
+      (setf *scratch-space* ans))))
 
+(defun next-array (data)
+  (let* ((last-cell (cdr data))
+	 (cons-array (or (cdr last-cell)
+			 (setf (cdr last-cell)
+			       (getmem))))
+	 (array (first cons-array))
+	 (len (array-total-size array)))
+    (when (null (car data))
+      (setf (car data)
+	    (or last-cell
+		cons-array
+		(error "how?"))))
+    (setf (cdr data) cons-array)
+    (values (1- len)
+	    array)))
 
+(defun reset-my-iterator (iterator)
+  (let ((data (iter-ator:p-data iterator)))
+    (setf (cdr data) (car data))
+    (setf (iter-ator:p-index iterator) 0)))
+(defun my-iterator ()
+  (let ((cons (cons "my-iterator" nil)))
+    (iter-ator:make-iterator 0 nil (cons cons cons) #'next-array)))
+(defun free-my-iterator-memory (iterator)
+  (let* ((cons (iter-ator:p-data iterator))
+	 (head (car cons)))
+    (givemem (cdr (car cons)))
+    
+    (setf (cdr cons) head)
+    (setf (cdr head) nil))
+  ;;cleanup
+  (setf (iter-ator:p-array iterator) nil
+	(iter-ator:p-index iterator) 0))

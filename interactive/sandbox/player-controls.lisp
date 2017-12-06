@@ -258,56 +258,64 @@
 (defparameter *fist*
   (gen-fister *fist-aabb* (list #'ahook)))
 
+
+(defparameter *reach* 128.0)
+(defparameter *swinging* nil)
 (defun use-fists (control-state look-vec pos)
   (let ((fist *fist*))
     (with-vec (px py pz) (pos)
-      (with-vec (vx vy vz) (look-vec)
-	(progn
-	  (standard-fist
-	   fist
-	   px py pz
-	   vx vy vz))))
-    (use-fist fist
-	      (window::skey-p (window::mouseval :left) control-state)
-	      (window::skey-p (window::mouseval :right) control-state)
-	      *left-fist-fnc*
-	      *right-fist-fnc*)))
+      (with-vec (vx vy vz) (look-vec)	
+	(when (window:mice-locked-p)
+	  (when (window::skey-j-p (window::keyval :w) control-state)
+	    (toggle *swinging*))
+	  (when *swinging*
+	    (big-swing-fist
+	     px py pz
+	     vx vy vz)))
+	(let ((a (window::skey-p (window::mouseval :left) control-state))
+	      (b (window::skey-p (window::mouseval :right) control-state)))
+	  (when (or a b)
+	    (standard-fist
+	     fist
+	     px py pz
+	     (* *reach* vx) (* *reach* vy) (* *reach* vz))
+	    (use-fist fist
+		      a
+		      b
+		      *left-fist-fnc*
+		      *right-fist-fnc*)))))))
 (defparameter *right-fist-fnc*
-  (or
-   ;;  (atest::sheath 1 2)
-   (lambda (x y z)
-     (dobox ((x (- x 1) (+ x 2))
-	     (y (- y 1) (+ y 2))
-	     (z (- z 1) (+ z 2)))
-	    (atest::dirts x y z)
-	    (atest::grassify x y z)
-	    #+nil
-	    (let ((blockval 1))
-	      (plain-setblock
-	       x
-	       y
-	       z
-	       blockval
-	       (aref mc-blocks:*lightvalue* blockval)))))))
+  (lambda (x y z)
+    (let ((blockval 1))
+      (plain-setblock
+       x
+       y
+       z
+       blockval
+       (aref mc-blocks:*lightvalue* blockval)))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
-    (dobox ((x (- x 1) (+ x 2))
-	    (y (- y 1) (+ y 2))
-	    (z (- z 1) (+ z 2)))
-	   (setblock-with-update x y z 0 0))))
+    (setblock-with-update x y z 0 0)))
 
-#+nil
 (defparameter *big-fist-fun*
-  (lambda (x y z)
-    (when (and (<= 0 x 127)
-	       (<= 0 y 127)
-	       (<= -128 z -1))
-      (let ((blockid 0))
-	(setblock-with-update x y z blockid  (aref mc-blocks:*lightvalue* blockid))))))
+  (or
+   (lambda (x y z)
+     (let ((a (world::getblock x y z)))
+       (unless (or (= a 1)
+		   (= a 0))
+	 (plain-setblock x y z 0 0))))
+   ;;  #'atest::bonder2
+   #+nil
+   (lambda (x y z)
+     (atest::dirts x y z)
+     (atest::grassify x y z))
+  ;; (atest::sheath 2 1)
+   (lambda (x y z) ;(print (list x y z))
+     )
+   ))
 
-#+nil
 (defun big-swing-fist (px py pz vx vy vz)
-  (let ((u 5))
+  (let ((u 128))
     (aabb-collect-blocks
      px py pz (* u vx) (* u vy) (* u vz)
      (load-time-value
@@ -321,11 +329,12 @@
      *big-fist-fun*)))
 
 #+nil
-(when (window:mice-locked-p)
-  (when (window::skey-p (window::keyval :q) control-state)
-    (big-swing-fist
-     px py pz
-     vx vy vz)))
+(lambda (x y z)
+    (when (and (<= 0 x 127)
+	       (<= 0 y 127)
+	       (<= -128 z -1))
+      (let ((blockid 0))
+	(setblock-with-update x y z blockid  (aref mc-blocks:*lightvalue* blockid)))))
 
 #+nil
 (defun collide-with-world (fun)

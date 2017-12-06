@@ -35,14 +35,23 @@
 (defun loadchunk (path position-list)
   (let ((position (apply #'world:chunkhashfunc position-list)))
     (let ((data (myload2 path position-list)))
-      (when data 
-	(destructuring-bind (blocks light sky) data
-	  (setf (gethash position world:chunkhash)
-		(coerce blocks '(simple-array (unsigned-byte 8) (*))))
-	  (setf (gethash position world:lighthash)
-		(coerce light '(simple-array (unsigned-byte 4) (*))))
-	  (setf (gethash position world:skylighthash)
-		(coerce sky '(simple-array (unsigned-byte 4) (*)))))
+      (when data
+	
+	(and
+	 (let ((blocks (pop data)))
+	   (when blocks
+	     (setf (gethash position world:chunkhash)
+		   (coerce blocks '(simple-array (unsigned-byte 8) (*)))))
+	   data)
+	 (let ((light (pop data)))
+	   (when light
+	     (setf (gethash position world:lighthash)
+		   (coerce light '(simple-array (unsigned-byte 4) (*)))))
+	   data)
+	 (let ((sky (pop data)))
+	   (when sky
+	     (setf (gethash position world:skylighthash)
+		   (coerce sky '(simple-array (unsigned-byte 4) (*)))))))
 	(return-from loadchunk t)))))
 
 (defun save-world (path)

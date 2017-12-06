@@ -1,11 +1,25 @@
 (in-package :sandbox)
 
 (defun mesh-chunk (times bufs)
-  (aplayground::with-iterators (xyz uv dark) bufs iter-ator:wasabiis
+  (declare (type fixnum times))
+  (declare (type simple-vector bufs))
+  (declare (optimize (speed 3) (safety 0)))
+  (aplayground::with-iterators ((xyz single-float)
+				(uv single-float)
+				(dark single-float))
+      bufs iter-ator:bind-iterator-in
     (dotimes (x times)
       (%gl:vertex-attrib-1f 8 (dark))
       (%gl:vertex-attrib-2f 2 (uv) (uv))
       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
+
+(defmacro with-gl-list (&body body)
+  (let ((list-sym (gensym)))
+    `(let ((,list-sym (gl:gen-lists 1)))
+       (gl:new-list ,list-sym :compile)
+       ,@body
+       (gl:end-list)
+       ,list-sym)))
 
 (defun update-chunk-mesh (len coords iter)
   (when coords
@@ -14,13 +28,17 @@
       (when old-call-list (gl:delete-lists old-call-list 1)))
     (if (zerop len)
 	(remove-chunk-display-list coords)	  
-	(set-chunk-display-list coords (let ((list (gl:gen-lists 1)))
-					 (gl:new-list list :compile)
+	(set-chunk-display-list coords (with-gl-list
 					 (gl:with-primitives :quads
-					   (aplayground::reset-attrib-buffer-iterators iter)
-					   (mesh-chunk len iter))
-					 (gl:end-list)
-					 list)))))
+					   (reset-attrib-buffer-iterators iter)
+					   (mesh-chunk len iter)))))
+    (map nil (lambda (x) (free-my-iterator-memory x)) iter)
+    ))
+
+(defparameter *attrib-buffer-iterators*
+  (map-into (make-array 3 :element-type t :initial-element nil)
+	    (lambda ()
+	      (my-iterator))))
 
 (defparameter mesher-thread nil)
 (defun designatemeshing ()
@@ -34,8 +52,8 @@
 	(setf mesher-thread
 	      (bordeaux-threads:make-thread
 	       (lambda ()
-		 (let ((iter aplayground::*attrib-buffer-iterators*))
-		   (aplayground::reset-attrib-buffer-iterators iter)
+		 (let ((iter *attrib-buffer-iterators*))
+		   (reset-attrib-buffer-iterators iter)
 		   (sb-thread:return-from-thread
 		    (chunk-shape thechunk iter))))))))))
 #+nil

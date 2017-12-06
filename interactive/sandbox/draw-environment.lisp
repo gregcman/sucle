@@ -133,39 +133,39 @@
 	   (funcall setfnc name func))
 	 (getfnc (name)
 	   (funcall getfnc name)))
-    (progn
-      (bornfnc
-       :terrain-png
-       (lambda ()
-	 (let ((image
-		(flip-image:flip-image
-		 (load-png 
-		  (img-path #P"terrain.png")))))
-	   (color-grasses
-	    (getfnc :grass-png)
-	    image)
-	   image)))
-      (bornfnc
-       :grass-png
-       (lambda ()
-	 (load-png 
-	  (img-path #P"grasscolor.png"))))
-      (bornfnc
-       :terrain
-       (lambda ()
-	 (multiple-value-prog1
-	     (values
-	      (glhelp:pic-texture
-	       (getfnc :terrain-png)
-	       :rgba)
-	      :opengl)
+    (bornfnc
+     :terrain-png
+     (lambda ()
+       (let ((image
+	      (flip-image:flip-image
+	       (load-png 
+		(img-path #P"terrain.png")))))
+	 (color-grasses
+	  (getfnc :grass-png)
+	  image)
+	 image)))
+    (bornfnc
+     :terrain
+     (lambda ()
+       (multiple-value-prog1
+	   (values
+	    (glhelp:pic-texture
+	     (getfnc :terrain-png)
+	     :rgba)
+	    :opengl)
 					;	 (gl:generate-mipmap :texture-2d)
-	   (glhelp:apply-tex-params
-	    (quote ((:texture-min-filter . :nearest;-mipmap-nearest
-					 )
-		    (:texture-mag-filter . :nearest)
-		    (:texture-wrap-s . :repeat)
-		    (:texture-wrap-t . :repeat)))))))
+	 (glhelp:apply-tex-params
+	  (quote ((:texture-min-filter . :nearest;-mipmap-nearest
+				       )
+		  (:texture-mag-filter . :nearest)
+		  (:texture-wrap-s . :repeat)
+		  (:texture-wrap-t . :repeat)))))))
+    (bornfnc
+     :grass-png
+     (lambda ()
+       (load-png 
+	(img-path #P"grasscolor.png"))))
+    (progn
       (bornfnc
        :blockshader
        (lambda ()
@@ -179,51 +179,50 @@
 	   (Setf *blockshader-uniforms*
 		 (glhelp:cache-program-uniforms
 		  program
-		  '((:pmv . "projectionmodelview")
-		  ;  (:fog-color . "fogcolor")
-		  ;  (:aratio . "aratio")
-		  ;  (:cam-pos . "cameraPos")
-		  ;  (:foglet . "foglet")
-		    )))
+		  '((:pmv . "projectionmodelview"))))
 	   (values program :opengl))))
       (bornfnc
        :bs-vs
        (lambda ()
 	 (alexandria:read-file-into-string
-		   (shader-path "blockshader/transforms.vs"))))
+	  (shader-path "blockshader/vs.vs"))))
       (bornfnc
        :bs-frag
        (lambda ()
 	 (alexandria:read-file-into-string
-	  (shader-path "blockshader/basictexcoord.frag")))))))
+	  (shader-path "blockshader/frag.frag")))))
+    (progn
+      (bornfnc
+       :noopshader
+       (lambda ()
+	 (let ((program
+		(glhelp:make-shader-program-from-strings
+		 (getfnc :noop-vs)
+		 (getfnc :noop-frag)
+		 (quote (("position" . 0)	
+			 ("color" . 8))))))    
+	   (values program :opengl))))
+      (bornfnc
+       :noop-vs
+       (lambda ()
+	 (alexandria:read-file-into-string
+	  (shader-path "noop/noop.vs"))))
+      (bornfnc
+       :noop-frag
+       (lambda ()
+	 (alexandria:read-file-into-string
+	  (shader-path "noop/noop.frag")))))))
 
 
 (defparameter *blockshader-uniforms* nil)
 
+;;;the crosshair does not belong in the hud because the blending is
+;;;different
 #+nil
-(bornfnc
- :box
- (lambda ()
-   (draw-box -1.0 1.0 -1.0 1.0 -1.0 1.0)))
-#+nil
-(defun player-aabb+1 ()
-  (aabbcc:make-aabb
-   :minx -0.3
-   :miny -0.5
-   :minz -0.3
-   :maxx 0.3
-   :maxy 1.12
-   :maxz 0.3))
-
-#+nil
-(defun chunk-aabb ()
-  (aabbcc:make-aabb
-   :minx -8.0
-   :miny -8.0
-   :minz -8.0
-   :maxx 8.0
-   :maxy 8.0
-   :maxz 8.0))
+(defun draw-crosshair ()
+  (bind-shit :gui)
+  (gl:blend-func :one-minus-dst-color :one-minus-src-color)
+  (ldrawlist :crosshair))
 
 #+nil
 ;;matrix multiplication is associative
@@ -258,49 +257,6 @@
 
 
 #+nil
-(defun texture-imagery (texture-name image-name)
-  (setf (gethash texture-name *g/texture-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (pic-texture (get-image image-name)))))
-
-#+nil
-(name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
-					    ("texCoord" . 2)
-					    ("darkness" . 8)))
-#+nil
-(defun name-shader (shader-name vs fs attributes)
-  (setf (gethash shader-name *g/shader-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (make-shader-program-from-strings
-	   (get-text vs) (get-text fs) attributes))))
-
-
-#+nil
-(defun src-text (name src-path)
-  (setf (gethash name *g/text-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (aplayground::file-string src-path))))
-
-#+nil
-(defun src-image (name src-path)
-  (setf (gethash name *g/image-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (let ((img (imagewise:load-png src-path)))
-	    (imagewise:flip-image img)
-	    img))))
-
-#+nil
-(defun name-mesh (display-list-name mesh-func)
-  (setf (gethash display-list-name *g/call-list-backup*)
-	(lambda (&optional name)
-	  (declare (ignorable name))
-	  (create-call-list-from-func mesh-func))))
-
-#+nil
 (defun on-resize (w h)
   (setf *window-height* h
 	*window-width* w)
@@ -332,31 +288,12 @@
      (draw-hud)
      )))
 
-
-#+nil
-(progno
- (defparameter *vec4* (make-array 4 :element-type 'single-float))
- (defun vec4 (vec3)
-   (setf (aref *vec4* 0) (aref vec3 0))
-   (setf (aref *vec4* 1) (aref vec3 1))
-   (setf (aref *vec4* 2) (aref vec3 2))
-   *vec4*))
-
-
 #+nil
 (defun draw-framebuffer ()
   (gl:enable :blend)
   (gl:depth-func :always)
   (gl:bind-texture :texture-2d *framebuffer-texture*)
   (ldrawlist :background))
-
-;;;the crosshair does not belong in the hud because the blending is
-;;;different
-#+nil
-(defun draw-crosshair ()
-  (bind-shit :gui)
-  (gl:blend-func :one-minus-dst-color :one-minus-src-color)
-  (ldrawlist :crosshair))
 
 #+nil
 (defun draw-hud ()
@@ -507,10 +444,3 @@
 	 (cg-matrix:matrix* (cg-matrix:translate (cg-matrix:vec+ pos2
 								 (cg-matrix:vec-lerp posold pos partial)))
 			    (cg-matrix:scale* difx dify difz)))))))
-
-#+nil
-(defparameter *velocity* (cg-matrix:vec 0.0 0.0 0.0))
-#+nil
-(defparameter *orientation* (make-array 6 :element-type 'single-float
-					:initial-contents
-					'(0.0 0.0 0.0 0.0 0.0 0.0)))

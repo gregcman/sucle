@@ -9,12 +9,14 @@
 	  (max b2 (* time s2))
 	  (max b3 (* time s3))))))
 
-(defparameter *bluffs* nil)
+(defparameter *mesh-etex* nil)
+(defparameter *mesh-dark* nil)
+(defparameter *mesh-epos* nil)
 
 (defun chunk-shape (chunk-position iter)
   (declare (optimize (debug 3)))
-  (let ((times 0))
-    (let ((*bluffs* iter))
+  (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
+    (let ((times 0))
       (multiple-value-bind (io ko jo) (world:unhashfunc chunk-position)
 	(dobox ((i io (+ 16 io))
 		(j jo (+ 16 jo))
@@ -24,8 +26,8 @@
 		   (incf times
 			 (blockshape
 			  i j k
-			  blockid)))))))
-    (values times chunk-position iter)))
+			  blockid))))))
+      (values times chunk-position iter))))
 
 
 (defun blockshape (i j k blockid)
@@ -140,7 +142,7 @@
 	  (zd (+ ,k ,z3)))
       (declare (type fixnum xd yd zd))
       (lightfunc (,getfunc xd yd zd)))))
-(eval-when (:compile-toplevel :execute)
+(eval-when (:compile-toplevel)
   (progn
     (defun light-edge-i (i j k)
       (macroexpand-1
@@ -212,8 +214,12 @@
       (dotimes (x 16)
 	(setf (aref foo-array x)
 	      (light-gen 0.05 x)))
+      (let ((a (aref foo-array 0)))
+	(map-into foo-array
+		  (lambda (x)
+		    (/ (- x a) (- 1 a)))
+		  foo-array))
       foo-array)))
-
 
 (declaim (inline lightfunc))
 (defun lightfunc (light)
@@ -338,11 +344,13 @@
   `(defun ,name (i j k u0 v0 u1 v1)
      (declare (type fixnum i j k)
 	      (type single-float u0 v0 u1 v1))
-     (let ((buf-params *bluffs*))
-       (declare (type simple-vector buf-params))
-       (aplayground::with-iterators (epos etex dark)
-	   buf-params iter-ator:wasabios 
-	 ,@body))))
+     (iter-ator:bind-iterator-out
+      (epos single-float) *mesh-epos*
+      (iter-ator:bind-iterator-out
+       (etex single-float) *mesh-etex*
+       (iter-ator:bind-iterator-out
+	(dark single-float) *mesh-dark*	
+	,@body)))))
 
 (with-unsafe-speed
   (face-header side-i  
