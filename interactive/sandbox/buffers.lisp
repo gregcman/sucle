@@ -1,27 +1,4 @@
-(defpackage #:aplayground
-  (:use 
-   #:cl
-   #:fuktard))
-
-(in-package :aplayground)
-
-(defmacro with-iterators ((&rest bufvars) buf func &body body)
-  (let ((syms (mapcar (lambda (x) (declare (ignorable x)) (gensym)) bufvars)))
-    (with-vec-params
-	syms `(,buf)
-	(let ((acc (cons 'progn body)))
-	  (dolist (sym syms)
-	    (let ((value (pop bufvars)))
-	      (unless (consp value)
-		(setf value (list value)))
-	      (setf acc (list func value sym acc))))
-	  acc))))
-
 (in-package :sandbox)
-
-(defun reset-attrib-buffer-iterators (fill-data)
-  (dotimes (x (array-total-size fill-data))
-    (reset-my-iterator (aref fill-data x))))
 
 (defparameter *scratch-space* nil)
 (defun getmem ()
@@ -70,3 +47,10 @@
   ;;cleanup
   (setf (iter-ator:p-array iterator) nil
 	(iter-ator:p-index iterator) 0))
+
+(defmacro flush-my-iterator (a &body body)
+  (let ((var (gensym)))
+    `(let ((,var ,a)) 
+       (reset-my-iterator ,var)
+       ,@body
+       (free-my-iterator-memory ,var))))

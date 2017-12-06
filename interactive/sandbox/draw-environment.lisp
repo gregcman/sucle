@@ -1,11 +1,20 @@
 (in-package :sandbox)
-(defparameter *fog-ratio*  0.75)
 
-(defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
-(defparameter *fogcolor* (apply #'cg-matrix:vec
-				(nth 0 '((0.68 0.8 1.0)
-					 (0.05 0.1 0.2)
-					 (0.3 0.1 0.0)))))
+(defparameter *ourdir-aux* #.(or *compile-file-truename*
+				 *load-truename*))
+(defparameter ourdir
+  (let ((value *ourdir-aux*))
+    (make-pathname :host (pathname-host value)
+		   :directory (pathname-directory value))))
+(defparameter dir-resource (merge-pathnames #P"res/" ourdir))
+(defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
+(defparameter dir-mc-assets (merge-pathnames "image/" dir-resource))
+(defun shader-path (name)
+  (merge-pathnames name dir-shader))
+(defun img-path (name)
+  (merge-pathnames name dir-mc-assets))
+
+
 (defparameter *daytime* 1.0)
 (defparameter *chunks-changed* t)
 (defparameter *world-display-list* nil)
@@ -17,12 +26,8 @@
 
   (when *chunks-changed*
     (let ((old-world *world-display-list*))
-      (when old-world (gl:delete-lists old-world 1)))
-    (let ((new (gl:gen-lists 1)))
-      (gl:new-list new :compile)
-      (draw-world)
-      (gl:end-list)
-      (setf *world-display-list* new))
+      (when old-world (gl:delete-lists old-world 1)))   
+    (setf *world-display-list* (with-gl-list (draw-world)))
     (setf *chunks-changed* nil))
   (let ((call-list *world-display-list*))
     (if call-list    
@@ -42,11 +47,6 @@
   (defun remove-chunk-display-list (name)
     (remhash name *g/chunk-call-list*)))
 
-(defun distance-to (x0 y0 z0 x1 y1 z1)
-  (let ((dx (- x1 x0))
-	(dy (- y1 y0))
-	(dz (- z1 z0)))
-    (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 (defun update-world-vao (x y z)
   (clean-dirty)
   (maphash (lambda (k v)
@@ -54,167 +54,20 @@
 	     (gl:delete-lists v 1)
 	     (remove-chunk-display-list k))
 	   *g/chunk-call-list*)
-  (let ((list nil))
-    (maphash
-     (lambda (k v)
-       (declare (ignore v))
-       (push k list))
-     world::chunkhash)
-    (map nil #'dirty-push
-	 (sort list #'< :key
-	       (lambda (position)
-		 (multiple-value-bind (i j k) (world:unhashfunc position)
-		   (distance-to x y z
-				(- i 8)
-				(- k 8)
-				(- j 8))))))))
+  (map nil #'dirty-push
+       (sort (alexandria:hash-table-keys world::chunkhash) #'< :key
+	     (lambda (position)
+	       (multiple-value-bind (i j k) (world:unhashfunc position)
+		 ((lambda (x0 y0 z0 x1 y1 z1)
+		    (let ((dx (- x1 x0))
+			  (dy (- y1 y0))
+			  (dz (- z1 z0)))
+		      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
+		  x y z
+		  (- i 8)
+		  (- k 8)
+		  (- j 8)))))))
 
-(defparameter *ourdir-aux* #.(or *compile-file-truename*
-				 *load-truename*))
-(defparameter ourdir
-  (let ((value *ourdir-aux*))
-    (make-pathname :host (pathname-host value)
-		   :directory (pathname-directory value))))
-(defparameter dir-resource (merge-pathnames #P"res/" ourdir))
-(defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
-(defparameter dir-mc-assets (merge-pathnames "image/" dir-resource))
-(defun shader-path (name)
-  (merge-pathnames name dir-shader))
-(defun img-path (name)
-  (merge-pathnames name dir-mc-assets))
-
-(progn
-  (defun color-grasses (image terrain)
-    (let ((color (case 1
-		   (0 #(1742848/8775 2673664/8775 1079296/8775 255))
-		   (1 (getapixel 255 0 image))
-		   (2 (getapixel 0 0 image))
-		   (3 (getapixel 255 255 image)))))
-      (modify-greens 64 192 :color color :terrain terrain)
-      (modify-greens 80 192 :color color :terrain terrain)
-      (modify-greens 0 240 :color color :terrain terrain)))
-
-  (defun ubyte-mult (a b)
-    (truncate (* a b) 256))
-
-  (defun multiply-into (vecinto other)
-    (macrolet ((aux (a b num)
-		 `(let ((at (aref ,a ,num))
-			(bt (aref ,b ,num)))
-		    (setf (aref ,a ,num) (ubyte-mult at bt)))))
-      (aux vecinto other 0)
-      (aux vecinto other 1)
-      (aux vecinto other 2)
-      (aux vecinto other 3)))
-
-  (defun getapixel (h w image)
-    (destructuring-bind (height width c) (array-dimensions image)
-      (declare (ignore height))
-      (make-array 4 :element-type (array-element-type image)
-		  :displaced-to image
-		  :displaced-index-offset (* c (+ w (* h width))))))
-
-;;  (progno #(113 174 70 255)  #(198 304 122 255))
-;;;grass is 0 240
-;;;leaves is [64 80] 192
-  (defun modify-greens (xpos ypos
-			&key
-			  (color #(0 0 0 0))
-			  (terrain (error "no image")))
-    (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
-	   (multiply-into (getapixel y x terrain) color))))
-
-;;;;load a png image from a path
-(defun load-png (filename)
-  (opticl:read-png-file filename))
-
-(defun build-deps (getfnc setfnc)
-  (flet ((bornfnc (name func)
-	   (funcall setfnc name func))
-	 (getfnc (name)
-	   (funcall getfnc name)))
-    (bornfnc
-     :terrain-png
-     (lambda ()
-       (let ((image
-	      (flip-image:flip-image
-	       (load-png 
-		(img-path #P"terrain.png")))))
-	 (color-grasses
-	  (getfnc :grass-png)
-	  image)
-	 image)))
-    (bornfnc
-     :terrain
-     (lambda ()
-       (multiple-value-prog1
-	   (values
-	    (glhelp:pic-texture
-	     (getfnc :terrain-png)
-	     :rgba)
-	    :opengl)
-					;	 (gl:generate-mipmap :texture-2d)
-	 (glhelp:apply-tex-params
-	  (quote ((:texture-min-filter . :nearest;-mipmap-nearest
-				       )
-		  (:texture-mag-filter . :nearest)
-		  (:texture-wrap-s . :repeat)
-		  (:texture-wrap-t . :repeat)))))))
-    (bornfnc
-     :grass-png
-     (lambda ()
-       (load-png 
-	(img-path #P"grasscolor.png"))))
-    (progn
-      (bornfnc
-       :blockshader
-       (lambda ()
-	 (let ((program
-		(glhelp:make-shader-program-from-strings
-		 (getfnc :bs-vs)
-		 (getfnc :bs-frag)
-		 (quote (("position" . 0)	
-			 ("texCoord" . 2)
-			 ("darkness" . 8))))))    
-	   (Setf *blockshader-uniforms*
-		 (glhelp:cache-program-uniforms
-		  program
-		  '((:pmv . "projectionmodelview"))))
-	   (values program :opengl))))
-      (bornfnc
-       :bs-vs
-       (lambda ()
-	 (alexandria:read-file-into-string
-	  (shader-path "blockshader/vs.vs"))))
-      (bornfnc
-       :bs-frag
-       (lambda ()
-	 (alexandria:read-file-into-string
-	  (shader-path "blockshader/frag.frag")))))
-    (progn
-      (bornfnc
-       :noopshader
-       (lambda ()
-	 (let ((program
-		(glhelp:make-shader-program-from-strings
-		 (getfnc :noop-vs)
-		 (getfnc :noop-frag)
-		 (quote (("position" . 0)	
-			 ("color" . 8))))))    
-	   (values program :opengl))))
-      (bornfnc
-       :noop-vs
-       (lambda ()
-	 (alexandria:read-file-into-string
-	  (shader-path "noop/noop.vs"))))
-      (bornfnc
-       :noop-frag
-       (lambda ()
-	 (alexandria:read-file-into-string
-	  (shader-path "noop/noop.frag")))))))
-
-
-(defparameter *blockshader-uniforms* nil)
 
 ;;;the crosshair does not belong in the hud because the blending is
 ;;;different
@@ -444,3 +297,12 @@
 	 (cg-matrix:matrix* (cg-matrix:translate (cg-matrix:vec+ pos2
 								 (cg-matrix:vec-lerp posold pos partial)))
 			    (cg-matrix:scale* difx dify difz)))))))
+
+
+#+nil
+((defparameter *fog-ratio*  0.75)
+ (defparameter *avector* (cg-matrix:vec 0.0 0.0 0.0))
+ (defparameter *fogcolor* (apply #'cg-matrix:vec
+				 (nth 0 '((0.68 0.8 1.0)
+					  (0.05 0.1 0.2)
+					  (0.3 0.1 0.0))))))

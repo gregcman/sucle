@@ -1,5 +1,6 @@
 (in-package :fuktard)
 
+;;uiop:parse-body alexandria parse-body?
 (eval-always
  (defun destructure-def (form)
    (destructuring-bind (header name params &rest rest) form

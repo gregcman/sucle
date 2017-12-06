@@ -141,7 +141,6 @@
 (defparameter *pre-trampoline-hooks* nil)
 
 (defun sandbox-init ()
-  (sandbox::build-deps #'getfnc #'bornfnc)
   (setf sandbox::*world-display-list* nil)
   (clrhash sandbox::*g/chunk-call-list*)
   
@@ -244,19 +243,198 @@
 		      (tick *ticker* #'physss))
     (camat:update-matrices *camera*)
     (camera-shader *camera*))
-  (gl:use-program (getfnc :noopshader))
+  (set-render-area (make-instance 'render-area :x 0 :y 0
+				  :width 200 :height 200
+				  ))
+  (gl:enable :blend)
+  (gl:blend-func :one :one-minus-src-alpha
+   )
+  (gl:use-program (getfnc 'noopshader))
+;;  (gl:disable :cull-face)
+;;  (gl:delete-lists (getfnc :huh?) 1)
+ ;; (remove-stuff :huh?)
+  (gl:call-list (getfnc 'huh?))
   )
 
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
-  (gl:use-program (getfnc :blockshader))
+  (gl:use-program (getfnc 'blockshader))
   
-  (glhelp:with-uniforms uniform sandbox::*blockshader-uniforms*
+  (glhelp:with-uniforms uniform (getfnc 'blockshader-uniforms)
     (gl:uniform-matrix-4fv
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
      nil))
-  (gl:disable :blend)
-  (gl:bind-texture :texture-2d (funcall #'getfnc :terrain))
+;;  (gl:disable :blend)
+  (gl:bind-texture :texture-2d (funcall #'getfnc 'terrain))
   (sandbox::draw-chunk-meshes) 
   (sandbox::designatemeshing))
+
+(defmacro progeach (value body)
+  `(etouq
+    (cons 'progn
+	  (mapcar (lambda (x) (list ',value x))
+		  ,body))))
+
+(bornfnc
+ 'huh?
+ (lambda ()
+   (let ((a (sandbox::my-iterator))
+	 (c (sandbox::my-iterator))
+	 (len 0))
+     (iter-ator:bind-iterator-out
+      (col single-float) c
+      (iter-ator:bind-iterator-out
+       (pos single-float) a
+
+       (progeach
+	pos
+	(axis-aligned-quads:quadk+ 0.0 '(-1.0 1.0 -1.0 1.0)))
+       #+nil
+       (progeach
+	col
+	'(1.0 0.0 0.0 0.0
+	  0.0 0.0 0.0 0.0
+	  0.0 1.0 0.0 0.0
+	  1.0 1.0 0.0 0.0))
+       (incf len 4)
+       ))
+
+     (values
+      (sandbox::with-gl-list
+	(gl:with-primitives :quads 
+	  (sandbox::flush-my-iterator a
+	    (sandbox::flush-my-iterator c
+	      ((lambda (times a c)
+		 (iter-ator:bind-iterator-in
+		  (xyz single-float) a
+		  (iter-ator:bind-iterator-in
+		   (dark single-float) c
+		   (dotimes (x times)     
+		     (%gl:vertex-attrib-4f 8 (dark) (dark) (dark) (dark))
+		     (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
+	       len a c)))))
+      :opengl))))
+
+(progn
+  (defun color-grasses (terrain color)
+    (modify-greens 64 192 :color color :terrain terrain)
+    (modify-greens 80 192 :color color :terrain terrain)
+    (modify-greens 0 240 :color color :terrain terrain))
+
+  
+
+  (defun getapixel (h w image)
+    (destructuring-bind (height width c) (array-dimensions image)
+      (declare (ignore height))
+      (make-array 4 :element-type (array-element-type image)
+		  :displaced-to image
+		  :displaced-index-offset (* c (+ w (* h width))))))
+
+  #+nil
+  (#(1742848/8775 2673664/8775 1079296/8775 255)
+    (getapixel 0 0 grass-tint)
+    (getapixel 255 255 grass-tint))
+
+  ;;  (progno #(113 174 70 255)  #(198 304 122 255))
+;;;grass is 0 240
+;;;leaves is [64 80] 192
+  (defun modify-greens (xpos ypos
+			&key
+			  (color #(0 0 0 0))
+			  (terrain (error "no image")))
+    (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
+	   ((lambda (vecinto other)
+	      (map-into vecinto (lambda (a b) (truncate (* a b) 256)) vecinto other))
+	    (getapixel y x terrain) color))))
+
+;;;;load a png image from a path
+
+(defun load-png (filename)
+  (opticl:read-png-file filename))
+
+(bornfnc
+ 'terrain-png
+ (lambda ()
+   (let ((image
+	  (flip-image:flip-image
+	   (load-png 
+	    (sandbox::img-path #P"terrain.png"))))
+	 (tint nil))
+     (let ((grass-tint (getfnc 'grass-png)))
+       (setf tint #(200 6 128 255) ;(getapixel 255 0 grass-tint)
+	     ))
+     (color-grasses
+      image
+      tint)
+     image)))
+(bornfnc
+ 'terrain
+ (lambda ()
+   (multiple-value-prog1
+       (values
+	(glhelp:pic-texture
+	 (getfnc 'terrain-png)
+	 :rgba)
+	:opengl)
+					;	 (gl:generate-mipmap :texture-2d)
+     (glhelp:apply-tex-params
+      (quote ((:texture-min-filter . :nearest;-mipmap-nearest
+				   )
+	      (:texture-mag-filter . :nearest)
+	      (:texture-wrap-s . :repeat)
+	      (:texture-wrap-t . :repeat)))))))
+(bornfnc
+ 'grass-png
+ (lambda ()
+   (load-png 
+    (sandbox::img-path #P"grasscolor.png"))))
+(progn
+  (bornfnc
+   'blockshader-uniforms
+   (lambda ()
+     (glhelp:cache-program-uniforms
+      (getfnc 'blockshader)
+      '((:pmv . "projectionmodelview")))))
+  (bornfnc
+   'blockshader
+   (lambda ()
+     (let ((program
+	    (glhelp:make-shader-program-from-strings
+	     (getfnc 'bs-vs)
+	     (getfnc 'bs-frag)
+	     (quote (("position" . 0)	
+		     ("texCoord" . 2)
+		     ("darkness" . 8))))))    
+       (values program :opengl))))
+  (bornfnc
+   'bs-vs
+   (lambda ()
+     (alexandria:read-file-into-string
+      (sandbox::shader-path "blockshader/vs.vs"))))
+  (bornfnc
+   'bs-frag
+   (lambda ()
+     (alexandria:read-file-into-string
+      (sandbox::shader-path "blockshader/frag.frag")))))
+(progn
+  (bornfnc
+   'noopshader
+   (lambda ()
+     (let ((program
+	    (glhelp:make-shader-program-from-strings
+	     (getfnc 'noop-vs)
+	     (getfnc 'noop-frag)
+	     (quote (("position" . 0)	
+		     ("color" . 8))))))    
+       (values program :opengl))))
+  (bornfnc
+   'noop-vs
+   (lambda ()
+     (alexandria:read-file-into-string
+      (sandbox::shader-path "noop/noop.vs"))))
+  (bornfnc
+   'noop-frag
+   (lambda ()
+     (alexandria:read-file-into-string
+      (sandbox::shader-path "noop/noop.frag")))))

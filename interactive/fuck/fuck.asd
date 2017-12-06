@@ -7,6 +7,7 @@
 	       #:sandbox
 	       #:terminal625-tickr
 	       #:terminal625-camat
+	       #:opticl
 	       )
   :serial t
   :components

@@ -1,17 +1,19 @@
 (in-package :sandbox)
 
-(defun mesh-chunk (times bufs)
+(defun mesh-chunk (times a b c)
   (declare (type fixnum times))
-  (declare (type simple-vector bufs))
   (declare (optimize (speed 3) (safety 0)))
-  (aplayground::with-iterators ((xyz single-float)
-				(uv single-float)
-				(dark single-float))
-      bufs iter-ator:bind-iterator-in
-    (dotimes (x times)
-      (%gl:vertex-attrib-1f 8 (dark))
-      (%gl:vertex-attrib-2f 2 (uv) (uv))
-      (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))
+  (iter-ator:bind-iterator-in
+   (xyz single-float) a
+   (iter-ator:bind-iterator-in
+    (uv single-float) b
+    (iter-ator:bind-iterator-in
+     (dark single-float) c
+     (dotimes (x times)
+       
+       (%gl:vertex-attrib-1f 8 (dark))
+       (%gl:vertex-attrib-2f 2 (uv) (uv))
+       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))))
 
 (defmacro with-gl-list (&body body)
   (let ((list-sym (gensym)))
@@ -28,12 +30,16 @@
       (when old-call-list (gl:delete-lists old-call-list 1)))
     (if (zerop len)
 	(remove-chunk-display-list coords)	  
-	(set-chunk-display-list coords (with-gl-list
-					 (gl:with-primitives :quads
-					   (reset-attrib-buffer-iterators iter)
-					   (mesh-chunk len iter)))))
-    (map nil (lambda (x) (free-my-iterator-memory x)) iter)
-    ))
+	(set-chunk-display-list
+	 coords
+	 (with-gl-list
+	   (gl:with-primitives :quads
+	     
+	     (with-vec (a b c) (iter)
+	       (flush-my-iterator a
+		 (flush-my-iterator b
+		   (flush-my-iterator c
+		     (mesh-chunk len a b c)))))))))))
 
 (defparameter *attrib-buffer-iterators*
   (map-into (make-array 3 :element-type t :initial-element nil)
@@ -53,7 +59,7 @@
 	      (bordeaux-threads:make-thread
 	       (lambda ()
 		 (let ((iter *attrib-buffer-iterators*))
-		   (reset-attrib-buffer-iterators iter)
+		   (map nil (lambda (x) (free-my-iterator-memory x)) iter)
 		   (sb-thread:return-from-thread
 		    (chunk-shape thechunk iter))))))))))
 #+nil
@@ -72,50 +78,3 @@
 	    (remove-display-list :world)
 	    (when old-world (gl:delete-lists old-world 1)))))))
   (setf mesher-thread nil))
-
-#+nil
-(defun shape-list (verts len)   
-  (declare (type fixnum len)
-	   (type (simple-array single-float *) verts))
-  (unless (zerop len)
-    (let ((ourlist (gl:gen-lists 1))
-	  (vertsize 6))
-      (declare (type fixnum vertsize len))
-      (gl:new-list ourlist :compile)
-      (macrolet ((wow (num start)
-		   `(%gl:vertex-attrib-4f ,num
-					  (aref verts (+ base ,(+ start 0)))
-					  (aref verts (+ base ,(+ start 1)))
-					  (aref verts (+ base ,(+ start 2)))
-					  (aref verts (+ base ,(+ start 3)))))
-		 (wow2 (num start)
-		   `(%gl:vertex-attrib-2f ,num
-					  (aref verts (+ base ,(+ start 0)))
-					  (aref verts (+ base ,(+ start 1)))))
-		 (wow3 (num start)
-		   `(%gl:vertex-attrib-3f ,num
-					  (aref verts (+ base ,(+ start 0)))
-					  (aref verts (+ base ,(+ start 1)))
-					  (aref verts (+ base ,(+ start 2)))))
-		 (wow1 (num start)
-		   `(%gl:vertex-attrib-1f ,num
-					  (aref verts (+ base ,start)))))
-	(gl:with-primitives :quads
-	  (BLOCK NIL
-	    (LET ((base 0)
-		  (end (the fixnum (* len vertsize))))
-	      (DECLARE (TYPE UNSIGNED-BYTE end base))
-	      (TAGBODY
-		 (GO end)
-	       rep
-		 (TAGBODY
-		    (wow1 8 5)
-		    (wow2 2 3)
-		    (wow3 0 0)
-		    )
-		 (PSETQ base (the fixnum (+ vertsize base)))
-	       end
-		 (UNLESS (>= base end) (GO rep))
-		 (RETURN-FROM NIL (PROGN NIL)))))))
-      (gl:end-list)
-      ourlist)))

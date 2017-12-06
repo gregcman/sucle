@@ -13,6 +13,7 @@
 			 (:file "with-unsafe-speed")
 			 (:file "with-declaim-inline")
 			 (:file "with-vec-params")
+			 (:file "other")
 			 (:module "defdestructure"
 				  :serial t
 				  :components ((:file "defdestructure")))

@@ -8,7 +8,6 @@
 		 #:terminal625-zeorp
 		 #:terminal625-mcblk
 		 #:terminal625-aabbc
-		 #:opticl
 		 #:glhelp)
     :serial t
     :components
