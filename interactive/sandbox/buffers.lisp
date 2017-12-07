@@ -37,6 +37,9 @@
 (defun my-iterator ()
   (let ((cons (cons "my-iterator" nil)))
     (iter-ator:make-iterator 0 nil (cons cons cons) #'next-array)))
+;;todo: make data hold the getmem function,
+;;and not be a cons cell, or at least a named cons cell
+
 (defun free-my-iterator-memory (iterator)
   (let* ((cons (iter-ator:p-data iterator))
 	 (head (car cons)))

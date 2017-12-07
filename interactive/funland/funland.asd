@@ -14,6 +14,7 @@
 			 (:file "with-declaim-inline")
 			 (:file "with-vec-params")
 			 (:file "other")
+			 (:file "destructive")
 			 (:module "defdestructure"
 				  :serial t
 				  :components ((:file "defdestructure")))

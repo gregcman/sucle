@@ -3,9 +3,9 @@
 (defparameter *thread* nil)
 (defun main ()
   (when (or (eq nil *thread*)
-	    (not (sb-thread:thread-alive-p *thread*)))
+	    (not (bordeaux-threads:thread-alive-p *thread*)))
     (setf *thread*
-	  (sb-thread:make-thread
+	  (bordeaux-threads:make-thread
 	   (just-main)))))
 
 (defun just-main ()
@@ -141,10 +141,7 @@
 (defparameter *pre-trampoline-hooks* nil)
 
 (defun sandbox-init ()
-  (setf sandbox::*world-display-list* nil)
   (clrhash sandbox::*g/chunk-call-list*)
-  
-  (setf sandbox::mesher-thread nil)
   (sandbox::clean-dirty))
 (push 'sandbox-init *pre-trampoline-hooks*)
 
@@ -243,17 +240,19 @@
 		      (tick *ticker* #'physss))
     (camat:update-matrices *camera*)
     (camera-shader *camera*))
+  #+nil
   (set-render-area (make-instance 'render-area :x 0 :y 0
 				  :width 200 :height 200
 				  ))
-  (gl:enable :blend)
-  (gl:blend-func :one :one-minus-src-alpha
-   )
-  (gl:use-program (getfnc 'noopshader))
-;;  (gl:disable :cull-face)
-;;  (gl:delete-lists (getfnc :huh?) 1)
- ;; (remove-stuff :huh?)
-  (gl:call-list (getfnc 'huh?))
+;  (gl:enable :blend)
+ ;
+;
+;  (gl:blend-func :one :one-minus-src-alpha)
+  ;;  (gl:use-program (getfnc 'noopshader))
+  ;;  (gl:disable :cull-face)
+  ;;  (gl:delete-lists (getfnc :huh?) 1)
+  ;; (remove-stuff :huh?)
+  ;; (gl:call-list (getfnc 'huh?))
   )
 
 (defun camera-shader (camera)
@@ -301,7 +300,7 @@
        ))
 
      (values
-      (sandbox::with-gl-list
+      (glhelp:with-gl-list
 	(gl:with-primitives :quads 
 	  (sandbox::flush-my-iterator a
 	    (sandbox::flush-my-iterator c
@@ -362,7 +361,7 @@
 	    (sandbox::img-path #P"terrain.png"))))
 	 (tint nil))
      (let ((grass-tint (getfnc 'grass-png)))
-       (setf tint #(200 6 128 255) ;(getapixel 255 0 grass-tint)
+       (setf tint (getapixel 255 0 grass-tint)
 	     ))
      (color-grasses
       image

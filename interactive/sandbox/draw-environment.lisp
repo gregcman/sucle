@@ -16,28 +16,21 @@
 
 
 (defparameter *daytime* 1.0)
-(defparameter *chunks-changed* t)
-(defparameter *world-display-list* nil)
 (defun draw-chunk-meshes ()
   (gl:enable :depth-test)  
   (gl:depth-func :less)
   (gl:enable :cull-face)
   (gl:cull-face :back)
+  (draw-world))
 
-  (when *chunks-changed*
-    (let ((old-world *world-display-list*))
-      (when old-world (gl:delete-lists old-world 1)))   
-    (setf *world-display-list* (with-gl-list (draw-world)))
-    (setf *chunks-changed* nil))
-  (let ((call-list *world-display-list*))
-    (if call-list    
-	(gl:call-list call-list))))
 (defun draw-world ()
-  (maphash
-   (lambda (key display-list)
-     (when (numberp key)
-       (gl:call-list display-list)))
-   *g/chunk-call-list*))
+  (declare (optimize (speed 3) (safety 0)))
+  (with-hash-table-iterator (next *g/chunk-call-list*)
+    (loop
+       (multiple-value-bind (more? key value) (next)
+	 (declare (ignore key))
+	 (unless more? (return nil))
+	 (gl:call-list value)))))
 (progn
   (defparameter *g/chunk-call-list* (make-hash-table :test 'eq));;opengl call lists
   (defun get-chunk-display-list (name)
@@ -204,12 +197,7 @@
      (name-mesh :crosshair #'mesh-crosshair)
      (name-mesh :gui #'draw-hotbar)
      (name-mesh :hotbar-selector #'draw-hotbar-selector))
-
-   (defun load-shaders ())
-   #+nil
-   (src-text :ss-vs (shader-path "solidshader/transforms.vs"))
-   #+nil
-   (src-text :ss-frag (shader-path "solidshader/basictexcoord.frag"))))
+))
 
 #+nil
 ((defun draw-box (minx maxx miny maxy minz maxz)
@@ -306,3 +294,4 @@
 				 (nth 0 '((0.68 0.8 1.0)
 					  (0.05 0.1 0.2)
 					  (0.3 0.1 0.0))))))
+
