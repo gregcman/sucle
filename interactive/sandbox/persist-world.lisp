@@ -1,31 +1,14 @@
 (in-package #:sandbox)
 
-(defun save (path things)
-  (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
-    (dolist (thing things)
-      (print thing stream))))
-
-(defun myload (path)
-  (let ((things nil))
-    (with-open-file (stream path :direction :input :if-does-not-exist nil)
-      (tagbody rep
-	 (let ((thing (read stream nil nil)))
-	   (when thing
-	     (push thing things)
-	     (go rep)))))
-    (nreverse things)))
-
-(defun save2 (path thingfilename &rest things)
-  (save (merge-pathnames (format nil "~s" thingfilename) path) things))
-
-(defun myload2 (path thingfilename)
-  (myload (merge-pathnames (format nil "~s" thingfilename) path)))
-
-(defparameter *saves-dir* nil)
+(defparameter *some-saves* nil)
+(defun msave (path)
+  (filesystem-util:call-with-path path #'sandbox::save-world *some-saves*))
+(defun mload (path)
+  (filesystem-util:call-with-path path #'sandbox::load-world *some-saves*))
 
 (defun savechunk (path position)
   (let ((position-list (multiple-value-list (world:unhashfunc position))))
-    (save2
+    (filesystem-util:save2
      path
      position-list
      (gethash position world:chunkhash)
@@ -34,7 +17,7 @@
 
 (defun loadchunk (path position-list)
   (let ((position (apply #'world:chunkhashfunc position-list)))
-    (let ((data (myload2 path position-list)))
+    (let ((data (filesystem-util:myload2 path position-list)))
       (when data
 	
 	(and

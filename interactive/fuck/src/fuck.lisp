@@ -113,24 +113,12 @@
 			:frustum-near (/ 1.0 8.0)))
 (defparameter *render-area* (make-instance 'render-area))
 
-(defparameter *sandbox-on* t)
 (defparameter *ticker* nil)
 
 (defun init ()
   (setf %gl:*gl-get-proc-address* (window:get-proc-address))
   (window:set-vsync t)
   (gl:enable :scissor-test)
-  (progn
-    (setf window:*resize-hook*
-	  (lambda (width height)
-	    (let ((camera *camera*))
-	      (setf (camat:camera-aspect-ratio camera)
-		    (/ (coerce width 'single-float)
-		       (coerce height 'single-float))))
-	    (let ((render-area *render-area*))
-	      (setf (render-area-width render-area) (- width 40)
-		    (render-area-height render-area) (- height 40)))))
-    (funcall window:*resize-hook* window:*width* window:*height*))
   (scrub-old-gl)
   (setf *ticker*
 	(tickr:make-ticker
@@ -140,10 +128,50 @@
   (call-trampoline))
 (defparameter *pre-trampoline-hooks* nil)
 
-(defun sandbox-init ()
-  (clrhash sandbox::*g/chunk-call-list*)
-  (sandbox::clean-dirty))
-(push 'sandbox-init *pre-trampoline-hooks*)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+					
+(progn
+  (declaim (ftype (function (single-float) single-float)
+		  translator))
+  (fuktard::with-unsafe-speed
+    (defun translator (x)
+      (let* ((a (* x 0.6))
+	     (b (+ 0.2 a))
+	     (c (* b b b))
+	     (d (* 8.0 0.15 (/ (coerce pi 'single-float) 180.0)))
+	     (e (* d c)))
+	(declare (type single-float a b c d e))
+	e))))
+
+(defparameter *mouse-multiplier* (translator 0.5))
+
+(defun delta2 ()
+  (let ((mult *mouse-multiplier*))
+    (multiple-value-bind (dx dy) (delta)
+      (let ((dyaw (- (* dx mult)))
+	    (dpitch (* dy mult)))
+	(values dyaw dpitch)))))
+(defun delta ()
+  (let ((mouse-data (load-time-value (cons 0 0))))
+    (multiple-value-bind (newx newy) (window:get-mouse-position)
+      (multiple-value-prog1 (values
+			     (- newx (car mouse-data))
+			     (- newy (cdr mouse-data)))
+	(setf (car mouse-data) newx
+	      (cdr mouse-data) newy)))))
+
+(defparameter mousecapturestate nil)
+(defun remove-spurious-mouse-input ()
+  (if (window:mice-locked-p)
+      (case mousecapturestate
+	((nil)
+	 (delta) ;;toss spurious mouse movement 
+	 (setf mousecapturestate :justcaptured))
+	(:justcaptured (setq mousecapturestate t))
+	((t)))
+      (when mousecapturestate
+	(setq mousecapturestate nil))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun wasd-mover (w? a? s? d?)
   (let ((x 0)
@@ -167,6 +195,12 @@
 	  (window::keyval ,(intern (write-to-string n) :keyword))
 	  control-state) ,n))
      '(0 1 2 3 4 5 6 7 8 9)))))
+
+(defparameter *sandbox-on* t)
+(setf sandbox::*some-saves* #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
+(defun sandbox-init ()
+  (clrhash sandbox::*g/chunk-call-list*))
+(push 'sandbox-init *pre-trampoline-hooks*)
 
 (defparameter *ents* (map-into (make-array 10) #'sandbox::gentity))
 (defparameter *ent* (aref *ents* 1))
@@ -225,6 +259,15 @@
 (setf *trampoline* 'atick)
 (defun atick (session)
   (declare (ignorable session))
+  ((lambda (width height)
+      (let ((camera *camera*))
+	(setf (camat:camera-aspect-ratio camera)
+	      (/ (coerce width 'single-float)
+		 (coerce height 'single-float))))
+      (let ((render-area *render-area*))
+	(setf (render-area-width render-area) (- width 40)
+	      (render-area-height render-area) (- height 40))))
+   window::*width* window::*height*)
   (set-render-area *render-area*)
   (gl:clear-color 0.0 0.0 0.0 0.0)
   (gl:clear
@@ -240,19 +283,6 @@
 		      (tick *ticker* #'physss))
     (camat:update-matrices *camera*)
     (camera-shader *camera*))
-  #+nil
-  (set-render-area (make-instance 'render-area :x 0 :y 0
-				  :width 200 :height 200
-				  ))
-;  (gl:enable :blend)
- ;
-;
-;  (gl:blend-func :one :one-minus-src-alpha)
-  ;;  (gl:use-program (getfnc 'noopshader))
-  ;;  (gl:disable :cull-face)
-  ;;  (gl:delete-lists (getfnc :huh?) 1)
-  ;; (remove-stuff :huh?)
-  ;; (gl:call-list (getfnc 'huh?))
   )
 
 (defun camera-shader (camera)
@@ -264,65 +294,19 @@
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
      nil))
-;;  (gl:disable :blend)
   (gl:bind-texture :texture-2d (funcall #'getfnc 'terrain))
-  (sandbox::draw-chunk-meshes) 
+  (gl:enable :depth-test)  
+  (gl:depth-func :less)
+  (gl:enable :cull-face)
+  (gl:cull-face :back)
+  (sandbox::draw-world)
   (sandbox::designatemeshing))
-
-(defmacro progeach (value body)
-  `(etouq
-    (cons 'progn
-	  (mapcar (lambda (x) (list ',value x))
-		  ,body))))
-
-(bornfnc
- 'huh?
- (lambda ()
-   (let ((a (sandbox::my-iterator))
-	 (c (sandbox::my-iterator))
-	 (len 0))
-     (iter-ator:bind-iterator-out
-      (col single-float) c
-      (iter-ator:bind-iterator-out
-       (pos single-float) a
-
-       (progeach
-	pos
-	(axis-aligned-quads:quadk+ 0.0 '(-1.0 1.0 -1.0 1.0)))
-       #+nil
-       (progeach
-	col
-	'(1.0 0.0 0.0 0.0
-	  0.0 0.0 0.0 0.0
-	  0.0 1.0 0.0 0.0
-	  1.0 1.0 0.0 0.0))
-       (incf len 4)
-       ))
-
-     (values
-      (glhelp:with-gl-list
-	(gl:with-primitives :quads 
-	  (sandbox::flush-my-iterator a
-	    (sandbox::flush-my-iterator c
-	      ((lambda (times a c)
-		 (iter-ator:bind-iterator-in
-		  (xyz single-float) a
-		  (iter-ator:bind-iterator-in
-		   (dark single-float) c
-		   (dotimes (x times)     
-		     (%gl:vertex-attrib-4f 8 (dark) (dark) (dark) (dark))
-		     (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
-	       len a c)))))
-      :opengl))))
 
 (progn
   (defun color-grasses (terrain color)
     (modify-greens 64 192 :color color :terrain terrain)
     (modify-greens 80 192 :color color :terrain terrain)
     (modify-greens 0 240 :color color :terrain terrain))
-
-  
-
   (defun getapixel (h w image)
     (destructuring-bind (height width c) (array-dimensions image)
       (declare (ignore height))
@@ -334,7 +318,7 @@
   (#(1742848/8775 2673664/8775 1079296/8775 255)
     (getapixel 0 0 grass-tint)
     (getapixel 255 255 grass-tint))
-
+;;minecraft fog color sometimes (0.68 0.8 1.0)
   ;;  (progno #(113 174 70 255)  #(198 304 122 255))
 ;;;grass is 0 240
 ;;;leaves is [64 80] 192
@@ -358,7 +342,7 @@
    (let ((image
 	  (flip-image:flip-image
 	   (load-png 
-	    (sandbox::img-path #P"terrain.png"))))
+	    (sandbox::sub-path #P"terrain.png"))))
 	 (tint nil))
      (let ((grass-tint (getfnc 'grass-png)))
        (setf tint (getapixel 255 0 grass-tint)
@@ -387,7 +371,7 @@
  'grass-png
  (lambda ()
    (load-png 
-    (sandbox::img-path #P"grasscolor.png"))))
+    (sandbox::sub-path #P"grasscolor.png"))))
 (progn
   (bornfnc
    'blockshader-uniforms
@@ -400,40 +384,11 @@
    (lambda ()
      (let ((program
 	    (glhelp:make-shader-program-from-strings
-	     (getfnc 'bs-vs)
-	     (getfnc 'bs-frag)
+	     sandbox::*blockshader-vs*
+	     sandbox::*blockshader-frag*
 	     (quote (("position" . 0)	
 		     ("texCoord" . 2)
 		     ("darkness" . 8))))))    
-       (values program :opengl))))
-  (bornfnc
-   'bs-vs
-   (lambda ()
-     (alexandria:read-file-into-string
-      (sandbox::shader-path "blockshader/vs.vs"))))
-  (bornfnc
-   'bs-frag
-   (lambda ()
-     (alexandria:read-file-into-string
-      (sandbox::shader-path "blockshader/frag.frag")))))
-(progn
-  (bornfnc
-   'noopshader
-   (lambda ()
-     (let ((program
-	    (glhelp:make-shader-program-from-strings
-	     (getfnc 'noop-vs)
-	     (getfnc 'noop-frag)
-	     (quote (("position" . 0)	
-		     ("color" . 8))))))    
-       (values program :opengl))))
-  (bornfnc
-   'noop-vs
-   (lambda ()
-     (alexandria:read-file-into-string
-      (sandbox::shader-path "noop/noop.vs"))))
-  (bornfnc
-   'noop-frag
-   (lambda ()
-     (alexandria:read-file-into-string
-      (sandbox::shader-path "noop/noop.frag")))))
+       (values program :opengl)))))
+
+

@@ -1,3 +1,2 @@
 (defpackage #:sandbox
-  (:use #:cl #:fuktard)
-  (:export #:main))
+  (:use #:cl #:fuktard))

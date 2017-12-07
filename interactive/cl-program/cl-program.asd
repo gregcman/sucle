@@ -7,4 +7,5 @@
 	      :components
 	      ((:file "rectangular-tilemap")
 	       (:file "axis-aligned-quads")
-	       (:file "util")))))
+	       (:file "flip-image")
+	       (:file "filesystem-util")))))
