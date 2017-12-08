@@ -290,7 +290,7 @@
   (gl:use-program (getfnc 'blockshader))
   
   (glhelp:with-uniforms uniform (getfnc 'blockshader-uniforms)
-    (gl:uniform-matrix-4fv
+    (gl:uniform-matrix-4fv 
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
      nil))
@@ -387,9 +387,11 @@
   (bornfnc
    'blockshader-uniforms
    (lambda ()
-     (glhelp:cache-program-uniforms
-      (getfnc 'blockshader)
-      `((:pmv . ,(sandbox::getname 'sandbox::projection-model-view sandbox::*test-vs*))))))
+     (values
+      (glhelp:cache-program-uniforms
+       (getfnc 'blockshader)
+       `((:pmv . ,(sandbox::getname 'sandbox::projection-model-view sandbox::*test-vs*))))
+      :opengl)))
   (bornfnc
    'blockshader
    (lambda ()
@@ -400,7 +402,8 @@
 	     sandbox::*blockshader-frag*
 	     `((,(sandbox::getname 'sandbox::position sandbox::*test-vs*) . 2)	
 	       (,(sandbox::getname 'sandbox::texcoord sandbox::*test-vs*) . 8)
-	       (,(sandbox::getname 'sandbox::color sandbox::*test-vs*) . 0)))))    
+	       (,(sandbox::getname 'sandbox::color sandbox::*test-vs*) . 0)
+	       ))))    
        (values program :opengl)))))
 
 
