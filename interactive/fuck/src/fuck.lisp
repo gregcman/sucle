@@ -302,6 +302,11 @@
   (sandbox::draw-world)
   (sandbox::designatemeshing))
 
+;;seizures are so FUN!
+#+nil
+#(:clear :set :copy :copy-inverted
+  :noop :invert :and :nand :or :nor
+  :xor :equiv :and-reverse :and-inverted :or-reverse :or-inverted)
 (progn
   (defun color-grasses (terrain color)
     (modify-greens 64 192 :color color :terrain terrain)
@@ -352,6 +357,12 @@
       tint)
      image)))
 (bornfnc
+ 'font-png
+ (lambda ()
+   (flip-image:flip-image
+    (load-png 
+     (sandbox::sub-path #P"font.png")))))
+(bornfnc
  'terrain
  (lambda ()
    (multiple-value-prog1
@@ -378,17 +389,18 @@
    (lambda ()
      (glhelp:cache-program-uniforms
       (getfnc 'blockshader)
-      '((:pmv . "projectionmodelview")))))
+      `((:pmv . ,(sandbox::getname 'sandbox::projection-model-view sandbox::*test-vs*))))))
   (bornfnc
    'blockshader
    (lambda ()
+     (sandbox::test)
      (let ((program
 	    (glhelp:make-shader-program-from-strings
 	     sandbox::*blockshader-vs*
 	     sandbox::*blockshader-frag*
-	     (quote (("position" . 0)	
-		     ("texCoord" . 2)
-		     ("darkness" . 8))))))    
+	     `((,(sandbox::getname 'sandbox::position sandbox::*test-vs*) . 2)	
+	       (,(sandbox::getname 'sandbox::texcoord sandbox::*test-vs*) . 8)
+	       (,(sandbox::getname 'sandbox::color sandbox::*test-vs*) . 0)))))    
        (values program :opengl)))))
 
 

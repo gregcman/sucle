@@ -1,9 +1,9 @@
 (in-package :fuck)
 
-(defmacro progeach (value body)
+(defmacro progeach (fun body)
   `(etouq
     (cons 'progn
-	  (mapcar (lambda (x) (list ',value x))
+	  (mapcar ,fun
 		  ,body))))
 (bornfnc
  'huh?
@@ -17,7 +17,7 @@
        (pos single-float) a
 
        (progeach
-	pos
+	(lambda (x) (list 'col x))
 	(axis-aligned-quads:quadk+ 0.0 '(-1.0 1.0 -1.0 1.0)))
        #+nil
        (progeach
