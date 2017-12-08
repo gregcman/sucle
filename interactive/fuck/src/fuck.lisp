@@ -287,9 +287,9 @@
 
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
-  (gl:use-program (getfnc 'blockshader))
+  (glhelp::use-gl-program (getfnc 'blockshader))
   
-  (glhelp:with-uniforms uniform (getfnc 'blockshader-uniforms)
+  (glhelp:with-uniforms uniform (getfnc 'blockshader)
     (gl:uniform-matrix-4fv 
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
@@ -385,25 +385,8 @@
     (sandbox::sub-path #P"grasscolor.png"))))
 (progn
   (bornfnc
-   'blockshader-uniforms
-   (lambda ()
-     (values
-      (glhelp:cache-program-uniforms
-       (getfnc 'blockshader)
-       `((:pmv . ,(sandbox::getname 'sandbox::projection-model-view sandbox::*test-vs*))))
-      :opengl)))
-  (bornfnc
    'blockshader
-   (lambda ()
-     (sandbox::test)
-     (let ((program
-	    (glhelp:make-shader-program-from-strings
-	     sandbox::*blockshader-vs*
-	     sandbox::*blockshader-frag*
-	     `((,(sandbox::getname 'sandbox::position sandbox::*test-vs*) . 2)	
-	       (,(sandbox::getname 'sandbox::texcoord sandbox::*test-vs*) . 8)
-	       (,(sandbox::getname 'sandbox::color sandbox::*test-vs*) . 0)
-	       ))))    
-       (values program :opengl)))))
-
-
+   (lambda ()    
+     (values
+      (glhelp::create-gl-program sandbox::*atest*)
+      :opengl))))
