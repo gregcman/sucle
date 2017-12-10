@@ -1,0 +1,6 @@
+singleton-lparallel: starts an lparallel kernel
+camat: camera matrix
+cgmat: adds destructive operators to sb-cga
+glfw3: ??????
+queue: a fifo queue and a unique element queue
+zeorp: an array iterator and reader/writer
