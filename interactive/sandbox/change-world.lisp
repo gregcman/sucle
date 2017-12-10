@@ -73,8 +73,6 @@
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)
 	    (function my-iterator)))
-
-(setf lparallel:*kernel* (lparallel:make-kernel 4))
 (defparameter *achannel* (lparallel:make-channel))
 (defun designatemeshing ()
   (loop

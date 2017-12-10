@@ -4,7 +4,7 @@
 	       #:funland
 	       #:terminal625-queue
 	       #:terminal625-zeorp
-	       #:lparallel
+	       #:singleton-lparallel
 	       #:glhelp)
   :serial t
   :components
