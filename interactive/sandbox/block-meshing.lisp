@@ -32,92 +32,6 @@
       (values times chunk-position iter))))
 
 
-(defun blockshape (i j k blockid)
-  (case blockid
-    (2 (rendergrass blockid i j k))
-    (t (renderstandardblock blockid i j k))))
-
-;;;if the block is air, the side gets rendered. if the block is transparent
-;;;and the same type ex: texture between glass - there is no texture - if they are
-;;;different - water and glass -it shows
-(defun show-sidep (blockid other-blockid)
-  (or (zerop other-blockid)
-      (and (/= blockid other-blockid)
-	   (not (aref mc-blocks:*opaquecubelooukup* other-blockid)))))
-
-(defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
-  (let ((id (gensym)))
-    `(let ((,id (* 4 ,num-form)))
-       ,(apply #'with-vec-params `((,id ,u0 ,v0 ,u1 ,v1)) `(,*16x16-tilemap*)
-	       body))))
-
-(eval-when (:compile-toplevel)
-  (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
-
-(defun rendergrass (id i j k)
-  (let ((times 0))
-    (with-texture-translator2 (u0 u1 v0 v1) 2
-      (let ((adj-id (world:getblock i (1- j) k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side-j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) 0
-      (let ((adj-id (world:getblock i (1+ j) k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side+j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) 3
-      (let ((adj-id (world:getblock (1- i) j k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side-i i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1+ i) j k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side+i i j k u0 v0 u1 v1)))    
-      (let ((adj-id (world:getblock i j (1- k))))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side-k i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i j (1+ k))))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side+k i j k u0 v0 u1 v1))))
-    times))
-
-;;changing j-
-
-(defun renderstandardblock (id i j k)
-  (let ((times 0)
-	(texid (aref mc-blocks:*blockIndexInTexture* id)))
-    (with-texture-translator2 (u0 u1 v0 v1) texid
-      (let ((adj-id (world:getblock i (1- j) k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side-j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) texid
-      (let ((adj-id (world:getblock i (1+ j) k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side+j i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1- i) j k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side-i i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1+ i) j k)))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side+i i j k u0 v0 u1 v1)))    
-      (let ((adj-id (world:getblock i j (1- k))))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side-k i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i j (1+ k))))
-	(when (show-sidep id adj-id)
-	  (incf times 4)
-	  (side+k i j k u0 v0 u1 v1))))
-    times))
-
 (defmacro %edge-aux ((i j k)
 		     getfunc
 		     (x0 y0 z0)
@@ -433,3 +347,89 @@
 		(00 -1 1)    
 		(00 00 1)    
 		(-1 00 1))))
+
+(defun blockshape (i j k blockid)
+  (case blockid
+    (2 (rendergrass blockid i j k))
+    (t (renderstandardblock blockid i j k))))
+
+;;;if the block is air, the side gets rendered. if the block is transparent
+;;;and the same type ex: texture between glass - there is no texture - if they are
+;;;different - water and glass -it shows
+(defun show-sidep (blockid other-blockid)
+  (or (zerop other-blockid)
+      (and (/= blockid other-blockid)
+	   (not (aref mc-blocks:*opaquecubelooukup* other-blockid)))))
+
+(defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
+  (let ((id (gensym)))
+    `(let ((,id (* 4 ,num-form)))
+       ,(apply #'with-vec-params `((,id ,u0 ,v0 ,u1 ,v1)) `(,*16x16-tilemap*)
+	       body))))
+
+(eval-when (:compile-toplevel)
+  (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
+
+(defun rendergrass (id i j k)
+  (let ((times 0))
+    (with-texture-translator2 (u0 u1 v0 v1) 2
+      (let ((adj-id (world:getblock i (1- j) k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side-j i j k u0 v0 u1 v1))))
+    (with-texture-translator2 (u0 u1 v0 v1) 0
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side+j i j k u0 v0 u1 v1))))
+    (with-texture-translator2 (u0 u1 v0 v1) 3
+      (let ((adj-id (world:getblock (1- i) j k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side-i i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1+ i) j k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side+i i j k u0 v0 u1 v1)))    
+      (let ((adj-id (world:getblock i j (1- k))))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side-k i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i j (1+ k))))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side+k i j k u0 v0 u1 v1))))
+    times))
+
+;;changing j-
+
+(defun renderstandardblock (id i j k)
+  (let ((times 0)
+	(texid (aref mc-blocks:*blockIndexInTexture* id)))
+    (with-texture-translator2 (u0 u1 v0 v1) texid
+      (let ((adj-id (world:getblock i (1- j) k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side-j i j k u0 v0 u1 v1))))
+    (with-texture-translator2 (u0 u1 v0 v1) texid
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side+j i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1- i) j k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side-i i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1+ i) j k)))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side+i i j k u0 v0 u1 v1)))    
+      (let ((adj-id (world:getblock i j (1- k))))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side-k i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i j (1+ k))))
+	(when (show-sidep id adj-id)
+	  (incf times 4)
+	  (side+k i j k u0 v0 u1 v1))))
+    times))

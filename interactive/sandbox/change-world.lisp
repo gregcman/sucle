@@ -1,5 +1,7 @@
 (in-package :sandbox)
 
+(world:setup-hashes)
+
 (defun draw-world ()
   (declare (optimize (speed 3) (safety 0)))
   (with-hash-table-iterator (next *g/chunk-call-list*)
@@ -157,9 +159,7 @@
       (glslgen:make-shader-vars
        :in '((texcoord "vec2")
 	     (color "float")
-	     (sampler "sampler2D")
-
-	     (time "float"))
+	     (sampler "sampler2D"))
        :program
        (glslgen:main
 	(glslgen:spaces `("vec4" "pixdata" "=" ,(glslgen:funglsl "texture2D"
@@ -167,7 +167,7 @@
 								 'texcoord)))
 	(glslgen:spaces `((:fragment-color ".rgb") "=" color "*" ("pixdata" ".rgb")))))
       :attributes
-      '((position . 2)
+      '((position . 2) 
 	(texcoord . 8)
 	(color . 0))
       :varyings

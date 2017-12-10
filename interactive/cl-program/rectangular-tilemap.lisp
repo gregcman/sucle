@@ -13,7 +13,7 @@
 	  (vsize (/ 1f0 (float height))))
       (multiple-value-bind (vfoo ufoo) (floor num width)
 	(let ((u (* (float ufoo) usize))
-	      (v (* (- height (float vfoo) 1) vsize)))
+	      (v (* (float vfoo) vsize)))
 	  (values u v
 		  (+ u usize) 
 		  (+ v vsize)))))))
@@ -27,9 +27,9 @@
 	  (multiple-value-bind (x0 y0 x1 y1) (sequential-index-generator width height x)
 	    (let ((p (* x 4)))
 	      (setf (aref ret (+ 0 p)) x0
-		    (aref ret (+ 1 p)) y0
+		    (aref ret (+ 1 p)) y1
 		    (aref ret (+ 2 p)) x1
-		    (aref ret (+ 3 p)) y1))))
+		    (aref ret (+ 3 p)) y0))))
 	ret))))
 (progn
   (declaim (ftype (function (simple-vector fixnum)
@@ -38,6 +38,7 @@
   (defun index-quad-lookup (array code)
     (declare (optimize (speed 3) (safety 0)))
     (let ((p (* code 4)))
+      (declare (type fixnum p))
       (values (aref array p)
 	      (aref array (1+ p))
 	      (aref array (+ 2 p))

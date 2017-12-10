@@ -1,11 +1,9 @@
 (asdf:defsystem #:cl-program
-    :depends-on ()
+    :depends-on (#:funland)
     :serial t
     :components
-    
-    ((:module "auxiliary-functions"
-	      :components
-	      ((:file "rectangular-tilemap")
-	       (:file "axis-aligned-quads")
-	       (:file "flip-image")
-	       (:file "filesystem-util")))))
+    ((:file "rectangular-tilemap")
+     (:file "axis-aligned-quads")
+     (:file "flip-image")
+     (:file "filesystem-util")
+     (:file "fps-independent-timestep")))
