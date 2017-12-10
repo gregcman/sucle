@@ -1122,7 +1122,8 @@ edge, or no case"
 (defparameter *sandbox-on* t)
 (setf sandbox::*some-saves*
       (cdr (assoc (machine-instance) 
-		  '(("gm3-imac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/"))
+		  '(("gm3-imac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
+		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		  :test 'equal)))
 (defparameter *ticker* nil)
 (defun sandbox-init ()
