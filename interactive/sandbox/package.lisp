@@ -1,2 +1,2 @@
 (defpackage #:sandbox
-  (:use #:cl #:fuktard))
+  (:use #:cl #:funland))

@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 (eval-always
  (defun map-home-symbols (package func)
    (do-symbols (symbol package)
@@ -14,4 +14,4 @@
 			       (fboundp x))
 			   (export x))))))
 
-(eval-always (export-all-functions-and-symbols :fuktard))
+(eval-always (export-all-functions-and-symbols :funland))

@@ -1,5 +1,5 @@
 (defpackage :pix
-  (:use #:cl #:fuktard))
+  (:use #:cl #:funland))
 
 (in-package :pix)
 

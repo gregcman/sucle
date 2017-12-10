@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 
 (defmacro macrontinue (cont-list sub-form)
   (if cont-list

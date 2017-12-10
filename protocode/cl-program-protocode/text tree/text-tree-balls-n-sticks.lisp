@@ -17,7 +17,7 @@
   (setf *alist* nil)
   (clrhash *ahash*))
 
-(fuktard:with-unsafe-speed
+(funland:with-unsafe-speed
   (defun test-hash ()
     (let ((hash *ahash*)
 	  (nums *nums*))
@@ -28,7 +28,7 @@
 	 (let ((item (aref nums x)))
 	   (setf (gethash item hash) item)))))))
 
-(fuktard:with-unsafe-speed
+(funland:with-unsafe-speed
   (defun test-hash2 ()
     (let ((hash *ahash*)
 	  (nums *nums*)
@@ -41,7 +41,7 @@
 	   (setf a (gethash item hash)))))
       a)))
 
-(fuktard:with-unsafe-speed
+(funland:with-unsafe-speed
   (defun test-alist2 ()
     (let ((nums *nums*)
 	  (alist *alist*)
@@ -54,7 +54,7 @@
 	     (setf a (car cons))))))
       a)))
 
-(fuktard:with-unsafe-speed
+(funland:with-unsafe-speed
   (defun test-alist ()
     (let ((nums *nums*)
 	  (alist *alist*))
@@ -72,7 +72,7 @@
 (defparameter *alist* nil)
 
 
-(fuktard:with-unsafe-speed
+(funland:with-unsafe-speed
   (defun online-test ()
     (let* ((num-obj 22)
 	   (num-iterations 1000000)

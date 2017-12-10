@@ -1,5 +1,5 @@
 (defpackage :cl-ffmpeg
-  (:use :cl :cffi :fuktard :cl-ffmpeg-bindings))
+  (:use :cl :cffi :funland :cl-ffmpeg-bindings))
 
 (in-package :cl-ffmpeg)
 

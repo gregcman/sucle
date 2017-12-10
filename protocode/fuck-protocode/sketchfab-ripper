@@ -11,7 +11,7 @@
  #+nil(defparameter *data2* (sandbox::byte-read "/home/imac/Documents/stuff2/model_file.bin"))
 
 
- (fuktard:with-unsafe-speed
+ (funland:with-unsafe-speed
    (defun float-array (offset size &optional (data *data2*))
      (declare (type (simple-array (unsigned-byte 8)) data))
      (let ((array (make-array size :element-type 'single-float)))

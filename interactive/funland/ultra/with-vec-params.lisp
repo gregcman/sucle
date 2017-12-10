@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 (export (quote (with-vec-params with-vec-params2 with-vec)))
 
 

@@ -1,5 +1,5 @@
 (defpackage :physical-keyboard
-  (:use :cl :fuktard))
+  (:use :cl :funland))
 
 (in-package :physical-keyboard)
 
@@ -51,9 +51,9 @@
 		     (cons xpos ypos))))))))))
 
 (defun key-position (char)
-  (aref (fuktard:etouq *data*) (char-code char)))
+  (aref (funland:etouq *data*) (char-code char)))
 (defun code-position (code)
-  (aref (fuktard:etouq *data*) code))
+  (aref (funland:etouq *data*) code))
 
 
 

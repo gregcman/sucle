@@ -1,7 +1,7 @@
 (defpackage :iter-ator
   (:use
    #:cl
-   #:fuktard)
+   #:funland)
   (:nicknames
    #:iateor)
   (:export

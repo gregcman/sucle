@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 
 (export (quote etouq))
 #+nil

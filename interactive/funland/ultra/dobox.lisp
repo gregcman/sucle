@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 
 (defun dorange-generator (body var start-form end-form &key (test '<) (jmp 'if) (inc 1))
   (let ((temp (gensym))

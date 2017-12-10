@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 
 ;;from uiop
 (defmacro nest (&rest things)

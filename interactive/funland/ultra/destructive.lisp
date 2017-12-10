@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 
 (defmacro %list (target &rest args)
   (let ((list-var (gensym))

@@ -1,4 +1,4 @@
-(in-package :fuck)
+(in-package :funfair)
 
 (defmacro progeach (fun body)
   `(etouq

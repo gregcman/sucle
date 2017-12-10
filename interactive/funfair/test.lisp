@@ -1,6 +1,6 @@
 (defpackage :atest
   (:use :cl
-	:fuktard))
+	:funland))
 (in-package :atest)
 (defparameter *box* #(0 128 0 128 0 128))
 (with-unsafe-speed

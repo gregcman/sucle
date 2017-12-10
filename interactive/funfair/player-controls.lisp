@@ -318,7 +318,7 @@ edge, or no case"
 
 
 (defpackage #:sndbx
-  (:use :cl :fuktard :fuck))
+  (:use :cl :funland :funfair))
 (in-package #:sndbx)
 (defun floor5 (x)
   (1- (ceiling x)))
@@ -1056,7 +1056,7 @@ edge, or no case"
 (progn
   (declaim (ftype (function (single-float) single-float)
 		  translator))
-  (fuktard::with-unsafe-speed
+  (funland::with-unsafe-speed
     (defun translator (x)
       (let* ((a (* x 0.6))
 	     (b (+ 0.2 a))
@@ -1122,7 +1122,7 @@ edge, or no case"
 (defparameter *sandbox-on* t)
 (setf sandbox::*some-saves*
       (cdr (assoc (machine-instance) 
-		  '(("gm3-imac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
+		  '(("gm3-iMac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
 		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		  :test 'equal)))
 (defparameter *ticker* nil)

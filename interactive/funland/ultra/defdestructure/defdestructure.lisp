@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 
 ;;uiop:parse-body alexandria parse-body?
 (eval-always

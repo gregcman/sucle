@@ -1,12 +1,12 @@
-(defpackage #:fuck
-  (:use #:cl #:fuktard)
+(defpackage #:funfair
+  (:use #:cl #:funland)
   
   (:export *trampoline*)
   (:export bornfnc getfnc deflazy)
   (:export microseconds tick *control-state* *camera* *render-area* *pre-trampoline-hooks*
 	  set-render-area render-area-x render-area-y render-area-width render-area-height))
 
-(in-package :fuck)
+(in-package :funfair)
 
 (defparameter *thread* nil)
 (defun main ()

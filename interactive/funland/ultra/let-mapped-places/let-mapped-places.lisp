@@ -1,4 +1,4 @@
-(in-package :fuktard)
+(in-package :funland)
 
 (defun type-multimap-alist (type varname alist)
   (let ((value (assoc type alist :test 'equal)))

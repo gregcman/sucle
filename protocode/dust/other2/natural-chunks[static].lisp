@@ -1,6 +1,6 @@
 (defpackage :natural-chunks
   (:use :cl
-	:fuktard))
+	:funland))
 
 (in-package :natural-chunks)
 

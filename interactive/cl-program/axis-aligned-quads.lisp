@@ -1,5 +1,5 @@
 (defpackage :axis-aligned-quads
-  (:use :cl :fuktard))
+  (:use :cl :funland))
 
 (in-package :axis-aligned-quads)
 

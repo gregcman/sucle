@@ -1,6 +1,6 @@
 (defpackage #:mc-blocks
   (:use #:cl
-	#:fuktard))
+	#:funland))
 
 (in-package :mc-blocks)
 

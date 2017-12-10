@@ -1,8 +1,8 @@
-(defpackage fuktard
+(defpackage #:funland
   (:use #:cl)
   (:export
    #:dobox
    #:toggle
    #:progno))
 
-(in-package fuktard)
+(in-package #:funland)

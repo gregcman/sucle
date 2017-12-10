@@ -1,4 +1,4 @@
-(asdf:defsystem #:fuck
+(asdf:defsystem #:funfair
   :depends-on (
 	       #:funland	       
 	       #:terminal625-glfw3
@@ -10,7 +10,7 @@
 	       )
   :serial t
   :components
-  ((:file "fuck")
+  ((:file "funfair")
    (:file "test")
    (:file "player-controls")))
 
