@@ -20,6 +20,8 @@
     (remhash name *g/chunk-call-list*)))
 
 (defun update-world-vao (x y z)
+  (clean-dirty)
+  (lparallel:kill-tasks 'mesh-chunk)
   (maphash (lambda (k v)
 	     (declare (ignorable k))
 	     (gl:delete-lists v 1)
@@ -75,26 +77,26 @@
 	    (function my-iterator)))
 (defparameter *achannel* (lparallel:make-channel))
 (defun designatemeshing ()
-  (loop
-     (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)
-       (if success-p
-	   (apply (car value) (cdr value))
-	   (return))))
-  (let ((thechunk (dirty-pop)))
-    (when thechunk
-      (let ((lparallel:*task-category* 'mesh-chunk))
-	(lparallel:submit-task
-	 *achannel*
-	 (lambda (iter space)
-	   (map nil (lambda (x) (free-my-iterator-memory x)) iter)
-	   (multiple-value-bind (a b c) (chunk-shape thechunk iter)
-	     (%list space #'update-chunk-mesh a b c)))
-	 (attrib-buffer-iterators)
-	 (make-list 4))))))
+  (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)
+    (if success-p
+	(apply (car value) (cdr value))
+	(let ((thechunk (dirty-pop)))
+	  (when thechunk
+	    (let ((lparallel:*task-category* 'mesh-chunk))
+	      (lparallel:submit-task
+	       *achannel*
+	       (lambda (iter space)
+		 (map nil (lambda (x) (free-my-iterator-memory x)) iter)
+		 (multiple-value-bind (a b c) (chunk-shape thechunk iter)
+		   (%list space #'update-chunk-mesh a b c)))
+	       (attrib-buffer-iterators)
+	       (make-list 4))))))))
 
 ;;;;keeping track of the changes to the world
 (progn
   (defparameter dirtychunks (q:make-uniq-q))
+  (defun clean-dirty ()
+    (setf dirtychunks (q:make-uniq-q)))
   (defun dirty-pop ()
     (q:uniq-pop dirtychunks))
   (defun dirty-push (item)

@@ -635,22 +635,9 @@ edge, or no case"
   (yaw 0.0)
   (pitch 0.0))
 
-(defun look-around (neck dyaw dpitch)
-  (let ((twopi (coerce (* 2 pi) 'single-float))
-	(halfpi (coerce (/ pi 2) 'single-float)))
-    (let ((yaw0? (zerop dyaw))
-	  (pitch0? (zerop dpitch)))
-      (symbol-macrolet ((yaw (necking-yaw neck))
-			(pitch (necking-pitch neck)))
-	(unless yaw0?
-	  (setf yaw (mod (+ yaw dyaw) twopi)))
-	(unless pitch0?
-	  (setf pitch
-		(alexandria:clamp
-		 (+ pitch dpitch)
-		 (* -0.99 halfpi)
-		 (* 0.99 halfpi))))))))
-
+(defun lookaround2 (neck newyaw newpitch)
+  (setf (necking-yaw neck) newyaw
+	(necking-pitch neck) newpitch))
 (defun necktovec (neck result-vec)
   (unit-pitch-yaw result-vec
 		  (necking-pitch neck)
@@ -937,8 +924,6 @@ edge, or no case"
 		    (noclip (entity-clip? entity)))
     (setf is-jumping (window::skey-p (window::keyval :space) control-state))
     (setf is-sneaking (window::skey-p (window::keyval :a) control-state))
-    (when (window::skey-j-p (window::keyval :r) control-state)
-      (window:toggle-mouse-capture))
     (when (window:mice-locked-p)
       (when (window::skey-j-p (window::keyval :v) control-state)
 	(toggle noclip))
@@ -1051,50 +1036,7 @@ edge, or no case"
 ;;70 is normal
 ;;110 is quake pro
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-					
-(progn
-  (declaim (ftype (function (single-float) single-float)
-		  translator))
-  (funland::with-unsafe-speed
-    (defun translator (x)
-      (let* ((a (* x 0.6))
-	     (b (+ 0.2 a))
-	     (c (* b b b))
-	     (d (* 8.0 0.15 (/ (coerce pi 'single-float) 180.0)))
-	     (e (* d c)))
-	(declare (type single-float a b c d e))
-	e))))
 
-(defparameter *mouse-multiplier* (translator 0.5))
-
-(defun delta2 ()
-  (let ((mult *mouse-multiplier*))
-    (multiple-value-bind (dx dy) (delta)
-      (let ((dyaw (- (* dx mult)))
-	    (dpitch (* dy mult)))
-	(values dyaw dpitch)))))
-(defun delta ()
-  (let ((mouse-data (load-time-value (cons 0 0))))
-    (multiple-value-bind (newx newy) (window:get-mouse-position)
-      (multiple-value-prog1 (values
-			     (- newx (car mouse-data))
-			     (- newy (cdr mouse-data)))
-	(setf (car mouse-data) newx
-	      (cdr mouse-data) newy)))))
-
-(defparameter mousecapturestate nil)
-(defun remove-spurious-mouse-input ()
-  (if (window:mice-locked-p)
-      (case mousecapturestate
-	((nil)
-	 (delta) ;;toss spurious mouse movement 
-	 (setf mousecapturestate :justcaptured))
-	(:justcaptured (setq mousecapturestate t))
-	((t)))
-      (when mousecapturestate
-	(setq mousecapturestate nil))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun wasd-mover (w? a? s? d?)
   (let ((x 0)
@@ -1180,7 +1122,7 @@ edge, or no case"
 
 (defun change-entity-neck (entity yaw pitch)
   (let ((neck (entity-neck entity)))
-    (look-around neck yaw pitch)))
+    (lookaround2 neck yaw pitch)))
 
 (defparameter *fov*
   ((lambda (deg)
@@ -1189,11 +1131,64 @@ edge, or no case"
 
 (setf *trampoline* 'atick)
 (setf *pre-trampoline-hooks* (list 'sandbox-init))
+(defparameter *black* (make-instance 'funfair::render-area :height 2 :width 2
+				     :x 0
+				     :y 0))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
+  (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
+    (multiple-value-prog1
+	(values (- x (car data))
+		(- y (cdr data)))
+	(setf (car data) x
+	      (cdr data) y))))
+(defun update-moused (fraction)
+  (setf *last-mouse-x* *mouse-x*
+	*last-mouse-y* *mouse-y*)
+  (multiple-value-bind (dx dy) (moused)
+    (let ((x (+ *mouse-x* dx))
+	  (y (+ *mouse-y* dy)))
+      (let ((value *mouse-multiplier-aux*))
+	(when (> y value)
+	  (setf y value))
+	(when (< y (- value))
+	  (setf y (- value))))
+      (setf *mouse-x* x)
+      (setf *mouse-y* y)
+      (setf *lerp-mouse-x* (alexandria:lerp fraction *last-mouse-x* x))
+      (setf *lerp-mouse-y* (alexandria:lerp fraction *last-mouse-y* y)))))
+(defparameter *last-mouse-x* 0.0d0)
+(defparameter *last-mouse-y* 0.0d0)
+(defparameter *mouse-x* 0.0d0)
+(defparameter *mouse-y* 0.0d0)
+(defparameter *lerp-mouse-x* 0.0d0)
+(defparameter *lerp-mouse-y* 0.0d0)
+					
+(progn
+  (declaim (ftype (function (single-float) single-float)
+		  translator))
+  (funland::with-unsafe-speed
+    (defun translator (x)
+      (let* ((a (* x 0.6))
+	     (b (+ 0.2 a))
+	     (c (* b b b))
+	     (d (* 8.0 0.15 (/ (coerce pi 'single-float) 180.0)))
+	     (e (* d c)))
+	(declare (type single-float a b c d e))
+	e))))
+
+(defparameter *mouse-multiplier* (translator 0.5))
+(defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun atick (session)
   (declare (ignorable session))
+
   ((lambda (width height)
-      (let ((camera *camera*))
-	(setf (camat:camera-aspect-ratio camera)
+     (let ((camera *camera*))
+       (setf (camat:camera-aspect-ratio camera)
 	      (/ (coerce width 'single-float)
 		 (coerce height 'single-float))))
       (let ((render-area *render-area*))
@@ -1209,15 +1204,42 @@ edge, or no case"
    :color-buffer-bit
    :depth-buffer-bit
    )
-  (remove-spurious-mouse-input)   
+  (when (window::skey-j-p (window::keyval :r) *control-state*)
+    (window:toggle-mouse-capture)
+    (moused))
   (setf (camat:camera-fov *camera*) *fov*)
   (when *sandbox-on*
-    (when (window:mice-locked-p)
-      (multiple-value-call #'change-entity-neck *ent* (delta2)))
-    (entity-to-camera *ent* *camera*
-		      (tick *ticker* #'physss))
+    (let ((fraction (tick *ticker* #'physss)))
+      (when (window:mice-locked-p)
+	(update-moused fraction)
+	(multiple-value-call
+	    #'change-entity-neck
+	  *ent*
+	  (multiple-value-bind (x y) (values *lerp-mouse-x*
+					     *lerp-mouse-y*)
+	    (values (coerce (* x -1.0d0 *mouse-multiplier*)
+			    'single-float)
+		    (coerce (* y *mouse-multiplier*)
+			    'single-float)))
+	  ))
+      (entity-to-camera *ent* *camera* fraction))
     (camat:update-matrices *camera*)
     (camera-shader *camera*))
+  
+  (progn
+    ((lambda (width height)
+       (let ((render-area *black*))
+	 (setf
+	  (render-area-x render-area) (- (* width (/ 1.0 2.0)) 1.0) 
+	  (render-area-y render-area) (- (* height (/ 1.0 2.0)) 1.0)
+	  )))
+     window::*width* window::*height*)
+    (set-render-area *black*)
+    (gl:clear-color 1.0 1.0 1.0 1.0)
+    (gl:clear
+     :color-buffer-bit
+     :depth-buffer-bit
+     ))
   )
 
 (defun camera-shader (camera)
