@@ -39,10 +39,7 @@
 (defun trampoline-bounce (exit-sym fun)
   (when window:*status*
     (throw exit-sym (values)))
-  (window:poll)
-  (window::update-control-state *control-state*)
-  (funcall fun exit-sym)
-  (window:update-display))
+  (funcall fun exit-sym))
 
 (progn
   (defun namexpr (hash name func)
@@ -114,9 +111,13 @@
     (+ (* (expt 10 6) (- s 1506020000)) m)))
 (defun tick (ticker fun &optional (time (microseconds)))
   (tickr:tick-update ticker time)
-  (tickr:tick-physics ticker fun)
-  (float (/ (tickr:ticker-accumulator ticker)
-	    (tickr:ticker-dt ticker))))
+  (let ((times
+	 (tickr:tick-physics ticker fun)))
+    (values
+     (coerce (* (tickr:ticker-accumulator ticker)
+		(tickr:ticker-aux ticker))
+	     'single-float)
+     times)))
 
 
 (defparameter *control-state* (window::make-control-state

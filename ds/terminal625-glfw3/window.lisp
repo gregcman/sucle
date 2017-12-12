@@ -119,8 +119,8 @@
 
 (glfw:def-scroll-callback scroll-callback (window x y)
   (declare (ignore window))
-  (incf *scroll-x* (coerce x 'single-float))
-  (incf *scroll-y* (coerce y 'single-float)))
+  (incf *scroll-x* x)
+  (incf *scroll-y* y))
 (defparameter *status* nil)
 (glfw:def-window-size-callback update-viewport (window w h)
   (declare (ignorable window))

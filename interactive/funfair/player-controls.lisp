@@ -1072,8 +1072,8 @@ edge, or no case"
   (clrhash sandbox::*g/chunk-call-list*)
   (setf *ticker*
 	(tickr:make-ticker
-	 :dt (floor 1000000 60)
-	 :current-time (microseconds))))
+	 (floor 1000000 60)
+	 (microseconds))))
 
 (defparameter *ents* (map-into (make-array 10) #'gentity))
 (defparameter *ent* (aref *ents* 1))
@@ -1164,7 +1164,6 @@ edge, or no case"
 (defparameter *mouse-y* 0.0d0)
 (defparameter *lerp-mouse-x* 0.0d0)
 (defparameter *lerp-mouse-y* 0.0d0)
-					
 (progn
   (declaim (ftype (function (single-float) single-float)
 		  translator))
@@ -1185,18 +1184,22 @@ edge, or no case"
 
 (defun atick (session)
   (declare (ignorable session))
-
+  (window:poll)
+  (window::update-control-state *control-state*)
+  (when (window::skey-j-p (window::keyval :r) *control-state*)
+    (window:toggle-mouse-capture)
+    (moused))
   ((lambda (width height)
      (let ((camera *camera*))
        (setf (camat:camera-aspect-ratio camera)
-	      (/ (coerce width 'single-float)
-		 (coerce height 'single-float))))
-      (let ((render-area *render-area*))
-	(setf (render-area-width render-area) (* width (/ 1.0 1.0)) 
-	      (render-area-height render-area) (* height (/ 1.0 1.0))
-	      (render-area-x render-area) 0
-	      (render-area-y render-area) 0
-	      )))
+	     (/ (coerce width 'single-float)
+		(coerce height 'single-float))))
+     (let ((render-area *render-area*))
+       (setf (render-area-width render-area) (* width (/ 1.0 1.0)) 
+	     (render-area-height render-area) (* height (/ 1.0 1.0))
+	     (render-area-x render-area) 0
+	     (render-area-y render-area) 0
+	     )))
    window::*width* window::*height*)
   (set-render-area *render-area*)
   (gl:clear-color 0.0 0.0 0.0 0.0)
@@ -1204,14 +1207,12 @@ edge, or no case"
    :color-buffer-bit
    :depth-buffer-bit
    )
-  (when (window::skey-j-p (window::keyval :r) *control-state*)
-    (window:toggle-mouse-capture)
-    (moused))
   (setf (camat:camera-fov *camera*) *fov*)
   (when *sandbox-on*
-    (let ((fraction (tick *ticker* #'physss)))
+    (multiple-value-bind (fraction times) (tick *ticker* #'physss)
+      (declare (ignorable times))
       (when (window:mice-locked-p)
-	(update-moused fraction)
+	(update-moused 0.5)
 	(multiple-value-call
 	    #'change-entity-neck
 	  *ent*
@@ -1225,7 +1226,7 @@ edge, or no case"
       (entity-to-camera *ent* *camera* fraction))
     (camat:update-matrices *camera*)
     (camera-shader *camera*))
-  
+    
   (progn
     ((lambda (width height)
        (let ((render-area *black*))
@@ -1240,7 +1241,7 @@ edge, or no case"
      :color-buffer-bit
      :depth-buffer-bit
      ))
-  )
+  (window:update-display))
 
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))

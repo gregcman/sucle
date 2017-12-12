@@ -5,21 +5,27 @@
    #:ticker-accumulator
    #:make-ticker
    #:tick-physics
-   #:tick-update))
+   #:tick-update
+   #:ticker-aux))
 
 (in-package :tickr)
 
-(defstruct ticker
+(defstruct (ticker (:constructor %make-ticker))
   (ticks 0 :type fixnum)
   (dt (floor 1000000 60) :type fixnum)
   (current-time (error "give initial time") :type fixnum)
   (accumulator 0 :type fixnum)
-  (bailout (floor 1000000 4) :type fixnum))
+  (bailout (floor 1000000 4) :type fixnum)
+  (aux 0.0 :type double-float))
+
+(declaim (ftype (function (fixnum fixnum)) make-ticker))
+(defun make-ticker (dt time)
+  (%make-ticker :dt dt :current-time time :aux (coerce (/ 1 dt) 'double-float)))
 
 (defun tick-physics (ticker function)
   (let ((accumulator (ticker-accumulator ticker))
 	(ticks (ticker-ticks ticker))
-	(changed? nil))
+	(times 0))
     (let ((dt (ticker-dt ticker)))
       (loop
 	 (if (>= accumulator dt)
@@ -27,12 +33,13 @@
 	       (funcall function)
 	       (incf ticks dt)
 	       (decf accumulator dt)
-	       (setf changed? t))
+	       (incf times))
 	     (progn
-	       (when changed?
+	       (unless (zerop times)
 		 (setf (ticker-accumulator ticker) accumulator)
 		 (setf (ticker-ticks ticker) ticks))
-	       (return)))))))
+	       (return)))))
+    times))
 
 (defun tick-update (ticker new-time)
   (let* ((frame-time (- new-time (ticker-current-time ticker))))
