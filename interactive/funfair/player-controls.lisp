@@ -1143,9 +1143,7 @@ edge, or no case"
 		(- y (cdr data)))
 	(setf (car data) x
 	      (cdr data) y))))
-(defun update-moused (fraction)
-  (setf *last-mouse-x* *mouse-x*
-	*last-mouse-y* *mouse-y*)
+(defun update-moused (&optional (smoothing-factor 0.5))
   (multiple-value-bind (dx dy) (moused)
     (let ((x (+ *mouse-x* dx))
 	  (y (+ *mouse-y* dy)))
@@ -1156,10 +1154,8 @@ edge, or no case"
 	  (setf y (- value))))
       (setf *mouse-x* x)
       (setf *mouse-y* y)
-      (setf *lerp-mouse-x* (alexandria:lerp fraction *last-mouse-x* x))
-      (setf *lerp-mouse-y* (alexandria:lerp fraction *last-mouse-y* y)))))
-(defparameter *last-mouse-x* 0.0d0)
-(defparameter *last-mouse-y* 0.0d0)
+      (setf *lerp-mouse-x* (alexandria:lerp smoothing-factor *lerp-mouse-x* x))
+      (setf *lerp-mouse-y* (alexandria:lerp smoothing-factor *lerp-mouse-y* y)))))
 (defparameter *mouse-x* 0.0d0)
 (defparameter *mouse-y* 0.0d0)
 (defparameter *lerp-mouse-x* 0.0d0)

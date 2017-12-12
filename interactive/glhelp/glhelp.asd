@@ -4,5 +4,6 @@
   :components
   ((:file "glhelp")
    (:file "glslgen")
+   (:file "glslgen2")
    (:file "cache")
    (:file "other")))

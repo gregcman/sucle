@@ -163,8 +163,8 @@
        :program
        (glslgen:main
 	(glslgen:spaces `("vec4" "pixdata" "=" ,(glslgen:funglsl "texture2D"
-								 'sampler
-								 'texcoord)))
+								 '(sampler
+								   texcoord))))
 	(glslgen:spaces `((:fragment-color ".rgb") "=" color "*" ("pixdata" ".rgb")))))
       :attributes
       '((position . 2) 

@@ -46,7 +46,7 @@
 (defun blogn (&rest body)
   (brackets (apply #'statement body)))
 
-(defun funglsl (name &rest args)
+(defun funglsl (name args)
   (list name "(" (spaces args ", ") ")"))
 
 (defun comment (&rest args)
