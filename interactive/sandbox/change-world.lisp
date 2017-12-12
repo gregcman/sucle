@@ -143,29 +143,34 @@
       'glslgen:shader-program-data
       :version 120
       :vs
-      (glslgen:make-shader-vars
-       :out '((color-out "float")
+      (glslgen2::make-shader-stage
+       :out '((color-out "vec3")
 	      (texcoord-out "vec2"))
        :in '((position "vec4")
 	     (texcoord "vec2")
-	     (color "float" "0.5")
+	     (color "float")
+	     (time "float")
 	     (projection-model-view "mat4"))
        :program
-       (glslgen:main
-	(glslgen:spaces `("gl_Position" "=" projection-model-view "*" position))
-	(glslgen:spaces `(color-out "=" color))
-	(glslgen:spaces `(texcoord-out "=" texcoord))))
+       '(defun main void ()
+	 (= gl-position (* projection-model-view
+			 (+ position (vec4 (sin (+ (* 0.1 time) (* 0.1 (|.| position x))))
+					   (cos (+ time (|.| position y)))
+					   (sin (+ (* 0.7 time) (|.| position z)))
+					   0.0))))
+	 (= color-out (vec3 color))
+	 (= texcoord-out texcoord)))
       :frag
-      (glslgen:make-shader-vars
+      (glslgen2::make-shader-stage
        :in '((texcoord "vec2")
-	     (color "float")
+	     (color "vec3")
 	     (sampler "sampler2D"))
        :program
-       (glslgen:main
-	(glslgen:spaces `("vec4" "pixdata" "=" ,(glslgen:funglsl "texture2D"
-								 '(sampler
-								   texcoord))))
-	(glslgen:spaces `((:fragment-color ".rgb") "=" color "*" ("pixdata" ".rgb")))))
+       '(defun main void ()
+	 (/**/ vec4 pixdata)
+	 (= pixdata (texture2d sampler texcoord))
+	 (= (|.| gl-frag-color rgb)
+	  (* color (|.| pixdata rgb)))))
       :attributes
       '((position . 2) 
 	(texcoord . 8)
@@ -174,7 +179,8 @@
       '((color-out . color)
 	(texcoord-out . texcoord))
       :uniforms
-      '((:pmv (:vertex-shader projection-model-view)))))
+      '((:pmv (:vertex-shader projection-model-view))
+	(:time (:vertex-shader time)))))
     (glslgen:dump-shader-program-data a)
     a))
 

@@ -1185,6 +1185,12 @@ edge, or no case"
   (when (window::skey-j-p (window::keyval :r) *control-state*)
     (window:toggle-mouse-capture)
     (moused))
+  (let ((wowz (gethash 'blockshader funfair::*stuff*)))
+    (when wowz
+      (when (not (eq (glhelp::gl-program-object-src wowz)
+		     sandbox::*atest*))
+	(gl:delete-program (glhelp::gl-program-object-handle wowz))
+	(funfair::remove-stuff 'blockshader))))
   ((lambda (width height)
      (let ((camera *camera*))
        (setf (camat:camera-aspect-ratio camera)
@@ -1247,7 +1253,11 @@ edge, or no case"
     (gl:uniform-matrix-4fv 
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
-     nil))
+     nil)
+    (gl:uniformf 
+     (uniform :time)
+     (float (/ (get-internal-real-time)
+	       100.0))))
   (gl:bind-texture :texture-2d (funcall #'getfnc 'terrain))
   (gl:enable :depth-test)  
   (gl:depth-func :less)

@@ -374,8 +374,13 @@
     (setf (shader-program-data-vars-attributes data) preprocessed)
     (setf (shader-program-data-raw-attributes data) raw-attributes)
     (glhelp:make-shader-program-from-strings
-     (shader-program-data-vs-string data)
-     (shader-program-data-frag-string data)
+     (;print
+      progn
+      (shader-program-data-vs-string data))
+     
+     (;print
+      progn
+      (shader-program-data-frag-string data))
      raw-attributes)))
 
 (export '(spaces main make-shader-vars funglsl shader-program-data dump-shader-program-data))
