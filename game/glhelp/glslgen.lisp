@@ -1,5 +1,9 @@
 (defpackage #:glslgen
-  (:use #:cl))
+  (:use #:cl
+	#:funland)
+  (:export
+   spaces
+   main make-shader-vars funglsl shader-program-data dump-shader-program-data))
 (in-package :glslgen)
 
 ;;;;;;;;;;;;;;;;
@@ -32,8 +36,6 @@
 " x
 "}
 "))
-(defun main (&rest body)
-  (list "void main()" (apply #'blogn body)))
 (defun spaces (body &optional (divider " "))
   (let (a
 	(first t))
@@ -96,85 +98,82 @@
 		(getf inlist :qualifier) :varying))))))
 
 (defparameter *genvar-counter* nil)
+(defun newname ()
+  (with-output-to-string (str)
+    (write "G" :stream str :escape nil)
+    (write (incf *genvar-counter*) :stream str)))
+(defun flood-names (hash)
+  (dohash (key value) hash
+    (let ((stringcell (getf value :string)))
+      (cond (stringcell ;;its shared when its a list
+	     (unless (car stringcell)
+	       (setf (car stringcell) (newname))))
+	    (t (setf (getf (gethash key hash) :string)
+		     (newname)))))))
 (defun fill-vars (vs frag)
   (let ((*genvar-counter* 0))
-    (labels ((newname ()
-	       (with-output-to-string (str)
-		 (write "G" :stream str :escape nil)
-		 (write (incf *genvar-counter*) :stream str)))
-	     (flood-names (hash)
-	       (with-hash-table-iterator (next hash)
-		 (loop (multiple-value-bind (more? key value) (next)
-			 (unless more? (return))
-			 (let ((stringcell (getf value :string)))
-			   (cond (stringcell ;;its shared when its a list
-				  (unless (car stringcell)
-				    (setf (car stringcell) (newname))))
-				 (t (setf (getf (gethash key hash) :string)
-					  (newname))))))))))
-      (flood-names (shader-vars-in vs))
-      (flood-names (shader-vars-out vs))
-      (flood-names (shader-vars-in frag))
-      (flood-names (shader-vars-out frag))
-      (flood-names (shader-vars-temp vs))
-      (flood-names (shader-vars-temp frag)))))
-
+    (flood-names (shader-vars-in vs))
+    (flood-names (shader-vars-out vs))
+    (flood-names (shader-vars-in frag))
+    (flood-names (shader-vars-out frag))
+    (flood-names (shader-vars-temp vs))
+    (flood-names (shader-vars-temp frag))))
 
 ;;;attach qualifiers
 (defun qualify (hash connected not-connected)
-  (with-hash-table-iterator (next hash)
-    (loop (multiple-value-bind (more? k v) (next)
-	    (unless more? (return))
-	    (unless (getf v :qualifier)
-	      (let ((string-cell (getf v :string)))
-		(setf (getf (gethash k hash) :qualifier)
-		      (if (consp string-cell) ;;means that the variable is shared 
-			  connected ;;attribute or varying
-			  not-connected))))))))
+  (dohash (k v) hash
+    (unless (getf v :qualifier)
+      (let ((string-cell (getf v :string)))
+	(setf (getf (gethash k hash) :qualifier)
+	      (if (consp string-cell) ;;means that the variable is shared 
+		  connected ;;attribute or varying
+		  not-connected))))))
 (defparameter *glsl-version* 110)
 (defparameter *stage* nil)
 (defun qualify-version (hash)
-  (with-hash-table-iterator (next hash)
-    (loop (multiple-value-bind (more? k v) (next)
-	    (unless more? (return))
-	    (flet ((setqualifier (q)
-		     (setf (getf (gethash k hash) :qualifier) q)))
-	      (if (<= 130 *glsl-version*)
-		  (case (getf v :qualifier)
-		    (:attribute (setqualifier :in))
-		    (:varying (ecase *stage*
-				(:vertex-shader (setqualifier :out))
-				(:fragment-shader (setqualifier :in)))))
-		  (case (getf v :qualifier)
-		    (:in (ecase *stage*
-			   (:vertex-shader (setqualifier :attribute))
-			   (:fragment-shader (setqualifier :varying))))
-		    (:out (ecase *stage*
-			   (:vertex-shader (setqualifier :out))
-			   (:fragment-shader (setqualifier nil)))))))))))
+  (dohash (k v) hash
+    (flet ((setqualifier (q)
+	     (setf (getf (gethash k hash) :qualifier) q)))
+      (if (<= 130 *glsl-version*)
+	  (case (getf v :qualifier)
+	    (:attribute (setqualifier :in))
+	    (:varying (ecase *stage*
+			(:vertex-shader (setqualifier :out))
+			(:fragment-shader (setqualifier :in)))))
+	  (case (getf v :qualifier)
+	    (:in (ecase *stage*
+		   (:vertex-shader (setqualifier :attribute))
+		   (:fragment-shader (setqualifier :varying))))
+	    (:out (ecase *stage*
+		    (:vertex-shader (setqualifier :out))
+		    (:fragment-shader (setqualifier nil)))))))))
+
+(defun dump-type (varname type)
+  (typecase type
+    (cons (list (pop type) " " varname "[" (car type) "]"))
+    (otherwise (list type " " varname))))
 (defun dumpvars (hash)
   (let (acc)
-    (with-hash-table-iterator (next hash)
-      (loop (multiple-value-bind (more? k v) (next)
-	      (declare (ignorable k))
-	      (unless more? (return))
-	      (let ((list (list (getf v :type) (uncar (getf v :string)))))
-		(flet ((dump-initforms ()
-			 (let ((initform (getf v :initform)))
-			   (when initform
-			     (nconc list (list "=" initform))))))
-		  (let ((qualifier (case (getf v :qualifier)
-				     (:in "in") ;;no initform
-				     (:out "out") ;;no initform
-				     (:varying "varying") ;;no initforms
-				     (:attribute "attribute") ;;no initforms
-				     (:const (dump-initforms) "const")  ;;initforms
-				     (:uniform (when (>= *glsl-version* 120)
-						 (dump-initforms))
-					       "uniform") ;;initforms
-				     (otherwise (dump-initforms) nil)))) ;;initforms
-		    (when qualifier (push qualifier list))
-		    (push (spaces list) acc)))))))
+    (dohash (k v) hash
+      (declare (ignorable k))
+      (let ((list (list (dump-type (uncar (getf v :string))
+				   (getf v :type)))))
+	(flet ((dump-initforms ()
+		 (let ((initform (getf v :initform)))
+		   (when initform
+		     (nconc list (list "=" initform))))))
+	  (let ((qualifier (case (getf v :qualifier)
+			     (:in "in") ;;no initform
+			     (:out "out") ;;no initform
+			     (:varying "varying") ;;no initforms
+			     (:attribute "attribute") ;;no initforms
+			     (:const (dump-initforms) "const")  ;;initforms
+			     (:uniform (when (>= *glsl-version* 120)
+					 (dump-initforms))
+				       "uniform") ;;initforms
+			     (otherwise (dump-initforms) nil)))) ;;initforms
+	    (when qualifier (push qualifier list))
+	    (push (spaces list) acc)))))
     acc))
 
 ;;
@@ -325,6 +324,8 @@
 		   (shader-program-data-attributes data)
 		   (shader-program-data-varyings data)
 		   (shader-program-data-uniforms data))
+      
+      (print (list vs-string frag-string uniforms))
       (multiple-value-prog1
 	  (setf (values (shader-program-data-vs-string data)
 			(shader-program-data-frag-string data)
@@ -382,5 +383,3 @@
       progn
       (shader-program-data-frag-string data))
      raw-attributes)))
-
-(export '(spaces main make-shader-vars funglsl shader-program-data dump-shader-program-data))

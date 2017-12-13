@@ -4,12 +4,10 @@
 
 (defun draw-world ()
   (declare (optimize (speed 3) (safety 0)))
-  (with-hash-table-iterator (next *g/chunk-call-list*)
-    (loop
-       (multiple-value-bind (more? key value) (next)
-	 (declare (ignore key))
-	 (unless more? (return nil))
-	 (gl:call-list value)))))
+  (dohash (key value) *g/chunk-call-list*
+    (declare (ignore key))
+    (gl:call-list value)))
+
 (progn
   (defparameter *g/chunk-call-list* (make-hash-table :test 'eq))
   (defun get-chunk-display-list (name)
@@ -151,25 +149,32 @@
 	     (color "float")
 	     (projection-model-view "mat4"))
        :program
-       '(defun main void ()
-	 (= gl-position (* projection-model-view position))
+       '(defun "main" void ()
+	 (= "gl_Position" (* projection-model-view position))
 	 (= color-out (vec3 color))
 	 (= texcoord-out texcoord)))
       :frag
       (glslgen2::make-shader-stage
        :in '((texcoord "vec2")
 	     (color "float")
-	     (sampler "sampler2D"))
+	     (sampler "sampler2D")
+;	     (wombo ("float" 4) "{2.0, 10.4, 1.0, 10.0}")
+	     )
        :program
-       '(defun main void ()
+       '(defun "main" void ()
 	 (/**/ vec4 pixdata)
-	 (= pixdata (texture2d sampler texcoord))
+	 (= pixdata ("texture2D" sampler texcoord))
 	 #+nil
-	 (if (> (|.| pixdata g) 0.5)
+	 (if (> (|.| pixdata "g") 0.5)
 	     (progn
-	       discard))
-	 (= (|.| :gl-frag-color rgb)
-	  (* color (|.| pixdata rgb)))))
+	       "discard"))
+	 (= (|.| pixdata "rgb") (|.| pixdata "bgr"))
+	 (/**/ vec3 temp)
+	 (= temp 
+	  (* color
+	   (|.| pixdata "rgb")))
+	 ;;	 (*= temp ([] wombo (int (* 4.0 (|.| temp "g")))))
+	 (= (|.| :gl-frag-color "rgb") temp)))
       :attributes
       '((position . 2) 
 	(texcoord . 8)

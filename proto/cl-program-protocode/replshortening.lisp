@@ -1,10 +1,5 @@
 (in-package :aplayground)
 
-(defun spill-hash (hash &optional (stream *standard-output*))
-  (loop for key being the hash-keys of hash
-     using (hash-value value)
-     do (format stream "~S ~S~%" key value)))
-
 (defun print-bits (n &optional (stream *standard-output*))
   (format stream "~64,'0b" n)
   n)

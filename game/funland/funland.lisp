@@ -180,7 +180,6 @@
 (defmacro with-let-mapped-places ((&rest place-pairs) &body body)
   (%with-let-mapped-places place-pairs body))
 
-(export (quote %with-let-mapped-places))
 (defun %with-let-mapped-places (place-pairs &optional body)
   (let ((let-args nil)
 	(setf-args nil)
@@ -205,3 +204,18 @@
 	     ,(cons 'progn new-body)
 	   ,(cons 'setf setf-args))))))
 
+(defun spill-hash (hash &optional (stream *standard-output*))
+  (loop for key being the hash-keys of hash
+     using (hash-value value)
+     do (format stream "~S ~S~%" key value)))
+
+(defmacro dohash ((k v) hash &body body)
+  (multiple-value-bind (forms decl doc) (parse-body body)
+    (declare (ignorable doc))
+    (with-gensyms (next more? hashvar)
+      `(let ((,hashvar ,hash))
+	 (with-hash-table-iterator (,next ,hashvar)
+	   (loop (multiple-value-bind (,more? ,k ,v) (,next)
+		   ,@decl
+		   (unless ,more? (return))
+		   . ,forms)))))))

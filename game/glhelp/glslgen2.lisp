@@ -56,7 +56,7 @@
     (dolist (common *operators*)
       (destructuring-bind (dump-fun &rest ops) common
 	(dolist (sym ops)
-	  (let ((name (string-downcase (symbol-name sym))))
+	  (let ((name (string sym)))
 	    (setf (gethash name hash) dump-fun)))))
     hash))
 
@@ -107,25 +107,26 @@
 
 (defparameter *builtin-vars*
   '
-  ((gl-position "gl_Position" vec4)
-   (gl-point-size "gl_PointSize" float)
+  ("gl_Position" ;vec4
+   "gl_PointSize"; float
    
-   (gl-frag-color "gl_FragColor" vec4)
-   (gl-frag-coord "gl_FragCoord" vec4)
-   (gl-frag-data "gl_FragData" vec4 [])
-   (gl-front-facing "gl_FrontFacing" bool)
-   (gl-point-coord "gl_PointCoord" vec2)))
+   "gl_FragColor"; vec4
+   "gl_FragCoord"; vec4
+   "gl_FragData" ;vec4 []
+   "gl_FrontFacing"; bool
+   "gl_PointCoord" ;vec2
+   ))
 
 ;;constants
 (defparameter *some-constants*
-  '((gl-max-vertex-attribs "gl_MaxVertexAttribs")
-    (gl-max-vertex-uniform-vectors "gl_MaxVertexUniformVectors")
-    (gl-max-varying-vectors "gl_MaxVaryingVectors")
-    (gl-max-vertex-texture-image-units "gl_MaxVertexTextureImageUnits")
-    (gl-max-combined-texture-image-units "gl_MaxCombinedTextureImageUnits")
-    (gl-max-texture-image-units "gl_MaxTextureImageUnits")
-    (gl-max-fragments-uniform-vectors "gl_MaxFragmentUniformVectors")
-    (gl-max-draw-buffers "gl_MaxDrawbuffers")))
+  '("gl_MaxVertexAttribs"
+    "gl_MaxVertexUniformVectors"
+    "gl_MaxVaryingVectors"
+    "gl_MaxVertexTextureImageUnits"
+    "gl_MaxCombinedTextureImageUnits"
+    "gl_MaxTextureImageUnits"
+    "gl_MaxFragmentUniformVectors"
+    "gl_MaxDrawbuffers"))
 
 (defparameter *more-funs*
   '
@@ -165,43 +166,39 @@
    faceforward
    reflect
    refract
-   (matrix-comp-mult "matrixCompMult")
-   (less-than "lessThan")
-   (less-than-equal "lessThanEqual")
-   (greater-than "greaterThan")
-   (greater-than-equal "greaterThanEqual")
+   "matrixCompMult"
+   "lessThan"
+   "lessThanEqual"
+   "greaterThan"
+   "greaterThanEqual"
    equal
-   (not-equal "notEqual")
+   "notEqual"
    any
    all
    not
-   (texture2d "texture2D")
-   (texture2d-proj "texture2DProj")
-   (texture2d-lod "texture2DLod")
-   (texture2d-proj-lod "texture2DProjLod")
-   (texture-cube "textureCube")
-   (texture-cube-lod "textureCubeLod")))
+   "texture2D"
+   "texture2DProj"
+   "texture2DLod"
+   "texture2DProjLod"
+   "textureCube"
+   "textureCubeLod"))
 
 (defparameter *more-glsl-words*
-  '((void "void")
-    (sampler2d "sampler2D")
-    (texture2d "texture2D")))
-
-(defun glslify-name (name)
-  (substitute #\_ #\- (string-downcase name)))
+  '(void
+    "sampler2D"
+    "texture2D"))
 
 (defun gen-tables (&rest lists)
   (let ((hash (make-hash-table :test 'equal)))
     (labels
       ((build-item (item)
 	 (cond ((atom item)
-		(let ((namestring (symbol-name item)))
-		  (add-item namestring (glslify-name namestring))))
-	       (t (destructuring-bind (name glsl-name &rest rest) item
-		    (declare (ignore rest))
-		    (add-item (symbol-name name) glsl-name)))))
+		(let ((namestring (string item)))
+		  (add-item namestring (if (symbolp item)
+					   (string-downcase namestring)
+					   namestring))))))
        (add-item (name glsl-name)
-	 (setf (gethash (glslify-name name) hash) glsl-name))
+	 (setf (gethash name hash) glsl-name))
        (do-items (list)
 	 (dolist (item list)
 	   (build-item item))))
@@ -248,7 +245,7 @@
   (if (member node reserved)
       node
       (typecase node
-	(symbol (let ((newname (glslify-name (symbol-name node))))
+	(symbol (let ((newname (string node)))
 		  (or
 		   (get-var-name newname)
 		   newname)))
@@ -260,8 +257,8 @@
 (defun make-shader-stage (&key in out temp program)
   (let ((*reserved* (cons :gl-frag-color (mapcar #'first (append in out temp)))))
     (let ((dedumped (output-stuff program)))
-   ;   (print dedumped)
-   ;   (print (glslgen::dump-string #'identity dedumped))
+      (print dedumped)
+      (print (glslgen::dump-string #'identity dedumped))
       
       (glslgen::make-shader-vars :out out
 				 :in in
@@ -306,9 +303,9 @@
   (declare (ignore op))
   (destructuring-bind (name type params &rest body) args
     (list
-     (get-var-name (glslify-name (symbol-name type)))
+     (get-var-name (string type))
      " "
-     (glslify-name (symbol-name name))
+     (string name)
      (comma-separated-list params)
      (glsl-progn nil body))))
 (defparameter *special-op-string-hash*
@@ -316,6 +313,11 @@
     (dolist (common *special-operators*)
       (destructuring-bind (dump-fun &rest ops) common
 	(dolist (sym ops)
-	  (let ((name (string-downcase (symbol-name sym))))
+	  (let ((name (string sym)))
 	    (setf (gethash name hash) dump-fun)))))
     hash))
+
+
+#+nil
+(defun glslify-name (name)
+  (substitute #\_ #\- (string-downcase name)))
