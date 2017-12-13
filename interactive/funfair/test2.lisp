@@ -8,7 +8,7 @@
 
 (deflazy font-png ()
   (opticl:read-png-file
-   (filesystem-util:rebase-path *ourdir* #P"font.png")))
+   (filesystem-util:rebase-path #P"font.png" *ourdir*)))
 (deflazy font-texture (:opengl)
   (prog1
       (glhelp:pic-texture

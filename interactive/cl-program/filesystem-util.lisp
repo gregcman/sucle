@@ -28,9 +28,10 @@
 (defun rebase-path (path base)
   (let ((newpath (merge-pathnames path base)))
     (cond ((or (uiop:pathname-equal newpath base) 
-	       (not (uiop:subpathp newpath base))
-	       (not (uiop:directory-pathname-p newpath)))
-	   (error "SAVE DIR INVALID: ~a, ~a" path newpath))
+	       (not (uiop:subpathp newpath base)))
+	   (error "not a subpath
+~a
+~a" path newpath))
 	  (t
 	   newpath))))
 

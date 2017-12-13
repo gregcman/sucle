@@ -1307,7 +1307,7 @@ edge, or no case"
 (deflazy terrain-png ()
   (color-grasses
    (load-png 
-    (filesystem-util:rebase-path *ourdir* #P"terrain.png"))
+    (filesystem-util:rebase-path #P"terrain.png" *ourdir*))
    (getapixel 255 0 (getfnc 'grass-png))))
 (deflazy terrain (:opengl)
   (prog1
@@ -1321,7 +1321,7 @@ edge, or no case"
 	     (:texture-wrap-t . :repeat))))))
 (deflazy grass-png ()
   (load-png 
-   (filesystem-util:rebase-path *ourdir* #P"grasscolor.png")))
+   (filesystem-util:rebase-path #P"grasscolor.png" *ourdir*)))
 (deflazy blockshader (:opengl)
   (glhelp::create-gl-program sandbox::*atest*))
 
