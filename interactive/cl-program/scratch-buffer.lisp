@@ -1,5 +1,11 @@
-(in-package :sandbox)
+(defpackage #:scratch-buffer
+  (:use :cl)
+  (:export
+   my-iterator
+   free-my-iterator-memory
+   flush-my-iterator))
 
+(in-package #:scratch-buffer)
 (defparameter *scratch-space* nil)
 (defun getmem ()
   (let ((a *scratch-space*))
@@ -57,3 +63,4 @@
        (reset-my-iterator ,var)
        ,@body
        (free-my-iterator-memory ,var))))
+ 

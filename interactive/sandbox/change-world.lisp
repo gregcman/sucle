@@ -52,9 +52,9 @@
 	 (glhelp:with-gl-list
 	   (gl:with-primitives :quads	     
 	     (with-vec (a b c) (iter)
-	       (flush-my-iterator a
-		 (flush-my-iterator b
-		   (flush-my-iterator c
+	       (scratch-buffer:flush-my-iterator a
+		 (scratch-buffer:flush-my-iterator b
+		   (scratch-buffer:flush-my-iterator c
 		     (mesh-chunk len a b c)))))))))))
 
 (defun mesh-chunk (times a b c)
@@ -74,7 +74,7 @@
 
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)
-	    (function my-iterator)))
+	    (function scratch-buffer:my-iterator)))
 (defparameter *achannel* (lparallel:make-channel))
 (defun designatemeshing ()
   (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)
@@ -86,7 +86,7 @@
 	      (lparallel:submit-task
 	       *achannel*
 	       (lambda (iter space)
-		 (map nil (lambda (x) (free-my-iterator-memory x)) iter)
+		 (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		 (multiple-value-bind (a b c) (chunk-shape thechunk iter)
 		   (%list space #'update-chunk-mesh a b c)))
 	       (attrib-buffer-iterators)
@@ -141,35 +141,34 @@
      a
      (make-instance
       'glslgen:shader-program-data
-      :version 120
+      :version 330
       :vs
       (glslgen2::make-shader-stage
-       :out '((color-out "vec3")
+       :out '((color-out "float")
 	      (texcoord-out "vec2"))
        :in '((position "vec4")
 	     (texcoord "vec2")
 	     (color "float")
-	     (time "float")
 	     (projection-model-view "mat4"))
        :program
        '(defun main void ()
-	 (= gl-position (* projection-model-view
-			 (+ position (vec4 (sin (+ (* 0.1 time) (* 0.1 (|.| position x))))
-					   (cos (+ time (|.| position y)))
-					   (sin (+ (* 0.7 time) (|.| position z)))
-					   0.0))))
+	 (= gl-position (* projection-model-view position))
 	 (= color-out (vec3 color))
 	 (= texcoord-out texcoord)))
       :frag
       (glslgen2::make-shader-stage
        :in '((texcoord "vec2")
-	     (color "vec3")
+	     (color "float")
 	     (sampler "sampler2D"))
        :program
        '(defun main void ()
 	 (/**/ vec4 pixdata)
 	 (= pixdata (texture2d sampler texcoord))
-	 (= (|.| gl-frag-color rgb)
+	 #+nil
+	 (if (> (|.| pixdata g) 0.5)
+	     (progn
+	       discard))
+	 (= (|.| :gl-frag-color rgb)
 	  (* color (|.| pixdata rgb)))))
       :attributes
       '((position . 2) 
@@ -179,8 +178,7 @@
       '((color-out . color)
 	(texcoord-out . texcoord))
       :uniforms
-      '((:pmv (:vertex-shader projection-model-view))
-	(:time (:vertex-shader time)))))
+      '((:pmv (:vertex-shader projection-model-view)))))
     (glslgen:dump-shader-program-data a)
     a))
 

@@ -1,6 +1,7 @@
 (defpackage #:funfair
   (:use #:cl #:funland)
-  
+
+  (:export main)
   (:export *trampoline*)
   (:export bornfnc getfnc deflazy)
   (:export microseconds tick *control-state* *camera* *render-area* *pre-trampoline-hooks*
@@ -39,7 +40,10 @@
 (defun trampoline-bounce (exit-sym fun)
   (when window:*status*
     (throw exit-sym (values)))
-  (funcall fun exit-sym))
+  (window:poll)
+  (funcall fun exit-sym)
+  (window::update-control-state *control-state*)
+  (window:update-display))
 
 (progn
   (defun namexpr (hash name func)

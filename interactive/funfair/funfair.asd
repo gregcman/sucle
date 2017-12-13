@@ -3,14 +3,11 @@
 	       #:funland	       
 	       #:terminal625-glfw3
 	       #:cl-program
-	       #:sandbox
 	       #:terminal625-camat
 	       #:terminal625-cgmat
-	       #:opticl
-	       )
+	       #:bordeaux-threads
+	       #:cl-opengl)
   :serial t
   :components
-  ((:file "funfair")
-   (:file "test")
-   (:file "player-controls")))
+  ((:file "funfair")))
 

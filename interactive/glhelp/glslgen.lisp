@@ -210,7 +210,7 @@
       (let ((value (or (gethash x (shader-vars-in shader-vars))
 		       (gethash x (shader-vars-out shader-vars))
 		       (gethash x (shader-vars-temp shader-vars))
-		       (when (eq x :fragment-color)
+		       (when (eq x :gl-frag-color)
 			 (return
 			   (if (> *glsl-version* 120)
 			       "roloCgarF_lg"
@@ -249,7 +249,7 @@
 	 (spaces '("precision" "mediump" "float"))))
       (when (> *glsl-version* 120)
 	(statement
-	 (spaces `("out" "vec4" :fragment-color))))
+	 (spaces `("out" "vec4" :gl-frag-color))))
       (qualify-and-dump (shader-vars-in shader-vars) :varying :uniform)
       (qualify-and-dump (shader-vars-out shader-vars) nil nil)
       (shader-vars-program shader-vars)))))

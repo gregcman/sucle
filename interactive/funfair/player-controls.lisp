@@ -1129,8 +1129,6 @@ edge, or no case"
      (* deg (coerce (/ pi 180.0) 'single-float)))
    70))
 
-(setf *trampoline* 'atick)
-(setf *pre-trampoline-hooks* (list 'sandbox-init))
 (defparameter *black* (make-instance 'funfair::render-area :height 2 :width 2
 				     :x 0
 				     :y 0))
@@ -1180,8 +1178,6 @@ edge, or no case"
 
 (defun atick (session)
   (declare (ignorable session))
-  (window:poll)
-  (window::update-control-state *control-state*)
   (when (window::skey-j-p (window::keyval :r) *control-state*)
     (window:toggle-mouse-capture)
     (moused))
@@ -1242,8 +1238,7 @@ edge, or no case"
     (gl:clear
      :color-buffer-bit
      :depth-buffer-bit
-     ))
-  (window:update-display))
+     )))
 
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
@@ -1254,6 +1249,7 @@ edge, or no case"
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
      nil)
+    #+nil
     (gl:uniformf 
      (uniform :time)
      (float (/ (get-internal-real-time)
@@ -1337,9 +1333,7 @@ edge, or no case"
    (sub-path #P"grasscolor.png")))
 (deflazy blockshader (:opengl)
   (glhelp::create-gl-program sandbox::*atest*))
-#+nil
-(deflazy font-png ()
-  (load-png 
-   (sandbox::sub-path #P"font.png")))
 
-
+(defun use-sandbox ()
+  (setf *trampoline* 'atick)
+  (setf *pre-trampoline-hooks* (list 'sandbox-init)))

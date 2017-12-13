@@ -11,9 +11,7 @@
 
   ((:file "package")
    (:file "vox") ;;generate a voxel hash structure
-   
-   (:file "buffers") ;;iterators with memory pool
-   
+  
    (:file "world")
    (:file "persist-world") ;;world <-> filesystem
 

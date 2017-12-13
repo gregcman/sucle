@@ -182,6 +182,11 @@
    (texture-cube "textureCube")
    (texture-cube-lod "textureCubeLod")))
 
+(defparameter *more-glsl-words*
+  '((void "void")
+    (sampler2d "sampler2D")
+    (texture2d "texture2D")))
+
 (defun glslify-name (name)
   (substitute #\_ #\- (string-downcase name)))
 
@@ -191,7 +196,7 @@
       ((build-item (item)
 	 (cond ((atom item)
 		(let ((namestring (symbol-name item)))
-		  (add-item namestring item)))
+		  (add-item namestring (glslify-name namestring))))
 	       (t (destructuring-bind (name glsl-name &rest rest) item
 		    (declare (ignore rest))
 		    (add-item (symbol-name name) glsl-name)))))
@@ -204,12 +209,9 @@
 	(do-items item))
       hash)))
 
-(defparameter *funs-string-hash*
-  (gen-tables *more-funs* *funs*))
-(defun get-fun-name (sym)
-  (gethash name *funs-string-hash*))
 (defparameter *vars-string-hash*
-  (gen-tables *builtin-vars* *some-constants*))
+  (gen-tables *builtin-vars* *some-constants* *more-glsl-words*
+	      *more-funs* *funs*))
 (defun get-var-name (name)
   (gethash name *vars-string-hash*))
 
@@ -247,21 +249,19 @@
       node
       (typecase node
 	(symbol (let ((newname (glslify-name (symbol-name node))))
-		  (let ((glsl-builtin (get-var-name newname)))
-		    (if glsl-builtin
-			glsl-builtin
-			(or (get-others newname)
-			    newname)))))
+		  (or
+		   (get-var-name newname)
+		   newname)))
 	(otherwise (write-to-string node :escape nil :pretty nil :base 10 :readably nil)))))
 
 (defun dump-test (list)
   (glslgen::dump-string #'identity (output-stuff list)))
 
 (defun make-shader-stage (&key in out temp program)
-  (let ((*reserved* (mapcar #'first (append in out temp))))
+  (let ((*reserved* (cons :gl-frag-color (mapcar #'first (append in out temp)))))
     (let ((dedumped (output-stuff program)))
-   ;;   (print dedumped)
-    ;;  (print (glslgen::dump-string #'identity dedumped))
+   ;   (print dedumped)
+   ;   (print (glslgen::dump-string #'identity dedumped))
       
       (glslgen::make-shader-vars :out out
 				 :in in
@@ -286,13 +286,27 @@
    (glsl-progn
     progn)
    (glsl-func-def
-    defun)))
+    defun)
+   (glsl-if
+    if)))
+(defun glsl-if (op args)
+  (declare (ignore op))
+  (destructuring-bind (test first &optional else) args
+    (let ((end (if else
+		   (list "else"
+			 (glslgen::brackets (output-stuff else)))
+		   nil)))
+      (list*
+       "if"
+       (paren (output-stuff test))
+       (glslgen::brackets (output-stuff first))
+       end))))
 
 (defun glsl-func-def (op args)
   (declare (ignore op))
   (destructuring-bind (name type params &rest body) args
     (list
-     (symbol-glsl-string type)
+     (get-var-name (glslify-name (symbol-name type)))
      " "
      (glslify-name (symbol-name name))
      (comma-separated-list params)
@@ -305,20 +319,3 @@
 	  (let ((name (string-downcase (symbol-name sym))))
 	    (setf (gethash name hash) dump-fun)))))
     hash))
-
-(defun symbol-glsl-string (sym)
-  (let ((name (glslify-name (symbol-name sym))))
-    (gethash name *glsl-string-hash*)))
-(defparameter *more-glsl-words*
-  '((void "void")
-    (sampler2d "sampler2D")
-    (texture2d "texture2D")))
-(defparameter *glsl-string-hash*
-  (let ((hash (make-hash-table :test 'equal)))
-    (dolist (common *more-glsl-words*)
-      (destructuring-bind (sym-name glsl-name) common
-	(let ((name (glslify-name (symbol-name sym-name))))
-	  (setf (gethash name hash) glsl-name))))
-    hash))
-(defun get-others (name)
-  (gethash name *glsl-string-hash*))
