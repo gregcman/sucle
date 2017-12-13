@@ -2,9 +2,13 @@
 
 (defparameter *some-saves* nil)
 (defun msave (path)
-  (filesystem-util:call-with-path path #'sandbox::save-world *some-saves*))
+  (let ((newpath (filesystem-util:rebase-path path *some-saves*)))
+    (ensure-directories-exist newpath)
+    (save-world newpath)))
 (defun mload (path)
-  (filesystem-util:call-with-path path #'sandbox::load-world *some-saves*))
+  (let ((newpath (filesystem-util:rebase-path path *some-saves*)))
+    (ensure-directories-exist newpath)
+    (load-world newpath)))
 
 (defun savechunk (path position)
   (let ((position-list (multiple-value-list (world:unhashfunc position))))

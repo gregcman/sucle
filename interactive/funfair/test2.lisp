@@ -4,18 +4,11 @@
 	#:funland))
 (in-package #:funtext)
 
-(defvar *ourdir-aux* #.(or *compile-file-truename*
-			   *load-truename*))
-(defvar *ourdir*
-  (let ((value *ourdir-aux*))
-    (make-pathname :host (pathname-host value)
-		   :directory (pathname-directory value))))
-(defun sub-path (name)
-  (merge-pathnames name *ourdir*))
+(defvar *ourdir* (filesystem-util:this-directory))
 
 (deflazy font-png ()
   (opticl:read-png-file
-   (sub-path #P"font.png")))
+   (filesystem-util:rebase-path *ourdir* #P"font.png")))
 (deflazy font-texture (:opengl)
   (prog1
       (glhelp:pic-texture
@@ -52,7 +45,7 @@
     (gl:call-list (getfnc 'huh?))))
 
 (defun use-text ()
-  (setf *trampoline* 'pre-frame)
+  (setf *trampoline* 'per-frame)
   (setf *pre-trampoline-hooks* nil))
 
 (defmacro progeach (fun body)

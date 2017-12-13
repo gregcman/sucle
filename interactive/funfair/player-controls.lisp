@@ -1302,21 +1302,12 @@ edge, or no case"
 (defun load-png (filename)
   (opticl:read-png-file filename))
 
-
-(defparameter *ourdir-aux* #.(or *compile-file-truename*
-				 *load-truename*))
-(defparameter *ourdir*
-  (let ((value *ourdir-aux*))
-    (make-pathname :host (pathname-host value)
-		   :directory (pathname-directory value))))
-(defun sub-path (name)
-  (merge-pathnames name *ourdir*))
-
+(defvar *ourdir* (filesystem-util:this-directory))
 
 (deflazy terrain-png ()
   (color-grasses
    (load-png 
-    (sub-path #P"terrain.png"))
+    (filesystem-util:rebase-path *ourdir* #P"terrain.png"))
    (getapixel 255 0 (getfnc 'grass-png))))
 (deflazy terrain (:opengl)
   (prog1
@@ -1330,10 +1321,12 @@ edge, or no case"
 	     (:texture-wrap-t . :repeat))))))
 (deflazy grass-png ()
   (load-png 
-   (sub-path #P"grasscolor.png")))
+   (filesystem-util:rebase-path *ourdir* #P"grasscolor.png")))
 (deflazy blockshader (:opengl)
   (glhelp::create-gl-program sandbox::*atest*))
 
 (defun use-sandbox ()
   (setf *trampoline* 'atick)
   (setf *pre-trampoline-hooks* (list 'sandbox-init)))
+
+;;;; run use-sandbox before running funfair::main
