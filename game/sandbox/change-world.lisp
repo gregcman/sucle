@@ -151,7 +151,7 @@
        :program
        '(defun "main" void ()
 	 (= "gl_Position" (* projection-model-view position))
-	 (= color-out (vec3 color))
+	 (= color-out color)
 	 (= texcoord-out texcoord)))
       :frag
       (glslgen2::make-shader-stage
