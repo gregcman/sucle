@@ -1206,6 +1206,7 @@ edge, or no case"
    :depth-buffer-bit
    )
   (setf (camat:camera-fov *camera*) *fov*)
+  (setf (camat:camera-frustum-far *camera*) (* 1024.0 256.0))
   (when *sandbox-on*
     (multiple-value-bind (fraction times) (tick *ticker* #'physss)
       (declare (ignorable times))

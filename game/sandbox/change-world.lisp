@@ -168,7 +168,7 @@
 	 (if (> (|.| pixdata "g") 0.5)
 	     (progn
 	       "discard"))
-	 (= (|.| pixdata "rgb") (|.| pixdata "bgr"))
+	 (= (|.| pixdata "rgb") (|.| pixdata "rgb"))
 	 (/**/ vec3 temp)
 	 (= temp 
 	  (* color

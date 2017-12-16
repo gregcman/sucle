@@ -257,8 +257,8 @@
 (defun make-shader-stage (&key in out temp program)
   (let ((*reserved* (cons :gl-frag-color (mapcar #'first (append in out temp)))))
     (let ((dedumped (output-stuff program)))
-      (print dedumped)
-      (print (glslgen::dump-string #'identity dedumped))
+;;      (print dedumped)
+ ;;     (print (glslgen::dump-string #'identity dedumped))
       
       (glslgen::make-shader-vars :out out
 				 :in in

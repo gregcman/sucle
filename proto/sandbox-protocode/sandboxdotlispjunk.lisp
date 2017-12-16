@@ -49,10 +49,6 @@
   (dobox ((x 0 128) (y 0 64) (z -128 0))
 	 (plain-setblock x y z 0 0)))
 
-(defun test-world ()
-  (dobox ((x 0 8) (y -8 0))
-	 (someseq x y)))
-
 (defun spawn ()
   (goto 64 80 -64))
 
