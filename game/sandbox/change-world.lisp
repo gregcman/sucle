@@ -139,7 +139,7 @@
      a
      (make-instance
       'glslgen:shader-program-data
-      :version 330
+      :version 120
       :vs
       (glslgen2::make-shader-stage
        :out '((color-out "float")
