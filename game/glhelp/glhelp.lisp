@@ -17,8 +17,9 @@
 
 (defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
 					   (:texture-mag-filter . :nearest)
-					   (:texture-wrap-s . :repeat)
-					   (:texture-wrap-t . :repeat))))
+;					   (:texture-wrap-s . :repeat)
+;					   (:texture-wrap-t . :repeat)
+					   )))
 ;;;;tex-parameters is an alist of pairs (a . b) with
 ;;;;(lambda (a b) (gl:tex-parameter :texture-2d a b))
 (defun pic-texture (thepic type)
@@ -100,10 +101,9 @@
 
     ;; setup texture and attach it to the framebuffer
     (gl:bind-texture :texture-2d texture)
-    (gl:tex-parameter :texture-2d :texture-min-filter :nearest-mipmap-nearest)
+    (gl:tex-parameter :texture-2d :texture-min-filter :nearest)
     (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
     (gl:tex-image-2d :texture-2d 0 :rgba w h 0 :rgba :unsigned-byte (cffi:null-pointer))
-    (gl:generate-mipmap-ext :texture-2d)
     (gl:bind-texture :texture-2d 0)
     (gl:framebuffer-texture-2d-ext :framebuffer-ext
                                    :color-attachment0-ext
@@ -124,8 +124,12 @@
       (unless (gl::enum= framebuffer-status :framebuffer-complete-ext)
         (error "Framebuffer not complete: ~A." framebuffer-status)))
 
+    #+nil
     (gl:clear-color 0.0 0.0 0.0 0.0)
+    #+nil
     (gl:clear :color-buffer-bit
 	      :depth-buffer-bit)
-    (gl:enable :depth-test :multisample)
+    #+nil
+    (gl:enable :depth-test ;:multisample
+	       )
     (values texture framebuffer)))

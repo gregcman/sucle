@@ -27,7 +27,8 @@
 (defparameter *arguments* '(window::*iresizable*
 			    window::*iwidth*
 			    window::*iheight*))
-(defparameter *argument-values* (list nil 720 480))
+(defparameter *argument-values* (list nil 720 480
+				      ))
 
 (progn
   (defparameter *trampoline* (lambda (exit-token) (throw exit-token (values))))
@@ -124,8 +125,11 @@
      times)))
 
 
-(defparameter *control-state* (window::make-control-state
-			       :curr window::*input-state*))
+(defparameter *control-state*
+  window::*control-state*
+  #+nil
+  (window::make-control-state
+   :curr window::*input-state*))
 (defparameter *camera* (camat:make-camera
 			:frustum-far (* 256.0)
 			:frustum-near (/ 1.0 8.0)))

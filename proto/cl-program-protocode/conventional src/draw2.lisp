@@ -92,41 +92,6 @@
       (get-stuff :font-image2 *stuff* *backup*)
       :rgba
       *default-tex-params*))))
-
-(defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16))
-(bornfnc
- :glsl-code-lookup
- (lambda ()
-   (let ((a (cffi:foreign-alloc :float :count (* 4 256))))
-     (dotimes (x 256)
-       (let ((offset (* 4 x))
-	     (tilemap-lookup *16x16-tilemap*))
-	 (etouq
-	  (with-vec-params
-	      `((offset ,@(vec-slots :rectangle
-				     '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)
-				       ))))
-	    '(tilemap-lookup)
-	    '(progn
-	      (setf (cffi:mem-aref a :float (+ offset 0)) x0)
-	      (setf (cffi:mem-aref a :float (+ offset 1)) y0)
-	      (setf (cffi:mem-aref a :float (+ offset 2)) x1)
-	      (setf (cffi:mem-aref a :float (+ offset 3)) y1)
-	      )))))
-     a)))
-(bornfnc
- :terminal256color-lookup
- (lambda ()
-   (let ((a (cffi:foreign-alloc :float :count (* 4 256))))
-     (dotimes (x 256)
-       (let ((offset (* 4 x)))
-	 (multiple-value-bind (r g b) (color-rgb x) 
-	   (progn
-	     (setf (cffi:mem-aref a :float (+ offset 0)) r)
-	     (setf (cffi:mem-aref a :float (+ offset 1)) g)
-	     (setf (cffi:mem-aref a :float (+ offset 2)) b)
-	     (setf (cffi:mem-aref a :float (+ offset 3)) 0.1)))))
-     a)))
 (bornfnc
  :glyph-screen
  (lambda ()
