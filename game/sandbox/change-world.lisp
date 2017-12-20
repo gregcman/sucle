@@ -139,7 +139,7 @@
      a
      (make-instance
       'glslgen:shader-program-data
-      :version 330
+      :version 120
       :vs
       (glslgen2::make-shader-stage
        :out '((color-out "float")
@@ -151,7 +151,7 @@
        :program
        '(defun "main" void ()
 	 (= "gl_Position" (* projection-model-view position))
-	 (= color-out (vec3 color))
+	 (= color-out color)
 	 (= texcoord-out texcoord)))
       :frag
       (glslgen2::make-shader-stage
