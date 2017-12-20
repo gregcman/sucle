@@ -1328,6 +1328,7 @@ edge, or no case"
 
 (defun use-sandbox ()
   (setf *trampoline* 'atick)
-  (setf *pre-trampoline-hooks* (list 'sandbox-init)))
+  (setf *pre-trampoline-hooks* (list 'sandbox-init))
+  (setf window:*resize-hook* (constantly nil)))
 
 ;;;; run use-sandbox before running funfair::main

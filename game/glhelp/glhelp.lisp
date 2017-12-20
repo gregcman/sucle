@@ -99,25 +99,26 @@
     ;; setup framebuffer
     (gl:bind-framebuffer-ext :framebuffer-ext framebuffer)
 
-    ;; setup texture and attach it to the framebuffer
-    (gl:bind-texture :texture-2d texture)
-    (gl:tex-parameter :texture-2d :texture-min-filter :nearest)
-    (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
-    (gl:tex-image-2d :texture-2d 0 :rgba w h 0 :rgba :unsigned-byte (cffi:null-pointer))
-    (gl:bind-texture :texture-2d 0)
-    (gl:framebuffer-texture-2d-ext :framebuffer-ext
-                                   :color-attachment0-ext
-                                   :texture-2d
-                                   texture
-                                   0)
-
-    ;; setup depth-buffer and attach it to the framebuffer
-    (gl:bind-renderbuffer-ext :renderbuffer-ext depthbuffer)
-    (gl:renderbuffer-storage-ext :renderbuffer-ext :depth-component24 w h)
-    (gl:framebuffer-renderbuffer-ext :framebuffer-ext
-                                     :depth-attachment-ext
-                                     :renderbuffer-ext
-                                     depthbuffer)
+    (progn
+      ;; setup texture and attach it to the framebuffer
+      (gl:bind-texture :texture-2d texture)
+      (gl:tex-parameter :texture-2d :texture-min-filter :nearest)
+      (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
+      (gl:tex-image-2d :texture-2d 0 :rgba w h 0 :rgba :unsigned-byte (cffi:null-pointer))
+      (gl:bind-texture :texture-2d 0)
+      (gl:framebuffer-texture-2d-ext :framebuffer-ext
+				     :color-attachment0-ext
+				     :texture-2d
+				     texture
+				     0))
+    (progn
+      ;; setup depth-buffer and attach it to the framebuffer
+      (gl:bind-renderbuffer-ext :renderbuffer-ext depthbuffer)
+      (gl:renderbuffer-storage-ext :renderbuffer-ext :depth-component24 w h)
+      (gl:framebuffer-renderbuffer-ext :framebuffer-ext
+				       :depth-attachment-ext
+				       :renderbuffer-ext
+				       depthbuffer))
 
     ;; validate framebuffer
     (let ((framebuffer-status (gl:check-framebuffer-status-ext :framebuffer-ext)))
@@ -132,4 +133,4 @@
     #+nil
     (gl:enable :depth-test ;:multisample
 	       )
-    (values texture framebuffer)))
+    (values texture framebuffer depthbuffer)))
