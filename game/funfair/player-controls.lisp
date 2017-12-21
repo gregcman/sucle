@@ -1073,7 +1073,12 @@ edge, or no case"
   (setf *ticker*
 	(tickr:make-ticker
 	 (floor 1000000 60)
-	 (microseconds))))
+	 (microseconds)))
+  (scrubgl2))
+(defun scrubgl2 ()
+  (dohash (k v) funfair::*stuff*
+    (when (typep v 'glhelp::gl-object)
+      (funfair::remove-stuff k))))
 
 (defparameter *ents* (map-into (make-array 10) #'gentity))
 (defparameter *ent* (aref *ents* 1))
@@ -1255,7 +1260,7 @@ edge, or no case"
      (uniform :time)
      (float (/ (get-internal-real-time)
 	       100.0))))
-  (gl:bind-texture :texture-2d (funcall #'getfnc 'terrain))
+  (gl:bind-texture :texture-2d (glhelp::handle (getfnc 'terrain)))
   (gl:enable :depth-test)  
   (gl:depth-func :less)
   (gl:enable :cull-face)
@@ -1305,25 +1310,28 @@ edge, or no case"
 
 (defvar *ourdir* (filesystem-util:this-directory))
 
-(deflazy terrain-png ()
+(deflazy terrain-png (grass-png)
   (color-grasses
    (load-png 
     (filesystem-util:rebase-path #P"terrain.png" *ourdir*))
-   (getapixel 255 0 (getfnc 'grass-png))))
-(deflazy terrain (:opengl)
-  (prog1
-      (glhelp:pic-texture
-       (getfnc 'terrain-png)
-       :rgba)
-    (glhelp:apply-tex-params
-     (quote ((:texture-min-filter . :nearest)
-	     (:texture-mag-filter . :nearest)
-	     (:texture-wrap-s . :repeat)
-	     (:texture-wrap-t . :repeat))))))
+   (getapixel 255 0 grass-png)))
+(deflazy terrain (terrain-png)
+  (make-instance
+   'glhelp::gl-texture
+   :handle
+   (prog1
+       (glhelp:pic-texture
+	terrain-png
+	:rgba)
+     (glhelp:apply-tex-params
+      (quote ((:texture-min-filter . :nearest)
+	      (:texture-mag-filter . :nearest)
+	      (:texture-wrap-s . :repeat)
+	      (:texture-wrap-t . :repeat)))))))
 (deflazy grass-png ()
   (load-png 
    (filesystem-util:rebase-path #P"grasscolor.png" *ourdir*)))
-(deflazy blockshader (:opengl)
+(deflazy blockshader ()
   (glhelp::create-gl-program sandbox::*atest*))
 
 (defun use-sandbox ()
@@ -1332,3 +1340,11 @@ edge, or no case"
   (setf window:*resize-hook* (constantly nil)))
 
 ;;;; run use-sandbox before running funfair::main
+
+;;example::
+#+nil
+(progn
+  (ql:quickload :sandbox-funfair)
+  (sndbx::use-sandbox)
+  (sandbox::mload "third/")
+  (main))

@@ -10,3 +10,11 @@
        ,list-sym)))
 
 (export '(with-gl-list))
+
+(defmacro with-gl-context (&body body)
+  `(unwind-protect (progn
+		     (setf glhelp::*gl-context* (gensym))
+		     ,@body)
+     (setf glhelp::*gl-context* nil)))
+
+(export '(with-gl-context))

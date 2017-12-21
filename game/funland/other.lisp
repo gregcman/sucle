@@ -22,6 +22,13 @@ unique symbol the named variable will be bound to."
                  names)
      ,@forms))
 
+(defun make-gensym-list (length &optional (x "G"))
+  "Returns a list of LENGTH gensyms, each generated as if with a call to MAKE-GENSYM,
+using the second (optional, defaulting to \"G\") argument."
+  (let ((g (if (typep x '(integer 0)) x (string x))))
+    (loop repeat length
+          collect (gensym g))))
+
 (defmacro once-only (specs &body forms)
   "Evaluates FORMS with symbols specified in SPECS rebound to temporary
 variables, ensuring that each initform is evaluated only once.
@@ -87,3 +94,19 @@ arguments when given."
          (push (pop body) decls)
          (go :declarations)))
     (values body (nreverse decls) doc)))
+
+(export '(with-gensyms nest once-only parse-body symbolicate2))
+
+
+(defun symbolicate2 (things &optional (package *package*))
+  "Concatenate together the names of some strings and symbols,
+producing a symbol in the current package."
+  (let* ((length (reduce #'+ things
+                         :key (lambda (x) (length (string x)))))
+         (name (make-array length :element-type 'character)))
+    (let ((index 0))
+      (dolist (thing things (values (intern name package)))
+        (let* ((x (string thing))
+               (len (length x)))
+          (replace name x :start1 index)
+          (incf index len))))))

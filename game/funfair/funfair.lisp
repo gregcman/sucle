@@ -46,50 +46,66 @@
   (window::update-control-state *control-state*)
   (window:update-display))
 
+(defparameter *circle* nil)
 (progn
   (defun namexpr (hash name func)
     (setf (gethash name hash) func))
-  (defun get-stuff (name stuff otherwise secondary)
+  (defun get-stuff (name stuff otherwise)
     (multiple-value-bind (val exists-p) (gethash name stuff)
       (if exists-p
 	  val
-	  (let ((genfunc (gethash name otherwise)))
-	    (cond ((functionp genfunc)
-		   (multiple-value-bind (value secondary-value) (funcall genfunc)
-		     (setf (gethash name stuff) value)
-		     (setf (gethash name secondary) secondary-value)
-		     value))
-		  (t (error "backup function not a function: ~a" genfunc))))))))
-
+	  (let* ((depdata (gethash name otherwise))
+		 (genfunc (cdr depdata))
+		 (deps (car depdata)))
+	    (when (member name *circle*)
+	      (error "circular dependency ~a" *circle*))
+	    (if genfunc
+		(let ((a nil))
+		  (dolist (item deps)
+		    (let ((*circle* (cons name *circle*)))
+		      (push (get-stuff item stuff otherwise) a)))
+		  (setf (gethash name stuff) 
+			(apply genfunc
+			       (nreverse a))))
+		(error "no backup fun: ~a" genfunc)))))))
 (progn
   (defparameter *backup* (make-hash-table :test 'eq))
-  (defparameter *stuff* (make-hash-table :test 'eq))
-  (defparameter *secondary* (make-hash-table :test 'eq))
+  (defparameter *stuff* (make-hash-table :test 'eq)))
+(progn
   (defun bornfnc (name func)
     (namexpr *backup* name func))
   (defun getfnc (name)
-    (get-stuff name *stuff* *backup* *secondary*))
+    (get-stuff name *stuff* *backup*))
+  (defun getfnc-no-update (name)
+    (gethash name *stuff*))
   (defun map-stuffs (fun)
-    ;;;fun = (key value secondary-value)
     (maphash (lambda (k v)
-	       (funcall fun k v (gethash k *secondary*)))
+	       (funcall fun k v))
 	     *stuff*))
   (defun remove-stuff (k)
-    (remhash k *secondary*)
     (remhash k *stuff*)))
 
-(defmacro deflazy (name (&optional type) &rest gen-forms)
-  `(bornfnc (quote ,name)
-	    (lambda ()
-	      (values (progn . ,gen-forms)
-		      ,type))))
-(defun scrub-old-gl ()
-  (map-stuffs
-   (lambda (k v secondary-value)
-     (declare (ignorable v))
-     (when (eq secondary-value :opengl)
-       (remove-stuff k)))))
-
+(defun mangle (sym &optional (start "_source_"))
+  (symbolicate2 (list start sym)
+		(symbol-package sym)))
+(defmacro deflazy (name (&rest deps) &rest gen-forms)
+  (let ((fun-name (mangle name)))
+    `(progn
+       (defun ,fun-name ,(mapcar (lambda (x)
+				   (typecase x
+				     (symbol x)
+				     (otherwise (second x))))
+				 deps)
+	 ,@gen-forms)
+       (bornfnc (quote ,name)
+		(cons
+		 (quote
+		  ,(mapcar (lambda (x)
+			     (typecase x
+			       (symbol x)
+			       (otherwise (first x))))
+			   deps))
+		 (function ,fun-name))))))
 (progn
   (defclass render-area ()
     ((x :accessor render-area-x
@@ -136,10 +152,10 @@
 (defparameter *render-area* (make-instance 'render-area))
 
 (defun init ()
-  (setf %gl:*gl-get-proc-address* (window:get-proc-address))
-  (window:set-vsync t)
-  (gl:enable :scissor-test)
-  (scrub-old-gl)
-  (dolist (x *pre-trampoline-hooks*) (funcall x))
-  (call-trampoline))
+  (glhelp:with-gl-context
+    (setf %gl:*gl-get-proc-address* (window:get-proc-address))
+    (window:set-vsync t)
+    (gl:enable :scissor-test)
+    (dolist (x *pre-trampoline-hooks*) (funcall x))
+    (call-trampoline)))
 (defparameter *pre-trampoline-hooks* nil)

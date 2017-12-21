@@ -383,3 +383,15 @@
       progn
       (shader-program-data-frag-string data))
      raw-attributes)))
+
+(defun ashader (&rest rest &key &allow-other-keys)
+  (let (a)
+    (setf
+     a
+     (apply
+      #'make-instance
+      'glslgen:shader-program-data
+      rest))
+    (glslgen:dump-shader-program-data a)
+    a))
+(export '(ashader))

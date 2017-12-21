@@ -6,7 +6,8 @@
 	       #:terminal625-camat
 	       #:terminal625-cgmat
 	       #:bordeaux-threads
-	       #:cl-opengl)
+	       #:cl-opengl
+	       #:glhelp)
   :serial t
   :components
   ((:file "funfair")))

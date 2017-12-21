@@ -32,7 +32,7 @@
        ,@body)))
 (defmacro eval-always (&body body)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     . ,body))
+     ,@body))
 
 (defmacro with-declaim-inline ((&rest names) &body body)
   `(progn
@@ -218,4 +218,4 @@
 	   (loop (multiple-value-bind (,more? ,k ,v) (,next)
 		   ,@decl
 		   (unless ,more? (return))
-		   . ,forms)))))))
+		   ,@forms)))))))
