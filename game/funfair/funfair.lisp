@@ -33,7 +33,7 @@
 (progn
   (defparameter *trampoline* (lambda (exit-token) (throw exit-token (values))))
   (defun call-trampoline ()
-    (let ((value (gensym)))
+    (let ((value (cons "trampoline" "token")))
       (catch value
 	(loop
 	   (trampoline-bounce value *trampoline*))))))
@@ -46,14 +46,22 @@
   (window::update-control-state *control-state*)
   (window:update-display))
 
+
+;;;;each item stores a:
+;;;;-token
+;;;;-value
+;;;;-function
+;;;;-args
 (defparameter *circle* nil)
+(defparameter *no-value* "no value")
 (progn
   (defun namexpr (hash name func)
     (setf (gethash name hash) func))
   (defun get-stuff (name stuff otherwise)
     (multiple-value-bind (val exists-p) (gethash name stuff)
-      (if exists-p
-	  val
+      (if (and exists-p
+	       (rest val))
+	  val ;;a cell 
 	  (let* ((depdata (gethash name otherwise))
 		 (genfunc (cdr depdata))
 		 (deps (car depdata)))
@@ -64,26 +72,69 @@
 		  (dolist (item deps)
 		    (let ((*circle* (cons name *circle*)))
 		      (push (get-stuff item stuff otherwise) a)))
-		  (setf (gethash name stuff) 
-			(apply genfunc
-			       (nreverse a))))
+		  (let ((dep-values (nreverse a)))
+		    (let ((value (apply genfunc
+					(mapcar #'car dep-values))))
+		      (let ((cell (or val
+				      (setf (gethash name stuff)
+					    (cons *no-value* nil)))))
+			(setf (car cell) value
+			      (cdr cell) (cons
+					  (mapcar (lambda (x)
+						    (cons x (cdr x)))
+						  dep-values)
+					  genfunc))
+			cell))))
 		(error "no backup fun: ~a" genfunc)))))))
-(progn
-  (defparameter *backup* (make-hash-table :test 'eq))
-  (defparameter *stuff* (make-hash-table :test 'eq)))
+
+(defparameter *backup* (make-hash-table :test 'eq))
+(defparameter *stuff* (make-hash-table :test 'eq))
 (progn
   (defun bornfnc (name func)
     (namexpr *backup* name func))
   (defun getfnc (name)
-    (get-stuff name *stuff* *backup*))
+    (car (get-stuff name *stuff* *backup*)))
   (defun getfnc-no-update (name)
-    (gethash name *stuff*))
-  (defun map-stuffs (fun)
-    (maphash (lambda (k v)
-	       (funcall fun k v))
-	     *stuff*))
+    (car (gethash name *stuff*)))
   (defun remove-stuff (k)
-    (remhash k *stuff*)))
+    (multiple-value-bind (value exists?) (gethash k *stuff*)
+      (when exists? 
+	(setf (car value) *no-value*
+	      (cdr value) nil)))))
+
+(defun dirty-p (name)
+  (multiple-value-bind (cell exists?) (gethash name *stuff*)
+    (cond (exists?
+	   (let ((cellcdr (cdr cell)))
+	     (unless (eq (cdr (gethash name *backup*)) ;;stored fun
+			 (cdr cellcdr)) ;;fun use to generate value
+	       (return-from dirty-p t))
+	     (dolist (item (car cellcdr))
+	       (unless
+		   (eq (cdr (car item)) ;;value data
+		       (cdr item)) ;;args used before
+		 (return-from dirty-p t))))
+	   nil)
+	  (t nil))))
+
+(defun reload (name)
+  (let ((a (funfair::getfnc-no-update name)))
+    (when a
+      (when (and (typep a 'glhelp::gl-object)
+		 (glhelp:alive-p a))
+	(glhelp::gl-delete* a))
+      (funfair::remove-stuff name))))
+
+(defun reload-if-dirty (name)
+  (when (dirty-p name)
+    (reload name)))
+
+(defun scrubgl2 ()
+  (dohash (k v) funfair::*stuff*
+    (when (typep (car v) 'glhelp::gl-object)
+      (funfair::remove-stuff k))))
+
+(export '(reload scrubgl2))
 
 (defun mangle (sym &optional (start "_source_"))
   (symbolicate2 (list start sym)

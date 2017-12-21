@@ -13,7 +13,7 @@
 
 (defmacro with-gl-context (&body body)
   `(unwind-protect (progn
-		     (setf glhelp::*gl-context* (gensym))
+		     (setf glhelp::*gl-context* (cons "gl-context" "token"))
 		     ,@body)
      (setf glhelp::*gl-context* nil)))
 

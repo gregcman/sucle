@@ -1075,10 +1075,6 @@ edge, or no case"
 	 (floor 1000000 60)
 	 (microseconds)))
   (scrubgl2))
-(defun scrubgl2 ()
-  (dohash (k v) funfair::*stuff*
-    (when (typep v 'glhelp::gl-object)
-      (funfair::remove-stuff k))))
 
 (defparameter *ents* (map-into (make-array 10) #'gentity))
 (defparameter *ent* (aref *ents* 1))
@@ -1179,6 +1175,10 @@ edge, or no case"
 (defparameter *mouse-multiplier* (translator 0.5))
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 
+
+(defparameter *reloadables*
+  '(blockshader-text
+    blockshader))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun atick (session)
@@ -1186,12 +1186,8 @@ edge, or no case"
   (when (window::skey-j-p (window::keyval :r) *control-state*)
     (window:toggle-mouse-capture)
     (moused))
-  (let ((wowz (gethash 'blockshader funfair::*stuff*)))
-    (when wowz
-      (when (not (eq (glhelp::gl-program-object-src wowz)
-		     sandbox::*atest*))
-	(gl:delete-program (glhelp::gl-program-object-handle wowz))
-	(funfair::remove-stuff 'blockshader))))
+  
+  (map nil #'funfair::reload-if-dirty *reloadables*)
   ((lambda (width height)
      (let ((camera *camera*))
        (setf (camat:camera-aspect-ratio camera)
@@ -1331,8 +1327,8 @@ edge, or no case"
 (deflazy grass-png ()
   (load-png 
    (filesystem-util:rebase-path #P"grasscolor.png" *ourdir*)))
-(deflazy blockshader ()
-  (glhelp::create-gl-program sandbox::*atest*))
+(deflazy blockshader (blockshader-text)
+  (glhelp::create-gl-program blockshader-text))
 
 (defun use-sandbox ()
   (setf *trampoline* 'atick)
@@ -1348,3 +1344,51 @@ edge, or no case"
   (sndbx::use-sandbox)
   (sandbox::mload "third/")
   (main))
+
+(deflazy blockshader-text ()
+  (glslgen::ashader
+   :version 120
+   :vs
+   (glslgen2::make-shader-stage
+    :out '((color-out "float")
+	   (texcoord-out "vec2"))
+    :in '((position "vec4")
+	  (texcoord "vec2")
+	  (color "float")
+	  (projection-model-view "mat4"))
+    :program
+    '(defun "main" void ()
+      (= "gl_Position" (* projection-model-view position))
+      (= color-out color)
+      (= texcoord-out texcoord)))
+   :frag
+   (glslgen2::make-shader-stage
+    :in '((texcoord "vec2")
+	  (color "float")
+	  (sampler "sampler2D")
+;;						     (wombo ("float" 4) "{2.0, 10.4, 1.0, 10.0}")
+	  )
+    :program
+    '(defun "main" void ()
+      (/**/ vec4 pixdata)
+      (= pixdata ("texture2D" sampler texcoord))
+      #+nil
+      (if (> (|.| pixdata "g") 0.5)
+	  (progn
+	    "discard"))
+;;      (= (|.| pixdata "rgb") (|.| pixdata "ggr"))
+      (/**/ vec3 temp)
+      (= temp 
+       (* color
+	(|.| pixdata "rgb")))
+;;      	 (*= temp ([] wombo (int (* 4.0 (|.| temp "g")))))
+      (= (|.| :gl-frag-color "rgb") temp)))
+   :attributes
+   '((position . 2) 
+     (texcoord . 8)
+     (color . 0))
+   :varyings
+   '((color-out . color)
+     (texcoord-out . texcoord))
+   :uniforms
+   '((:pmv (:vertex-shader projection-model-view)))))

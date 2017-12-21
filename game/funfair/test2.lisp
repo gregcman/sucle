@@ -30,14 +30,20 @@
 	     (:texture-wrap-s . :repeat)
 	     (:texture-wrap-t . :repeat))))))
 
+(defparameter *reloadables*
+  '(shader-test
+    text-shader
+    refraction-shader-text
+    refraction-shader
+    flat-shader-text
+    flat-shader))
+
 (defparameter *identity-mat*
   (cg-matrix:identity-matrix))
 (defparameter *view* (make-instance 'funfair::render-area))
 (defparameter *view256x256* (make-instance 'funfair::render-area
 					   :width 256
 					   :height 256))
-
-
 (defparameter *block-height* nil)
 (defparameter *block-width* nil)
 (setf (values *block-width* *block-height*)
@@ -47,15 +53,9 @@
 (defparameter *mouse-y* 0.0)
 (defun per-frame (session)
   (declare (ignorable session))
-  (unless (eq (glhelp::gl-program-object-src (getfnc 'text-shader))
-	      *shader-test*)
-    (reload 'text-shader))
-  (unless (eq (glhelp::gl-program-object-src (getfnc 'refraction-shader))
-	      *refraction-shader*)
-    (reload 'refraction-shader))
-  (unless (eq (glhelp::gl-program-object-src (getfnc 'flat-shader))
-	      *flat-shader*)
-    (reload 'flat-shader))
+
+  (map nil #'funfair::reload-if-dirty *reloadables*)
+  
   (setf (render-area-width *view*) window::*width*
 	(render-area-height *view*) window::*height*)
 
@@ -165,11 +165,6 @@
 (deflazy text-data ()
   (glhelp::make-gl-framebuffer 256 256))
 
-(defun scrubgl2 ()
-  (dohash (k v) funfair::*stuff*
-    (when (typep v 'glhelp::gl-object)
-      (funfair::remove-stuff k))))
-
 (defun use-text ()
   (setf *trampoline* 'per-frame)
   (setf *pre-trampoline-hooks* (list 'scrubgl2))
@@ -215,7 +210,7 @@
 		    (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
 	      len a b))))))))
 
-(defparameter *shader-test*
+(deflazy shader-test ()
   (glslgen:ashader
    :version 120
    :vs
@@ -297,8 +292,9 @@
 		   (row-major-aref ,lisp-array ,i)))
 	   ,@body)))))
 
-(deflazy text-shader ((glsl-code-lookup code) (terminal256color-lookup color))
-  (let ((shader (glhelp::create-gl-program *shader-test*)))
+(deflazy text-shader ((glsl-code-lookup code) (terminal256color-lookup color)
+		      shader-test)
+  (let ((shader (glhelp::create-gl-program shader-test)))
     (glhelp::use-gl-program shader)
     (glhelp:with-uniforms uniform shader
       (with-foreign-array (var code :float len)
@@ -405,7 +401,7 @@
 	       (c6 c)
 	       (g (- c 216))))))))
 
-(defparameter *refraction-shader*
+(deflazy refraction-shader-text ()
   (glslgen:ashader
    :version 120
    :vs
@@ -461,8 +457,8 @@
    '((:pmv (:vertex-shader projection-model-view))
      (size (:fragment-shader size)))))
 
-(deflazy refraction-shader ()
-  (glhelp::create-gl-program *refraction-shader*))
+(deflazy refraction-shader (refraction-shader-text)
+  (glhelp::create-gl-program refraction-shader-text))
 
 (defparameter *foo*
   (let ((*print-case* :downcase))
@@ -564,52 +560,38 @@
 		   (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
 	     len position value))))))))
 
-(defparameter *flat-shader*
-  (let (a)
-    (setf
-     a
-     (make-instance
-      'glslgen:shader-program-data
-      :version 120
-      :vs
-      (glslgen2::make-shader-stage
-       :out '((value-out "vec4"))
-       :in '((position "vec4")
-	     (value "vec4")
-	     (projection-model-view "mat4"))
-       :program
-       '(defun "main" void ()
-	 (= "gl_Position" (* projection-model-view position))
-	 (= value-out value)))
-      :frag
-      (glslgen2::make-shader-stage
-       :in '((value "vec4"))
-       :program
-       '(defun "main" void ()	 
-	 (=
-	  :gl-frag-color
-	  value
-	  )))
-      :attributes
-      '((position . 0) 
-	(value . 2))
-      :varyings
-      '((value-out . value))
-      :uniforms
-      '((:pmv (:vertex-shader projection-model-view)))))
-    (glslgen:dump-shader-program-data a)
-    a))
+(deflazy flat-shader-text ()
+  (glslgen:ashader
+   :version 120
+   :vs
+   (glslgen2::make-shader-stage
+    :out '((value-out "vec4"))
+    :in '((position "vec4")
+	  (value "vec4")
+	  (projection-model-view "mat4"))
+    :program
+    '(defun "main" void ()
+      (= "gl_Position" (* projection-model-view position))
+      (= value-out value)))
+   :frag
+   (glslgen2::make-shader-stage
+    :in '((value "vec4"))
+    :program
+    '(defun "main" void ()	 
+      (=
+       :gl-frag-color
+       value
+       )))
+   :attributes
+   '((position . 0) 
+     (value . 2))
+   :varyings
+   '((value-out . value))
+   :uniforms
+   '((:pmv (:vertex-shader projection-model-view)))))
 
-(deflazy flat-shader ()
-  (glhelp::create-gl-program *flat-shader*))
-
-(defun reload (name)
-  (let ((a (funfair::getfnc-no-update name)))
-    (when a
-      (when (and (typep a 'glhelp::gl-object)
-		 (glhelp:alive-p a))
-	(glhelp::gl-delete* a))
-      (funfair::remove-stuff name))))
+(deflazy flat-shader (flat-shader-text)
+  (glhelp::create-gl-program flat-shader-text))
 
 ;;;;usage:
 #+nil

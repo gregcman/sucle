@@ -131,56 +131,6 @@
     (setf (world:skygetlight i j k) new-sky-light-value)
     (block-dirtify i j k)))
 
-;;;;;
-
-(defparameter *atest*
-  (glslgen::ashader
-   :version 120
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((color-out "float")
-	   (texcoord-out "vec2"))
-    :in '((position "vec4")
-	  (texcoord "vec2")
-	  (color "float")
-	  (projection-model-view "mat4"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= color-out color)
-      (= texcoord-out texcoord)))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((texcoord "vec2")
-	  (color "float")
-	  (sampler "sampler2D")
-					;	     (wombo ("float" 4) "{2.0, 10.4, 1.0, 10.0}")
-	  )
-    :program
-    '(defun "main" void ()
-      (/**/ vec4 pixdata)
-      (= pixdata ("texture2D" sampler texcoord))
-      #+nil
-      (if (> (|.| pixdata "g") 0.5)
-	  (progn
-	    "discard"))
-      (= (|.| pixdata "rgb") (|.| pixdata "rgb"))
-      (/**/ vec3 temp)
-      (= temp 
-       (* color
-	(|.| pixdata "rgb")))
-      ;;	 (*= temp ([] wombo (int (* 4.0 (|.| temp "g")))))
-      (= (|.| :gl-frag-color "rgb") temp)))
-   :attributes
-   '((position . 2) 
-     (texcoord . 8)
-     (color . 0))
-   :varyings
-   '((color-out . color)
-     (texcoord-out . texcoord))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view)))))
-
 (defparameter *save*
   '("#version 100
 precision lowp float;
