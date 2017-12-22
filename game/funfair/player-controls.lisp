@@ -1178,7 +1178,8 @@ edge, or no case"
 
 (defparameter *reloadables*
   '(blockshader-text
-    blockshader))
+    blockshader
+    terrain-png))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun atick (session)
@@ -1201,7 +1202,7 @@ edge, or no case"
 	     )))
    window::*width* window::*height*)
   (set-render-area *render-area*)
-  (gl:clear-color 0.0 0.0 0.0 0.0)
+  (set-sky-color)
   (gl:clear
    :color-buffer-bit
    :depth-buffer-bit
@@ -1242,6 +1243,15 @@ edge, or no case"
      :depth-buffer-bit
      )))
 
+(defun set-sky-color ()
+  (let ((daytime sandbox::*daytime*))
+    (let ((r (* daytime (aref *sky-color* 0)))
+	  (g (* daytime (aref *sky-color* 1)))
+	  (b (* daytime (aref *sky-color* 2))))
+      (gl:clear-color r g b 1.0))))
+(defparameter *sky-color* (vector 0.68 0.8 1.0))
+(defparameter *fog-ratio* 0.75)
+
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
   (glhelp::use-gl-program (getfnc 'blockshader))
@@ -1251,6 +1261,20 @@ edge, or no case"
      (uniform :pmv)
      (camat:camera-matrix-projection-view-player camera)
      nil)
+    (flet ((fractionalize (x)
+	     (alexandria:clamp x 0.0 1.0)))
+      (let ((time sandbox::*daytime*))
+	(let ((x (fractionalize (* (aref *sky-color* 0) time)))
+	      (y (fractionalize (* (aref *sky-color* 1) time)))
+	      (z (fractionalize (* (aref *sky-color* 2) time))))
+	  (%gl:uniform-3f (uniform :fogcolor)
+			  x y z)
+	  (gl:uniformfv (uniform :camera-pos)
+			(camat:camera-vec-position *camera*))
+	  (%gl:uniform-1f (uniform :foglet)
+			  (/ -1.0 (or 128 (camat:camera-frustum-far *camera*)) *fog-ratio*))
+	  (%gl:uniform-1f (uniform :aratio)
+			  (/ 1.0 *fog-ratio*)))))
     #+nil
     (gl:uniformf 
      (uniform :time)
@@ -1310,7 +1334,7 @@ edge, or no case"
   (color-grasses
    (load-png 
     (filesystem-util:rebase-path #P"terrain.png" *ourdir*))
-   (getapixel 255 0 grass-png)))
+   (getapixel 255 255 grass-png)))
 (deflazy terrain (terrain-png)
   (make-instance
    'glhelp::gl-texture
@@ -1351,21 +1375,32 @@ edge, or no case"
    :vs
    (glslgen2::make-shader-stage
     :out '((color-out "float")
-	   (texcoord-out "vec2"))
+	   (texcoord-out "vec2")
+	   
+	   (fogratio-out "float"))
     :in '((position "vec4")
 	  (texcoord "vec2")
 	  (color "float")
-	  (projection-model-view "mat4"))
+	  (projection-model-view "mat4")
+
+	  (foglet "float")
+	  (aratio "float")
+	  (camera-pos "vec3"))
     :program
     '(defun "main" void ()
       (= "gl_Position" (* projection-model-view position))
       (= color-out color)
-      (= texcoord-out texcoord)))
+      (= texcoord-out texcoord)
+
+      (= fogratio-out (min 1.0 (+ (* foglet (distance camera-pos (|.| position "xyz"))) aratio)))))
    :frag
    (glslgen2::make-shader-stage
     :in '((texcoord "vec2")
 	  (color "float")
 	  (sampler "sampler2D")
+
+	  (fogratio "float")
+	  (fogcolor "vec3")
 ;;						     (wombo ("float" 4) "{2.0, 10.4, 1.0, 10.0}")
 	  )
     :program
@@ -1376,12 +1411,16 @@ edge, or no case"
       (if (> (|.| pixdata "g") 0.5)
 	  (progn
 	    "discard"))
-;;      (= (|.| pixdata "rgb") (|.| pixdata "ggr"))
+      ;;      (= (|.| pixdata "rgb") (|.| pixdata "ggr"))
       (/**/ vec3 temp)
       (= temp 
-       (* color
-	(|.| pixdata "rgb")))
-;;      	 (*= temp ([] wombo (int (* 4.0 (|.| temp "g")))))
+       (mix 
+	fogcolor
+	(* color
+	   (|.| pixdata "rgb"))
+	fogratio
+	))
+      ;;      	 (*= temp ([] wombo (int (* 4.0 (|.| temp "g")))))
       (= (|.| :gl-frag-color "rgb") temp)))
    :attributes
    '((position . 2) 
@@ -1389,6 +1428,11 @@ edge, or no case"
      (color . 0))
    :varyings
    '((color-out . color)
-     (texcoord-out . texcoord))
+     (texcoord-out . texcoord)
+     (fogratio-out . fogratio))
    :uniforms
-   '((:pmv (:vertex-shader projection-model-view)))))
+   '((:pmv (:vertex-shader projection-model-view))
+     (:fogcolor (:fragment-shader fogcolor))
+     (:foglet (:vertex-shader foglet))
+     (:aratio (:vertex-shader aratio))
+     (:camera-pos (:vertex-shader camera-pos)))))

@@ -46,6 +46,8 @@
   (window::update-control-state *control-state*)
   (window:update-display))
 
+(defun quit ()
+  (setf window:*status* t))
 
 ;;;;each item stores a:
 ;;;;-token

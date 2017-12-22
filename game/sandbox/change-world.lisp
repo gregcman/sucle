@@ -131,6 +131,7 @@
     (setf (world:skygetlight i j k) new-sky-light-value)
     (block-dirtify i j k)))
 
+#+nil
 (defparameter *save*
   '("#version 100
 precision lowp float;

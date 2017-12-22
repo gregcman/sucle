@@ -125,7 +125,8 @@
     (let ((foo-array (make-array 16 :element-type 'single-float)))
       (dotimes (x 16)
 	(setf (aref foo-array x)
-	      (light-gen 0.05 x)))
+	      (light-gen? 0.05 x)))
+      #+nil
       (let ((a (aref foo-array 0)))
 	(map-into foo-array
 		  (lambda (x)

@@ -1,21 +1,6 @@
 (in-package :aplayground)
 
 #+nil
-(defparameter *other-stuff* (make-hash-table :test 'eq))
-
-#+nil
-(defparameter *something* #.(or *compile-file-truename* *load-truename*))
-#+nil
-(defparameter ourdir
-  (make-pathname :host (pathname-host *something*)
-		 :directory (pathname-directory *something*)))
-
-
-#+nil
-  (defun raps (times form)
-     (make-list times :initial-element form))
-
-#+nil
 (progno
  (defconstant +single-float-pi+ (coerce pi 'single-float))
  (defconstant +single-float-two-pi+ (coerce (* 2 pi) 'single-float))
@@ -32,71 +17,38 @@
  (defparameter *temp-matrix3* (cg-matrix:identity-matrix))
  (defparameter *x-unit* (cg-matrix:vec 1.0 0.0 0.0)))
 
+#+nil
+(defun conspack-save (path thing &optional (overwritep nil))
+  (with-open-file (stream path
+			  :direction :output
+			  :if-does-not-exist :create
+			  :if-exists (if overwritep :supersede :error)
+			  :element-type '(unsigned-byte 8))
+    (conspack:tracking-refs ()
+			    (conspack:encode thing :stream stream))))
+#+nil
+(defun conspack-load (path)
+  (conspack:tracking-refs ()
+			  (conspack:decode (alexandria:read-file-into-byte-vector path))))
 
 #+nil
-(progno
- (defparameter dir-resource (merge-pathnames #P"res/" ourdir))
- (defparameter dir-shader (merge-pathnames #P"shaders/" dir-resource))
 
- (defun shader-path (name)
-   (merge-pathnames name dir-shader))
-
- (defun img-path (name)
-   (merge-pathnames name dir-resource)))
-
-
-
-#+nil
-(progno
- (progn
-   (defparameter *saves-dir* (merge-pathnames #P"save/" ourdir))
-   (defparameter *save-file* "file")
-
-   (defun asave (thing &key (file *save-file*) (overwritep nil))
-     (save file thing overwritep))
-
-   (defun aload (&optional (file *save-file*))
-     (myload file))
-
-   (defun save (filename thing &optional (overwritep nil))
-     (let ((path (saves-path filename)))
-       (with-open-file (stream path
-			       :direction :output
-			       :if-does-not-exist :create
-			       :if-exists (if overwritep :supersede :error)
-			       :element-type '(unsigned-byte 8))
-	 (conspack:tracking-refs ()
-	   (conspack:encode thing :stream stream)))))
-
-   (defun myload (filename)
-     (let ((path (saves-path filename)))
-       (conspack:tracking-refs ()
-	 (conspack:decode (alexandria:read-file-into-byte-vector path))))))
- (defun saves-path (path)
-   (merge-pathnames path *saves-dir*)))
-
-#+nil
-(defun quit ()
-  (setf e:*status* t))
-
-#+nil
 (progn
-  (progn
-    (defun skey-p (enum)
-      (e:key-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+  (defun skey-p (enum)
+    (e:key-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+	     ))
+  (defun skey-j-r (enum)
+    (e:key-j-r enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
 	       ))
-    (defun skey-j-r (enum)
-      (e:key-j-r enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
-		 ))
-    (defun skey-j-p (enum)
-      (e:key-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
-		 ))
-    (defun smice-p (enum)
-      (e:mice-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
-		))
-    (defun smice-j-p (enum)
-      (e:mice-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
-		  ))))
+  (defun skey-j-p (enum)
+    (e:key-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::key))
+	       ))
+  (defun smice-p (enum)
+    (e:mice-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
+	      ))
+  (defun smice-j-p (enum)
+    (e:mice-j-p enum;(cffi:convert-to-foreign enum (quote %cl-glfw3::mouse))
+		)))
 
 #+nil
 (defun make-eq-hash ()
@@ -109,33 +61,3 @@
     (defun set-symbol-value (symbol value)
       #+sbcl (sb-impl::%set-symbol-value symbol value)
       #-sbcl (set symbol value))))
-
-
-#+nil
-(defun byte-read (path)
-   (with-open-file (stream path :element-type '(unsigned-byte 8))
-     (let* ((len (file-length stream))
-	    (data (make-array len :element-type '(unsigned-byte 8))))
-       (dotimes (n len)
-	 (setf (aref data n) (read-byte stream)))
-       data)))
-
-#+nil
-(defun file-string (path)
-  (with-open-file (stream path)
-    (let ((data (make-string (file-length stream))))
-      (read-sequence data stream)
-      data)))
-
-
-#+nil
-(defun getapixel (h w image)
-  (destructuring-bind (height width c) (array-dimensions image)
-    (declare (ignore height))
-    (make-array 4 :element-type (array-element-type image)
-		:displaced-to image
-		:displaced-index-offset (* c (+ w (* h width))))))
-
-#+nil
-(defun complex-modulus (c)
-  (sqrt (realpart (* c (conjugate c)))))

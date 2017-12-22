@@ -36,7 +36,8 @@
     refraction-shader-text
     refraction-shader
     flat-shader-text
-    flat-shader))
+    flat-shader
+    text))
 
 (defparameter *identity-mat*
   (cg-matrix:identity-matrix))
@@ -72,6 +73,11 @@
    ;; (terpri)
   ;;  (princ "scrambling text")
     (reload 'text-shader))
+
+  (when (window::skey-j-p (window::keyval :escape))
+   ;; (terpri)
+  ;;  (princ "scrambling text")
+    (funfair::quit))
   
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
