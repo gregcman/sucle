@@ -10,5 +10,6 @@
 	       #:glhelp)
   :serial t
   :components
-  ((:file "funfair")))
+  ((:file "deflazy")
+   (:file "funfair")))
 

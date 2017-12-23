@@ -38,86 +38,41 @@
 	(loop
 	   (trampoline-bounce value *trampoline*))))))
 
-(defun trampoline-bounce (exit-sym fun)
+(defun trampoline-bounce (exit-token fun)
   (when window:*status*
-    (throw exit-sym (values)))
+    (throw exit-token (values)))
   (window:poll)
-  (funcall fun exit-sym)
+  (funcall fun exit-token)
   (window::update-control-state *control-state*)
   (window:update-display))
 
 (defun quit ()
   (setf window:*status* t))
 
-;;;;each item stores a:
-;;;;-token
-;;;;-value
-;;;;-function
-;;;;-args
-(defparameter *circle* nil)
-(defparameter *no-value* "no value")
-(progn
-  (defun namexpr (hash name func)
-    (setf (gethash name hash) func))
-  (defun get-stuff (name stuff otherwise)
-    (multiple-value-bind (val exists-p) (gethash name stuff)
-      (if (and exists-p
-	       (rest val))
-	  val ;;a cell 
-	  (let* ((depdata (gethash name otherwise))
-		 (genfunc (cdr depdata))
-		 (deps (car depdata)))
-	    (when (member name *circle*)
-	      (error "circular dependency ~a" *circle*))
-	    (if genfunc
-		(let ((a nil))
-		  (dolist (item deps)
-		    (let ((*circle* (cons name *circle*)))
-		      (push (get-stuff item stuff otherwise) a)))
-		  (let ((dep-values (nreverse a)))
-		    (let ((value (apply genfunc
-					(mapcar #'car dep-values))))
-		      (let ((cell (or val
-				      (setf (gethash name stuff)
-					    (cons *no-value* nil)))))
-			(setf (car cell) value
-			      (cdr cell) (cons
-					  (mapcar (lambda (x)
-						    (cons x (cdr x)))
-						  dep-values)
-					  genfunc))
-			cell))))
-		(error "no backup fun: ~a" genfunc)))))))
+;;;;;
+(defmacro deflazy (name (&rest deps) &rest gen-forms)
+  `(lazy-place::deflazy (gethash (quote ,name) *stuff*)
+       ,(mapcar (lambda (x)
+		  (typecase x
+		    (symbol `(,x (gethash (quote ,x) *stuff*)))
+		    (otherwise
+		     (destructuring-bind (name nick) x
+		       `(,nick (gethash (quote ,name) *stuff*))))))
+		deps)
+     ,@gen-forms))
 
-(defparameter *backup* (make-hash-table :test 'eq))
 (defparameter *stuff* (make-hash-table :test 'eq))
 (progn
-  (defun bornfnc (name func)
-    (namexpr *backup* name func))
   (defun getfnc (name)
-    (car (get-stuff name *stuff* *backup*)))
+    (lazy-place::fulfill
+     (gethash name *stuff*)))
   (defun getfnc-no-update (name)
-    (car (gethash name *stuff*)))
+    (lazy-place::lazy-place-value
+     (gethash name *stuff*)))
   (defun remove-stuff (k)
     (multiple-value-bind (value exists?) (gethash k *stuff*)
-      (when exists? 
-	(setf (car value) *no-value*
-	      (cdr value) nil)))))
-
-(defun dirty-p (name)
-  (multiple-value-bind (cell exists?) (gethash name *stuff*)
-    (cond (exists?
-	   (let ((cellcdr (cdr cell)))
-	     (unless (eq (cdr (gethash name *backup*)) ;;stored fun
-			 (cdr cellcdr)) ;;fun use to generate value
-	       (return-from dirty-p t))
-	     (dolist (item (car cellcdr))
-	       (unless
-		   (eq (cdr (car item)) ;;value data
-		       (cdr item)) ;;args used before
-		 (return-from dirty-p t))))
-	   nil)
-	  (t nil))))
+      (when exists?
+	(lazy-place::destroy value)))))
 
 (defun reload (name)
   (let ((a (funfair::getfnc-no-update name)))
@@ -128,37 +83,16 @@
       (funfair::remove-stuff name))))
 
 (defun reload-if-dirty (name)
-  (when (dirty-p name)
+  (when (lazy-place::dirty-p (gethash name *stuff*))
     (reload name)))
 
 (defun scrubgl2 ()
   (dohash (k v) funfair::*stuff*
-    (when (typep (car v) 'glhelp::gl-object)
+    (when (typep (lazy-place::lazy-place-value v)
+		 'glhelp::gl-object)
       (funfair::remove-stuff k))))
 
-(export '(reload scrubgl2))
-
-(defun mangle (sym &optional (start "_source_"))
-  (symbolicate2 (list start sym)
-		(symbol-package sym)))
-(defmacro deflazy (name (&rest deps) &rest gen-forms)
-  (let ((fun-name (mangle name)))
-    `(progn
-       (defun ,fun-name ,(mapcar (lambda (x)
-				   (typecase x
-				     (symbol x)
-				     (otherwise (second x))))
-				 deps)
-	 ,@gen-forms)
-       (bornfnc (quote ,name)
-		(cons
-		 (quote
-		  ,(mapcar (lambda (x)
-			     (typecase x
-			       (symbol x)
-			       (otherwise (first x))))
-			   deps))
-		 (function ,fun-name))))))
+;;;;;;;;;;;;;;;;;;;;;
 (progn
   (defclass render-area ()
     ((x :accessor render-area-x
@@ -207,8 +141,15 @@
 (defun init ()
   (glhelp:with-gl-context
     (setf %gl:*gl-get-proc-address* (window:get-proc-address))
+    (progn
+      (remove-stuff 'gl-context)
+      (getfnc 'gl-context))
+    (scrubgl2)
     (window:set-vsync t)
     (gl:enable :scissor-test)
     (dolist (x *pre-trampoline-hooks*) (funcall x))
     (call-trampoline)))
 (defparameter *pre-trampoline-hooks* nil)
+
+(deflazy gl-context ()
+  glhelp::*gl-context*)

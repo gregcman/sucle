@@ -78,7 +78,9 @@
    ;; (terpri)
   ;;  (princ "scrambling text")
     (funfair::quit))
-  
+
+  (gl:disable :cull-face)
+  (gl:disable :depth-test)
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
@@ -129,7 +131,6 @@
 			 (glhelp::texture (getfnc 'text-data))
 			 )))
     
-    (gl:disable :cull-face)
     (set-render-area *view*)
     (glhelp::bind-default-framebuffer)
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
@@ -137,7 +138,7 @@
 
 (defun uppow2 (n)
   (ash 1 (ceiling (log n 2))))
-;;up to next power of two
+ ;;up to next power of two
 (defun render-normal-text-refraction (w h)
   (let ((upw (uppow2 w))
 	(uph (uppow2 h))
@@ -154,6 +155,7 @@
 		   (/ h
 		      *block-height*)))
     (gl:disable :cull-face)
+    (gl:disable :depth-test)
     (set-render-area (make-instance 'funfair::render-area
 				    :width upw
 				    :height uph))
@@ -173,7 +175,7 @@
 
 (defun use-text ()
   (setf *trampoline* 'per-frame)
-  (setf *pre-trampoline-hooks* (list 'scrubgl2))
+  (setf *pre-trampoline-hooks* nil)
   (setf window::*resize-hook* 'render-normal-text-refraction))
 
 (defmacro progeach (fun body)

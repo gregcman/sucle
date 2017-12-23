@@ -1069,12 +1069,10 @@ edge, or no case"
 		  :test 'equal)))
 (defparameter *ticker* nil)
 (defun sandbox-init ()
-  (clrhash sandbox::*g/chunk-call-list*)
   (setf *ticker*
 	(tickr:make-ticker
 	 (floor 1000000 60)
-	 (microseconds)))
-  (scrubgl2))
+	 (microseconds))))
 
 (defparameter *ents* (map-into (make-array 10) #'gentity))
 (defparameter *ent* (aref *ents* 1))
@@ -1181,9 +1179,18 @@ edge, or no case"
     blockshader
     terrain-png))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(deflazy gl-init (funfair::gl-context)
+  (declare (ignorable funfair::gl-context))
+  (clrhash sandbox::*g/chunk-call-list*))
 
 (defun atick (session)
   (declare (ignorable session))
+ ; (print 324234)
+  (progn
+    (funfair::reload-if-dirty 'gl-init)
+ ;   (print 234234)
+    (getfnc 'gl-init))
+ ; (print 34243)
   (when (window::skey-j-p (window::keyval :r) *control-state*)
     (window:toggle-mouse-capture)
     (moused))
