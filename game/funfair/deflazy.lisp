@@ -134,41 +134,43 @@
   (with-slots (lazy-place-exists-p) lazy-place
     (setf lazy-place-exists-p nil)))
 
+;;ensure place contains a lazy value, and return that object
+(defmacro ensure-lazy-place (place &environment env)
+  (multiple-value-bind (vars vals stores setter getter)
+      (get-setf-expansion place env)
+    (funland::with-gensyms (value values-form)
+      `(let* (,@ (mapcar #'list vars vals))
+	 (or (let ((,value ,getter))
+	       (when (lazy-place-p ,value)
+		 ,value))
+	     (let ((,values-form (make-lazy-place)))
+	       (multiple-value-bind ,stores ,values-form
+		 ,setter)))))))
+
+;;set the values in the lazy cell
+(defun %deflazy-aux (fun deps inst)
+  (let ((len (list-length deps)))
+    (with-slots (lazy-place-genfun
+		 lazy-place-args
+		 lazy-place-args-values-old
+		 lazy-place-args-timestamps) inst
+      (setf lazy-place-genfun fun
+	    lazy-place-args-timestamps (make-list len :initial-element -1)
+	    lazy-place-args-values-old (make-list len)
+	    lazy-place-args deps)))
+  inst)
+
 (defmacro deflazy (place (&rest deps) &rest gen-forms)
   (let ((places (mapcar #'second deps))
-	(vars (mapcar #'first deps))
-	(deps-len (list-length deps)))
-    (funland::with-gensyms (len ensure-lazy-place)
-      `(macrolet ((,ensure-lazy-place (place &environment env)
-		    (multiple-value-bind (vars vals stores setter getter)
-			(get-setf-expansion place env)
-		      (funland::with-gensyms (value values-form)
-			`(let* (,@ (mapcar #'list vars vals))
-			   (or (let ((,value ,getter))
-				 (when (lazy-place-p ,value)
-				   ,value))
-			       (let ((,values-form (make-lazy-place)))
-				 (multiple-value-bind ,stores ,values-form
-				   ,setter))))))))
-	 (let ((inst (,ensure-lazy-place ,place))
-	       (,len ,deps-len))
-	   (with-slots (lazy-place-genfun
-			lazy-place-args
-			lazy-place-args-values-old
-			lazy-place-args-timestamps) inst
-	     (setf lazy-place-genfun
-		   (lambda ,vars
-		     ,@gen-forms))
-	     (setf lazy-place-args-timestamps
-		   (make-list ,len :initial-element -1))
-	     (setf lazy-place-args-values-old
-		   (make-list ,len))
-	     (setf lazy-place-args
-		   ,(cons 'list
-			  (mapcar (lambda (x) (list ensure-lazy-place x))
-				  places))
-		   ))
-	   inst)))))
+	(vars (mapcar #'first deps)))
+    `(let ((inst (ensure-lazy-place ,place)))
+       (%deflazy-aux
+	(lambda ,vars
+	  ,@gen-forms)
+	,(cons 'list
+	       (mapcar (lambda (x) (list 'ensure-lazy-place x))
+		       places))
+	inst))))
 
 #+nil
 (defmacro my-setf (place values-form &environment env)

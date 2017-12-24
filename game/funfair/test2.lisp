@@ -72,7 +72,7 @@
   (when (window::skey-j-p (window::keyval :r))
    ;; (terpri)
   ;;  (princ "scrambling text")
-    (reload 'text-shader))
+    (funfair::reload 'text-shader))
 
   (when (window::skey-j-p (window::keyval :escape))
    ;; (terpri)
