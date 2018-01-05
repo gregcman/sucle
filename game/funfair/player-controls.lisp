@@ -1067,39 +1067,33 @@ edge, or no case"
 		  '(("gm3-iMac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
 		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		  :test 'equal)))
-(defparameter *ticker* nil)
-(defun sandbox-init ()
-  (setf *ticker*
-	(tickr:make-ticker
-	 (floor 1000000 60)
-	 (microseconds))))
+(defparameter *ticker*
+  (tickr:make-ticker
+   (floor 1000000 60)
+   most-positive-fixnum))
 
 (defparameter *ents* (map-into (make-array 10) #'gentity))
 (defparameter *ent* (aref *ents* 1))
 
-(defparameter *paused* nil)
 (defun physss ()
   (let* ((player-farticle (entity-particle *ent*))
 	 (pos (farticle-position player-farticle))
 	 (control-state *control-state*))
     (meta-controls control-state
 			    *ent*)
-    (when (window::skey-j-p (window::keyval :x) control-state)
-      (toggle *paused*))
     (let ((num (num-key-jp *control-state*)))
       (when num
 	(setf *ent* (aref *ents* num))))
     #+nil
     (when (window::skey-j-p (window::keyval :j) control-state)
        (atest::wowz))
-    (unless *paused*
-      (setf (entity-hips *ent*)
-	    (wasd-mover
-	     (window::skey-p (window::keyval :e) control-state)
-	     (window::skey-p (window::keyval :s) control-state)
-	     (window::skey-p (window::keyval :d) control-state)
-	     (window::skey-p (window::keyval :f) control-state)))
-      (physentity *ent*))
+    (setf (entity-hips *ent*)
+	  (wasd-mover
+	   (window::skey-p (window::keyval :e) control-state)
+	   (window::skey-p (window::keyval :s) control-state)
+	   (window::skey-p (window::keyval :d) control-state)
+	   (window::skey-p (window::keyval :f) control-state)))
+    (physentity *ent*)
     (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
       (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -1.0)
       (use-fists control-state backwardsbug
@@ -1183,6 +1177,7 @@ edge, or no case"
   (declare (ignorable funfair::gl-context))
   (clrhash sandbox::*g/chunk-call-list*))
 
+(defparameter *paused* nil)
 (defun atick (session)
   (declare (ignorable session))
  ; (print 324234)
@@ -1216,25 +1211,29 @@ edge, or no case"
    )
   (setf (camat:camera-fov *camera*) *fov*)
   (setf (camat:camera-frustum-far *camera*) (* 1024.0 256.0))
+  (when (window::skey-j-p (window::keyval :x))
+    (toggle *paused*))
   (when *sandbox-on*
-    (multiple-value-bind (fraction times) (tick *ticker* #'physss)
-      (declare (ignorable times))
-      (when (window:mice-locked-p)
-	(update-moused 0.5)
-	(multiple-value-call
-	    #'change-entity-neck
-	  *ent*
-	  (multiple-value-bind (x y) (values *lerp-mouse-x*
-					     *lerp-mouse-y*)
-	    (values (coerce (* x -1.0d0 *mouse-multiplier*)
-			    'single-float)
-		    (coerce (* y *mouse-multiplier*)
-			    'single-float)))
-	  ))
-      (entity-to-camera *ent* *camera* fraction))
+    (if *paused*
+	(tick *ticker* (lambda ()))
+	(multiple-value-bind (fraction times) (tick *ticker* #'physss)
+	  (declare (ignorable times))
+	  (when (window:mice-locked-p)
+	    (update-moused 0.5)
+	    (multiple-value-call
+		#'change-entity-neck
+	      *ent*
+	      (multiple-value-bind (x y) (values *lerp-mouse-x*
+						 *lerp-mouse-y*)
+		(values (coerce (* x -1.0d0 *mouse-multiplier*)
+				'single-float)
+			(coerce (* y *mouse-multiplier*)
+				'single-float)))
+	      ))
+	  (entity-to-camera *ent* *camera* fraction)))
     (camat:update-matrices *camera*)
     (camera-shader *camera*))
-    
+  
   (progn
     ((lambda (width height)
        (let ((render-area *black*))
@@ -1363,7 +1362,6 @@ edge, or no case"
 
 (defun use-sandbox ()
   (setf *trampoline* 'atick)
-  (setf *pre-trampoline-hooks* (list 'sandbox-init))
   (setf window:*resize-hook* (constantly nil)))
 
 ;;;; run use-sandbox before running funfair::main

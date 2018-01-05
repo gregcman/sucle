@@ -147,9 +147,7 @@
     (scrubgl2)
     (window:set-vsync t)
     (gl:enable :scissor-test)
-    (dolist (x *pre-trampoline-hooks*) (funcall x))
     (call-trampoline)))
-(defparameter *pre-trampoline-hooks* nil)
 
 (deflazy gl-context ()
   glhelp::*gl-context*)

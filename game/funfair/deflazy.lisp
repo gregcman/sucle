@@ -148,16 +148,15 @@
 		 ,setter)))))))
 
 ;;set the values in the lazy cell
-(defun %deflazy-aux (fun deps inst)
-  (let ((len (list-length deps)))
-    (with-slots (lazy-place-genfun
-		 lazy-place-args
-		 lazy-place-args-values-old
-		 lazy-place-args-timestamps) inst
-      (setf lazy-place-genfun fun
-	    lazy-place-args-timestamps (make-list len :initial-element -1)
-	    lazy-place-args-values-old (make-list len)
-	    lazy-place-args deps)))
+(defun %deflazy-aux (len fun deps inst)
+  (with-slots (lazy-place-genfun
+	       lazy-place-args
+	       lazy-place-args-values-old
+	       lazy-place-args-timestamps) inst
+    (setf lazy-place-genfun fun
+	  lazy-place-args-timestamps (make-list len :initial-element -1)
+	  lazy-place-args-values-old (make-list len)
+	  lazy-place-args deps))
   inst)
 
 (defmacro deflazy (place (&rest deps) &rest gen-forms)
@@ -165,6 +164,7 @@
 	(vars (mapcar #'first deps)))
     `(let ((inst (ensure-lazy-place ,place)))
        (%deflazy-aux
+	,(list-length deps)
 	(lambda ,vars
 	  ,@gen-forms)
 	,(cons 'list

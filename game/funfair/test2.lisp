@@ -159,9 +159,7 @@
     (set-render-area (make-instance 'funfair::render-area
 				    :width upw
 				    :height uph))
-    (let ((obj (getfnc 'indirection)))
-      (glhelp::gl-delete* obj))
-    (funfair::remove-stuff 'indirection)
+    (funfair::reload 'indirection)
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
 
@@ -175,7 +173,6 @@
 
 (defun use-text ()
   (setf *trampoline* 'per-frame)
-  (setf *pre-trampoline-hooks* nil)
   (setf window::*resize-hook* 'render-normal-text-refraction))
 
 (defmacro progeach (fun body)
