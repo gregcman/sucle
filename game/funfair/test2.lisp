@@ -6,10 +6,21 @@
 
 (defvar *this-directory* (filesystem-util:this-directory))
 (deflazy font-png ()
-  (opticl:read-png-file
-   (filesystem-util:rebase-path #P"font.png"
-				*this-directory*)))
+  (let ((array
+	 (opticl:read-png-file
+	  (filesystem-util:rebase-path #P"font.png"
+				       *this-directory*))))
+    (destructuring-bind (w h) (array-dimensions array)
+      (let ((new
+	     (make-array (list w h 4) :element-type '(unsigned-byte 8))))
+	(dobox ((width 0 w)
+		(height 0 h))
+	       (let ((value (aref array width height)))
+		 (dotimes (i 4)
+		   (setf (aref new width height i) value))))
+	new))))
 
+#+nil
 (deflazy terrain-png ()
   (opticl:read-png-file
    (filesystem-util:rebase-path 
@@ -22,7 +33,7 @@
        :handle
        (glhelp:pic-texture
 	font-png
-	:luminance
+	:rgba
 	))
     (glhelp:apply-tex-params
      (quote ((:texture-min-filter . :nearest)
@@ -31,13 +42,16 @@
 	     (:texture-wrap-t . :repeat))))))
 
 (defparameter *reloadables*
-  '(shader-test
-    text-shader
+  '(
+    ;;shader-test
+;    text-shader
     render-normal-text-refraction
-    refraction-shader-text
-    refraction-shader
-    flat-shader-text
-    flat-shader
+ ;   refraction-shader-text
+ ;   refraction-shader
+ ;   flat-shader-text
+;    flat-shader
+;    font-png
+ ;   font-texture
     text
     foo
     terminal256color-lookup))
@@ -53,10 +67,7 @@
 (setf (values *block-width* *block-height*)
       (values 8.0 16.0))
 
-(defun use-text ()
-  (let ((item 'per-frame))
-    (unless (member item *trampoline*)
-      (push item *trampoline*))))
+(setf *trampoline* '(sndbx::per-frame funtext::per-frame))
 
 (defparameter *mouse-x* 0.0)
 (defparameter *mouse-y* 0.0)
@@ -330,7 +341,8 @@ z: ~10,1F"
       (= (|.| :gl-frag-color "rgb")
        (|.| fin "rgb"))
       (= (|.| :gl-frag-color "a")
-       (* (|.| fin "a")
+       (*
+	(|.| fin "a")
 	(|.| raw "a")))
       ))
    :attributes
@@ -420,51 +432,31 @@ z: ~10,1F"
 	     )))))
     a))
 
-;;VT100 terminal emulator color uniform
+;;color uniform
 (deflazy terminal256color-lookup ()
- (let ((a (make-array (* 4 256) :element-type 'single-float)))
+ (let ((arr (make-array (* 4 256) :element-type 'single-float)))
    (dotimes (x 256)
      (let ((offset (* 4 x)))
-       (multiple-value-bind (r g b) (color-rgb x) 
-	 (setf (aref a (+ offset 0)) r
-	       (aref a (+ offset 1)) g
-	       (aref a (+ offset 2)) b
-	       (aref a (+ offset 3)) 1.0))))
-   a))
-
-;;VT100 terminal emulator colors
+       (multiple-value-bind (r g b a) (color-rgb x) 
+	 (setf (aref arr (+ offset 0)) r
+	       (aref arr (+ offset 1)) g
+	       (aref arr (+ offset 2)) b
+	       (aref arr (+ offset 3)) a))))
+   arr))
 (defun color-rgb (color)
-  (labels ((c (r g b)
-	     (values (/ r 255.0) (/ g 255.0) (/ b 255.0)))
-	   (c6 (x)
-	     (let ((b (mod x 6))
-		   (g (mod (floor x 6) 6))
-		   (r (mod (floor x 36) 6)))
-	       (values (/ r 5.0) (/ g 5.0) (/ b 5.0))))
-	   (g (x)
-	     (let ((gray (/ x 23.0)))
-	       (values gray gray gray))))
-    (case color
-      (0 (c 0 0 0))
-      (1 (c 205 0 0))
-      (2 (c 0 205 0))
-      (3 (c 205 205 0))
-      (4 (c 0 0 238))
-      (5 (c 205 0 205))
-      (6 (c 0 205 205))
-      (7 (c 229 229 229))
-      (8 (c 127 127 127))
-      (9 (c 255 0 0))
-      (10 (c 0 255 0))
-      (11 (c 255 255 0))
-      (12 (c 92 92 255))
-      (13 (c 255 0 255))
-      (14 (c 0 255 255))
-      (15 (c 255 255 255))
-      (t (let ((c (- color 16)))
-	   (if (< c 216)
-	       (c6 c)
-	       (g (- c 216))))))))
+  (let ((one-third (etouq (coerce 1/3 'single-float))))
+    (macrolet ((k (num)
+		 `(* one-third (floatify (ldb (byte 2 ,num) color)))))
+      (values (k 0)
+	      (k 2)
+	      (k 4)
+	      (k 6)))))
+
+(defun color (r g b a)
+  (dpb a (byte 2 6)
+       (dpb b (byte 2 4)
+	    (dpb g (byte 2 2)
+		 (dpb r (byte 2 0) 0)))))
 
 (deflazy refraction-shader-text ()
   (glslgen:ashader
@@ -525,11 +517,16 @@ z: ~10,1F"
 (deflazy refraction-shader (refraction-shader-text)
   (glhelp::create-gl-program refraction-shader-text))
 
-
 (defun floatify (x)
   (coerce x 'single-float))
 
-(defun mesh-string-gl-points (x y string)
+(defun byte-float (x)
+  (/ (floatify x)
+     255.0))
+
+(defun mesh-string-gl-points (x y string &optional
+					   (bgcol (byte-float (color 0 0 0 0)))
+					   (fgcol (byte-float (color 0 0 0 3))))
   (let ((position (scratch-buffer:my-iterator))
        (value (scratch-buffer:my-iterator))
        (len 0))
@@ -552,10 +549,9 @@ z: ~10,1F"
 			     (pos (floatify (/ y 128.0))
 			      )
 			     (pos 0.0)
-			     (value (/ (floatify (char-code char))
-				       255.0))
-			     (value 0.909)
-			     (value 1.0)
+			     (value (byte-float (char-code char)))
+			     (value bgcol)
+			     (value fgcol)
 			     
 			     (setf x (1+ x))))))
 		  len)))
@@ -606,14 +602,4 @@ z: ~10,1F"
 
 (deflazy flat-shader (flat-shader-text)
   (glhelp::create-gl-program flat-shader-text))
-
-;;;;usage:
-#+nil
-(progn
-  (ql:quickload :text-funfair)
-  (in-package :funtext)
-  (use-text)
-  (main))
-
-;;distance field fonts?
 

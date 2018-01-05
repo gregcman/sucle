@@ -1178,7 +1178,7 @@ edge, or no case"
   (clrhash sandbox::*g/chunk-call-list*))
 
 (defparameter *paused* nil)
-(defun atick (session)
+(defun per-frame (session)
   (declare (ignorable session))
  ; (print 324234)
   (progn
@@ -1368,11 +1368,6 @@ edge, or no case"
    (filesystem-util:rebase-path #P"grasscolor.png" *ourdir*)))
 (deflazy blockshader (blockshader-text)
   (glhelp::create-gl-program blockshader-text))
-
-(defun use-sandbox ()
-  (let ((item 'atick))
-    (unless (member item *trampoline*)
-      (push 'atick *trampoline*))))
 
 ;;;; run use-sandbox before running funfair::main
 
