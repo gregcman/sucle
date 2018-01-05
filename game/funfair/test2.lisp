@@ -136,6 +136,57 @@
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))
     ))
 
+(defparameter *foo*
+  (let ((*print-case* :downcase))
+    (write-to-string
+     '(let ((width 256)
+	    (height 256))
+       (cffi:with-foreign-object (b :uint8 (etouq (* 256 256 4)))
+	 (dobox ((xpos 0 width)
+		 (ypos 0 height))		   
+		(let ((offset (the fixnum (* 4 (the fixnum (+ xpos (the fixnum (* ypos width))))))))
+		  (let ((num
+			 (random most-positive-fixnum)))
+		    (let ((zero-bits (ldb (byte 8 24) num)))
+		      (when (zerop zero-bits))
+		      (setf (cffi:mem-aref b :uint8 (+ offset '0)) (ldb (byte 8 16) num)
+			    (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num)
+			    (cffi:mem-aref b :uint8 (+ offset 2)) (logand 255 num) 
+			    (cffi:mem-aref b :uint8 (+ offset 3)) zero-bits))
+		    )))
+	 (gl:bind-texture :texture-2d (texture (getfnc 'text-data)))
+	 (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b))))))
+
+(defun copy-array-buf ()
+  (let ((width 256)
+	(height 256))
+    (cffi:with-foreign-object (b :uint8 (etouq (* 256 256 4)))
+      (dobox ((ypos 0 height)
+	      (xpos 0 width))
+	     (let ((base (the fixnum (+ xpos (the fixnum (* ypos width))))))
+	       (let ((offset (the fixnum (* 4 base))))
+		 (let ((num
+			#+nil
+			(logior (char-code (aref *foo* (mod base 1024)))
+				(ash 0 8)
+				(ash 255 16))
+					;	#+nil
+			
+			(ash (random (1- (ash 1 32))) -2)
+			
+			 #+nil
+			 (get-char-num
+			  (get-char (the fixnum (+ xpos xstart))
+				    (the fixnum (+ ypos ystart))))))
+		   (setf (cffi:mem-aref b :uint8 (+ offset 0)) (ldb (byte 8 16) num)
+			 (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num)
+			 (cffi:mem-aref b :uint8 (+ offset 2)) (logand 255 num) 
+			 (cffi:mem-aref b :uint8 (+ offset 3)) (ldb (byte 8 24) num))
+		   ))))
+      (progn
+	(gl:bind-texture :texture-2d (glhelp::texture (getfnc 'text-data)))
+	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
+
 
 (defun uppow2 (n)
   (ash 1 (ceiling (log n 2))))
@@ -241,11 +292,14 @@
       (/**/ vec4 ind)
       (= ind ("texture2D" indirection texcoord))
 
+      (/**/ vec4 raw)
+      (= raw ("texture2D" text-data
+	      (|.| ind "ba")))
+
       ;;where text changes go
-      (/**/ ivec4 chardata)
+      (/**/ ivec3 chardata)
       (= chardata
-       (ivec4 (* 255.0 ("texture2D" text-data
-				    (|.| ind "ba")))))
+       (ivec3 (* 255.0 raw)))
 
       ;;font atlass coordinates
       (/**/ vec4 fontdata)
@@ -264,13 +318,19 @@
 					;(vec2 0.5 0.5)
 	     (|.| ind "rg")
 	     )))
-
-      (= :gl-frag-color	  
+      
+      (/**/ vec4 fin)
+      (= fin
        (mix
 	([] color-atlas (|.| chardata "g"))
 	([] color-atlas (|.| chardata "b"))
-	pixcolor)
-       )))
+	pixcolor))
+      (= (|.| :gl-frag-color "rgb")
+       (|.| fin "rgb"))
+      (= (|.| :gl-frag-color "a")
+       (* (|.| fin "a")
+	(|.| raw "a")))
+      ))
    :attributes
    '((position . 0) 
      (texcoord . 2))
@@ -306,7 +366,7 @@
 			 var))
       (with-foreign-array (var color :float len)
 	(%gl:uniform-4fv (uniform 'color-data)
-			 (/ len 4)
+			 (/ len 3)
 			 var)))
     shader))
 
@@ -367,9 +427,7 @@
 	 (setf (aref a (+ offset 0)) r
 	       (aref a (+ offset 1)) g
 	       (aref a (+ offset 2)) b
-	       (aref a (+ offset 3)) (if (zerop (random 20))
-					 1.0
-					 0.0)))))
+	       (aref a (+ offset 3)) 1.0))))
    a))
 
 ;;VT100 terminal emulator colors
@@ -465,56 +523,6 @@
 (deflazy refraction-shader (refraction-shader-text)
   (glhelp::create-gl-program refraction-shader-text))
 
-(defparameter *foo*
-  (let ((*print-case* :downcase))
-    (write-to-string
-     '(let ((width 256)
-	    (height 256))
-       (cffi:with-foreign-object (b :uint8 (etouq (* 256 256 4)))
-	 (dobox ((xpos 0 width)
-		 (ypos 0 height))		   
-		(let ((offset (the fixnum (* 4 (the fixnum (+ xpos (the fixnum (* ypos width))))))))
-		  (let ((num
-			 (random most-positive-fixnum)))
-		    (let ((zero-bits (ldb (byte 8 24) num)))
-		      (when (zerop zero-bits))
-		      (setf (cffi:mem-aref b :uint8 (+ offset '0)) (ldb (byte 8 16) num)
-			    (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num)
-			    (cffi:mem-aref b :uint8 (+ offset 2)) (logand 255 num) 
-			    (cffi:mem-aref b :uint8 (+ offset 3)) zero-bits))
-		    )))
-	 (gl:bind-texture :texture-2d (texture (getfnc 'text-data)))
-	 (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b))))))
-
-(defun copy-array-buf ()
-  (let ((width 256)
-	(height 256))
-    (cffi:with-foreign-object (b :uint8 (etouq (* 256 256 4)))
-      (dobox ((ypos 0 height)
-	      (xpos 0 width))
-	     (let ((base (the fixnum (+ xpos (the fixnum (* ypos width))))))
-	       (let ((offset (the fixnum (* 4 base))))
-		 (let ((num
-			#+nil
-			(logior (char-code (aref *foo* (mod base 1024)))
-				(ash 0 8)
-				(ash 255 16))
-		;	#+nil
-			(random most-positive-fixnum)
-			 #+nil
-			 (get-char-num
-			  (get-char (the fixnum (+ xpos xstart))
-				    (the fixnum (+ ypos ystart))))))
-		   (let ((zero-bits (ldb (byte 8 24) num)))
-		     (when (zerop zero-bits))
-		     (setf (cffi:mem-aref b :uint8 (+ offset 0)) (ldb (byte 8 16) num)
-			   (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num)
-			   (cffi:mem-aref b :uint8 (+ offset 2)) (logand 255 num) 
-			   (cffi:mem-aref b :uint8 (+ offset 3)) zero-bits))
-		   ))))
-      (progn
-	(gl:bind-texture :texture-2d (glhelp::texture (getfnc 'text-data)))
-	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
 
 (defun floatify (x)
   (coerce x 'single-float))
