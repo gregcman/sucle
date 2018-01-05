@@ -89,7 +89,6 @@
 
   (when (window::skey-j-p (window::keyval :escape))
     (funfair::quit))
-
   (gl:disable :depth-test)
  ; #+nil
   (let ((program (getfnc 'flat-shader)))

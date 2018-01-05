@@ -995,34 +995,37 @@ edge, or no case"
     (sandbox::setblock-with-update x y z 0 0)))
 
 (defparameter *big-fist-fun*
-  (or
-   (lambda (x y z)
-     (let ((a (world::getblock x y z)))
-       (unless (or (= a 1)
-		   (= a 0))
-	 (sandbox::plain-setblock x y z 0 0))))
+  (lambda (x y z)
+    (let ((a (world::getblock x y z)))
+      (when (or (= a 1)
+		;(= a 0)
+		)	
+	(sandbox::setblock-with-update x y z 0 0))))
    ;;  #'atest::bonder2
-   #+nil
-   (lambda (x y z)
-     (atest::dirts x y z)
-     (atest::grassify x y z))
+
+  #+nil
+  (lambda (x y z)
+    (atest::dirts x y z)
+    (atest::grassify x y z))
   ;; (atest::sheath 2 1)
-   (lambda (x y z) ;(print (list x y z))
-     )
-   ))
+
+  #+nil
+  (lambda (x y z) ;(print (list x y z))
+    )
+   )
 
 (defun big-swing-fist (px py pz vx vy vz)
-  (let ((u 128))
+  (let ((u 16))
     (aabb-collect-blocks
      px py pz (* u vx) (* u vy) (* u vz)
      (load-time-value
       (aabbcc:make-aabb
-       :minx -10.3
-       :miny -10.5
-       :minz -10.3
-       :maxx 10.3
-       :maxy 11.12
-       :maxz 10.3))   
+       :minx -0.3
+       :miny -0.5
+       :minz -0.3
+       :maxx 0.3
+       :maxy 1.12
+       :maxz 0.3))   
      *big-fist-fun*)))
 
 ;;;;150 ms delay for sprinting
@@ -1180,16 +1183,12 @@ edge, or no case"
 (defparameter *paused* nil)
 (defun per-frame (session)
   (declare (ignorable session))
- ; (print 324234)
   (progn
     (funfair::reload-if-dirty 'gl-init)
- ;   (print 234234)
     (getfnc 'gl-init))
- ; (print 34243)
   (when (window::skey-j-p (window::keyval :r) *control-state*)
     (window:toggle-mouse-capture)
     (moused))
-  
   (map nil #'funfair::reload-if-dirty *reloadables*)
   ((lambda (width height)
      (let ((camera *camera*))
@@ -1234,7 +1233,6 @@ edge, or no case"
 	  (entity-to-camera *ent* *camera* fraction)))
     (camat:update-matrices *camera*)
     (camera-shader *camera*))
-  
   (progn
     ((lambda (width height)
        (let ((render-area *black*))
