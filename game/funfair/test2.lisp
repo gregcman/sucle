@@ -39,6 +39,7 @@
     flat-shader-text
     flat-shader
     text
+    foo
     terminal256color-lookup))
 
 (defparameter *identity-mat*
@@ -76,27 +77,34 @@
     (copy-array-buf))
 
   (when (window::skey-j-p (window::keyval :escape))
-   ;; (terpri)
-  ;;  (princ "scrambling text")
     (funfair::quit))
 
   (gl:disable :depth-test)
-  #+nil
+ ; #+nil
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
       (gl:uniform-matrix-4fv
        (uniform :pmv)
-       (cg-matrix:translate* ;0.5 0.1
-	*mouse-x* *mouse-y*
+       (cg-matrix:translate* 0.0 0.0
+	;*mouse-x* *mouse-y*
 			     0.0)
        nil))
-    #+nil
     (progn
-      (gl:clear-color 0.1 0.11 0.3 0.0)
-      (gl:clear :color-buffer-bit))
-    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-    (funfair::%set-render-area 0 0 256 256)
+      (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
+      (funfair::%set-render-area 0 0 256 256))
+    (let ((value (sndbx::farticle-position (sndbx::entity-particle sndbx::*ent*))))
+      (with-vec (a b c) (value)
+	(setfoo (format nil
+			"
+x: ~10,1F
+y: ~10,1F
+z: ~10,1F"
+			a b c))))
+    (when (window::skey-j-p (window::keyval :b))
+      (progn
+	(gl:clear-color 0.0 0.0 0.0 0.0)
+	(gl:clear :color-buffer-bit)))
     (gl:call-list (glhelp::handle (getfnc 'text)))
     )
   (let ((program (getfnc 'text-shader)))
@@ -136,26 +144,20 @@
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))
     ))
 
-(defparameter *foo*
+(defun setfoo (obj)
+  (setf *foo* obj)
+  (funfair::reload 'foo))
+(defparameter *foo* nil)
+(deflazy foo ()
   (let ((*print-case* :downcase))
     (write-to-string
-     '(let ((width 256)
-	    (height 256))
-       (cffi:with-foreign-object (b :uint8 (etouq (* 256 256 4)))
-	 (dobox ((xpos 0 width)
-		 (ypos 0 height))		   
-		(let ((offset (the fixnum (* 4 (the fixnum (+ xpos (the fixnum (* ypos width))))))))
-		  (let ((num
-			 (random most-positive-fixnum)))
-		    (let ((zero-bits (ldb (byte 8 24) num)))
-		      (when (zerop zero-bits))
-		      (setf (cffi:mem-aref b :uint8 (+ offset '0)) (ldb (byte 8 16) num)
-			    (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num)
-			    (cffi:mem-aref b :uint8 (+ offset 2)) (logand 255 num) 
-			    (cffi:mem-aref b :uint8 (+ offset 3)) zero-bits))
-		    )))
-	 (gl:bind-texture :texture-2d (texture (getfnc 'text-data)))
-	 (gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b))))))
+     *foo* :pretty t :escape nil)))
+
+(deflazy text (foo)
+  (make-instance
+    'glhelp::gl-list
+    :handle
+    (mesh-string-gl-points -128.0 -125.0 foo)))
 
 (defun copy-array-buf ()
   (let ((width 256)
@@ -527,8 +529,8 @@
 (defun floatify (x)
   (coerce x 'single-float))
 
-(deflazy text ()
- (let ((position (scratch-buffer:my-iterator))
+(defun mesh-string-gl-points (x y string)
+  (let ((position (scratch-buffer:my-iterator))
        (value (scratch-buffer:my-iterator))
        (len 0))
    (iter-ator:bind-iterator-out
@@ -552,28 +554,25 @@
 			     (pos 0.0)
 			     (value (/ (floatify (char-code char))
 				       255.0))
-			     (value 0.1)
-			     (value 0.99)
+			     (value 0.909)
+			     (value 1.0)
 			     
 			     (setf x (1+ x))))))
 		  len)))
-	    -128.0 -128.0 *foo*))))
-   (make-instance
-    'glhelp::gl-list
-    :handle
-    (glhelp:with-gl-list
-      (gl:with-primitives :points
-	(scratch-buffer:flush-my-iterator position
-	  (scratch-buffer:flush-my-iterator value
-	    ((lambda (times position value)
+	    x y string))))
+   (glhelp:with-gl-list
+     (gl:with-primitives :points
+       (scratch-buffer:flush-my-iterator position
+	 (scratch-buffer:flush-my-iterator value
+	   ((lambda (times position value)
+	      (iter-ator:bind-iterator-in
+	       (xyz single-float) position
 	       (iter-ator:bind-iterator-in
-		(xyz single-float) position
-		(iter-ator:bind-iterator-in
-		 (value single-float) value
-		 (dotimes (x times)
-		   (%gl:vertex-attrib-4f 2 (value) (value) (value) 1.0)
-		   (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
-	     len position value))))))))
+		(value single-float) value
+		(dotimes (x times)
+		  (%gl:vertex-attrib-4f 2 (value) (value) (value) 1.0)
+		  (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
+	    len position value)))))))
 
 (deflazy flat-shader-text ()
   (glslgen:ashader
