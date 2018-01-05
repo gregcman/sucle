@@ -969,8 +969,8 @@ edge, or no case"
 	    (big-swing-fist
 	     px py pz
 	     vx vy vz)))
-	(let ((a (window::skey-p (window::mouseval :left) control-state))
-	      (b (window::skey-p (window::mouseval :right) control-state)))
+	(let ((a (window::skey-j-p (window::mouseval :left) control-state))
+	      (b (window::skey-j-p (window::mouseval :right) control-state)))
 	  (when (or a b)
 	    (standard-fist
 	     fist
@@ -1203,6 +1203,7 @@ edge, or no case"
 	     (render-area-y render-area) 0
 	     )))
    window::*width* window::*height*)
+  (glhelp::bind-default-framebuffer)
   (set-render-area *render-area*)
   (set-sky-color)
   (gl:clear
@@ -1246,7 +1247,6 @@ edge, or no case"
     (gl:clear-color 1.0 1.0 1.0 1.0)
     (gl:clear
      :color-buffer-bit
-     :depth-buffer-bit
      )))
 
 (defun set-sky-color ()
@@ -1255,7 +1255,8 @@ edge, or no case"
 	  (g (* daytime (aref *sky-color* 1)))
 	  (b (* daytime (aref *sky-color* 2))))
       (gl:clear-color r g b 1.0))))
-(defparameter *sky-color* (vector 0.68 0.8 1.0))
+(defparameter *sky-color* #+nil (vector 0.68 0.8 1.0)
+	      (vector 1.0 1.0 1.0))
 (defparameter *fog-ratio* 0.75)
 
 (defun camera-shader (camera)
@@ -1281,16 +1282,23 @@ edge, or no case"
 			  (/ -1.0 (or 128 (camat:camera-frustum-far *camera*)) *fog-ratio*))
 	  (%gl:uniform-1f (uniform :aratio)
 			  (/ 1.0 *fog-ratio*)))))
+
+    (progn
+      (gl:uniformi (uniform :sampler) 0)
+      (glhelp::set-active-texture 0)
+      (gl:bind-texture :texture-2d
+		       (glhelp::handle (getfnc 'terrain))
+		       ))
     #+nil
     (gl:uniformf 
      (uniform :time)
      (float (/ (get-internal-real-time)
 	       100.0))))
-  (gl:bind-texture :texture-2d (glhelp::handle (getfnc 'terrain)))
   (gl:enable :depth-test)  
   (gl:depth-func :less)
   (gl:enable :cull-face)
   (gl:cull-face :back)
+  (gl:disable :blend)
   (sandbox::draw-world)
   (sandbox::designatemeshing))
 
@@ -1361,8 +1369,9 @@ edge, or no case"
   (glhelp::create-gl-program blockshader-text))
 
 (defun use-sandbox ()
-  (setf *trampoline* 'atick)
-  (setf window:*resize-hook* (constantly nil)))
+  (let ((item 'atick))
+    (unless (member item *trampoline*)
+      (push 'atick *trampoline*))))
 
 ;;;; run use-sandbox before running funfair::main
 
@@ -1440,4 +1449,5 @@ edge, or no case"
      (:fogcolor (:fragment-shader fogcolor))
      (:foglet (:vertex-shader foglet))
      (:aratio (:vertex-shader aratio))
-     (:camera-pos (:vertex-shader camera-pos)))))
+     (:camera-pos (:vertex-shader camera-pos))
+     (:sampler (:fragment-shader sampler)))))

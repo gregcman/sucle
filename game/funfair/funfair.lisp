@@ -30,19 +30,19 @@
 (defparameter *argument-values* (list nil 720 480
 				      ))
 
-(progn
-  (defparameter *trampoline* (lambda (exit-token) (throw exit-token (values))))
-  (defun call-trampoline ()
-    (let ((value (cons "trampoline" "token")))
-      (catch value
-	(loop
-	   (trampoline-bounce value *trampoline*))))))
+(defparameter *trampoline* nil)
+(defun call-trampoline ()
+  (let ((value (cons "trampoline" "token")))
+    (catch value
+      (loop
+	 (trampoline-bounce value *trampoline*)))))
 
-(defun trampoline-bounce (exit-token fun)
+(defun trampoline-bounce (exit-token funs)
   (when window:*status*
     (throw exit-token (values)))
   (window:poll)
-  (funcall fun exit-token)
+  (dolist (fun funs)
+    (funcall fun exit-token))
   (window::update-control-state *control-state*)
   (window:update-display))
 
@@ -75,15 +75,20 @@
 	(lazy-place::destroy value)))))
 
 (defun reload (name)
-  (let ((a (funfair::getfnc-no-update name)))
-    (when a
-      (when (and (typep a 'glhelp::gl-object)
-		 (glhelp:alive-p a))
-	(glhelp::gl-delete* a))
-      (funfair::remove-stuff name))))
+  (let ((place (gethash name *stuff*)))
+    (if place
+	(when (lazy-place::lazy-place-exists-p place)
+	  (let ((a (funfair::getfnc-no-update name)))
+	    (when (and (typep a 'glhelp::gl-object)
+		       (glhelp:alive-p a))
+	      (glhelp::gl-delete* a))
+	    (funfair::remove-stuff name)))
+	(format t "no place ~s" name))))
 
+(defun dirty? (name)
+  (lazy-place::dirty-p (gethash name *stuff*)))
 (defun reload-if-dirty (name)
-  (when (lazy-place::dirty-p (gethash name *stuff*))
+  (when (dirty? name)
     (reload name)))
 
 (defun scrubgl2 ()
@@ -138,12 +143,23 @@
 			:frustum-near (/ 1.0 8.0)))
 (defparameter *render-area* (make-instance 'render-area))
 
+(defun root-window-change (w h)
+  (let ((value (getfnc 'h)))
+    (unless (= value h)
+      (reload 'h)))
+  (let ((value (getfnc 'w)))
+    (unless (= value w)
+      (reload 'w))))
+
 (defun init ()
   (glhelp:with-gl-context
     (setf %gl:*gl-get-proc-address* (window:get-proc-address))
+    (setf window::*resize-hook* 'root-window-change)
     (progn
       (remove-stuff 'gl-context)
       (getfnc 'gl-context))
+    (remove-stuff 'h)
+    (remove-stuff 'w)
     (scrubgl2)
     (window:set-vsync t)
     (gl:enable :scissor-test)
@@ -151,3 +167,8 @@
 
 (deflazy gl-context ()
   glhelp::*gl-context*)
+
+(deflazy w ()
+  window::*width*)
+(deflazy h ()
+  window::*height*)

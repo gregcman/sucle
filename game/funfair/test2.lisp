@@ -33,11 +33,13 @@
 (defparameter *reloadables*
   '(shader-test
     text-shader
+    render-normal-text-refraction
     refraction-shader-text
     refraction-shader
     flat-shader-text
     flat-shader
-    text))
+    text
+    terminal256color-lookup))
 
 (defparameter *identity-mat*
   (cg-matrix:identity-matrix))
@@ -50,13 +52,17 @@
 (setf (values *block-width* *block-height*)
       (values 8.0 16.0))
 
+(defun use-text ()
+  (let ((item 'per-frame))
+    (unless (member item *trampoline*)
+      (push item *trampoline*))))
+
 (defparameter *mouse-x* 0.0)
 (defparameter *mouse-y* 0.0)
 (defun per-frame (session)
   (declare (ignorable session))
-
   (map nil #'funfair::reload-if-dirty *reloadables*)
-  
+  (getfnc 'render-normal-text-refraction)
   (setf (render-area-width *view*) window::*width*
 	(render-area-height *view*) window::*height*)
 
@@ -64,42 +70,35 @@
 	*mouse-y* (floatify (/ (- window::*height* window::*mouse-y*)
 			       *block-height*
 			       128.0)))
-  (when (window::skey-p (window::keyval :g))
+  (when (window::skey-p (window::keyval :n))
    ;; (terpri)
   ;;  (princ "scrambling text")
     (copy-array-buf))
-
-  (when (window::skey-j-p (window::keyval :r))
-   ;; (terpri)
-  ;;  (princ "scrambling text")
-    (funfair::reload 'text-shader))
 
   (when (window::skey-j-p (window::keyval :escape))
    ;; (terpri)
   ;;  (princ "scrambling text")
     (funfair::quit))
 
-  (gl:disable :cull-face)
   (gl:disable :depth-test)
+  #+nil
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
-    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-    (gl:viewport 0 0
-		;; 64 64
-		 256 256
-		 )
     (glhelp:with-uniforms uniform program
       (gl:uniform-matrix-4fv
        (uniform :pmv)
-       (cg-matrix:translate* *mouse-x* *mouse-y* 0.0)
+       (cg-matrix:translate* ;0.5 0.1
+	*mouse-x* *mouse-y*
+			     0.0)
        nil))
     #+nil
     (progn
       (gl:clear-color 0.1 0.11 0.3 0.0)
       (gl:clear :color-buffer-bit))
+    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
+    (funfair::%set-render-area 0 0 256 256)
     (gl:call-list (glhelp::handle (getfnc 'text)))
     )
-
   (let ((program (getfnc 'text-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -130,16 +129,27 @@
 			 ;;	 (getfnc 'font-texture)
 			 (glhelp::texture (getfnc 'text-data))
 			 )))
-    
-    (set-render-area *view*)
     (glhelp::bind-default-framebuffer)
-    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
+    (set-render-area *view*)
+    (gl:enable :blend)
+    (gl:blend-func :src-alpha :one-minus-src-alpha)
+    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))
+    ))
 
 
 (defun uppow2 (n)
   (ash 1 (ceiling (log n 2))))
  ;;up to next power of two
-(defun render-normal-text-refraction (w h)
+
+(deflazy indirection ()
+  (glhelp::make-gl-framebuffer
+   (uppow2 window::*width*)
+   (uppow2 window::*height*)))
+
+(deflazy text-data ()
+  (glhelp::make-gl-framebuffer 256 256))
+
+(deflazy render-normal-text-refraction ((funfair::w w) (funfair::h h))
   (let ((upw (uppow2 w))
 	(uph (uppow2 h))
 	(refract (getfnc 'refraction-shader)))
@@ -162,18 +172,6 @@
     (funfair::reload 'indirection)
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
-
-(deflazy indirection ()
-  (glhelp::make-gl-framebuffer
-   (uppow2 window::*width*)
-   (uppow2 window::*height*)))
-
-(deflazy text-data ()
-  (glhelp::make-gl-framebuffer 256 256))
-
-(defun use-text ()
-  (setf *trampoline* 'per-frame)
-  (setf window::*resize-hook* 'render-normal-text-refraction))
 
 (defmacro progeach (fun body)
   `(etouq
@@ -369,7 +367,9 @@
 	 (setf (aref a (+ offset 0)) r
 	       (aref a (+ offset 1)) g
 	       (aref a (+ offset 2)) b
-	       (aref a (+ offset 3)) 1.0))))
+	       (aref a (+ offset 3)) (if (zerop (random 20))
+					 1.0
+					 0.0)))))
    a))
 
 ;;VT100 terminal emulator colors
@@ -495,10 +495,12 @@
 	     (let ((base (the fixnum (+ xpos (the fixnum (* ypos width))))))
 	       (let ((offset (the fixnum (* 4 base))))
 		 (let ((num
+			#+nil
 			(logior (char-code (aref *foo* (mod base 1024)))
 				(ash 0 8)
 				(ash 255 16))
-			 ;;(random most-positive-fixnum)
+		;	#+nil
+			(random most-positive-fixnum)
 			 #+nil
 			 (get-char-num
 			  (get-char (the fixnum (+ xpos xstart))
