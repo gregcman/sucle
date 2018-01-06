@@ -48,6 +48,8 @@
  ;   font-texture
     text
     foo
+    foo2
+    text2
     terminal256color-lookup))
 
 (defparameter *identity-mat*
@@ -140,15 +142,30 @@
 y: ~10,1F
 z: ~10,1F"
 		      a b c))))
+  (unless (eq sndbx::*lastsel*
+	      sndbx::*selection*)
+    (setf sndbx::*lastsel*
+	  sndbx::*selection*)
+    (setfoo2
+     (with-output-to-string (*standard-output*)
+       (dolist (item sndbx::*selection*)
+	 (pprint item)))))
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
-      (gl:uniform-matrix-4fv
-       (uniform :pmv)
-       (retrans *textx* *texty*
-		)
-       nil))
-    (gl:call-list (glhelp::handle (getfnc 'text)))
+      (progn
+	(gl:uniform-matrix-4fv
+	 (uniform :pmv)
+	 (retrans *textx* *texty*)
+	 nil)
+	(gl:call-list (glhelp::handle (getfnc 'text))))
+      (progn
+	(gl:uniform-matrix-4fv
+	 (uniform :pmv)
+	 (retrans 10.0 10.0)
+	 nil)
+	(gl:call-list (glhelp::handle (getfnc 'text2)))))
+    
     )
   (let ((program (getfnc 'text-shader)))
     (glhelp::use-gl-program program)
@@ -189,21 +206,39 @@ z: ~10,1F"
 					;  #+nil
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
 
-(defun setfoo (obj)
-  (let ((*print-case* :downcase))
-    (setf *foo*
-	  (write-to-string
-	   obj :pretty t :escape nil)))
-  (funfair::reload 'foo))
-(defparameter *foo* nil)
-(deflazy foo ()
-  *foo*)
+(progn
+  (defun setfoo2 (obj)
+    (let ((*print-case* :downcase))
+      (setf *foo2*
+	    (write-to-string
+	     obj :pretty t :escape nil)))
+    (flag-text-dirty)
+    (funfair::reload 'foo2))
+  (defparameter *foo2* nil)
+  (deflazy foo2 ()
+    *foo2*)
+  (deflazy text2 (foo2)
+    (make-instance
+     'glhelp::gl-list
+     :handle
+     (mesh-string-gl-points -128.0 -128.0 foo2))))
 
-(deflazy text (foo)
-  (make-instance
-    'glhelp::gl-list
-    :handle
-    (mesh-string-gl-points -128.0 -128.0 foo)))
+(progn
+  (defun setfoo (obj)
+    (let ((*print-case* :downcase))
+      (setf *foo*
+	    (write-to-string
+	     obj :pretty t :escape nil)))
+    (funfair::reload 'foo))
+  (defparameter *foo* nil)
+  (deflazy foo ()
+    *foo*)
+
+  (deflazy text (foo)
+    (make-instance
+     'glhelp::gl-list
+     :handle
+     (mesh-string-gl-points -128.0 -128.0 foo))))
 
 (defun copy-array-buf ()
   (let ((width 256)

@@ -14,37 +14,38 @@
     (filesystem-util:save2
      path
      position-list
-     (gethash position world:chunkhash)
-     (gethash position world:lighthash)
-     (gethash position world:skylighthash))))
+     (gethash position world::*lispobj*)
+;     (gethash position world:lighthash)
+;     (gethash position world:skylighthash)
+     )))
 
 (defun loadchunk (path position-list)
   (let ((position (apply #'world:chunkhashfunc position-list)))
     (let ((data (filesystem-util:myload2 path position-list)))
-      (when data
-	
-	(and
-	 (let ((blocks (pop data)))
-	   (when blocks
-	     (setf (gethash position world:chunkhash)
-		   (coerce blocks '(simple-array (unsigned-byte 8) (*)))))
-	   data)
-	 (let ((light (pop data)))
-	   (when light
-	     (setf (gethash position world:lighthash)
-		   (coerce light '(simple-array (unsigned-byte 4) (*)))))
-	   data)
-	 (let ((sky (pop data)))
-	   (when sky
-	     (setf (gethash position world:skylighthash)
-		   (coerce sky '(simple-array (unsigned-byte 4) (*)))))))
-	(return-from loadchunk t)))))
+      (case (length data)
+	(3
+	 (destructuring-bind (blocks light sky) data
+	   (let ((len (length blocks)))
+	     (let ((new (make-array len)))
+	       (setf (gethash position world::*lispobj*)
+		     new)
+	       (dotimes (i len)
+		 (setf (aref new i)
+		       (dpb (aref sky i) (byte 4 12)
+			    (dpb (aref light i) (byte 4 8) (aref blocks i))))))))
+	 t)
+	(1
+	 (let ((objdata (pop data)))
+	   (when objdata
+	     (setf (gethash position world::*lispobj*)
+		   (coerce objdata '(simple-array t (*))))))
+	 t)))))
 
 (defun save-world (path)
   (maphash (lambda (k v)
 	     (declare (ignorable v))
 	     (savechunk path k))
-	   world:chunkhash))
+	   world::*lispobj*))
 (defun load-world (path)
   (let ((files (uiop:directory-files path)))
     (dolist (file files)

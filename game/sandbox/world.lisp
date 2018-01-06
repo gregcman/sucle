@@ -38,7 +38,6 @@
 
 (defpackage #:world
   (:use :cl)	
-  (:nicknames #:w)
   (:export 
 
 ;;;block accessors
@@ -59,23 +58,6 @@
    #:unhashfunc
    #:chunkhashfunc
 
-;;;initialization
-   #:setup-hashes
-   #:define-accessors
-   #:establish-stystem
-   #:gen-holder
-   #:system
-   #:world-init
-
-
-;;;containers
-   #:chunkhash
-   #:lighthash
-   #:skylighthash
-   #:metahash
-
-   #:heighthash
-
 ;;;chunks
    #:clearchunk
    #:%new-chunk
@@ -86,10 +68,6 @@
    ))
 
 (in-package #:world)
-(defparameter chunkhash nil)
-(defparameter lighthash nil)
-(defparameter skylighthash nil)
-(defparameter metahash nil)
 
 (defun send-to-free-mem (hash pool)
   (maphash
@@ -111,32 +89,6 @@
 	       :element-type ',type
 	       :initial-element ,defaultval))
 
-(defparameter freechunkmempool8
-  (recycle:make-recycler
-   :create-func #'(lambda (&optional (x 0)) (%new-chunk (unsigned-byte 8) x 4 4 4))
-   :cleanup-func #'clearchunk
-   :size-cap 128))
-
-(defparameter freechunkmempool4
-  (recycle:make-recycler
-   :create-func #'(lambda (&optional (x 0)) (%new-chunk (unsigned-byte 4) x 4 4 4))
-   :cleanup-func #'clearchunk
-   :size-cap 512))
-
-(defun clearworld ()
-  (send-to-free-mem chunkhash freechunkmempool8)
-  (send-to-free-mem lighthash freechunkmempool4)
-  (send-to-free-mem skylighthash freechunkmempool4)
-  (send-to-free-mem metahash freechunkmempool4)
-  (if nil
-      (send-to-free-mem heighthash)))
-
-(defun setup-hashes ()
-  (setf chunkhash (vox::genhash))
-  (setf lighthash (vox::genhash))
-  (setf skylighthash (vox::genhash))
-  (setf metahash (vox::genhash)))
-
 (eval-when (:compile-toplevel)
   (defun system ()
     (let ((uniform-spec (coge:gen-spec)))
@@ -157,47 +109,78 @@
 	 (,%setter-name (chunkhashfunc i k j) new))
        (defun (setf ,getter-name) (new i j k)
 	 (,setter-name i j k new))))
+  (funland::etouq (vox::define-fixnum-ops (system))))
 
-  (defun gen-holder (bits setter getter %setter %getter hash default creator)
-    (let ((new (system)))
-      (vox::field new `(simple-array (unsigned-byte ,bits) (4096)) hash default creator)
-      (vox::access new %getter %setter)
-      (list'progn
-       (vox::prep-hash new)
-       (define-accessors getter setter %getter %setter))))
+(defparameter *freechunkmempoolobj*
+  (recycle:make-recycler
+   :create-func #'(lambda (&optional (x 0)) (%new-chunk t x 4 4 4))
+   :cleanup-func #'clearchunk
+   :size-cap 32))
+(defparameter *lispobj* (make-hash-table :test 'eq))
+(defun clearworld ()
+  (send-to-free-mem *lispobj* *freechunkmempoolobj*))
 
-  (defparameter code-fixnum-operations (vox::define-fixnum-ops (system)))
-  (defparameter block-code
-    (gen-holder 8
-		'setblock 'getblock
-		'%setblock '%getblock
-		'chunkhash 0
-		'(recycle:get-from freechunkmempool8 0)))
-  (defparameter light-code
-    (gen-holder 4
-		'setlight 'getlight
-		'%setlight '%getlight
-		'lighthash 0
-		'(recycle:get-from freechunkmempool4 0)))
-  (defparameter skylight-code
-    (gen-holder 4 'skysetlight 'skygetlight
-		'%skysetlight '%skygetlight
-		'skylighthash 15
-		'(recycle:get-from freechunkmempool4 15)))
-  (defparameter meta-code
-    (gen-holder 4 'setmeta 'getmeta
-		'%setmeta '%getmeta
-		'metahash 0
-		'(recycle:get-from freechunkmempool4 0)) )
+(eval-when (:compile-toplevel)
+  (funland::etouq
+   (let ((value (logior (ash 15 12))))
+     ((lambda (setter getter %setter %getter hash default creator)
+	(let ((new (system)))
+	  (vox::field new `(simple-array t (4096)) hash default creator)
+	  (vox::access new %getter %setter)
+	  (list 'progn
+		(vox::prep-hash new)
+		(define-accessors getter setter %getter %setter)
+		`(defsetf %getter %setter))))
+      'setobj 'getobj
+      '%setobj '%getobj
+      '*lispobj* value
+      `(recycle:get-from *freechunkmempoolobj* ,value)))))
 
-  (defun establish-system ()
+(defgeneric lispobj-dispatch (obj))
+
+(defun value-dispatch (value)
+  (typecase value
+    (fixnum value)
+    (otherwise (lispobj-dispatch value))))
+
+(defsetf num-getobj setobj)
+(defun num-getobj (i j k)
+  (let ((value (getobj i j k)))
+    (value-dispatch value)))
+(defsetf %num-getobj %setobj)
+(defun %num-getobj (place)
+  (let ((value (%getobj place)))
+    (value-dispatch value)))
+
+(defmacro suite (bits position set get %set %get)
+  (let* ((bytespec `(byte ,bits ,position))
+	 (access `(ldb ,bytespec
+		       (num-getobj i j k)))
+	 (%access `(ldb ,bytespec
+			(%num-getobj place))))
     `(progn
-       ,code-fixnum-operations
-       ,block-code
-       ,light-code
-       ,skylight-code
-       ,meta-code))
-  (defmacro setup ()
-    (establish-system)))
+       (defun ,set (i j k new) (setf ,access new))
+       (defun ,get (i j k) ,access)
+       (defsetf ,get ,set)
+       (defun ,%set (place new) (setf ,%access new))
+       (defun ,%get (place) ,%access)
+       (defsetf ,%get ,%set))))
+(progn
+  (suite 8 0 setblock getblock %setblock %getblock)
+  (suite 4 8 setlight getlight %setlight %getlight)
+  (suite 4 12 skysetlight skygetlight %skysetlight %skygetlight)
+  (suite 4 16 setmeta getmeta %setmeta %getmeta))
 
-(setup)
+(defun blockify (blockid light sky meta)
+  (dpb meta (byte 16 4)
+	(dpb sky (byte 4 12)
+	     (dpb light (byte 4 8) blockid))))
+
+(defmethod lispobj-dispatch ((obj character))
+  (blockify (char-code obj) 0 0 0))
+
+(defmethod lispobj-dispatch ((obj t))
+  (blockify (logcount (sxhash obj)) 0 0 0))
+
+(defmethod lispobj-dispatch ((obj symbol))
+  56)

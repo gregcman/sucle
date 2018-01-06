@@ -25,6 +25,21 @@
   (maxy 0.0 :type single-float)
   (maxz 0.0 :type single-float))
 
+(defun aabb-collide (aabb0 px0 py0 pz0 aabb1 px1 py1 pz1 vx vy vz)
+  (%%collide (+ px0 (aabb-minx aabb0))
+	     (+ py0 (aabb-miny aabb0))
+	     (+ pz0 (aabb-minz aabb0))
+	     (+ px0 (aabb-maxx aabb0))
+	     (+ py0 (aabb-maxy aabb0))
+	     (+ pz0 (aabb-maxz aabb0))	    
+	     vx vy vz
+	     (+ px1 (aabb-minx aabb1))
+	     (+ py1 (aabb-miny aabb1))
+	     (+ pz1 (aabb-minz aabb1))
+	     (+ px1 (aabb-maxx aabb1))
+	     (+ py1 (aabb-maxy aabb1))
+	     (+ pz1 (aabb-maxz aabb1))))
+
 (defun step-motion (get-collision-data px py pz vx vy vz &optional xclamp yclamp zclamp)
   (multiple-value-bind (ratio xc yc zc)
       (funcall get-collision-data px py pz vx vy vz)
@@ -56,20 +71,6 @@
    (if yclamp 0 vy)
    (if zclamp 0 vz)))
 
-(defun aabb-collide (aabb0 px0 py0 pz0 aabb1 px1 py1 pz1 vx vy vz)
-  (%%collide (+ px0 (aabb-minx aabb0))
-	     (+ py0 (aabb-miny aabb0))
-	     (+ pz0 (aabb-minz aabb0))
-	     (+ px0 (aabb-maxx aabb0))
-	     (+ py0 (aabb-maxy aabb0))
-	     (+ pz0 (aabb-maxz aabb0))	    
-	     vx vy vz
-	     (+ px1 (aabb-minx aabb1))
-	     (+ py1 (aabb-miny aabb1))
-	     (+ pz1 (aabb-minz aabb1))
-	     (+ px1 (aabb-maxx aabb1))
-	     (+ py1 (aabb-maxy aabb1))
-	     (+ pz1 (aabb-maxz aabb1))))
 
 (defun %%collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
   (multiple-value-bind (x y z)
@@ -684,22 +685,6 @@ edge, or no case"
 	  (setf (fister-exists fist) t))
 	(setf (fister-exists fist) nil))))
 
-(defun use-fist (fist left-p right-p left-fun right-fun)
-  (let ((fist? (fister-exists fist))
-	(selected-block (fister-selected-block fist))
-	(normal-block (fister-normal-block fist)))
-    (when fist?
-      (when left-p
-	(funcall left-fun
-		 (aref selected-block 0)
-		 (aref selected-block 1)
-		 (aref selected-block 2)))
-      (when right-p
-	(funcall right-fun
-		 (aref normal-block 0)
-		 (aref normal-block 1)
-		 (aref normal-block 2))))))
-
 ;;;;;;;;;;;;;;;;;;;;
 (defstruct farticle
   (position (cg-matrix:vec 0.0 0.0 0.0))
@@ -1077,10 +1062,18 @@ edge, or no case"
     (sandbox::setblock-with-update x y z 0 0)))
 
 (defparameter *big-fist-fun*
+ ; #'atest::tree
+  ;(atest::sheath 1 2)
+  #+nil
+  (lambda (x y z)
+    (unless (= 0 (world::getblock x y z))	
+      (sandbox::plain-setblock x y z 1 0)))
+;  #+nil
   (lambda (x y z)
     (let ((a (world::getblock x y z)))
       (when (or (= a 1)
-		;(= a 0)
+		(= a 2)
+		(= a 3)
 		)	
 	(sandbox::setblock-with-update x y z 0 0))))
    ;;  #'atest::bonder2
@@ -1134,11 +1127,16 @@ edge, or no case"
     (moused))
   (when (window::skey-j-p (window::keyval :x))
     (toggle *paused*))
+  (when (window::skey-j-p (window::keyval :h))
+    (setf *selection* nil))
   (when *sandbox-on*
     (if (or (window:mice-free-p) *paused*)
 	(tick *ticker* (lambda ()))
 	(stuff)))
   (render-stuff))
+
+(defparameter *lastsel* nil)
+(defparameter *selection* nil)
 
 (defun stuff ()
   (let* ((player-farticle (entity-particle *ent*))
@@ -1192,11 +1190,33 @@ edge, or no case"
 		    fist
 		    px py pz
 		    (* *reach* vx) (* *reach* vy) (* *reach* vz))
-		   (use-fist fist
-			     a
-			     b
-			     *left-fist-fnc*
-			     *right-fist-fnc*)))))))
+		   
+		   ((lambda (fist left-p right-p left-fun right-fun)
+		      (let ((fist? (fister-exists fist))
+			    (selected-block (fister-selected-block fist))
+			    (normal-block (fister-normal-block fist)))
+			(when fist?
+			  (when left-p
+			    (with-vec (a b c) (selected-block)
+			      (cond  ((window::skey-p (window::keyval :left-shift))
+				      (push (vector a b c) *selection*))
+				     ((window::skey-p (window::keyval :left-control))
+				      (push (world::getobj a b c) *selection*))
+				     (t
+				      (funcall left-fun a b c)))))
+			  (when right-p
+			    (with-vec (a b c) (normal-block)
+			      (cond ((window::skey-p (window::keyval :left-shift))
+				     (push (vector a b c) *selection*))
+				    ((window::skey-p (window::keyval :left-control))
+				     (push (world::getobj a b c) *selection*))
+				    (t
+				     (funcall right-fun a b c))))))))
+		    fist
+		    a
+		    b
+		    *left-fist-fnc*
+		    *right-fist-fnc*)))))))
        control-state backwardsbug
        pos)))
   (multiple-value-bind (fraction times) (tick *ticker* #'physss)

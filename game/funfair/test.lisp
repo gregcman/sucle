@@ -364,14 +364,14 @@
 		       (b y (+ y 16))
 		       (c z (+ z 16)))
 		      (funcall fun a c b))))
-	   world::chunkhash))
+	   world::*lispobj*))
 
 (defun map-all-chunks1 (fun)
   (maphash (lambda (k v)
 	     (declare (ignore v))
 	     (multiple-value-bind (x y z) (world:unhashfunc k)
 	       (funcall fun x y z)))
-	   world::chunkhash))
+	   world::*lispobj*))
 
 (defun tree (x y z)
   (let ((trunk-height (+ 1 (random 3))))

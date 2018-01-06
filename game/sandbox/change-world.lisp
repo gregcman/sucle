@@ -1,7 +1,5 @@
 (in-package :sandbox)
 
-(world:setup-hashes)
-
 (defun draw-world ()
   (declare (optimize (speed 3) (safety 0)))
   (dohash (key value) *g/chunk-call-list*
@@ -26,7 +24,7 @@
 	     (remove-chunk-display-list k))
 	   *g/chunk-call-list*)
   (map nil #'dirty-push
-       (sort (alexandria:hash-table-keys world::chunkhash) #'< :key
+       (sort (alexandria:hash-table-keys world::*lispobj*) #'< :key
 	     (lambda (position)
 	       (multiple-value-bind (i j k) (world:unhashfunc position)
 		 ((lambda (x0 y0 z0 x1 y1 z1)
