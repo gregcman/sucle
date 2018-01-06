@@ -20,12 +20,6 @@
 		   (setf (aref new width height i) value))))
 	new))))
 
-#+nil
-(deflazy terrain-png ()
-  (opticl:read-png-file
-   (filesystem-util:rebase-path 
-    #P"terrain.png"
-    *this-directory*)))
 (deflazy font-texture (font-png)
   (prog1
       (make-instance
@@ -69,8 +63,26 @@
 
 (setf *trampoline* '(sndbx::per-frame funtext::per-frame))
 
-(defparameter *mouse-x* 0.0)
-(defparameter *mouse-y* 0.0)
+(defparameter *trans* (cg-matrix:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
+(defun retrans (x y &optional (trans *trans*))
+  (setf (aref trans 12) (/ x 128.0)
+	(aref trans 13) (/ y 128.0))
+  trans)
+
+(defparameter *clear-text-buffer-flag* nil)
+(defun flag-text-dirty ()
+  (setf *clear-text-buffer-flag* t))
+(progn
+  (progn
+    (defparameter *mouse-x* 0.0)
+    (defparameter *mouse-y* 0.0))
+  (progn
+    (defparameter *old-mouse-x* 0.0)
+    (defparameter *old-mouse-y* 0.0)))
+
+(progn
+  (defparameter *textx* 0.0)
+  (defparameter *texty* 0.0))
 (defun per-frame (session)
   (declare (ignorable session))
   (map nil #'funfair::reload-if-dirty *reloadables*)
@@ -78,43 +90,64 @@
   (setf (render-area-width *view*) window::*width*
 	(render-area-height *view*) window::*height*)
 
-  (setf *mouse-x* (floatify (/ window::*mouse-x* *block-width* 128.0))
-	*mouse-y* (floatify (/ (- window::*height* window::*mouse-y*)
-			       *block-height*
-			       128.0)))
+  (when (window::mice-free-p)
+    (let ((newmousex (floatify (/ window::*mouse-x* *block-width*)))
+	  (newmousey (floatify (/ (- window::*height* window::*mouse-y*)
+				  *block-height*))))
+      (setf *old-mouse-x* *mouse-x*
+	    *old-mouse-y* *mouse-y*)
+      (setf *mouse-x* newmousex
+	    *mouse-y* newmousey)))
+  (when (and (window::mice-free-p)
+	     (window::skey-p (window::mouseval :left)))
+    (let ((dx (- *mouse-x* *old-mouse-x*))
+	  (dy (- *mouse-y* *old-mouse-y*)))
+      (unless (= dx dy 0)
+	(incf *textx* dx)
+	(incf *texty* dy)
+	(flag-text-dirty)))
+    )
   (when (window::skey-p (window::keyval :n))
    ;; (terpri)
   ;;  (princ "scrambling text")
     (copy-array-buf))
+  (when (window::skey-j-p (window::keyval :b))
+    (flag-text-dirty))
 
   (when (window::skey-j-p (window::keyval :escape))
     (funfair::quit))
-  (gl:disable :depth-test)
- ; #+nil
+  (when (window::skey-j-p (window::keyval :y)
+			  )
+    (toggle sndbx::*depth-buffer?*))
+  
+  (render-stuff)
+  )
+
+(defun render-stuff ()
+  (gl:disable :depth-test)					; #+nil
+  (progn
+    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
+    (funfair::%set-render-area 0 0 256 256))
+  (when *clear-text-buffer-flag*
+    (setf *clear-text-buffer-flag* nil)
+    (progn
+      (gl:clear-color 0.0 0.0 0.0 0.0)
+      (gl:clear :color-buffer-bit)))
+  (let ((value (sndbx::farticle-position (sndbx::entity-particle sndbx::*ent*))))
+    (with-vec (a b c) (value)
+      (setfoo (format nil
+		      "x: ~10,1F
+y: ~10,1F
+z: ~10,1F"
+		      a b c))))
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
       (gl:uniform-matrix-4fv
        (uniform :pmv)
-       (cg-matrix:translate* 0.0 0.0
-	;*mouse-x* *mouse-y*
-			     0.0)
+       (retrans *textx* *texty*
+		)
        nil))
-    (progn
-      (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-      (funfair::%set-render-area 0 0 256 256))
-    (let ((value (sndbx::farticle-position (sndbx::entity-particle sndbx::*ent*))))
-      (with-vec (a b c) (value)
-	(setfoo (format nil
-			"
-x: ~10,1F
-y: ~10,1F
-z: ~10,1F"
-			a b c))))
-    (when (window::skey-j-p (window::keyval :b))
-      (progn
-	(gl:clear-color 0.0 0.0 0.0 0.0)
-	(gl:clear :color-buffer-bit)))
     (gl:call-list (glhelp::handle (getfnc 'text)))
     )
   (let ((program (getfnc 'text-shader)))
@@ -128,7 +161,7 @@ z: ~10,1F"
 	(gl:uniformi (uniform 'indirection) 0)
 	(glhelp::set-active-texture 0)
 	(gl:bind-texture :texture-2d
-	;;		 (getfnc 'font-texture)
+			 ;;		 (getfnc 'font-texture)
 			 (glhelp::texture (getfnc 'indirection))
 			 ))
       (progn
@@ -149,25 +182,28 @@ z: ~10,1F"
 			 )))
     (glhelp::bind-default-framebuffer)
     (set-render-area *view*)
+    ;;   (gl:enable :depth-test)
+    ;;   (gl:depth-func :always)
     (gl:enable :blend)
     (gl:blend-func :src-alpha :one-minus-src-alpha)
-    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))
-    ))
+					;  #+nil
+    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
 
 (defun setfoo (obj)
-  (setf *foo* obj)
+  (let ((*print-case* :downcase))
+    (setf *foo*
+	  (write-to-string
+	   obj :pretty t :escape nil)))
   (funfair::reload 'foo))
 (defparameter *foo* nil)
 (deflazy foo ()
-  (let ((*print-case* :downcase))
-    (write-to-string
-     *foo* :pretty t :escape nil)))
+  *foo*)
 
 (deflazy text (foo)
   (make-instance
     'glhelp::gl-list
     :handle
-    (mesh-string-gl-points -128.0 -125.0 foo)))
+    (mesh-string-gl-points -128.0 -128.0 foo)))
 
 (defun copy-array-buf ()
   (let ((width 256)
@@ -253,7 +289,7 @@ z: ~10,1F"
 
       (progeach
        (lambda (x) (list 'pos x))
-       (axis-aligned-quads:quadk+ 0.0 '(-1.0 1.0 -1.0 1.0)))
+       (axis-aligned-quads:quadk+ 0.5 '(-1.0 1.0 -1.0 1.0)))
       (progeach
        (lambda (x) (list 'tex x))
        (axis-aligned-quads:duaq 1 nil '(0.0 1.0 0.0 1.0))))
@@ -524,7 +560,7 @@ z: ~10,1F"
      255.0))
 
 (defun mesh-string-gl-points (x y string &optional
-					   (bgcol (byte-float (color 0 0 0 0)))
+					   (bgcol (byte-float (color 3 3 3 0)))
 					   (fgcol (byte-float (color 0 0 0 3))))
   (let ((position (scratch-buffer:my-iterator))
        (value (scratch-buffer:my-iterator))
@@ -541,12 +577,11 @@ z: ~10,1F"
 		  (dotimes (index len)
 		    (let ((char (aref string index)))
 		      (cond ((char= char #\Newline)
-			     (setf x start y (1- y)))
+			     (setf x start)
+			     (decf y))
 			    (t
-			     (pos (floatify (/ x 128.0))
-			      )
-			     (pos (floatify (/ y 128.0))
-			      )
+			     (pos (floatify x))
+			     (pos (floatify y))
 			     (pos 0.0)
 			     (value (byte-float (char-code char)))
 			     (value bgcol)

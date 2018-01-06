@@ -915,25 +915,6 @@ edge, or no case"
    (entity-configure-collision-fun entity)
    (entity-aabb entity)))
 
-(defun meta-controls (control-state entity)
-  (symbol-macrolet ((pos (farticle-position (entity-particle entity)))
-		    (is-jumping (entity-jump? entity))
-		    (is-sneaking (entity-sneak? entity))
-		    (fly (entity-fly? entity))
-		    (gravity (entity-gravity? entity))
-		    (noclip (entity-clip? entity)))
-    (setf is-jumping (window::skey-p (window::keyval :space) control-state))
-    (setf is-sneaking (window::skey-p (window::keyval :a) control-state))
-    (when (window:mice-locked-p)
-      (when (window::skey-j-p (window::keyval :v) control-state)
-	(toggle noclip))
-      (with-vec (x y z) (pos)
-	(when (window::skey-j-p (window::keyval :p) control-state)
-	  (sandbox::update-world-vao x y z)))
-      (when (window::skey-j-p (window::keyval :g) control-state)
-	(toggle fly)
-	(toggle gravity)))))
-
 (defparameter *fist-aabb*
      ;;;a very small cubic fist
   (aabbcc:make-aabb
@@ -952,81 +933,6 @@ edge, or no case"
 	      fun)
 	(funcall set-aabb fist-aabb))
     fist))
-(defparameter *fist*
-  (gen-fister *fist-aabb* (list #'ahook)))
-
-
-(defparameter *reach* 128.0)
-(defparameter *swinging* nil)
-(defun use-fists (control-state look-vec pos)
-  (let ((fist *fist*))
-    (with-vec (px py pz) (pos)
-      (with-vec (vx vy vz) (look-vec)	
-	(when (window:mice-locked-p)
-	  (when (window::skey-j-p (window::keyval :w) control-state)
-	    (toggle *swinging*))
-	  (when *swinging*
-	    (big-swing-fist
-	     px py pz
-	     vx vy vz)))
-	(let ((a (window::skey-j-p (window::mouseval :left) control-state))
-	      (b (window::skey-j-p (window::mouseval :right) control-state)))
-	  (when (or a b)
-	    (standard-fist
-	     fist
-	     px py pz
-	     (* *reach* vx) (* *reach* vy) (* *reach* vz))
-	    (use-fist fist
-		      a
-		      b
-		      *left-fist-fnc*
-		      *right-fist-fnc*)))))))
-(defparameter *right-fist-fnc*
-  (lambda (x y z)
-    (let ((blockval 1))
-      (sandbox::plain-setblock
-       x
-       y
-       z
-       blockval
-       (aref mc-blocks:*lightvalue* blockval)))))
-(defparameter *left-fist-fnc*
-  (lambda (x y z)
-    (sandbox::setblock-with-update x y z 0 0)))
-
-(defparameter *big-fist-fun*
-  (lambda (x y z)
-    (let ((a (world::getblock x y z)))
-      (when (or (= a 1)
-		;(= a 0)
-		)	
-	(sandbox::setblock-with-update x y z 0 0))))
-   ;;  #'atest::bonder2
-
-  #+nil
-  (lambda (x y z)
-    (atest::dirts x y z)
-    (atest::grassify x y z))
-  ;; (atest::sheath 2 1)
-
-  #+nil
-  (lambda (x y z) ;(print (list x y z))
-    )
-   )
-
-(defun big-swing-fist (px py pz vx vy vz)
-  (let ((u 16))
-    (aabb-collect-blocks
-     px py pz (* u vx) (* u vy) (* u vz)
-     (load-time-value
-      (aabbcc:make-aabb
-       :minx -0.3
-       :miny -0.5
-       :minz -0.3
-       :maxx 0.3
-       :maxy 1.12
-       :maxz 0.3))   
-     *big-fist-fun*)))
 
 ;;;;150 ms delay for sprinting
 ;;;;player eye height is 1.5, subtract 1/8 for sneaking
@@ -1079,28 +985,7 @@ edge, or no case"
 (defparameter *ent* (aref *ents* 1))
 
 (defun physss ()
-  (let* ((player-farticle (entity-particle *ent*))
-	 (pos (farticle-position player-farticle))
-	 (control-state *control-state*))
-    (meta-controls control-state
-			    *ent*)
-    (let ((num (num-key-jp *control-state*)))
-      (when num
-	(setf *ent* (aref *ents* num))))
-    #+nil
-    (when (window::skey-j-p (window::keyval :j) control-state)
-       (atest::wowz))
-    (setf (entity-hips *ent*)
-	  (wasd-mover
-	   (window::skey-p (window::keyval :e) control-state)
-	   (window::skey-p (window::keyval :s) control-state)
-	   (window::skey-p (window::keyval :d) control-state)
-	   (window::skey-p (window::keyval :f) control-state)))
-    (physentity *ent*)
-    (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -1.0)
-      (use-fists control-state backwardsbug
-			  pos))))
+  (physentity *ent*))
 
 (defun farticle-to-camera (farticle camera fraction)
   (let ((curr (farticle-position farticle))
@@ -1123,7 +1008,7 @@ edge, or no case"
 (defparameter *fov*
   ((lambda (deg)
      (* deg (coerce (/ pi 180.0) 'single-float)))
-   70))
+   (nth 1 '(95 70))))
 
 (defparameter *black* (make-instance 'funfair::render-area :height 2 :width 2
 				     :x 0
@@ -1170,9 +1055,67 @@ edge, or no case"
 (defparameter *mouse-multiplier* (translator 0.5))
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 
+;;;;;
+(defparameter *fist*
+  (gen-fister *fist-aabb* (list #'ahook)))
+
+
+(defparameter *reach* 128.0)
+(defparameter *swinging* nil)
+
+(defparameter *right-fist-fnc*
+  (lambda (x y z)
+    (let ((blockval 1))
+      (sandbox::plain-setblock
+       x
+       y
+       z
+       blockval
+       (aref mc-blocks:*lightvalue* blockval)))))
+(defparameter *left-fist-fnc*
+  (lambda (x y z)
+    (sandbox::setblock-with-update x y z 0 0)))
+
+(defparameter *big-fist-fun*
+  (lambda (x y z)
+    (let ((a (world::getblock x y z)))
+      (when (or (= a 1)
+		;(= a 0)
+		)	
+	(sandbox::setblock-with-update x y z 0 0))))
+   ;;  #'atest::bonder2
+
+  #+nil
+  (lambda (x y z)
+    (atest::dirts x y z)
+    (atest::grassify x y z))
+  ;; (atest::sheath 2 1)
+
+  #+nil
+  (lambda (x y z) ;(print (list x y z))
+    )
+   )
+
+(defun big-swing-fist (px py pz vx vy vz)
+  (let ((u 16))
+    (aabb-collect-blocks
+     px py pz (* u vx) (* u vy) (* u vz)
+     (load-time-value
+      (aabbcc:make-aabb
+       :minx -0.3
+       :miny -0.5
+       :minz -0.3
+       :maxx 0.3
+       :maxy 1.12
+       :maxz 0.3))   
+     *big-fist-fun*)))
+
+;;;;
+
 
 (defparameter *reloadables*
-  '(blockshader-text
+  '(gl-init
+    blockshader-text
     blockshader
     terrain-png))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1184,12 +1127,96 @@ edge, or no case"
 (defun per-frame (session)
   (declare (ignorable session))
   (progn
-    (funfair::reload-if-dirty 'gl-init)
+    (map nil #'funfair::reload-if-dirty *reloadables*)
     (getfnc 'gl-init))
   (when (window::skey-j-p (window::keyval :r) *control-state*)
     (window:toggle-mouse-capture)
     (moused))
-  (map nil #'funfair::reload-if-dirty *reloadables*)
+  (when (window::skey-j-p (window::keyval :x))
+    (toggle *paused*))
+  (when *sandbox-on*
+    (if (or (window:mice-free-p) *paused*)
+	(tick *ticker* (lambda ()))
+	(stuff)))
+  (render-stuff))
+
+(defun stuff ()
+  (let* ((player-farticle (entity-particle *ent*))
+	 (pos (farticle-position player-farticle))
+	 (control-state *control-state*))
+    ((lambda (control-state entity)
+       (symbol-macrolet ((pos (farticle-position (entity-particle entity)))
+			 (is-jumping (entity-jump? entity))
+			 (is-sneaking (entity-sneak? entity))
+			 (fly (entity-fly? entity))
+			 (gravity (entity-gravity? entity))
+			 (noclip (entity-clip? entity)))
+	 (setf is-jumping (window::skey-p (window::keyval :space) control-state))
+	 (setf is-sneaking (window::skey-p (window::keyval :a) control-state))
+	 (when (window:mice-locked-p)
+	   (when (window::skey-j-p (window::keyval :v) control-state)
+	     (toggle noclip))
+	   (with-vec (x y z) (pos)
+	     (when (window::skey-j-p (window::keyval :p) control-state)
+	       (sandbox::update-world-vao x y z)))
+	   (when (window::skey-j-p (window::keyval :g) control-state)
+	     (toggle fly)
+	     (toggle gravity))))) control-state
+     *ent*)
+    (let ((num (num-key-jp *control-state*)))
+      (when num
+	(setf *ent* (aref *ents* num))))
+    (setf (entity-hips *ent*)
+	  (wasd-mover
+	   (window::skey-p (window::keyval :e) control-state)
+	   (window::skey-p (window::keyval :s) control-state)
+	   (window::skey-p (window::keyval :d) control-state)
+	   (window::skey-p (window::keyval :f) control-state)))
+    (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
+      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -1.0)
+      ((lambda (control-state look-vec pos)
+	 (let ((fist *fist*))
+	   (with-vec (px py pz) (pos)
+	     (with-vec (vx vy vz) (look-vec)	
+	       (when (window:mice-locked-p)
+		 (when (window::skey-j-p (window::keyval :w) control-state)
+		   (toggle *swinging*))
+		 (when *swinging*
+		   (big-swing-fist
+		    px py pz
+		    vx vy vz)))
+	       (let ((a (window::skey-j-p (window::mouseval :left) control-state))
+		     (b (window::skey-j-p (window::mouseval :right) control-state)))
+		 (when (or a b)
+		   (standard-fist
+		    fist
+		    px py pz
+		    (* *reach* vx) (* *reach* vy) (* *reach* vz))
+		   (use-fist fist
+			     a
+			     b
+			     *left-fist-fnc*
+			     *right-fist-fnc*)))))))
+       control-state backwardsbug
+       pos)))
+  (multiple-value-bind (fraction times) (tick *ticker* #'physss)
+    (declare (ignorable times))
+    (when (window:mice-locked-p)
+      (update-moused 0.5)
+      (multiple-value-call
+	  #'change-entity-neck
+	*ent*
+	(multiple-value-bind (x y) (values *lerp-mouse-x*
+					   *lerp-mouse-y*)
+	  (values (coerce (* x -1.0d0 *mouse-multiplier*)
+			  'single-float)
+		  (coerce (* y *mouse-multiplier*)
+			  'single-float)))
+	))
+    (entity-to-camera *ent* *camera* fraction)))
+
+(defparameter *render-ticks* 0)
+(defun render-stuff ()
   ((lambda (width height)
      (let ((camera *camera*))
        (setf (camat:camera-aspect-ratio camera)
@@ -1205,34 +1232,13 @@ edge, or no case"
   (glhelp::bind-default-framebuffer)
   (set-render-area *render-area*)
   (set-sky-color)
-  (gl:clear
-   :color-buffer-bit
-   :depth-buffer-bit
-   )
   (setf (camat:camera-fov *camera*) *fov*)
   (setf (camat:camera-frustum-far *camera*) (* 1024.0 256.0))
-  (when (window::skey-j-p (window::keyval :x))
-    (toggle *paused*))
-  (when *sandbox-on*
-    (if *paused*
-	(tick *ticker* (lambda ()))
-	(multiple-value-bind (fraction times) (tick *ticker* #'physss)
-	  (declare (ignorable times))
-	  (when (window:mice-locked-p)
-	    (update-moused 0.5)
-	    (multiple-value-call
-		#'change-entity-neck
-	      *ent*
-	      (multiple-value-bind (x y) (values *lerp-mouse-x*
-						 *lerp-mouse-y*)
-		(values (coerce (* x -1.0d0 *mouse-multiplier*)
-				'single-float)
-			(coerce (* y *mouse-multiplier*)
-				'single-float)))
-	      ))
-	  (entity-to-camera *ent* *camera* fraction)))
-    (camat:update-matrices *camera*)
-    (camera-shader *camera*))
+  (camat:update-matrices *camera*)
+  ;;;render chunks
+  (camera-shader *camera*)
+  ;;;render crosshairs
+;  #+nil
   (progn
     ((lambda (width height)
        (let ((render-area *black*))
@@ -1245,7 +1251,8 @@ edge, or no case"
     (gl:clear-color 1.0 1.0 1.0 1.0)
     (gl:clear
      :color-buffer-bit
-     )))
+     ))
+  (incf *render-ticks*))
 
 (defun set-sky-color ()
   (let ((daytime sandbox::*daytime*))
@@ -1253,50 +1260,80 @@ edge, or no case"
 	  (g (* daytime (aref *sky-color* 1)))
 	  (b (* daytime (aref *sky-color* 2))))
       (gl:clear-color r g b 1.0))))
-(defparameter *sky-color*  (vector 0.68 0.8 1.0)
-	      ;(vector 1.0 1.0 1.0)
+(defparameter *sky-color*  ;(vector 0.68 0.8 1.0)
+	      (vector 0.3 0.1 0.0)
   )
 (defparameter *fog-ratio* 0.75)
 
+(defparameter *depth-buffer?* t)
+;;when set to nil does not clear the depth buffer, but instead flip-flops
+;;the depth function and matrix. has edge artefacts when using glclear for color
+
+(defparameter *mata*
+  (cg-matrix:matrix*
+   (cg-matrix:translate* 0.0 0.0 1.0)
+   (cg-matrix:scale* 1.0 1.0 -1.0)))
+(defparameter *temp-matrix* (cg-matrix:identity-matrix))
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
   (glhelp::use-gl-program (getfnc 'blockshader))
-  
-  (glhelp:with-uniforms uniform (getfnc 'blockshader)
-    (gl:uniform-matrix-4fv 
-     (uniform :pmv)
-     (camat:camera-matrix-projection-view-player camera)
-     nil)
-    (flet ((fractionalize (x)
-	     (alexandria:clamp x 0.0 1.0)))
-      (let ((time sandbox::*daytime*))
-	(let ((x (fractionalize (* (aref *sky-color* 0) time)))
-	      (y (fractionalize (* (aref *sky-color* 1) time)))
-	      (z (fractionalize (* (aref *sky-color* 2) time))))
-	  (%gl:uniform-3f (uniform :fogcolor)
-			  x y z)
-	  (gl:uniformfv (uniform :camera-pos)
-			(camat:camera-vec-position *camera*))
-	  (%gl:uniform-1f (uniform :foglet)
-			  (/ -1.0 (or 128 (camat:camera-frustum-far *camera*)) *fog-ratio*))
-	  (%gl:uniform-1f (uniform :aratio)
-			  (/ 1.0 *fog-ratio*)))))
 
-    (progn
-      (gl:uniformi (uniform :sampler) 0)
-      (glhelp::set-active-texture 0)
-      (gl:bind-texture :texture-2d
-		       (glhelp::handle (getfnc 'terrain))
-		       ))
-    #+nil
-    (gl:uniformf 
-     (uniform :time)
-     (float (/ (get-internal-real-time)
-	       100.0))))
-  (gl:enable :depth-test)  
-  (gl:depth-func :less)
+  (let ((cam (camat:camera-matrix-projection-view-player camera))
+	(matrix *temp-matrix*))
+    (cond (*depth-buffer?*
+	   (gl:clear-depth 1.0)
+	   (gl:clear
+	   :color-buffer-bit
+	   :depth-buffer-bit)
+	   (gl:depth-func :less)
+	   (setf matrix cam))
+	  (t
+	   (cond ((evenp *render-ticks*)
+		  ;;	   (gl:clear-depth 0.0)
+		  (gl:depth-func :greater)
+		  (gl:depth-range 0.5 1.0)
+		  (cg-matrix:%matrix* matrix
+				      *mata* cam))
+		 (t
+		  ;;	   (gl:clear-depth 1.0)
+		  (gl:depth-func :less)
+		  (gl:depth-range 0.0 0.5)
+		  (setf matrix cam)))))
+
+    (glhelp:with-uniforms uniform (getfnc 'blockshader)
+      (gl:uniform-matrix-4fv 
+       (uniform :pmv)
+       matrix
+       nil)
+      (flet ((fractionalize (x)
+	       (alexandria:clamp x 0.0 1.0)))
+	(let ((time sandbox::*daytime*))
+	  (let ((x (fractionalize (* (aref *sky-color* 0) time)))
+		(y (fractionalize (* (aref *sky-color* 1) time)))
+		(z (fractionalize (* (aref *sky-color* 2) time))))
+	    (%gl:uniform-3f (uniform :fogcolor)
+			    x y z)
+	    (gl:uniformfv (uniform :camera-pos)
+			  (camat:camera-vec-position *camera*))
+	    (%gl:uniform-1f (uniform :foglet)
+			    (/ -1.0 (or 128 (camat:camera-frustum-far *camera*)) *fog-ratio*))
+	    (%gl:uniform-1f (uniform :aratio)
+			    (/ 1.0 *fog-ratio*)))))
+
+      (progn
+	(gl:uniformi (uniform :sampler) 0)
+	(glhelp::set-active-texture 0)
+	(gl:bind-texture :texture-2d
+			 (glhelp::handle (getfnc 'terrain))
+			 ))
+      #+nil
+      (gl:uniformf 
+       (uniform :time)
+       (float (/ (get-internal-real-time)
+		 100.0)))))
+  (gl:enable :depth-test)
+  
   (gl:enable :cull-face)
-  (gl:cull-face :back)
   (gl:disable :blend)
   (sandbox::draw-world)
   (sandbox::designatemeshing))
