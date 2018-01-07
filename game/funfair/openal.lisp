@@ -199,8 +199,12 @@
        (values (interleave16 left right len format (* 2 len) arr)
 	       (* len 4))))))
 
+(defmacro clamp (min max x)
+  `(max ,min (min ,max ,x)))
+
 
 ;;;;crackling noise when floats above 1.0 or below -1.0?
+;;;; clamp or scale floats outside of [-1.0 1.0]?
 (eval-when (:compile-toplevel)
   (defparameter *int16-dispatch*
     '(case format
@@ -215,10 +219,8 @@
 					;	 (print scale)
 	 (audio-type :float
 		     (round
-		      (- (the (single-float -1.0 1.0)
-			      (* 
-			       value
-			       scaling-factor))
+		      (- (* (clamp -1.0 1.0 value)
+			    scaling-factor)
 			 0.5)))))
       ((:dblp :dbl)
        (let* ((scale 1.0d0
@@ -229,10 +231,10 @@
 	 (declare (type double-float scale scaling-factor))
 	 (audio-type :double
 		     (round
-		      (- (the (double-float -1d0 1d0)
-			      (* 
-			       value
-			       scaling-factor))
+		      (- 
+			 (* 
+			  (clamp -1.0d0 1.0d0 value)
+			  scaling-factor)
 			 0.5d0)))))
       ((:s16 :s16p)
        (audio-type :int16 value))
@@ -303,7 +305,7 @@
   (defparameter *uint8-dispatch*
     '(case format
       ((:fltp :flt)
-       (let* ((scale 1.0 #+nil
+       (let* ((scale 1.2 #+nil
 	       (find-max :float
 			 1.0
 			 -1.0))
@@ -311,13 +313,13 @@
 	 (declare (type single-float scale scaling-factor))
 	 (audio-type :float
 		     (round
-		      (- (the (single-float -1.0 1.0)
-			      (* 
-			       value
-			       scaling-factor))
+		      (- 
+			 (* 
+			  (clamp -1.0 1.0 value)
+			  scaling-factor)
 			 0.5)))))
       ((:dblp :dbl)
-       (let* ((scale 1.0d0 #+nil
+       (let* ((scale 1.2d0 #+nil
 	       (find-max :double
 			 1.0d0
 			 -1.0d0))
@@ -325,10 +327,10 @@
 	 (declare (type double-float scale scaling-factor))
 	 (audio-type :double
 		     (round
-		      (- (the (double-float -1d0 1d0)
-			      (* 
-			       value
-			       scaling-factor))
+		      (- 
+			 (* 
+			  (clamp -1.0d0 1.0d0 value)
+			  scaling-factor)
 			 0.5d0)))))
       ((:s16 :s16p)
        (audio-type :int16 (+ 128 (ash value -8))))
