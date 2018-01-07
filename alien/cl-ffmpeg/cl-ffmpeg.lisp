@@ -3,122 +3,156 @@
 
 (in-package :cl-ffmpeg)
 
-(defun get-sound-buff (music; &optional sample-rate
-				)
-  (block bye
-    (let ((adubs nil)
-	  (asize -3)
-	  (actual-sample-rate)
-	  (bytes-per-sample nil)
-	  (channels nil)
-	  (audio-format nil))
-      (cffi:with-foreign-string (path music)
-	;; initialize all muxers, demuxers and protocols for libavformat
-	;; (does nothing if called twice during the course of one program execution)
-	(av-register-all)
-	(cffi:with-foreign-objects ((an-int :int)
-				    (&format :pointer)
-				 ;   (&swr :pointer)
-				    (&frame :pointer)
-				    (&stream :pointer)
-				    (&codec :pointer))
+;; initialize all muxers, demuxers and protocols for libavformat
+;; (does nothing if called twice during the course of one program execution)
+(eval-when (:execute :load-toplevel)
+  (av-register-all))
 
-	  (setf (cffi:mem-ref &format :pointer)
-		(avformat-alloc-context))
-;;;	  (print 343)
-	  (unless (zerop
-		   (avformat-open-input &format
-					path
-					(cffi:null-pointer)
-					(cffi:null-pointer)))
-	    (print "could not open file")
-	    (return-from bye -1))
-	  (when (> 0 (avformat-find-stream-info (cffi:mem-ref &format :pointer)
-						(cffi:null-pointer)))
-	    (print "could not retrive stream info from file")
-	    (return-from bye -1))
-	  (let ((stream-index (find-first-audio-stream2 (cffi:mem-ref &format :pointer))))
-	    (when (= -1 stream-index)
-	      (print "could not retrieve audio stream from file")
-	      (return-from bye -1))
-	    (let* ((stream-array (cffi:foreign-slot-value (cffi:mem-ref &format :pointer)
-							  (quote (:struct |AVFormatContext|))
-							  (quote cl-ffmpeg-bindings::streams)))
-		   (the-stream (mem-aref stream-array
-					 :pointer
-					 stream-index)))
-	      (setf (cffi:mem-ref &stream :pointer)
-		    the-stream)))
-	  (progn
-	    ;;;find and open codec
-	    (setf (cffi:mem-ref &codec :pointer)
-		  (foreign-slot-value (cffi:mem-ref &stream :pointer)
-				      (quote (:struct cl-ffmpeg-bindings::|AVStream|))
-				      (quote cl-ffmpeg-bindings::codec)))
-	    (when (> 0 (avcodec-open2 (cffi:mem-ref &codec :pointer)
-				      (avcodec-find-decoder
-				       (cffi:foreign-slot-value
-					(cffi:mem-ref &codec :pointer)
-					(quote (:struct cl-ffmpeg-bindings::|AVCodecContext|))
-					(quote cl-ffmpeg-bindings::codec_id)))
-				      (cffi:null-pointer)))
-	      (print "failed to open decoder for stream number stream-index for file path")
-	      (return-from bye -1)))
-	  #+nil
-	  (progn
-	    ;;prepare resampler
-	    (setf (mem-ref &swr :pointer) (swr-alloc))
-	    (setf actual-sample-rate
-		  (prepare-resampler2 (cffi:mem-ref &swr :pointer)
-				      (cffi:mem-ref &codec :pointer)
-				      sample-rate))
-	    (when (zerop (swr-is-initialized (cffi:mem-ref &swr :pointer)))
-	      (print "resampler-not-properly initialized")
-	      (return-from bye -1)))
+(defclass some-sound ()
+  ((dubs :initform nil)
+   (size :initform nil)
+   
+   (rate :initform nil)
+   (bytes-per-sample :initform nil)
+   (channels :initform nil)
+   (audio-format :initform nil)
+   
+   (playsize :initform nil)
+   (dubs2 :initform nil)))
 
-	  (let ((codec (cffi:mem-ref &codec :pointer)))
-	    (cffi:with-foreign-slots ((cl-ffmpeg-bindings::channels
-				       cl-ffmpeg-bindings::channel_layout
-				       cl-ffmpeg-bindings::sample_rate
-				       cl-ffmpeg-bindings::sample_fmt) codec
-				      (:struct cl-ffmpeg-bindings::|AVCodecContext|))
-	      (setf actual-sample-rate cl-ffmpeg-bindings::sample_rate)
-	      (setf bytes-per-sample (cl-ffmpeg-bindings::av-get-bytes-per-sample
-				      cl-ffmpeg-bindings::sample_fmt))
-	      (setf audio-format cl-ffmpeg-bindings::sample_fmt)
-	      (setf channels cl-ffmpeg-bindings::channels)))
-	  
-	  (progn (setf (cffi:mem-ref &frame :pointer) (av-frame-alloc))
-		 (when (cffi:null-pointer-p (cffi:mem-ref &frame :pointer))
-		   (print "error allocating the frame")
-		   (return-from bye -1)))
-	  (cffi:with-foreign-object (data-pointer :pointer channels)
-	    (cffi:with-foreign-object (packet (quote (:struct cl-ffmpeg-bindings::|AVPacket|)))
-	      ;;prepare to read data
-	      (av-init-packet packet)
-	      (iterate-through-frames2 
-	       (cffi:mem-ref &format :pointer)
-	       packet
-	       (cffi:mem-ref &codec :pointer)
-	       (cffi:mem-ref &frame :pointer)
-					;	   (cffi:mem-ref &swr :pointer)
-	       data-pointer
-	       an-int
+;   (&swr :pointer)
+(defclass demux-data ()
+  ((&format :initform nil)
+   (&frame :initform nil)
+   (&codec :initform nil)
+   (live :initform nil)))
+
+(defun init-demux-data (inst)
+  (let ((a (cffi:foreign-alloc :pointer :count 1))
+	(b (cffi:foreign-alloc :pointer :count 1))
+	(d (cffi:foreign-alloc :pointer :count 1)))
+    (with-slots (&format &frame &codec live) inst
+      (setf &format a)
+      (setf &frame b)
+      (setf &codec d)
+      (setf live t)))
+  inst)
+
+(defun free-demux-data (inst)
+  (with-slots (&format &frame &codec live) inst
+    ;;clean up
+    (progn 
+      (av-frame-free &frame)
+      (avcodec-close (cffi:mem-ref &codec :pointer))
+      (avformat-free-context (cffi:mem-ref &format :pointer)))
+    (cffi:foreign-free &format)
+    (cffi:foreign-free &codec)
+    (cffi:foreign-free &frame)
+    (setf live nil)))
+
+
+(defun init-demux (demuxer music sound-data)
+  (with-slots ((actual-sample-rate rate)
 	       bytes-per-sample
-	       channels))
-	    (let ((arr (make-array channels)))
-	      (dotimes (i channels)
-		(setf (aref arr i) (cffi:mem-aref data-pointer :pointer i)))
-	      (setf adubs arr)))
-	  (progn ;;clean up
-	    (av-frame-free &frame)
-;	    (swr-free &swr)
-	    (avcodec-close (cffi:mem-ref &codec :pointer))
-	    (avformat-free-context (cffi:mem-ref &format :pointer)))
-	  
-	  (setf asize (cffi:mem-ref an-int :int))))
-      (values adubs asize actual-sample-rate bytes-per-sample channels audio-format))))
+	       channels
+	       audio-format) sound-data
+    (with-slots (&format &frame &codec) demuxer
+;;;	  (print 343)
+      (block bye
+	(setf (cffi:mem-ref &format :pointer)
+	      (avformat-alloc-context))
+	(let ((ret (cffi:with-foreign-string (path music)
+		     (avformat-open-input
+		      &format
+		      path
+		      (cffi:null-pointer)
+		      (cffi:null-pointer)))))
+	  (unless (zerop ret)
+	    (print "could not open file ~a")
+	    (return-from bye -1)))
+	(when (> 0 (avformat-find-stream-info (cffi:mem-ref &format :pointer)
+					      (cffi:null-pointer)))
+	  (print "could not retrive stream info from file")
+	  (return-from bye -1))
+	(let ((stream-index (find-first-audio-stream2 (cffi:mem-ref &format :pointer))))
+	  (when (= -1 stream-index)
+	    (print "could not retrieve audio stream from file")
+	    (return-from bye -1))
+	  (let* ((stream-array (cffi:foreign-slot-value (cffi:mem-ref &format :pointer)
+							(quote (:struct |AVFormatContext|))
+							(quote cl-ffmpeg-bindings::streams)))
+		 (the-stream (mem-aref stream-array
+				       :pointer
+				       stream-index)))
+	    (progn
+	    ;;;find and open codec
+	      (setf (cffi:mem-ref &codec :pointer)
+		    (foreign-slot-value the-stream
+					(quote (:struct cl-ffmpeg-bindings::|AVStream|))
+					(quote cl-ffmpeg-bindings::codec)))
+	      (when (> 0 (avcodec-open2 (cffi:mem-ref &codec :pointer)
+					(avcodec-find-decoder
+					 (cffi:foreign-slot-value
+					  (cffi:mem-ref &codec :pointer)
+					  (quote (:struct cl-ffmpeg-bindings::|AVCodecContext|))
+					  (quote cl-ffmpeg-bindings::codec_id)))
+					(cffi:null-pointer)))
+		(print "failed to open decoder for stream number stream-index for file path")
+		(return-from bye -1)))))
+	#+nil
+	(progn
+	  ;;prepare resampler
+	  (setf (mem-ref &swr :pointer) (swr-alloc))
+	  (setf actual-sample-rate
+		(prepare-resampler2 (cffi:mem-ref &swr :pointer)
+				    (cffi:mem-ref &codec :pointer)
+				    sample-rate))
+	  (when (zerop (swr-is-initialized (cffi:mem-ref &swr :pointer)))
+	    (print "resampler-not-properly initialized")
+	    (return-from bye -1)))
 
+	(let ((codec (cffi:mem-ref &codec :pointer)))
+	  (cffi:with-foreign-slots ((cl-ffmpeg-bindings::channels
+				     cl-ffmpeg-bindings::channel_layout
+				     cl-ffmpeg-bindings::sample_rate
+				     cl-ffmpeg-bindings::sample_fmt) codec
+				    (:struct cl-ffmpeg-bindings::|AVCodecContext|))
+	    (setf actual-sample-rate cl-ffmpeg-bindings::sample_rate)
+	    (setf bytes-per-sample (cl-ffmpeg-bindings::av-get-bytes-per-sample
+				    cl-ffmpeg-bindings::sample_fmt))
+	    (setf audio-format cl-ffmpeg-bindings::sample_fmt)
+	    (setf channels cl-ffmpeg-bindings::channels)))
+	  
+	(progn (setf (cffi:mem-ref &frame :pointer) (av-frame-alloc))
+	       (when (cffi:null-pointer-p (cffi:mem-ref &frame :pointer))
+		 (print "error allocating the frame")
+		 (return-from bye -1)))))
+
+	))
+
+(defun get-sound-buff (music sound-data)
+  (let ((demuxer (init-demux-data (make-instance 'demux-data))))
+    (init-demux demuxer music sound-data)
+    (with-slots ((adubs dubs)
+		 (asize size)
+		 channels) sound-data
+      (cffi:with-foreign-object (data-pointer :pointer channels)
+	(cffi:with-foreign-object (packet (quote (:struct cl-ffmpeg-bindings::|AVPacket|)))
+	  ;;prepare to read data
+	  (av-init-packet packet)
+	  (setf asize
+		(iterate-through-frames2
+		 demuxer
+		 packet
+		 data-pointer
+		 sound-data)))
+	(let ((arr (make-array channels)))
+	  (dotimes (i channels)
+	    (setf (aref arr i) (cffi:mem-aref data-pointer :pointer i)))
+	  (setf adubs arr))))
+
+      					;	    (swr-free &swr)
+    (free-demux-data demuxer)))
 #+nil
 (progn
   (defparameter av-ch-front-left 1)
@@ -207,74 +241,79 @@
 	    (incf audiocount)
 	    (if (< 1 audiocount)
 		(format t "more than one audio stream?!?!: find-first-audio-stream2 ~a"
-			       audiocount)
+			audiocount)
 		(setf stream-index index))
 	  ;  (return-from out)
 	    ))))
     stream-index))
 
-(defun iterate-through-frames2 (format packet codec frame #+nil swr data mehsize typesize
-				channels)
-  (declare (type cffi:foreign-pointer format packet codec frame data))
-  (declare (type (integer 0 8) typesize)
-	   (type (integer 0 8) channels))
-  (declare (optimize (speed 3) (safety 0)))
-  (dotimes (index channels)
-    (setf (cffi:mem-aref data :pointer index)
-	  (cffi:null-pointer)))
-  (let ((size 0)
-;	(count 0)
-	)
-    (declare (type fixnum size))
-    (loop
-       (progn
-	 ;(incf count)
-	 ;(print count)
-	 (when (< (av-read-frame format packet) 0)
-	   (return))
-	 (cffi:with-foreign-objects ((gotframe :int))
-	   (when (< (avcodec-decode-audio4 codec frame gotframe packet) 0)
-	     (continue)
-	     ;(return)
-	     )
-	   (when (zerop (mem-ref gotframe :int))
-	     (continue)))
-	 (let ((samples (cffi:foreign-slot-value
-			 frame
-			 (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-			 (quote cl-ffmpeg-bindings::nb_samples)))
-	       (rawdata (cffi:foreign-slot-value
-			 frame
-			 (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-			 (quote cl-ffmpeg-bindings::data))))
-	   #+nil
-	   (dotimes (index 8)
-	     (print (mem-aref
-		     (cffi:foreign-slot-value
-		      frame
-		      (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-		      (quote cl-ffmpeg-bindings::extended_data))
-		     :pointer index)))
-	   (let* ((sample-size  (* typesize samples))
-		  (total-size (the fixnum (* typesize size)))
-		  (newsize (+ sample-size total-size)))
+(defun iterate-through-frames2 (demuxer packet data sound-data)
+  (declare (type cffi:foreign-pointer packet data))
+					; (declare (optimize (speed 3) (safety 0)))
+  (with-slots (&format &codec &frame) demuxer
+    (let ((format (mem-ref &format :pointer))
+	  (codec (mem-ref &codec :pointer))
+	  (frame (mem-ref &frame :pointer)))		;(cffi:mem-ref &swr :pointer)
+      (declare (type cffi:foreign-pointer format codec frame))
+      (with-slots (channels (typesize bytes-per-sample)) sound-data
+					;     (print (list channels packet typesize))
+	#+nil
+	(declare (type (integer 0 8) typesize)
+		 (type (integer 0 8) channels))
+	(dotimes (index channels)
+	  (setf (cffi:mem-aref data :pointer index)
+		(cffi:null-pointer)))
+	(let ((size 0)
+					;	(count 0)
+	      )
+	  (declare (type fixnum size))
+	  (loop
+					;	   (print 234234)
+	     (progn
+					;(incf count)
+					;(print count)
+	       (when (< (av-read-frame format packet) 0)
+		 (return))
+	       (cffi:with-foreign-object (gotframe :int 1)
+		 (when (< (avcodec-decode-audio4 codec frame gotframe packet) 0)
+		   (continue)
+					;(return)
+		   )
+		 (when (zerop (mem-ref gotframe :int))
+		   (continue)))
+	       (let ((samples (cffi:foreign-slot-value
+			       frame
+			       (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+			       (quote cl-ffmpeg-bindings::nb_samples)))
+		     (rawdata (cffi:foreign-slot-value
+			       frame
+			       (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+			       (quote cl-ffmpeg-bindings::data))))
+		 #+nil
+		 (dotimes (index 8)
+		   (print (mem-aref
+			   (cffi:foreign-slot-value
+			    frame
+			    (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+			    (quote cl-ffmpeg-bindings::extended_data))
+			   :pointer index)))
+		 (let* ((sample-size  (* typesize samples))
+			(total-size (the fixnum (* typesize size)))
+			(newsize (+ sample-size total-size)))
 
-	     (dotimes (index channels
-		       )
-	       (symbol-macrolet ((outbuf (cffi:mem-aref data :pointer index)))
-		 (let ((inbuf (mem-aref rawdata :pointer index)))
-		   (setf outbuf
-			 (realloc outbuf newsize))
+		   (dotimes (index channels)
+		     (symbol-macrolet ((outbuf (cffi:mem-aref data :pointer index)))
+		       (let ((inbuf (mem-aref rawdata :pointer index)))
+			 (setf outbuf
+			       (realloc outbuf newsize))
 					;		     (print 234234)
-		   (memcpy (cffi:inc-pointer outbuf
-					     total-size)
-			   inbuf
-			   sample-size)))))
-	   
-	   (incf size samples))))
-    (setf (mem-ref mehsize :int)
-	  size)
-    size))
+			 (memcpy (cffi:inc-pointer outbuf
+						   total-size)
+				 inbuf
+				 sample-size)))))
+		 
+		 (incf size samples))))
+	  size)))))
 
 #+nil
 (cffi:with-foreign-object (&buffer :pointer)
