@@ -43,13 +43,13 @@
   (multiple-value-prog1
       (setf (values dubs size rate bytes-per-sample channels audio-format)
 	    (cl-ffmpeg::get-sound-buff music))
-
+    (print "data dumped")
     (progn (setf (values dubs2 playsize)
 		 (convert
-		  (aref dubs 0)
 		  (case (length dubs)
 		    (1 (aref dubs 0))
 		    (otherwise (aref dubs 1)))
+		  (aref dubs 0)
 		  size
 		  audio-format
 		  *playback*))
@@ -67,24 +67,14 @@
        dubs)
   (setf dubs nil))
 
-#+nil
-(defcenum |AVSampleFormat|
-  (:none -1)
-  :u8
-  :s16
-  :s32
-  :flt
-  :fbl
+(defun play (&optional file)
+  (if file (progn
+	     (alut-test file)
+	     (alut-hello-world)))
+  (al:source-play *source*))
+(defun pause ()
+  (al:source-pause *source*))
 
-  :u8p
-  :s16p
-  :s32p
-  :fltp
-  :dblp
-  :s64
-  :s64p
-
-  :nb)
 
 
 (defun alut-hello-world ()
@@ -106,8 +96,7 @@
     (al:listener :orientation (vector 0.0 1.0 0.0 0.0 1.0 0.0))
     (al:buffer-data buffer *playback* dubs2 playsize rate
 		    )
-    (al:source source :buffer buffer)
-    (al:source-play source)))
+    (al:source source :buffer buffer)))
 
 (defparameter *source* nil)
 (defparameter *buffer* nil)
@@ -186,17 +175,32 @@
   (defparameter *int16-dispatch*
     '(case format
       ((:fltp :flt)
-       (audio-type :float
-	(truncate 
-	 (* (the (single-float -1.0 1.0)
-		 value)
-	    32767.0))))
+       (let* ((scale (find-max :float
+			       1.0
+			       -1.0))
+	      (scaling-factor (/ 32767.5 scale)))
+	 (declare (type single-float scale scaling-factor))
+;	 (print scale)
+	 (audio-type :float
+		     (round
+		      (- (the (single-float -1.0 1.0)
+			      (* 
+			       value
+			       scaling-factor))
+			 0.5)))))
       ((:dblp :dbl)
-       (audio-type :double
-	(truncate 
-	 (* (the (double-float -1d0 1d0)
-		 value)
-	    32767.0d0))))
+       (let* ((scale (find-max :double
+			       1.0d0
+			       -1.0d0))
+	      (scaling-factor (/ 32767.5d0 scale)))
+	 (declare (type double-float scale scaling-factor))
+	 (audio-type :double
+		     (round
+		      (- (the (double-float -1d0 1d0)
+			      (* 
+			       value
+			       scaling-factor))
+			 0.5d0)))))
       ((:s16 :s16p)
        (audio-type :int16 value))
       ((:s32 :s32p)
@@ -221,7 +225,23 @@
 				   (value (if (oddp index)
 					      (cffi:mem-aref left ,type little-index)		    
 					      (cffi:mem-aref right ,type little-index))))
-			      ,form)))))
+			      ,form))))
+		 (find-max (type min max)
+		   `(let ((min ,min)
+			  (max ,max))
+		      (dotimes (index length)
+			(let ((a (cffi:mem-aref left ,type index))		    
+			      (b (cffi:mem-aref right ,type index)))
+			  (cond ((< a min)
+				 (setf min a))
+				((> a max)
+				 (setf max a)))
+			  (cond ((< b min)
+				 (setf min b))
+				((> b max)
+				 (setf max b)))))
+		      (max (abs min)
+			   (abs max)))))
 	(etouq *int16-dispatch*))
       (values arr
 	      (the fixnum (* newlen 2))))))
@@ -235,8 +255,19 @@
 		 `(dotimes (index newlen)
 		    (setf (cffi:mem-aref arr :int16 index)
 			  (let ((value (cffi:mem-aref buffer ,type index)))
-			    ,form)))))
-      	(etouq *int16-dispatch*))
+			    ,form))))
+	       (find-max (type min max)
+		 `(let ((min ,min)
+			(max ,max))
+		    (dotimes (index newlen)
+		      (let ((a (cffi:mem-aref buffer ,type index)))
+			(cond ((< a min)
+			       (setf min a))
+			      ((> a max)
+			       (setf max a)))))
+		    (max (abs min)
+			 (abs max)))))
+      (etouq *int16-dispatch*))
     (values arr
 	    (the fixnum (* 2 newlen)))))
 
@@ -244,17 +275,31 @@
   (defparameter *uint8-dispatch*
     '(case format
       ((:fltp :flt)
-       (audio-type :float
-	(truncate 
-	 (* (the (single-float -1.0 1.0)
-		 (+ 1f0 value))
-	    127.5))))
+       (let* ((scale (find-max :float
+			       1.0
+			       -1.0))
+	      (scaling-factor (/ 127.5 scale)))
+	 (declare (type single-float scale scaling-factor))
+	 (audio-type :float
+		     (round
+		      (- (the (single-float -1.0 1.0)
+			      (* 
+			       value
+			       scaling-factor))
+			 0.5)))))
       ((:dblp :dbl)
-       (audio-type :double
-	(truncate 
-	 (* (the (double-float -1d0 1d0)
-		 (+ 1d0 value))
-	    127.5d0))))
+       (let* ((scale (find-max :double
+			       1.0d0
+			       -1.0d0))
+	      (scaling-factor (/ 127.5d0 scale)))
+	 (declare (type double-float scale scaling-factor))
+	 (audio-type :double
+		     (round
+		      (- (the (double-float -1d0 1d0)
+			      (* 
+			       value
+			       scaling-factor))
+			 0.5d0)))))
       ((:s16 :s16p)
        (audio-type :int16 (+ 128 (ash value -8))))
       ((:s32 :s32p)
@@ -279,7 +324,23 @@
 				   (value (if (oddp index)
 					      (cffi:mem-aref left ,type little-index)		    
 					      (cffi:mem-aref right ,type little-index))))
-			      ,form)))))
+			      ,form))))
+		 (find-max (type min max)
+		   `(let ((min ,min)
+			  (max ,max))
+		      (dotimes (index length)
+			(let ((a (cffi:mem-aref left ,type index))		    
+			      (b (cffi:mem-aref right ,type index)))
+			  (cond ((< a min)
+				 (setf min a))
+				((> a max)
+				 (setf max a)))
+			  (cond ((< b min)
+				 (setf min b))
+				((> b max)
+				 (setf max b)))))
+		      (max (abs min)
+			   (abs max)))))
 	(etouq *uint8-dispatch*))
       (values arr
 	      newlen))))
@@ -293,7 +354,18 @@
 		 `(dotimes (index newlen)
 		    (setf (cffi:mem-aref arr :uint8 index)
 			  (let ((value (cffi:mem-aref buffer ,type index)))
-			    ,form)))))
-      	(etouq *uint8-dispatch*))
+			    ,form))))
+	       (find-max (type min max)
+		 `(let ((min ,min)
+			(max ,max))
+		    (dotimes (index newlen)
+		      (let ((a (cffi:mem-aref buffer ,type index)))
+			(cond ((< a min)
+			       (setf min a))
+			      ((> a max)
+			       (setf max a)))))
+		    (max (abs min)
+			 (abs max)))))
+      (etouq *uint8-dispatch*))
     (values arr
 	    newlen)))

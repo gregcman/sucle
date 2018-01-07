@@ -188,23 +188,26 @@
 					(quote cl-ffmpeg-bindings::nb_streams))))
     (block out
       (dotimes (index count)
-	(let* ((streams (cffi:foreign-slot-value format
-					(quote (:struct cl-ffmpeg-bindings::|AVFormatContext|))
-					(quote cl-ffmpeg-bindings::streams)))
+	(let* ((streams (cffi:foreign-slot-value
+			 format
+			 (quote (:struct cl-ffmpeg-bindings::|AVFormatContext|))
+			 (quote cl-ffmpeg-bindings::streams)))
 	       (stream (cffi:mem-aref
 			streams
 			:pointer))
-	       (codec (cffi:foreign-slot-value stream
-					(quote (:struct cl-ffmpeg-bindings::|AVStream|))
-					(quote cl-ffmpeg-bindings::codec)))
-	       (codec_type (cffi:foreign-slot-value codec
-					(quote (:struct cl-ffmpeg-bindings::|AVCodecContext|))
-					(quote cl-ffmpeg-bindings::codec_type))))
+	       (codec (cffi:foreign-slot-value
+		       stream
+		       (quote (:struct cl-ffmpeg-bindings::|AVStream|))
+		       (quote cl-ffmpeg-bindings::codec)))
+	       (codec_type (cffi:foreign-slot-value
+			    codec
+			    (quote (:struct cl-ffmpeg-bindings::|AVCodecContext|))
+			    (quote cl-ffmpeg-bindings::codec_type))))
 	  (when (eq :audio codec_type)
 	    (incf audiocount)
 	    (if (< 1 audiocount)
-		(progn (print "more than one audio stream?!?!: find-first-audio-stream2")
-		       (print audiocount))
+		(format t "more than one audio stream?!?!: find-first-audio-stream2 ~a"
+			       audiocount)
 		(setf stream-index index))
 	  ;  (return-from out)
 	    ))))
@@ -219,16 +222,21 @@
   (dotimes (index channels)
     (setf (cffi:mem-aref data :pointer index)
 	  (cffi:null-pointer)))
- ; (print channels)
-  (let ((size 0))
+  (let ((size 0)
+;	(count 0)
+	)
     (declare (type fixnum size))
     (loop
        (progn
-	 (unless (>= (av-read-frame format packet) 0)
+	 ;(incf count)
+	 ;(print count)
+	 (when (< (av-read-frame format packet) 0)
 	   (return))
 	 (cffi:with-foreign-objects ((gotframe :int))
 	   (when (< (avcodec-decode-audio4 codec frame gotframe packet) 0)
-	     (return))
+	     (continue)
+	     ;(return)
+	     )
 	   (when (zerop (mem-ref gotframe :int))
 	     (continue)))
 	 (let ((samples (cffi:foreign-slot-value
@@ -239,7 +247,14 @@
 			 frame
 			 (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
 			 (quote cl-ffmpeg-bindings::data))))
-
+	   #+nil
+	   (dotimes (index 8)
+	     (print (mem-aref
+		     (cffi:foreign-slot-value
+		      frame
+		      (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+		      (quote cl-ffmpeg-bindings::extended_data))
+		     :pointer index)))
 	   (let* ((sample-size  (* typesize samples))
 		  (total-size (the fixnum (* typesize size)))
 		  (newsize (+ sample-size total-size)))
