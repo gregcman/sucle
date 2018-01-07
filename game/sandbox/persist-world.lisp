@@ -14,10 +14,7 @@
     (filesystem-util:save2
      path
      position-list
-     (gethash position world::*lispobj*)
-;     (gethash position world:lighthash)
-;     (gethash position world:skylighthash)
-     )))
+     (gethash position world::*lispobj*))))
 
 (defun loadchunk (path position-list)
   (let ((position (apply #'world:chunkhashfunc position-list)))

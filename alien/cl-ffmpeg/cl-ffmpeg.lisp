@@ -3,19 +3,21 @@
 
 (in-package :cl-ffmpeg)
 
-(defun get-sound-buff (music sample-rate)
+(defun get-sound-buff (music; &optional sample-rate
+				)
   (block bye
     (let ((adubs nil)
-	  (aans nil)
-	  (asize -3))
+	  (asize -3)
+	  (actual-sample-rate)
+	  (bytes-per-sample nil)
+	  (channels nil))
       (cffi:with-foreign-string (path music)
 	;; initialize all muxers, demuxers and protocols for libavformat
 	;; (does nothing if called twice during the course of one program execution)
 	(av-register-all)
-	(cffi:with-foreign-objects ((data-pointer :pointer)
-				    (an-int :int)
+	(cffi:with-foreign-objects ((an-int :int)
 				    (&format :pointer)
-				    (&swr :pointer)
+				 ;   (&swr :pointer)
 				    (&frame :pointer)
 				    (&stream :pointer)
 				    (&codec :pointer))
@@ -61,46 +63,66 @@
 				      (cffi:null-pointer)))
 	      (print "failed to open decoder for stream number stream-index for file path")
 	      (return-from bye -1)))
+	  #+nil
 	  (progn
 	    ;;prepare resampler
 	    (setf (mem-ref &swr :pointer) (swr-alloc))
-	    (prepare-resampler2 (cffi:mem-ref &swr :pointer)
-				(cffi:mem-ref &codec :pointer)
-				sample-rate)
+	    (setf actual-sample-rate
+		  (prepare-resampler2 (cffi:mem-ref &swr :pointer)
+				      (cffi:mem-ref &codec :pointer)
+				      sample-rate))
 	    (when (zerop (swr-is-initialized (cffi:mem-ref &swr :pointer)))
 	      (print "resampler-not-properly initialized")
 	      (return-from bye -1)))
+
+	  (let ((codec (cffi:mem-ref &codec :pointer)))
+	    (cffi:with-foreign-slots ((cl-ffmpeg-bindings::channels
+				       cl-ffmpeg-bindings::channel_layout
+				       cl-ffmpeg-bindings::sample_rate
+				       cl-ffmpeg-bindings::sample_fmt) codec
+				      (:struct cl-ffmpeg-bindings::|AVCodecContext|))
+	      (setf actual-sample-rate cl-ffmpeg-bindings::sample_rate)
+	      (setf bytes-per-sample (cl-ffmpeg-bindings::av-get-bytes-per-sample
+				      cl-ffmpeg-bindings::sample_fmt))
+	      (setf channels cl-ffmpeg-bindings::channels)))
+	  
 	  (progn (setf (cffi:mem-ref &frame :pointer) (av-frame-alloc))
 		 (when (cffi:null-pointer-p (cffi:mem-ref &frame :pointer))
 		   (print "error allocating the frame")
 		   (return-from bye -1)))
-	  (cffi:with-foreign-object (packet (quote (:struct cl-ffmpeg-bindings::|AVPacket|)))
-	    ;;prepare to read data
-	    (av-init-packet packet)
-
-	    (setf aans
-		  (iterate-through-frames2 
-		   (cffi:mem-ref &format :pointer)
-		   packet
-		   (cffi:mem-ref &codec :pointer)
-		   (cffi:mem-ref &frame :pointer)
-		   (cffi:mem-ref &swr :pointer)
-		   data-pointer
-		   an-int)))
+	  (cffi:with-foreign-object (data-pointer :pointer channels)
+	    (cffi:with-foreign-object (packet (quote (:struct cl-ffmpeg-bindings::|AVPacket|)))
+	      ;;prepare to read data
+	      (av-init-packet packet)
+	      (iterate-through-frames2 
+	       (cffi:mem-ref &format :pointer)
+	       packet
+	       (cffi:mem-ref &codec :pointer)
+	       (cffi:mem-ref &frame :pointer)
+					;	   (cffi:mem-ref &swr :pointer)
+	       data-pointer
+	       an-int
+	       bytes-per-sample
+	       channels))
+	    (let ((arr (make-array channels)))
+	      (dotimes (i channels)
+		(setf (aref arr i) (cffi:mem-aref data-pointer :pointer i)))
+	      (setf adubs arr)))
 	  (progn ;;clean up
 	    (av-frame-free &frame)
-	    (swr-free &swr)
+;	    (swr-free &swr)
 	    (avcodec-close (cffi:mem-ref &codec :pointer))
 	    (avformat-free-context (cffi:mem-ref &format :pointer)))
 	  
-	  (setf adubs (cffi:mem-ref data-pointer :pointer))
 	  (setf asize (cffi:mem-ref an-int :int))))
-      (values adubs asize aans))))
+      (values adubs asize actual-sample-rate bytes-per-sample channels))))
 
-(defparameter av-ch-front-left 1)
-(defparameter av-ch-front-right 2)
-(defparameter av-ch-front-center 4)
-(defparameter av-sample-fmt-16 1)
+#+nil
+(progn
+  (defparameter av-ch-front-left 1)
+  (defparameter av-ch-front-right 2)
+  (defparameter av-ch-front-center 4)
+  (defparameter av-sample-fmt-16 1))
 
 #+nil
 (defun print-struct (yo)
@@ -119,6 +141,7 @@
       (princ x)
       (terpri))))
 
+#+nil
 (defun prepare-resampler2 (swr codec user-sample-rate)
 ;;;  (print-struct (cffi:convert-from-foreign codec (quote (:struct cl-ffmpeg-bindings::|AVCodecContext|))))
   (cffi:with-foreign-slots ((cl-ffmpeg-bindings::channels
@@ -126,25 +149,38 @@
 			     cl-ffmpeg-bindings::sample_rate
 			     cl-ffmpeg-bindings::sample_fmt) codec
 			    (:struct cl-ffmpeg-bindings::|AVCodecContext|))
-    (av-opt-set-int swr "in_channel_count" cl-ffmpeg-bindings::channels 0)
-    (av-opt-set-int swr "out_channel_count" 1 0)
-    (av-opt-set-int swr "in_channel_layout" cl-ffmpeg-bindings::channel_layout 0)
-    (av-opt-set-int swr "out_channel_layout" av-ch-front-center 0)
+    #+nil
+    (progn
+      (av-opt-set-int swr "in_channel_count" cl-ffmpeg-bindings::channels 0)
+      (av-opt-set-int swr "out_channel_count" 1 0))
+
+    (progn
+      (av-opt-set-int swr "in_channel_layout" cl-ffmpeg-bindings::channel_layout 0)
+      (av-opt-set-int swr "out_channel_layout"
+		      #+nil
+		      av-ch-front-center
+		     ; #+nil
+		      (logior av-ch-front-left
+			      av-ch-front-right) 0))
     (av-opt-set-int swr "in_sample_rate" cl-ffmpeg-bindings::sample_rate 0)
-    (av-opt-set-int swr "out_sample_rate" user-sample-rate 0)
+    (av-opt-set-int swr "out_sample_rate" (or user-sample-rate
+					      (setf user-sample-rate
+						    cl-ffmpeg-bindings::sample_rate)) 0)
     (av-opt-set-sample-fmt swr "in_sample_fmt" (cffi:foreign-enum-value
 						(quote cl-ffmpeg-bindings::|AVSampleFormat|)
 						cl-ffmpeg-bindings::sample_fmt) 0)
     (av-opt-set-sample-fmt swr "out_sample_fmt" (cffi:foreign-enum-value
-						(quote cl-ffmpeg-bindings::|AVSampleFormat|)
+						 (quote cl-ffmpeg-bindings::|AVSampleFormat|)
 						:s16)
 			   0)
     )
-  (swr-init swr))
+  (swr-init swr)
+  user-sample-rate)
 (defparameter avmedia-type-audio 1)
 
 (defun find-first-audio-stream2 (format)
   (let ((stream-index -1)
+	(audiocount 0)
 	(count (cffi:foreign-slot-value format
 					(quote (:struct cl-ffmpeg-bindings::|AVFormatContext|))
 					(quote cl-ffmpeg-bindings::nb_streams))))
@@ -163,59 +199,81 @@
 					(quote (:struct cl-ffmpeg-bindings::|AVCodecContext|))
 					(quote cl-ffmpeg-bindings::codec_type))))
 	  (when (eq :audio codec_type)
+	    (incf audiocount)
+	    (when (< 1 audiocount)
+	      (print "more than one audio stream?!?!")
+	      (print audiocount))
 	    (setf stream-index index)
-	    (return-from out)))))
+	  ;  (return-from out)
+	    ))))
     stream-index))
 
-(defun iterate-through-frames2 (format packet codec frame swr data size)
-  (setf (cffi:mem-ref data :pointer) (cffi:null-pointer))
-  (setf (cffi:mem-ref size :int) 0)
-  (loop
-     (progn
-       (unless (>= (av-read-frame format packet) 0)
-	 (return))
-       (cffi:with-foreign-objects ((gotframe :int))
-	 (when (< (avcodec-decode-audio4 codec frame gotframe packet) 0)
+(defun iterate-through-frames2 (format packet codec frame #+nil swr data mehsize typesize
+				channels)
+  (dotimes (index channels)
+    (setf (cffi:mem-aref data :pointer index)
+	  (cffi:null-pointer)))
+ ; (print channels)
+  (let ((size 0))
+    (loop
+       (progn
+	 (unless (>= (av-read-frame format packet) 0)
 	   (return))
-	 (when (zerop (mem-ref gotframe :int))
-	   (continue))
-	 (cffi:with-foreign-object (&buffer :pointer)
-	   (av-samples-alloc
-	    &buffer
-	    (cffi:null-pointer)
-	    1
-	    (cffi:foreign-slot-value frame
-				     (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				     (quote cl-ffmpeg-bindings::nb_samples))
-	    av-sample-fmt-16
-	    0)
-	   (let ((frame-count
-		  (swr-convert swr
-			       &buffer
-			       (cffi:foreign-slot-value
-				frame
-				(quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				(quote cl-ffmpeg-bindings::nb_samples))
-			       (cffi:foreign-slot-value
-				frame
-				(quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				(quote cl-ffmpeg-bindings::data))
-			       (cffi:foreign-slot-value
-				frame
-				(quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				(quote cl-ffmpeg-bindings::nb_samples)))))
-	     (setf (cffi:mem-ref data :pointer)
-		   (realloc (cffi:mem-ref data :pointer)
-			    (* (cffi:foreign-type-size :int16)
-			       (+ (cffi:mem-ref size :int)
-				  (cffi:foreign-slot-value
-				   frame
-				   (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				   (quote cl-ffmpeg-bindings::nb_samples))))))
-	     (memcpy (cffi:inc-pointer (mem-ref data :pointer) (* (foreign-type-size :int16)
-								  (mem-ref size :int)))
-		     (mem-ref &buffer :pointer)
-		     (* frame-count (foreign-type-size :int16)))
-	     (setf (mem-ref size :int)
-		   (+ (mem-ref size :int)
-		      frame-count))))))))
+	 (cffi:with-foreign-objects ((gotframe :int))
+	   (when (< (avcodec-decode-audio4 codec frame gotframe packet) 0)
+	     (return))
+	   (when (zerop (mem-ref gotframe :int))
+	     (continue))
+	   (let ((samples (cffi:foreign-slot-value
+			   frame
+			   (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+			   (quote cl-ffmpeg-bindings::nb_samples)))
+		 (rawdata (cffi:foreign-slot-value
+			   frame
+			   (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+			   (quote cl-ffmpeg-bindings::data))))
+
+	     (let* ((sample-size  (* typesize samples))
+		    (total-size (* typesize size))
+		    (newsize (+ sample-size total-size)))
+
+	       (dotimes (index channels
+			 )
+		 (symbol-macrolet ((outbuf (cffi:mem-aref data :pointer index)))
+		   (let ((inbuf (mem-aref rawdata :pointer index)))
+		     (setf outbuf
+			   (realloc outbuf newsize))
+;		     (print 234234)
+		     (memcpy (cffi:inc-pointer outbuf
+					       total-size)
+			     inbuf
+			     sample-size)))))
+	     
+	     (incf size samples)))))
+    (setf (mem-ref mehsize :int)
+	  size)
+    size))
+
+#+nil
+(cffi:with-foreign-object (&buffer :pointer)
+  (av-samples-alloc
+   &buffer
+   (cffi:null-pointer)
+   2
+   samples
+   av-sample-fmt-16
+   0)
+
+
+  #+nil
+  (dotimes (x 8)
+    (print (mem-aref rawdata :pointer x)))
+
+
+  #+nil
+  (swr-convert
+   swr
+   &buffer
+   samples
+   rawdata
+   samples))

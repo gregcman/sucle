@@ -717,6 +717,9 @@
     :void
   (s :pointer))
 
+(defcfun ("av_get_bytes_per_sample" av-get-bytes-per-sample) :int
+  (enum |AVSampleFormat|))
+
 (export (quote (|AVIOInterruptCB|
 		|AVFormatContext|
 		|AVPacket| |AVRational| |AVFrame|
