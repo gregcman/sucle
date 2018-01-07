@@ -29,18 +29,68 @@
   (defparameter dubs nil)
   (defparameter size nil)
   (defparameter rate nil))
+(progn
+  (defparameter bytes-per-sample nil)
+  (defparameter channels nil))
 
+(defparameter dubs2 nil)
+(defparameter dubs2same nil)
 (defun alut-test (&optional (music *music*))
   (reset)
-  (setf (values dubs size rate)
-	(cl-ffmpeg::get-sound-buff music))
+  (multiple-value-prog1
+      (setf (values dubs size rate bytes-per-sample channels)
+	    (cl-ffmpeg::get-sound-buff music))
+    (case (length dubs)
+      (1 (setf dubs2 (aref dubs 0))
+	 (setf dubs2same t))
+      (otherwise (setf dubs2 (interleave
+			      (aref dubs 0)
+			      (aref dubs 1)
+			      size bytes-per-sample))
+		 (print "interleavling")
+		 (setf dubs2same nil))))
   )
 
 (defun reset ()
-  (when (cffi::pointerp dubs)
-    
-    (cffi::foreign-free dubs)
-    (setf dubs nil)))
+  (unless dubs2same
+    (when (cffi::pointerp dubs2)    
+      (cffi::foreign-free dubs2)
+      (setf dubs2 nil)))
+  (map nil
+       (lambda (x)
+	 (when (cffi::pointerp x)    
+	   (cffi::foreign-free x)))
+       dubs)
+  (setf dubs nil))
+
+(defun interleave (left right length sample-byte-size)
+  (declare (type fixnum length sample-byte-size))
+  (declare (optimize (speed 3) (safety 0)))
+  (unless (< 0 sample-byte-size 100)
+    (error "sample byte size??: ~a" sample-byte-size))
+  (let ((newlen (* 2 length sample-byte-size)))
+    (declare (type fixnum newlen))
+    (let ((arr
+	   (cffi:foreign-alloc :uint8 :count newlen))
+	  (aindex 0)
+	  (bindex 0)
+	  (count 0)
+	  (flip nil))
+      (declare (type fixnum aindex bindex count))
+      (dotimes (index newlen)
+	(setf (cffi:mem-aref arr :uint8 index)
+	      (if flip
+		  (prog1
+		      (cffi:mem-aref left :uint8 aindex)
+		    (incf aindex))
+		  (prog1
+		      (cffi:mem-aref right :uint8 bindex)
+		    (incf bindex))))
+	(incf count)
+	(when (= count sample-byte-size)
+	  (toggle flip)
+	  (setf count 0)))
+      arr)))
 
 (defun alut-hello-world ()
   (alc:make-context-current *alc-context*)
@@ -59,7 +109,7 @@
     (al:listener :gain 1.0)
     (al:listener :position (vector 0.0 0.0 0.0))
     (al:listener :orientation (vector 0.0 1.0 0.0 0.0 1.0 0.0))
-    (al:buffer-data buffer :stereo16 (aref dubs 0) (* 2 size) rate
+    (al:buffer-data buffer :stereo16 dubs2 (* 2 size) rate
 		    )
     (al:source source :buffer buffer)
     (al:source-play source)))
