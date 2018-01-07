@@ -3,24 +3,27 @@
 	)
   (:import-from
    #:cl-ffmpeg
-   #:dubs
-   #:size
+ ;  #:dubs
+ ;  #:size
    #:rate
    #:bytes-per-sample
    #:channels
    #:audio-format
    #:playsize
-   #:dubs2))
+ ;  #:dubs2
+   ))
 (in-package #:sound-stuff)
 
 (defparameter *data* nil)
 (defparameter *playback* :stereo16)
 (defun alut-test (music &optional (sound-data (make-instance 'cl-ffmpeg::some-sound)))
+  #+nil
   (reset sound-data)
+  (cl-ffmpeg::get-sound-buff music sound-data)
+  (print "data dumped: alut-test ")
+  #+nil
   (with-slots (dubs size rate bytes-per-sample channels audio-format
 		    dubs2 playsize) sound-data
-    (cl-ffmpeg::get-sound-buff music sound-data)
-      (print "data dumped: alut-test ")
     (setf (values dubs2 playsize)
 	  (convert
 	   (case (length dubs)
@@ -32,11 +35,15 @@
 	   *playback*)))
   sound-data)
 
+#+nil
 (defun reset (sound-data)
-  (with-slots (dubs2 dubs) sound-data
+  (with-slots (;;;;dubs2
+	       dubs) sound-data
+    #+nil
     (when (cffi::pointerp dubs2)    
       (cffi::foreign-free dubs2)
       (setf dubs2 nil))
+    #+nil
     (when (typep dubs 'sequence)
       (map nil
 	   (lambda (x)
@@ -45,39 +52,68 @@
 	   dubs))
     (setf dubs nil)))
 
-(defun play (&optional file)
-  (if file (progn
-	     (setf *data* (alut-test file))
-	     (alut-hello-world *data*)))
+(defun load-file (file)
+  (alut-hello-world)
+  (setf *data* (alut-test file))
+  #+nil
+  (with-slots (dubs2 playsize rate) *data*
+    (playmem dubs2 playsize rate)))
+(defun play ()
   (al:source-play *source*))
 (defun pause ()
   (al:source-pause *source*))
 
+(defun get-buffer ()
+ ; (print "get-buffer")
+  (or (pop *free-buffers*)
+      (al:gen-buffer)))
 
-(defun alut-hello-world (sound-data)
+(defun source-unqueue-buffer (sid)
+  (cffi:with-foreign-object (buffer-array :uint)
+    (setf (cffi:mem-ref buffer-array :uint) 0)
+    (%al:source-unqueue-buffers sid 1 buffer-array)
+    (unless (zerop (cffi:mem-ref buffer-array :uint))
+      (cffi:mem-aref buffer-array :uint 0))))
+(defun free-buffers ()
+  (let ((bufs (al:get-source *source* :buffers-processed)))
+    (unless (zerop bufs)
+      (loop
+	 repeat bufs do
+	   (let ((buf (source-unqueue-buffer *source*)))
+	     (when buf
+	       (push buf *free-buffers*)))))
+    bufs))
+
+(defun source-queue-buffer (sid buffer)
+  (let ((empty? (al:get-source sid :buffers-queued)))
+    (cffi:with-foreign-object (buffer-array :uint 1)
+      (setf (cffi:mem-aref buffer-array :uint 0)
+	    buffer)
+      (%al:source-queue-buffers sid 1 buffer-array))
+    (when (zerop empty?)
+      (unless (eq :paused (al:get-source sid :source-state))
+	(al:source-play sid)))))
+
+(defparameter *free-buffers* nil)
+(defun playmem (pcm playsize rate)
+  (free-buffers)
+  (let ((buffer (get-buffer)))
+    (al:buffer-data buffer *playback* pcm playsize rate
+		    )
+    (source-queue-buffer *source* buffer)))
+
+(defun alut-hello-world ()
   (alc:make-context-current *alc-context*)
-  (when (and *buffer* (cffi::pointerp *buffer*))
-    (al:delete-buffer *buffer*))
-  (when (and *source* (cffi::pointerp *source*))
-    (al:delete-source *source*))
-  (setf *source* (al:gen-source))
-  (setf *buffer* (al:gen-buffer))
-  (let ((source *source*)
-	(buffer *buffer*))
+  (let ((source *source*))
     (al:source source :position (vector 0.0 0.0 0.0))
     (al:source source :velocity (vector 0.0 0.0 0.0))
     (al:source source :gain 1.0)
     (al:source source :pitch 1.0)
     (al:listener :gain 1.0)
     (al:listener :position (vector 0.0 0.0 0.0))
-    (al:listener :orientation (vector 0.0 1.0 0.0 0.0 1.0 0.0))
-    (with-slots (dubs2 playsize rate) sound-data
-      (al:buffer-data buffer *playback* dubs2 playsize rate
-		      ))
-    (al:source source :buffer buffer)))
+    (al:listener :orientation (vector 0.0 1.0 0.0 0.0 1.0 0.0))))
 
 (defparameter *source* nil)
-(defparameter *buffer* nil)
 
 (defparameter *alc-device* nil)
 (defun open-device ()
@@ -102,7 +138,8 @@
 
 (defun start-al ()
   (open-device)
-  (open-context))
+  (open-context)
+  (setf *source* (al:gen-source)))
 
 (defun destroy-al ()
   (close-context)
@@ -163,16 +200,19 @@
 	       (* len 4))))))
 
 
+;;;;crackling noise when floats above 1.0 or below -1.0?
 (eval-when (:compile-toplevel)
   (defparameter *int16-dispatch*
     '(case format
       ((:fltp :flt)
-       (let* ((scale (find-max :float
-			       1.0
-			       -1.0))
+       (let* ((scale 1.0
+		#+nil
+		(find-max :float
+			  1.0
+			  -1.0))
 	      (scaling-factor (/ 32767.5 scale)))
 	 (declare (type single-float scale scaling-factor))
-;	 (print scale)
+					;	 (print scale)
 	 (audio-type :float
 		     (round
 		      (- (the (single-float -1.0 1.0)
@@ -181,7 +221,8 @@
 			       scaling-factor))
 			 0.5)))))
       ((:dblp :dbl)
-       (let* ((scale (find-max :double
+       (let* ((scale 1.0d0
+		#+nil(find-max :double
 			       1.0d0
 			       -1.0d0))
 	      (scaling-factor (/ 32767.5d0 scale)))
@@ -215,6 +256,7 @@
 					  (cffi:mem-aref left ,type little-index)		    
 					  (cffi:mem-aref right ,type little-index))))
 			  ,form))))
+	     #+nil
 	     (find-max (type min max)
 	       `(let ((min ,min)
 		      (max ,max))
@@ -242,6 +284,7 @@
 		  (setf (cffi:mem-aref arr :int16 index)
 			(let ((value (cffi:mem-aref buffer ,type index)))
 			  ,form))))
+	     #+nil
 	     (find-max (type min max)
 	       `(let ((min ,min)
 		      (max ,max))
@@ -260,9 +303,10 @@
   (defparameter *uint8-dispatch*
     '(case format
       ((:fltp :flt)
-       (let* ((scale (find-max :float
-			       1.0
-			       -1.0))
+       (let* ((scale 1.0 #+nil
+	       (find-max :float
+			 1.0
+			 -1.0))
 	      (scaling-factor (/ 127.5 scale)))
 	 (declare (type single-float scale scaling-factor))
 	 (audio-type :float
@@ -273,9 +317,10 @@
 			       scaling-factor))
 			 0.5)))))
       ((:dblp :dbl)
-       (let* ((scale (find-max :double
-			       1.0d0
-			       -1.0d0))
+       (let* ((scale 1.0d0 #+nil
+	       (find-max :double
+			 1.0d0
+			 -1.0d0))
 	      (scaling-factor (/ 127.5d0 scale)))
 	 (declare (type double-float scale scaling-factor))
 	 (audio-type :double
@@ -306,6 +351,7 @@
 					  (cffi:mem-aref left ,type little-index)		    
 					  (cffi:mem-aref right ,type little-index))))
 			  ,form))))
+	     #+nil
 	     (find-max (type min max)
 	       `(let ((min ,min)
 		      (max ,max))
@@ -333,6 +379,7 @@
 		  (setf (cffi:mem-aref arr :uint8 index)
 			(let ((value (cffi:mem-aref buffer ,type index)))
 			  ,form))))
+	     #+nil
 	     (find-max (type min max)
 	       `(let ((min ,min)
 		      (max ,max))
