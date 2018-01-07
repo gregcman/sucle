@@ -311,7 +311,7 @@
   :s16
   :s32
   :flt
-  :fbl
+  :dbl
 
   :u8p
   :s16p
