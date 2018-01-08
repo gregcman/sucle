@@ -22,6 +22,12 @@
   `(subprocess (*standard-output* *standard-input* *terminal-io*)
      ,@body))
 
+
+(defmacro floatify (x)
+  `(coerce ,x 'single-float))
+(defmacro clamp (min max x)
+  `(max ,min (min ,max ,x)))
+
 #+nil
 (progno     
      (al:listener :position vec)
@@ -41,100 +47,120 @@
        (setf (aref curr 5) (aref other2 2))
        (al:listener :orientation curr)))
 
-(defparameter *data* nil)
-(defparameter *playback* (or; :mono8
+#+nil
+((alut-hello-world)
+ (defun alut-hello-world (&optional (source *source*))
+   (al:source source :position (vector 0.0 0.0 0.0))
+   (al:source source :velocity (vector 0.0 0.0 0.0))
+   (al:source source :gain 1.0)
+   (al:source source :pitch 1.0)))
+
+(defclass datobj ()
+  ((data :initform nil)
+   (source :initform nil)
+   (playback :initform (or; :mono8
 			     ;:mono16
 			     ;:stereo8
 			     :stereo16
 			     ))
-(defparameter *source* nil)
-(defparameter *time-remaining* 0.0)
-(defparameter *used-buffers* (make-hash-table :test 'eql))
-;;do not switch source formats!!!!
+   (time-remaining :initform 0.0)
+   (used-buffers :initform (make-hash-table :test 'eql))
+   (cancel :initform t)))
 
-(defparameter *esc* t)
-(defun getpacket (data samples channels audio-format rate)
-  (let ((format *playback*))
-    (multiple-value-bind (array playsize)
-	(sound-stuff::convert
-	 (case channels
-	   (1 (cffi:mem-aref data :pointer 0))
-	   (otherwise (cffi:mem-aref data :pointer 1)))
-	 (cffi:mem-aref data :pointer 0)
-	 samples
-	 audio-format
-	 format)
-      (sound-stuff::playmem format array playsize rate)
-      (cffi::foreign-free array)))
-  nil)
-(defun alut-test (music)
-  (setf *esc* nil
-	*time-remaining* 0.0)
-  (let ((music (cl-ffmpeg::init-music-stuff music)))
-    (tagbody rep
-       (when (cl-ffmpeg::get-sound-buff music #'getpacket)
-	 (loop
-	    (progn
-	      (when *esc* (return))
-	      (free-buffers)
-	      (let ((almost 0.5))
-		(if (<= *time-remaining* almost)
-		    (go rep)
-		    (sleep (max 0.0 (- *time-remaining* almost)))
-		    ))))))
+(defparameter *data* nil)
+;;do not switch source formats!!!!
+(defparameter *datobj* (make-instance 'datobj))
+(defun load-file (file &optional (datobj *datobj*))
+  (with-slots (source) datobj
+    (when source (al:delete-source source))
+    (setf source (al:gen-source)))
+  (setf *data* (alut-test file datobj)))
+(defun play (&optional (datobj *datobj*))
+  (with-slots (source) datobj
+    (al:source-play source)))
+(defun pause (&optional (datobj *datobj*))
+  (with-slots (source) datobj
+    (al:source-pause source)))
+(defun stop (&optional (datobj *datobj*))
+  (with-slots (cancel source used-buffers time-remaining) datobj
+    (setf cancel t)
+    (al:source-stop source)
+    (free-buffers datobj)
+    (free-buffers-hash used-buffers)
+    (setf time-remaining 0.0)))
+
+
+(defun getpacket (dataobj)
+  (let ((format (slot-value dataobj 'playback)))
+    (lambda (data samples channels audio-format rate)
+      (multiple-value-bind (array playsize)
+	  (sound-stuff::convert
+	   (case channels
+	     (1 (cffi:mem-aref data :pointer 0))
+	     (otherwise (cffi:mem-aref data :pointer 1)))
+	   (cffi:mem-aref data :pointer 0)
+	   samples
+	   audio-format
+	   format)
+	(sound-stuff::playmem format array playsize rate dataobj)
+	(cffi::foreign-free array))
+      nil)))
+(defun alut-test (music datobj)
+  (let ((music (cl-ffmpeg::init-music-stuff music))
+	(packetfun (getpacket datobj)))
+    (with-slots (cancel time-remaining) datobj
+      (setf cancel nil
+	    time-remaining 0.0)
+      (tagbody rep
+	 (when (cl-ffmpeg::get-sound-buff music packetfun)
+	   (loop
+	      (progn
+		(when cancel (return))
+		(free-buffers datobj)
+		(let ((almost 0.5))
+		  (if (<= time-remaining almost)
+		      (go rep)
+		      (sleep (max 0.0 (- time-remaining almost)))
+		      )))))))
     (cl-ffmpeg::free-music-stuff music)
-    (print "data dumped: alut-test ")
+ ;   (print "data dumped: alut-test ")
     music))
+
 
 (defun reset-listener ()
   (al:listener :gain 1.0)
   (al:listener :position (vector 0.0 0.0 0.0))
   (al:listener :orientation (vector 0.0 1.0 0.0 0.0 1.0 0.0)))
-(defun alut-hello-world (&optional (source *source*))
-  (al:source source :position (vector 0.0 0.0 0.0))
-  (al:source source :velocity (vector 0.0 0.0 0.0))
-  (al:source source :gain 1.0)
-  (al:source source :pitch 1.0))
-(defun load-file (file)
-  (when *source* (al:delete-source *source*))
-  (setf *source* (al:gen-source))
-  (alut-hello-world)
-  (setf *data* (alut-test file)))
-(defun play ()
-  (al:source-play *source*))
-(defun pause ()
-  (al:source-pause *source*))
-(defun stop ()
-  (setf *esc* t)
-  (al:source-stop *source*)
-  (free-buffers)
-  (free-buffers-hash *used-buffers*)
-  (clrhash *used-buffers*)
-  (setf *time-remaining* 0.0))
-(defun source-unqueue-buffer (sid)
-  (let ((value (%source-unqueue-buffer sid)))
-    (when value
-      (remhash value *used-buffers*))
-    value))
-(defun playmem (format pcm playsize rate)
-  (let ((buffer (get-buffer)))
-    (al:buffer-data buffer format pcm playsize rate)
-    (source-queue-buffer *source* buffer)))
-(defun source-queue-buffer (sid buffer)
-  (incf *time-remaining* (buffer-seconds buffer))
-  (setf (gethash buffer *used-buffers*) t)
-  (%source-queue-buffer sid buffer))
-(defun free-buffers ()
-  (multiple-value-bind (time bufs)
-      (%free-buffers *source*)
-    (decf *time-remaining* time)
-    (values time bufs)))
+
+(defun source-unqueue-buffer (datobj)
+  (with-slots ((sid source) used-buffers) datobj
+      (let ((value (%source-unqueue-buffer sid)))
+	(when value
+	  (remhash value used-buffers))
+	value)))
+(defun playmem (format pcm playsize rate datobj)
+  (with-slots (source) datobj
+    (let ((buffer (get-buffer)))
+      (al:buffer-data buffer format pcm playsize rate)
+      (source-queue-buffer datobj buffer))))
+(defun source-queue-buffer (datobj buffer)
+  (with-slots (time-remaining (sid source) used-buffers) datobj
+    (incf time-remaining (buffer-seconds buffer))
+    (setf (gethash buffer used-buffers) t)
+    (%source-queue-buffer sid buffer)))
+(defun free-buffers (datobj)
+  (with-slots (source time-remaining) datobj
+    (multiple-value-bind (time bufs)
+	(%free-buffers source datobj)
+      (decf time-remaining time)
+      (values time bufs))))
 
 (defun free-buffers-hash (hash)
   (bordeaux-threads:with-lock-held (*free-buffers-lock*)
     (funland::dohash (k v) hash
       (declare (ignore v))
-      (push k *free-buffers*))))
+      (push k *free-buffers*)))
+  (clrhash hash))
 
 (defun get-buffer ()
   (or (bordeaux-threads:with-lock-held (*free-buffers-lock*)
@@ -142,12 +168,12 @@
       (al:gen-buffer)))
 (defparameter *free-buffers* nil)
 (defparameter *free-buffers-lock* (bordeaux-threads:make-lock "free albuffers"))
-(defun %free-buffers (sid)
+(defun %free-buffers (sid datobj)
   (let ((bufs (al:get-source sid :buffers-processed))
 	(time 0.0))
     (when (< 0 bufs)
       (dotimes (i bufs)
-	(let ((buf (source-unqueue-buffer sid)))
+	(let ((buf (source-unqueue-buffer datobj)))
 	  (when buf
 	    (incf time (buffer-seconds buf))
 	    (bordeaux-threads:with-lock-held (*free-buffers-lock*)
@@ -176,16 +202,15 @@
 	(al:source-play sid)))))
 
 ;;;;;
-
-(defmacro floatify (x)
-  `(coerce ,x 'single-float))
 (defun buffer-seconds (buffer)
   (let ((size (floatify (al:get-buffer buffer :size)))
 	(bits (floatify (al:get-buffer buffer :bits)))
 	(channels (floatify (al:get-buffer buffer :channels)))
 	(frequency (floatify (al:get-buffer buffer :frequency))))
-    (/ (/ (* size 8) channels bits)
-       frequency)))
+    ;;   (print (list size bits channels frequency))
+    (let ((denom (* channels bits frequency)))
+      (/ (* size 8) denom))
+       ))
 
 ;;;;initialization
 (defparameter *alc-device* nil)
@@ -216,6 +241,7 @@
 (defun destroy-al ()
   (close-context)
   (close-device)
+  (setf *free-buffers* nil)
   (setf *al-on?* nil))
 (defparameter *al-on?* nil)
 (defun really-start ()
@@ -248,10 +274,6 @@
       (:stereo16
        (values (interleave16 left right format (* 2 len) arr)
 	       (* len 4))))))
-
-(defmacro clamp (min max x)
-  `(max ,min (min ,max ,x)))
-
 
 ;;	DC DAC Modeled -> [-1.0 1.0] -> [-32768 32767]
 ;;      apple core audo, alsa, matlab, sndlib -> (lambda (x) (* x #x8000))

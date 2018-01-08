@@ -190,7 +190,7 @@
 
 (defun find-first-audio-stream2 (format)
   (let ((stream-index -1)
-	(audiocount 0)
+;	(audiocount 0)
 	(count (cffi:foreign-slot-value format
 					(quote (:struct cl-ffmpeg-bindings::|AVFormatContext|))
 					(quote cl-ffmpeg-bindings::nb_streams))))
@@ -212,12 +212,15 @@
 			    (quote (:struct cl-ffmpeg-bindings::|AVCodecContext|))
 			    (quote cl-ffmpeg-bindings::codec_type))))
 	  (when (eq :audio codec_type)
-	    (incf audiocount)
-	    (if (< 1 audiocount)
-		(format t "more than one audio stream?!?!: find-first-audio-stream2 ~a"
-			audiocount)
-		(setf stream-index index))
-	  ;  (return-from out)
+					; (incf audiocount)
+	    #+nil
+	    (cond ((< 1 audiocount)
+		   (format t "more than one audio stream?!?!: find-first-audio-stream2 ~a"
+			   audiocount))
+		  )
+	    (setf stream-index index)
+	    
+	    (return-from out)
 	    ))))
     stream-index))
 
