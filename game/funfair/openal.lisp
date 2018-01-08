@@ -3,68 +3,68 @@
 	)
   (:import-from
    #:cl-ffmpeg
- ;  #:dubs
- ;  #:size
    #:rate
    #:bytes-per-sample
    #:channels
    #:audio-format
-   #:playsize
- ;  #:dubs2
    ))
 (in-package #:sound-stuff)
 
+(defparameter *esc* t)
 (defparameter *data* nil)
-(defparameter *playback* :stereo16)
-(defun alut-test (music &optional (sound-data (make-instance 'cl-ffmpeg::some-sound)))
-  #+nil
-  (reset sound-data)
-  (cl-ffmpeg::get-sound-buff music sound-data)
-  (print "data dumped: alut-test ")
-  #+nil
-  (with-slots (dubs size rate bytes-per-sample channels audio-format
-		    dubs2 playsize) sound-data
-    (setf (values dubs2 playsize)
-	  (convert
-	   (case (length dubs)
-	     (1 (aref dubs 0))
-	     (otherwise (aref dubs 1)))
-	   (aref dubs 0)
-	   size
-	   audio-format
-	   *playback*)))
-  sound-data)
-
-#+nil
-(defun reset (sound-data)
-  (with-slots (;;;;dubs2
-	       dubs) sound-data
-    #+nil
-    (when (cffi::pointerp dubs2)    
-      (cffi::foreign-free dubs2)
-      (setf dubs2 nil))
-    #+nil
-    (when (typep dubs 'sequence)
-      (map nil
-	   (lambda (x)
-	     (when (cffi::pointerp x)    
-	       (cffi::foreign-free x)))
-	   dubs))
-    (setf dubs nil)))
+(defparameter *playback* (or :mono8
+			     :mono16
+			     :stereo8
+			     :stereo16))
+(defun alut-test (music)
+  (setf *esc* nil)
+  (let ((music (cl-ffmpeg::init-music-stuff music)))
+    (tagbody rep
+       (let ((more?
+	      (cl-ffmpeg::get-sound-buff
+	       music
+	       (lambda (data samples channels audio-format rate)
+		 (multiple-value-bind (array playsize)
+		     (sound-stuff::convert
+		      (case channels
+			(1 (cffi:mem-aref data :pointer 0))
+			(otherwise (cffi:mem-aref data :pointer 1)))
+		      (cffi:mem-aref data :pointer 0)
+		      samples
+		      audio-format
+		      sound-stuff::*playback*)
+		   (sound-stuff::playmem array playsize rate)
+		   (cffi::foreign-free array))
+		 nil))))
+	 (when more?
+	   (loop
+	      (progn
+		(when *esc* (return))
+		(free-buffers)
+		(when (< *time-remaining* 0.5)
+		  (go rep)))))))
+    (cl-ffmpeg::free-music-stuff music)
+    (print "data dumped: alut-test ")
+    music))
 
 (defun load-file (file)
   (alut-hello-world)
-  (setf *data* (alut-test file))
-  #+nil
-  (with-slots (dubs2 playsize rate) *data*
-    (playmem dubs2 playsize rate)))
+  (setf *data* (alut-test file)))
 (defun play ()
   (al:source-play *source*))
+(defparameter *time-remaining* 0.0)
 (defun pause ()
   (al:source-pause *source*))
+(defun stop ()
+  (setf *esc* t)
+  (al:source-stop *source*)
+  (free-buffers)
+  (setf *time-remaining* 0.0))
+(defparameter *free-buffers* nil)
 
 (defun get-buffer ()
- ; (print "get-buffer")
+					; (print "get-buffer")
+  (free-buffers)
   (or (pop *free-buffers*)
       (al:gen-buffer)))
 
@@ -81,10 +81,13 @@
 	 repeat bufs do
 	   (let ((buf (source-unqueue-buffer *source*)))
 	     (when buf
-	       (push buf *free-buffers*)))))
+	       (decf *time-remaining* (buffer-seconds buf))
+	       (when buf
+		 (push buf *free-buffers*))))))
     bufs))
 
 (defun source-queue-buffer (sid buffer)
+  (incf *time-remaining* (buffer-seconds buffer))
   (let ((empty? (al:get-source sid :buffers-queued)))
     (cffi:with-foreign-object (buffer-array :uint 1)
       (setf (cffi:mem-aref buffer-array :uint 0)
@@ -94,7 +97,16 @@
       (unless (eq :paused (al:get-source sid :source-state))
 	(al:source-play sid)))))
 
-(defparameter *free-buffers* nil)
+(defmacro floatify (x)
+  `(coerce ,x 'single-float))
+(defun buffer-seconds (buffer)
+  (let ((size (floatify (al:get-buffer buffer :size)))
+	(bits (floatify (al:get-buffer buffer :bits)))
+	(channels (floatify (al:get-buffer buffer :channels)))
+	(frequency (floatify (al:get-buffer buffer :frequency))))
+    (/ (/ (* size 8) channels bits)
+       frequency)))
+
 (defun playmem (pcm playsize rate)
   (free-buffers)
   (let ((buffer (get-buffer)))
@@ -209,24 +221,16 @@
   (defparameter *int16-dispatch*
     '(case format
       ((:fltp :flt)
-       (let* ((scale 1.0
-		#+nil
-		(find-max :float
-			  1.0
-			  -1.0))
+       (let* ((scale 1.0)
 	      (scaling-factor (/ 32767.5 scale)))
 	 (declare (type single-float scale scaling-factor))
-					;	 (print scale)
 	 (audio-type :float
 		     (round
 		      (- (* (clamp -1.0 1.0 value)
 			    scaling-factor)
 			 0.5)))))
       ((:dblp :dbl)
-       (let* ((scale 1.0d0
-		#+nil(find-max :double
-			       1.0d0
-			       -1.0d0))
+       (let* ((scale 1.0d0)
 	      (scaling-factor (/ 32767.5d0 scale)))
 	 (declare (type double-float scale scaling-factor))
 	 (audio-type :double
@@ -257,24 +261,7 @@
 			       (value (if (oddp index)
 					  (cffi:mem-aref left ,type little-index)		    
 					  (cffi:mem-aref right ,type little-index))))
-			  ,form))))
-	     #+nil
-	     (find-max (type min max)
-	       `(let ((min ,min)
-		      (max ,max))
-		  (dotimes (index length)
-		    (let ((a (cffi:mem-aref left ,type index))		    
-			  (b (cffi:mem-aref right ,type index)))
-		      (cond ((< a min)
-			     (setf min a))
-			    ((> a max)
-			     (setf max a)))
-		      (cond ((< b min)
-			     (setf min b))
-			    ((> b max)
-			     (setf max b)))))
-		  (max (abs min)
-		       (abs max)))))
+			  ,form)))))
     (etouq *int16-dispatch*))
   arr)
 
@@ -285,19 +272,7 @@
 	       `(dotimes (index newlen)
 		  (setf (cffi:mem-aref arr :int16 index)
 			(let ((value (cffi:mem-aref buffer ,type index)))
-			  ,form))))
-	     #+nil
-	     (find-max (type min max)
-	       `(let ((min ,min)
-		      (max ,max))
-		  (dotimes (index newlen)
-		    (let ((a (cffi:mem-aref buffer ,type index)))
-		      (cond ((< a min)
-			     (setf min a))
-			    ((> a max)
-			     (setf max a)))))
-		  (max (abs min)
-		       (abs max)))))
+			  ,form)))))
     (etouq *int16-dispatch*))
   arr)
 
@@ -305,10 +280,7 @@
   (defparameter *uint8-dispatch*
     '(case format
       ((:fltp :flt)
-       (let* ((scale 1.2 #+nil
-	       (find-max :float
-			 1.0
-			 -1.0))
+       (let* ((scale 1.0)
 	      (scaling-factor (/ 127.5 scale)))
 	 (declare (type single-float scale scaling-factor))
 	 (audio-type :float
@@ -319,10 +291,7 @@
 			  scaling-factor)
 			 0.5)))))
       ((:dblp :dbl)
-       (let* ((scale 1.2d0 #+nil
-	       (find-max :double
-			 1.0d0
-			 -1.0d0))
+       (let* ((scale 1.0d0)
 	      (scaling-factor (/ 127.5d0 scale)))
 	 (declare (type double-float scale scaling-factor))
 	 (audio-type :double
@@ -352,24 +321,7 @@
 			       (value (if (oddp index)
 					  (cffi:mem-aref left ,type little-index)		    
 					  (cffi:mem-aref right ,type little-index))))
-			  ,form))))
-	     #+nil
-	     (find-max (type min max)
-	       `(let ((min ,min)
-		      (max ,max))
-		  (dotimes (index length)
-		    (let ((a (cffi:mem-aref left ,type index))		    
-			  (b (cffi:mem-aref right ,type index)))
-		      (cond ((< a min)
-			     (setf min a))
-			    ((> a max)
-			     (setf max a)))
-		      (cond ((< b min)
-			     (setf min b))
-			    ((> b max)
-			     (setf max b)))))
-		  (max (abs min)
-		       (abs max)))))
+			  ,form)))))
     (etouq *uint8-dispatch*))
   arr)
 
@@ -380,18 +332,6 @@
 	       `(dotimes (index newlen)
 		  (setf (cffi:mem-aref arr :uint8 index)
 			(let ((value (cffi:mem-aref buffer ,type index)))
-			  ,form))))
-	     #+nil
-	     (find-max (type min max)
-	       `(let ((min ,min)
-		      (max ,max))
-		  (dotimes (index newlen)
-		    (let ((a (cffi:mem-aref buffer ,type index)))
-		      (cond ((< a min)
-			     (setf min a))
-			    ((> a max)
-			     (setf max a)))))
-		  (max (abs min)
-		       (abs max)))))
+			  ,form)))))
     (etouq *uint8-dispatch*))
   arr)
