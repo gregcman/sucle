@@ -93,18 +93,30 @@
 (defun getpacket (dataobj)
   (let ((format (slot-value dataobj 'playback)))
     (lambda (data samples channels audio-format rate)
-      (multiple-value-bind (array playsize)
-	  (sound-stuff::convert
-	   (case channels
-	     (1 (cffi:mem-aref data :pointer 0))
-	     (otherwise (cffi:mem-aref data :pointer 1)))
-	   (cffi:mem-aref data :pointer 0)
-	   samples
-	   audio-format
-	   format)
-	(sound-stuff::playmem format array playsize rate dataobj)
-	(cffi::foreign-free array))
+      (flet ((conv (arr)
+	       (multiple-value-bind (array playsize)
+		   (sound-stuff::convert
+		    (case channels
+		      (1 (cffi:mem-aref data :pointer 0))
+		      (otherwise (cffi:mem-aref data :pointer 1)))
+		    (cffi:mem-aref data :pointer 0)
+		    samples
+		    audio-format
+		    format
+		    arr)
+		 (sound-stuff::playmem format array playsize rate dataobj))))
+	(let ((arrcount (ecase format
+			  ((:stereo8 :stereo16) (* samples 2))
+			  ((:mono8 :mono16) samples))))
+	  (case format
+	    ((:mono8 :stereo8)
+	     (cffi:with-foreign-object (arr :uint8 arrcount)
+	       (conv arr)))
+	    ((:mono16 :stereo16)
+	     (cffi:with-foreign-object (arr :int16 arrcount)
+	       (conv arr))))))
       nil)))
+
 (defun alut-test (music datobj)
   (let ((music (cl-ffmpeg::init-music-stuff music))
 	(packetfun (getpacket datobj)))
@@ -254,26 +266,20 @@
 
 
 ;;;;ffmpeg format to openal format
-(defun convert (left right len format playblack-format)
-  (let* ((arrcount (case playblack-format
-		     ((:stereo8 :stereo16) (* len 2))
-		     ((:mono8 :mono16) len)))
-	 (arr (case playblack-format
-		((:mono8 :stereo8) (cffi:foreign-alloc :uint8 :count arrcount))
-		((:mono16 :stereo16) (cffi:foreign-alloc :int16 :count arrcount)))))
-    (case playblack-format
-      (:mono8
-       (values (convert8 left len format arr)
-	       len))
-      (:mono16
-       (values (convert16 left len format arr)
-	       (* 2 len)))
-      (:stereo8
-       (values (interleave8 left right format (* 2 len) arr)
-	       (* len 2)))
-      (:stereo16
-       (values (interleave16 left right format (* 2 len) arr)
-	       (* len 4))))))
+(defun convert (left right len format playblack-format arr)
+  (case playblack-format
+    (:mono8
+     (values (convert8 left len format arr)
+	     len))
+    (:mono16
+     (values (convert16 left len format arr)
+	     (* 2 len)))
+    (:stereo8
+     (values (interleave8 left right format (* 2 len) arr)
+	     (* len 2)))
+    (:stereo16
+     (values (interleave16 left right format (* 2 len) arr)
+	     (* len 4)))))
 
 ;;	DC DAC Modeled -> [-1.0 1.0] -> [-32768 32767]
 ;;      apple core audo, alsa, matlab, sndlib -> (lambda (x) (* x #x8000))
@@ -282,7 +288,7 @@
 ;;;; clamp or scale floats outside of [-1.0 1.0]?
 (eval-when (:compile-toplevel)
   (defparameter *int16-dispatch*
-    '(case format
+    '(ecase format
       ((:fltp :flt)
        (let* ((scale 1.0)
 	      (scaling-factor (/ 32768.0 scale)))
@@ -347,7 +353,7 @@
 
 (eval-when (:compile-toplevel)
   (defparameter *uint8-dispatch*
-    '(case format
+    '(ecase format
       ((:fltp :flt)
        (let* ((scale 1.0)
 	      (scaling-factor (/ 128.0 scale)))
