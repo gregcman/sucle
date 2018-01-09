@@ -2,7 +2,8 @@
   :depends-on (:cl-openal
 	       :cl-alc
 	       :cl-ffmpeg
-	       :bordeaux-threads)
+	       :bordeaux-threads
+	       :singleton-lparallel)
     :serial t
     :components 
     ((:file "openal")))

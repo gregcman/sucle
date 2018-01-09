@@ -50,26 +50,45 @@
 (defclass datobj ()
   ((source :initform nil)
    (playback :initform (or ;:mono8
-			   ;:mono16
-			   ;:stereo8
+			   :mono16
+			   :stereo8
 			   :stereo16
 			   ))
    (time-remaining :initform 0)
    (used-buffers :initform (make-hash-table :test 'eql))
-   (cancel :initform t)
+   (cancel :initform nil) ;;set to t to stop streaming from disk to al
    (data :initform nil)))
 
-(defparameter *data* nil)
+(defun free-datobj (&optional (datobj *datobj*))
+  (with-slots (cancel source used-buffers data time-remaining) datobj
+    (al:source-stop source)
+    (al:source source :buffer 0)
+    (free-buffers-hash used-buffers)
+    (setf time-remaining 0)
+    (cl-ffmpeg::free-music-stuff data)
+    
+    (al:delete-source source)))
+
+(defun free-a-buffer (datobj)
+  (bordeaux-threads:with-lock-held (*free-buffers-lock*)
+    (let ((buf (al:get-source (slot-value datobj 'source) :buffer)))
+      (if (or (= buf 0)
+	      (= buf 1))
+	  (format t "wut ~a" buf)
+	  (push buf *free-buffers*)))))
+
+(defparameter *datobj* nil)
 ;;do not switch source formats!!!!
-(defparameter *datobj* (make-instance 'datobj))
-(defun load-file (file &optional (datobj *datobj*))
-  (with-slots (source) datobj
-    (when source (al:delete-source source))
-    (setf source (al:gen-source))
-    (al:source source :position (vector 0.0 1.0 0.0))
-    (al:source source :velocity (vector 1000.0 0.0 0.0))
-    (al:source source :gain 1.0))
-  (alut-test file datobj))
+(defun load-file (music-file)
+  (let ((datobj (make-instance 'datobj)))
+    (setf *datobj* datobj)
+    (with-slots (source data) datobj
+      (setf source (al:gen-source))
+      (setf data (cl-ffmpeg::init-music-stuff music-file))
+      (al:source source :position (vector 0.0 1.0 0.0))
+      (al:source source :velocity (vector 0.0 0.0 0.0))
+      (al:source source :gain 1.0)
+      datobj)))
 (defun play (&optional (datobj *datobj*))
   (with-slots (source) datobj
     (al:source-play source)))
@@ -77,75 +96,101 @@
   (with-slots (source) datobj
     (al:source-pause source)))
 (defun stop (&optional (datobj *datobj*))
-  (with-slots (cancel source used-buffers time-remaining) datobj
-    (setf cancel t)
-    (al:source-stop source)
-    (free-buffers datobj)
-    (free-buffers-hash used-buffers)
-    (setf time-remaining 0)))
+  (with-slots (cancel) datobj
+    (setf cancel t)))
 
+(defun push-sound (datobj)
+  (lparallel.queue:push-queue datobj *new-sounds*)
+  (when (or (not *sound-thread*)
+	    (not (bordeaux-threads:thread-alive-p *sound-thread*)))
+    (start-poller))
+  datobj)
 
-(defun alut-test (music-file datobj)
-  (let ((music (cl-ffmpeg::init-music-stuff music-file))
-	(format (slot-value datobj 'playback)))
-    (setf *data* music)
-    (unwind-protect
-	 (with-slots (cancel time-remaining) datobj
-	   (setf cancel nil
-		 time-remaining 0)
-	   (let* ((rate (slot-value 
-			(slot-value 
-			 music
-			 'cl-ffmpeg::sound)
-			'cl-ffmpeg::rate))
-		  (threshold (* 0.5 rate))
-		  (finish (+ threshold rate)))
-	     (loop
+(defparameter *new-sounds* (lparallel.queue:make-queue))
+(defparameter *sound-thread* nil)
+(defparameter *stop* nil)
+(defparameter *datobjs* (make-hash-table :test 'eql))
+(defparameter *datobjs-lock* (bordeaux-threads:make-lock "datobjs"))
+(defun poller ()
+  (unwind-protect
+       (tagbody repeat
+	  (dotimes (i (lparallel.queue:queue-count *new-sounds*))
+	    (bordeaux-threads:with-lock-held (*datobjs-lock*)
+	      (multiple-value-bind (value exists?)
+		  (lparallel.queue:try-pop-queue *new-sounds*)
+		(when exists?
+		  (setf (gethash value *datobjs*) t)))))
+	  (unless *stop*
+	    (let ((flag nil))
+	      (bordeaux-threads:with-lock-held (*datobjs-lock*)
+		(dohash (datobj dummy) *datobjs*
+		  (declare (ignorable dummy))
+		  (if (or (slot-value datobj 'cancel)
+			  (update-playable datobj)) ;;finished or cancelled
+		      (progn (remhash datobj *datobjs*)
+			     (free-datobj datobj))
+		      (setf flag t)))) ;;still playing
+	      (when flag
 		(sleep 0.1)
-;		(print 324234)
-		(free-buffers datobj)
-		(when cancel (return))
-					;		(princ 32434)
-;		(print (list threshold time-remaining))
-		(when (>= threshold time-remaining)
-		  (let ((target-samples (- finish time-remaining)))
-;		    (format t "target: ~a" target-samples)
-;		    (terpri)
-		    (when
-			(cl-ffmpeg::is-end?
-			 (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
-			   (flet ((conv (arr)
-				    (multiple-value-bind (array playsize)
-					(sound-stuff::convert
-					 (case channels
-					   (1 (cffi:mem-aref data :pointer 0))
-					   (otherwise (cffi:mem-aref data :pointer 1)))
-					 (cffi:mem-aref data :pointer 0)
-					 samples
-					 audio-format
-					 format
-					 arr)
-				      (sound-stuff::playmem format array playsize rate datobj))))
-			     (let ((arrcount (ecase format
-					       ((:stereo8 :stereo16) (* samples 2))
-					       ((:mono8 :mono16) samples))))
-			       (ecase format
-				 ((:mono8 :stereo8)
-				  (cffi:with-foreign-object (arr :uint8 arrcount)
-				    (conv arr)))
-				 ((:mono16 :stereo16)
-				  (cffi:with-foreign-object (arr :int16 arrcount)
-				    (conv arr))))))
-			   (decf target-samples samples)
-			   (when (>= 0 target-samples)
-;			     (format t "end: ~a" target-samples)
-;			     (terpri)
-			     (return))
-			   (when cancel (return))))
-		      (return)))))))
-      (cl-ffmpeg::free-music-stuff music))
-					;   (print "data dumped: alut-test ")
-    music))
+		(go repeat)))))
+    (cleanup-poller)))
+
+(defun cleanup-poller ()
+  (bordeaux-threads:with-lock-held (*datobjs-lock*)
+    (dohash (k v) *datobjs*
+      (declare (ignore v))
+      (free-datobj k))
+    (clrhash *datobjs*)
+    (setf *datobj* nil)
+
+    (let ((thread *sound-thread*))
+      (when thread
+	(unless (eq thread (bordeaux-threads:current-thread))
+	  (bordeaux-threads:destroy-thread thread))))
+    (setf *sound-thread* nil)))
+
+(defun start-poller ()
+  (setf *sound-thread* (iosub (poller))))
+
+(defun update-playable (datobj)
+  (with-slots (cancel time-remaining (format playback) (music data)) datobj
+    (let* ((rate (slot-value 
+		  (slot-value 
+		   music
+		   'cl-ffmpeg::sound)
+		  'cl-ffmpeg::rate))
+	   (threshold 0.5)
+	   (target 0.5))
+      (free-buffers datobj)
+      (when (>= (* rate threshold) time-remaining)
+	(let ((target-samples (* rate target)))
+	  (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
+	    (flet ((conv (arr)
+		     (multiple-value-bind (array playsize)
+			 (sound-stuff::convert
+			  (case channels
+			    (1 (cffi:mem-aref data :pointer 0))
+			    (otherwise (cffi:mem-aref data :pointer 1)))
+			  (cffi:mem-aref data :pointer 0)
+			  samples
+			  audio-format
+			  format
+			  arr)
+		       (sound-stuff::playmem format array playsize rate datobj))))
+	      (let ((arrcount (ecase format
+				((:stereo8 :stereo16) (* samples 2))
+				((:mono8 :mono16) samples))))
+		(ecase format
+		  ((:mono8 :stereo8)
+		   (cffi:with-foreign-object (arr :uint8 arrcount)
+		     (conv arr)))
+		  ((:mono16 :stereo16)
+		   (cffi:with-foreign-object (arr :int16 arrcount)
+		     (conv arr))))))
+	    (when cancel (return-from update-playable t))
+	    (decf target-samples samples)
+	    (when (>= 0 target-samples)
+	      (return))))))))
 
 #+nil
 (tagbody rep
@@ -196,6 +241,15 @@
       (push k *free-buffers*)))
   (clrhash hash))
 
+#+nil ;;;sources and buffers share namespace?
+(defun free-buffer-integrity? ()
+  (let ((a (reduce #'max *free-buffers* :initial-value 1))
+	(b (1+ (length *free-buffers*))))
+    (if
+     (= a
+	b)
+     t
+     (format t "max: ~a len: ~a" a b))))
 (defun get-buffer ()
   (or (bordeaux-threads:with-lock-held (*free-buffers-lock*)
 	(pop *free-buffers*))
@@ -272,11 +326,14 @@
   (open-device)
   (open-context)
   (alc:make-context-current *alc-context*)
+  (start-poller)
   (reset-listener))
 (defun destroy-al ()
   (close-context)
   (close-device)
   (setf *free-buffers* nil)
+  (clrhash *datobjs*)
+  (reset-poller)
   (setf *al-on?* nil))
 (defparameter *al-on?* nil)
 (defun really-start ()
