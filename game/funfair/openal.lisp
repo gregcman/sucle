@@ -56,8 +56,7 @@
    (al:source source :pitch 1.0)))
 
 (defclass datobj ()
-  ((data :initform nil)
-   (source :initform nil)
+  ((source :initform nil)
    (playback :initform (or; :mono8
 			     ;:mono16
 			     ;:stereo8
@@ -65,7 +64,8 @@
 			     ))
    (time-remaining :initform 0.0)
    (used-buffers :initform (make-hash-table :test 'eql))
-   (cancel :initform t)))
+   (cancel :initform t)
+   (data :initform nil)))
 
 (defparameter *data* nil)
 ;;do not switch source formats!!!!
@@ -89,7 +89,6 @@
     (free-buffers-hash used-buffers)
     (setf time-remaining 0.0)))
 
-
 (defun getpacket (dataobj)
   (let ((format (slot-value dataobj 'playback)))
     (lambda (data samples channels audio-format rate)
@@ -98,7 +97,7 @@
 		   (sound-stuff::convert
 		    (case channels
 		      (1 (cffi:mem-aref data :pointer 0))
-		      (otherwise (cffi:mem-aref data :pointer 1)))
+ 		      (otherwise (cffi:mem-aref data :pointer 1)))
 		    (cffi:mem-aref data :pointer 0)
 		    samples
 		    audio-format
@@ -108,7 +107,7 @@
 	(let ((arrcount (ecase format
 			  ((:stereo8 :stereo16) (* samples 2))
 			  ((:mono8 :mono16) samples))))
-	  (case format
+	  (ecase format
 	    ((:mono8 :stereo8)
 	     (cffi:with-foreign-object (arr :uint8 arrcount)
 	       (conv arr)))
