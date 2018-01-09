@@ -45,11 +45,8 @@
  ;   flat-shader-text
 ;    flat-shader
 ;    font-png
- ;   font-texture
-    text
-    foo
-    foo2
-    text2
+					;   font-texture
+    draw-commands
     terminal256color-lookup))
 
 (defparameter *identity-mat*
@@ -63,8 +60,6 @@
 (setf (values *block-width* *block-height*)
       (values 8.0 16.0))
 
-(setf *trampoline* '(sndbx::per-frame funtext::per-frame))
-
 (defparameter *trans* (cg-matrix:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
 (defun retrans (x y &optional (trans *trans*))
   (setf (aref trans 12) (/ x 128.0)
@@ -74,17 +69,6 @@
 (defparameter *clear-text-buffer-flag* nil)
 (defun flag-text-dirty ()
   (setf *clear-text-buffer-flag* t))
-(progn
-  (progn
-    (defparameter *mouse-x* 0.0)
-    (defparameter *mouse-y* 0.0))
-  (progn
-    (defparameter *old-mouse-x* 0.0)
-    (defparameter *old-mouse-y* 0.0)))
-
-(progn
-  (defparameter *textx* 0.0)
-  (defparameter *texty* 0.0))
 (defun per-frame (session)
   (declare (ignorable session))
   (map nil #'funfair::reload-if-dirty *reloadables*)
@@ -92,38 +76,12 @@
   (setf (render-area-width *view*) window::*width*
 	(render-area-height *view*) window::*height*)
 
-  (when (window::mice-free-p)
-    (let ((newmousex (floatify (/ window::*mouse-x* *block-width*)))
-	  (newmousey (floatify (/ (- window::*height* window::*mouse-y*)
-				  *block-height*))))
-      (setf *old-mouse-x* *mouse-x*
-	    *old-mouse-y* *mouse-y*)
-      (setf *mouse-x* newmousex
-	    *mouse-y* newmousey)))
-  (when (and (window::mice-free-p)
-	     (window::skey-p (window::mouseval :left)))
-    (let ((dx (- *mouse-x* *old-mouse-x*))
-	  (dy (- *mouse-y* *old-mouse-y*)))
-      (unless (= dx dy 0)
-	(incf *textx* dx)
-	(incf *texty* dy)
-	(flag-text-dirty)))
-    )
-  (when (window::skey-p (window::keyval :n))
-   ;; (terpri)
-  ;;  (princ "scrambling text")
-    (copy-array-buf))
-  (when (window::skey-j-p (window::keyval :b))
-    (flag-text-dirty))
+  (render-stuff))
 
-  (when (window::skey-j-p (window::keyval :escape))
-    (funfair::quit))
-  (when (window::skey-j-p (window::keyval :y)
-			  )
-    (toggle sndbx::*depth-buffer?*))
-  
-  (render-stuff)
-  )
+
+(deflazy draw-commands (funfair::gl-context)
+  (declare (ignorable funfair::gl-context))
+  (lparallel.queue:make-queue))
 
 (defun render-stuff ()
   (gl:disable :depth-test)					; #+nil
@@ -135,38 +93,24 @@
     (progn
       (gl:clear-color 0.0 0.0 0.0 0.0)
       (gl:clear :color-buffer-bit)))
-  (let ((value (sndbx::farticle-position (sndbx::entity-particle sndbx::*ent*))))
-    (with-vec (a b c) (value)
-      (setfoo (format nil
-		      "x: ~10,1F
-y: ~10,1F
-z: ~10,1F"
-		      a b c))))
-  (unless (eq sndbx::*lastsel*
-	      sndbx::*selection*)
-    (setf sndbx::*lastsel*
-	  sndbx::*selection*)
-    (setfoo2
-     (with-output-to-string (*standard-output*)
-       (dolist (item sndbx::*selection*)
-	 (pprint item)))))
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
-    (glhelp:with-uniforms uniform program
-      (progn
-	(gl:uniform-matrix-4fv
-	 (uniform :pmv)
-	 (retrans *textx* *texty*)
-	 nil)
-	(gl:call-list (glhelp::handle (getfnc 'text))))
-      (progn
-	(gl:uniform-matrix-4fv
-	 (uniform :pmv)
-	 (retrans 10.0 10.0)
-	 nil)
-	(gl:call-list (glhelp::handle (getfnc 'text2)))))
-    
-    )
+    (glhelp:with-uniforms
+	uniform program
+	(flet ((draw-xyz (x y call-list)
+		 (gl:uniform-matrix-4fv
+		  (uniform :pmv)
+		  (retrans x y)
+		  nil)
+		 (gl:call-list call-list)))
+	  (let ((draw-commands (getfnc 'draw-commands)))
+	    (lparallel.queue:with-locked-queue draw-commands
+	      (let ((times (/ (lparallel.queue:queue-count/no-lock draw-commands) 3)))
+		(dotimes (x times)
+		  (let ((x (lparallel.queue:try-pop-queue/no-lock draw-commands))
+			(y (lparallel.queue:try-pop-queue/no-lock draw-commands))
+			(list (lparallel.queue:try-pop-queue/no-lock draw-commands)))
+		    (draw-xyz x y list)))))))))
   (let ((program (getfnc 'text-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -205,70 +149,6 @@ z: ~10,1F"
     (gl:blend-func :src-alpha :one-minus-src-alpha)
 					;  #+nil
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
-
-(progn
-  (defun setfoo2 (obj)
-    (let ((*print-case* :downcase))
-      (setf *foo2*
-	    (write-to-string
-	     obj :pretty t :escape nil)))
-    (flag-text-dirty)
-    (funfair::reload 'foo2))
-  (defparameter *foo2* nil)
-  (deflazy foo2 ()
-    *foo2*)
-  (deflazy text2 (foo2)
-    (make-instance
-     'glhelp::gl-list
-     :handle
-     (mesh-string-gl-points -128.0 -128.0 foo2))))
-
-(progn
-  (defun setfoo (obj)
-    (let ((*print-case* :downcase))
-      (setf *foo*
-	    (write-to-string
-	     obj :pretty t :escape nil)))
-    (funfair::reload 'foo))
-  (defparameter *foo* nil)
-  (deflazy foo ()
-    *foo*)
-
-  (deflazy text (foo)
-    (make-instance
-     'glhelp::gl-list
-     :handle
-     (mesh-string-gl-points -128.0 -128.0 foo))))
-
-(defun copy-array-buf ()
-  (let ((width 256)
-	(height 256))
-    (cffi:with-foreign-object (b :uint8 (etouq (* 256 256 4)))
-      (dobox ((ypos 0 height)
-	      (xpos 0 width))
-	     (let ((base (the fixnum (+ xpos (the fixnum (* ypos width))))))
-	       (let ((offset (the fixnum (* 4 base))))
-		 (let ((num
-			#+nil
-			(logior (char-code (aref *foo* (mod base 1024)))
-				(ash 0 8)
-				(ash 255 16))
-					;	#+nil
-			
-			(ash (random (1- (ash 1 32))) -2)
-			
-			 #+nil
-			 (get-char-num
-			  (get-char (the fixnum (+ xpos xstart))
-				    (the fixnum (+ ypos ystart))))))
-		   (setf (cffi:mem-aref b :uint8 (+ offset 0)) (ldb (byte 8 16) num)
-			 (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num)
-			 (cffi:mem-aref b :uint8 (+ offset 2)) (logand 255 num) 
-			 (cffi:mem-aref b :uint8 (+ offset 3)) (ldb (byte 8 24) num))
-		   ))))
-      (progn
-	(gl:bind-texture :texture-2d (glhelp::texture (getfnc 'text-data)))
-	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
 
 
 (defun uppow2 (n)

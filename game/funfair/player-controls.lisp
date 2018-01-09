@@ -944,17 +944,6 @@ edge, or no case"
 	nil
 	(atan y x))))
 
-(defun num-key-jp (control-state)
-  (etouq
-   (cons
-    'cond
-    (mapcar
-     (lambda (n)
-       `((window::skey-j-p
-	  (window::keyval ,(intern (write-to-string n) :keyword))
-	  control-state) ,n))
-     '(0 1 2 3 4 5 6 7 8 9)))))
-
 (defparameter *sandbox-on* t)
 (setf sandbox::*some-saves*
       (cdr (assoc (machine-instance) 
@@ -1161,9 +1150,6 @@ edge, or no case"
 	     (toggle fly)
 	     (toggle gravity))))) control-state
      *ent*)
-    (let ((num (num-key-jp *control-state*)))
-      (when num
-	(setf *ent* (aref *ents* num))))
     (setf (entity-hips *ent*)
 	  (wasd-mover
 	   (window::skey-p (window::keyval :e) control-state)

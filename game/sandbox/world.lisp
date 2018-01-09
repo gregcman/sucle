@@ -89,27 +89,17 @@
 	       :element-type ',type
 	       :initial-element ,defaultval))
 
-(eval-when (:compile-toplevel)
-  (defun system ()
-    (let ((uniform-spec (coge:gen-spec)))
-      (vox::layout uniform-spec 25 0 25 26 9 52)
-      (vox::truncation uniform-spec 4 4 4)
-      (vox::derived-parts uniform-spec)
-      (vox::offset uniform-spec 0 0 0)
-      (vox::names uniform-spec
-		  'unhashfunc 'chunkhashfunc
-		  'chop 'anti-chop 'rem-flow '%%ref 'add)
-      uniform-spec))
-
-  (defun define-accessors (getter-name setter-name %getter-name %setter-name)
-    `(progn
-       (defun ,getter-name (i j k)
-	 (,%getter-name (chunkhashfunc i k j)))
-       (defun ,setter-name (i j k new)
-	 (,%setter-name (chunkhashfunc i k j) new))
-       (defun (setf ,getter-name) (new i j k)
-	 (,setter-name i j k new))))
-  (funland::etouq (vox::define-fixnum-ops (system))))
+(funland::etouq
+  (vox::define-fixnum-ops
+      (let ((uniform-spec (coge:gen-spec)))
+	(vox::layout uniform-spec 25 0 25 26 9 52)
+	(vox::truncation uniform-spec 4 4 4)
+	(vox::derived-parts uniform-spec)
+	(vox::offset uniform-spec 0 0 0)
+	(vox::names uniform-spec
+		    'unhashfunc 'chunkhashfunc
+		    'chop 'anti-chop 'rem-flow '%%ref 'add)
+	uniform-spec)))
 
 (defparameter *freechunkmempoolobj*
   (recycle:make-recycler
@@ -120,8 +110,15 @@
 (defun clearworld ()
   (send-to-free-mem *lispobj* *freechunkmempoolobj*))
 
-(eval-when (:compile-toplevel)
-  (funland::etouq
+(funland::etouq
+ (flet ((define-accessors (getter-name setter-name %getter-name %setter-name)
+	  `(progn
+	     (defun ,getter-name (i j k)
+	       (,%getter-name (chunkhashfunc i k j)))
+	     (defun ,setter-name (i j k new)
+	       (,%setter-name (chunkhashfunc i k j) new))
+	     (defun (setf ,getter-name) (new i j k)
+	       (,setter-name i j k new)))))
    (let ((value (logior (ash 15 12))))
      ((lambda (setter getter %setter %getter hash default creator)
 	(let ((new (system)))

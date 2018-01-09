@@ -3,7 +3,8 @@
 	       #:funfair
 	       #:terminal625-zeorp
 	       #:cl-program
-	       #:glhelp)
+	       #:glhelp
+	       #:singleton-lparallel)
   :serial t
   :components
-  ((:file "test2")))
+  ((:file "text-funfair")))
