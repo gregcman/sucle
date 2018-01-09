@@ -80,46 +80,42 @@
 	  packet nil
 	  demuxer nil)))
 
-(defun get-sound-buff (music-data packetfun)
-  "(packetfun carray-data samples channels audio-format rate)
--> return nil to abort"
-  (block outer
-    (with-slots (demuxer packet (sound-data sound))
-	music-data
-      (let ((packet packet)
-	    (demuxer demuxer)
-	    (sound-data sound-data))
-	(declare (type cffi:foreign-pointer packet))
-	(with-slots (channels)
-	    sound-data
-	  (with-slots (&format &codec &frame) demuxer
-	    (let ((format (mem-ref &format :pointer))
-		  (codec (mem-ref &codec :pointer))
-		  (frame (mem-ref &frame :pointer))
-		  (channels channels))
-	      (declare (type (integer 0 8) channels))
-	      (declare (type cffi:foreign-pointer format codec frame))
-	      (loop
-		 (progn
-		   (when (< (av-read-frame format packet) 0)
-		     (return-from outer nil))
-		   (cffi:with-foreign-object (gotframe :int 1)
-		     (when (< (avcodec-decode-audio4 codec frame gotframe packet) 0)
-		       (continue))
-		     (when (zerop (mem-ref gotframe :int))
-		       (continue)))
-		   (let ((samples (cffi:foreign-slot-value
-				   frame
-				   (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				   (quote cl-ffmpeg-bindings::nb_samples)))
-			 (rawdata (cffi:foreign-slot-value
-				   frame
-				   (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				   (quote cl-ffmpeg-bindings::data))))
-		     (with-slots (audio-format
-				  rate) sound-data
-		       (unless (funcall packetfun rawdata samples channels audio-format rate)
-			 (return-from outer t)))))))))))))
+(defparameter *end* (gensym))
+(defun is-end? (end)
+  (eq *end* end))
+
+(defmacro %get-sound-buff ((rawdata samples channels audio-format rate) music-data &body body)
+  (with-gensyms (demuxer sound packet format codec frame)
+    (once-only (music-data)
+      `(let ((,demuxer (slot-value ,music-data 'demuxer))
+	     (,sound (slot-value ,music-data 'sound))
+	     (,packet (slot-value ,music-data 'packet)))
+	 (declare (type cffi:foreign-pointer ,packet))
+	 (let ((,format (mem-ref (slot-value ,demuxer '&format) :pointer))
+	       (,codec (mem-ref (slot-value ,demuxer '&codec) :pointer))
+	       (,frame (mem-ref (slot-value ,demuxer '&frame) :pointer))
+	       (,channels (slot-value ,sound 'channels))
+	       (,audio-format (slot-value ,sound 'audio-format))
+	       (,rate (slot-value ,sound 'rate)))
+	   (declare (type (integer 0 8) ,channels))
+	   (declare (type cffi:foreign-pointer ,format ,codec ,frame))
+	   (loop
+	      (when (< (av-read-frame ,format ,packet) 0)
+		(return *end*))
+	      (cffi:with-foreign-object (gotframe :int 1)
+		(when (< (avcodec-decode-audio4 ,codec ,frame gotframe ,packet) 0)
+		  (continue))
+		(when (zerop (mem-ref gotframe :int))
+		  (continue)))
+	      (let ((,samples (cffi:foreign-slot-value
+			       ,frame
+			       (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+			       (quote cl-ffmpeg-bindings::nb_samples)))
+		    (,rawdata (cffi:foreign-slot-value
+			       ,frame
+			       (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+			       (quote cl-ffmpeg-bindings::data))))
+		,@body)))))))
 
 
 (defun init-demux (demuxer music sound-data)

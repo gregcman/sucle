@@ -47,22 +47,14 @@
        (setf (aref curr 5) (aref other2 2))
        (al:listener :orientation curr)))
 
-#+nil
-((alut-hello-world)
- (defun alut-hello-world (&optional (source *source*))
-   (al:source source :position (vector 0.0 0.0 0.0))
-   (al:source source :velocity (vector 0.0 0.0 0.0))
-   (al:source source :gain 1.0)
-   (al:source source :pitch 1.0)))
-
 (defclass datobj ()
   ((source :initform nil)
-   (playback :initform (or; :mono8
-			     ;:mono16
-			     ;:stereo8
-			     :stereo16
-			     ))
-   (time-remaining :initform 0.0)
+   (playback :initform (or ;:mono8
+			   ;:mono16
+			   ;:stereo8
+			   :stereo16
+			   ))
+   (time-remaining :initform 0)
    (used-buffers :initform (make-hash-table :test 'eql))
    (cancel :initform t)
    (data :initform nil)))
@@ -73,8 +65,11 @@
 (defun load-file (file &optional (datobj *datobj*))
   (with-slots (source) datobj
     (when source (al:delete-source source))
-    (setf source (al:gen-source)))
-  (setf *data* (alut-test file datobj)))
+    (setf source (al:gen-source))
+    (al:source source :position (vector 0.0 1.0 0.0))
+    (al:source source :velocity (vector 1000.0 0.0 0.0))
+    (al:source source :gain 1.0))
+  (alut-test file datobj))
 (defun play (&optional (datobj *datobj*))
   (with-slots (source) datobj
     (al:source-play source)))
@@ -87,68 +82,93 @@
     (al:source-stop source)
     (free-buffers datobj)
     (free-buffers-hash used-buffers)
-    (setf time-remaining 0.0)))
+    (setf time-remaining 0)))
 
-(defun getpacket (dataobj)
-  (let ((format (slot-value dataobj 'playback)))
-    (lambda (data samples channels audio-format rate)
-      (flet ((conv (arr)
-	       (multiple-value-bind (array playsize)
-		   (sound-stuff::convert
-		    (case channels
-		      (1 (cffi:mem-aref data :pointer 0))
- 		      (otherwise (cffi:mem-aref data :pointer 1)))
-		    (cffi:mem-aref data :pointer 0)
-		    samples
-		    audio-format
-		    format
-		    arr)
-		 (sound-stuff::playmem format array playsize rate dataobj))))
-	(let ((arrcount (ecase format
-			  ((:stereo8 :stereo16) (* samples 2))
-			  ((:mono8 :mono16) samples))))
-	  (ecase format
-	    ((:mono8 :stereo8)
-	     (cffi:with-foreign-object (arr :uint8 arrcount)
-	       (conv arr)))
-	    ((:mono16 :stereo16)
-	     (cffi:with-foreign-object (arr :int16 arrcount)
-	       (conv arr))))))
-      nil)))
 
-(defun alut-test (music datobj)
-  (let ((music (cl-ffmpeg::init-music-stuff music))
-	(packetfun (getpacket datobj)))
-    (with-slots (cancel time-remaining) datobj
-      (setf cancel nil
-	    time-remaining 0.0)
-      (tagbody rep
-	 (when (cl-ffmpeg::get-sound-buff music packetfun)
-	   (loop
-	      (progn
-		(when cancel (return))
+(defun alut-test (music-file datobj)
+  (let ((music (cl-ffmpeg::init-music-stuff music-file))
+	(format (slot-value datobj 'playback)))
+    (setf *data* music)
+    (unwind-protect
+	 (with-slots (cancel time-remaining) datobj
+	   (setf cancel nil
+		 time-remaining 0)
+	   (let* ((rate (slot-value 
+			(slot-value 
+			 music
+			 'cl-ffmpeg::sound)
+			'cl-ffmpeg::rate))
+		  (threshold (* 0.5 rate))
+		  (finish (+ threshold rate)))
+	     (loop
+		(sleep 0.1)
+;		(print 324234)
 		(free-buffers datobj)
-		(let ((almost 0.5))
-		  (if (<= time-remaining almost)
-		      (go rep)
-		      (sleep (max 0.0 (- time-remaining almost)))
-		      )))))))
-    (cl-ffmpeg::free-music-stuff music)
- ;   (print "data dumped: alut-test ")
+		(when cancel (return))
+					;		(princ 32434)
+;		(print (list threshold time-remaining))
+		(when (>= threshold time-remaining)
+		  (let ((target-samples (- finish time-remaining)))
+;		    (format t "target: ~a" target-samples)
+;		    (terpri)
+		    (when
+			(cl-ffmpeg::is-end?
+			 (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
+			   (flet ((conv (arr)
+				    (multiple-value-bind (array playsize)
+					(sound-stuff::convert
+					 (case channels
+					   (1 (cffi:mem-aref data :pointer 0))
+					   (otherwise (cffi:mem-aref data :pointer 1)))
+					 (cffi:mem-aref data :pointer 0)
+					 samples
+					 audio-format
+					 format
+					 arr)
+				      (sound-stuff::playmem format array playsize rate datobj))))
+			     (let ((arrcount (ecase format
+					       ((:stereo8 :stereo16) (* samples 2))
+					       ((:mono8 :mono16) samples))))
+			       (ecase format
+				 ((:mono8 :stereo8)
+				  (cffi:with-foreign-object (arr :uint8 arrcount)
+				    (conv arr)))
+				 ((:mono16 :stereo16)
+				  (cffi:with-foreign-object (arr :int16 arrcount)
+				    (conv arr))))))
+			   (decf target-samples samples)
+			   (when (>= 0 target-samples)
+;			     (format t "end: ~a" target-samples)
+;			     (terpri)
+			     (return))
+			   (when cancel (return))))
+		      (return)))))))
+      (cl-ffmpeg::free-music-stuff music))
+					;   (print "data dumped: alut-test ")
     music))
+
+#+nil
+(tagbody rep
+   (when
+       
+       (loop
+	  (progn
+	    
+	    
+	    (let ((almost (* 0.5 rate)))
+	      (if (<= time-remaining almost)
+		  (go rep)
+		  (sleep (/ (max 0 (- time-remaining almost))
+			    rate))
+		  ))))))
 
 
 (defun reset-listener ()
   (al:listener :gain 1.0)
   (al:listener :position (vector 0.0 0.0 0.0))
+  (al:listener :velocity (vector 0.0 0.0 0.0))
   (al:listener :orientation (vector 0.0 1.0 0.0 0.0 1.0 0.0)))
 
-(defun source-unqueue-buffer (datobj)
-  (with-slots ((sid source) used-buffers) datobj
-      (let ((value (%source-unqueue-buffer sid)))
-	(when value
-	  (remhash value used-buffers))
-	value)))
 (defun playmem (format pcm playsize rate datobj)
   (with-slots (source) datobj
     (let ((buffer (get-buffer)))
@@ -156,9 +176,12 @@
       (source-queue-buffer datobj buffer))))
 (defun source-queue-buffer (datobj buffer)
   (with-slots (time-remaining (sid source) used-buffers) datobj
-    (incf time-remaining (buffer-seconds buffer))
+    (incf time-remaining (buffer-samples buffer))
     (setf (gethash buffer used-buffers) t)
-    (%source-queue-buffer sid buffer)))
+   
+    (%source-queue-buffer sid buffer)
+    (unless (eq :paused (al:get-source sid :source-state))
+      (al:source-play sid))))
 (defun free-buffers (datobj)
   (with-slots (source time-remaining) datobj
     (multiple-value-bind (time bufs)
@@ -181,46 +204,47 @@
 (defparameter *free-buffers-lock* (bordeaux-threads:make-lock "free albuffers"))
 (defun %free-buffers (sid datobj)
   (let ((bufs (al:get-source sid :buffers-processed))
-	(time 0.0))
+	(time 0)
+	(used-buffers (slot-value datobj 'used-buffers)))
     (when (< 0 bufs)
-      (dotimes (i bufs)
-	(let ((buf (source-unqueue-buffer datobj)))
-	  (when buf
-	    (incf time (buffer-seconds buf))
-	    (bordeaux-threads:with-lock-held (*free-buffers-lock*)
-	      (push buf *free-buffers*))))))
+      (cffi:with-foreign-object (buffer-array :uint bufs)
+	(dotimes (index bufs)
+	  (setf (cffi:mem-aref buffer-array :uint index) 0))
+	(%al:source-unqueue-buffers sid bufs buffer-array)
+	(dotimes (index bufs)
+	  (let ((buf (cffi:mem-aref buffer-array :uint index)))
+	    (when (not (zerop buf))
+	      (remhash buf used-buffers)
+	      (incf time (buffer-samples buf))
+	      (bordeaux-threads:with-lock-held (*free-buffers-lock*)
+		(push buf *free-buffers*)))))))
     (values
      time
      bufs)))
 
-(defun %source-unqueue-buffer (sid)
-  (cffi:with-foreign-object (buffer-array :uint 1)
-    (setf (cffi:mem-aref buffer-array :uint 0) 0)
-    (%al:source-unqueue-buffers sid 1 buffer-array)
-    (let ((item (cffi:mem-aref buffer-array :uint 0)))
-      (if (zerop item)
-	  nil
-	  item))))
-
 (defun %source-queue-buffer (sid buffer)
-  (let ((empty? (al:get-source sid :buffers-queued)))
-    (cffi:with-foreign-object (buffer-array :uint 1)
-      (setf (cffi:mem-aref buffer-array :uint 0)
-	    buffer)
-      (%al:source-queue-buffers sid 1 buffer-array))
-    (when (zerop empty?)
-      (unless (eq :paused (al:get-source sid :source-state))
-	(al:source-play sid)))))
+  (cffi:with-foreign-object (buffer-array :uint 1)
+    (setf (cffi:mem-aref buffer-array :uint 0)
+	  buffer)
+    (%al:source-queue-buffers sid 1 buffer-array)))
+
+(defun buffer-samples (buffer)
+  (let ((size (floatify (al:get-buffer buffer :size))) ;byte count
+	(bits (floatify (al:get-buffer buffer :bits))) ;;bit depth eg: 16 or 8
+	(channels (floatify (al:get-buffer buffer :channels))))
+    (/ (* size 8)
+       (* channels bits))))
 
 ;;;;;
+#+nil
 (defun buffer-seconds (buffer)
-  (let ((size (floatify (al:get-buffer buffer :size)))
-	(bits (floatify (al:get-buffer buffer :bits)))
+  (let ((size (floatify (al:get-buffer buffer :size))) ;byte count
+	(bits (floatify (al:get-buffer buffer :bits))) ;;bit depth eg: 16 or 8
 	(channels (floatify (al:get-buffer buffer :channels)))
 	(frequency (floatify (al:get-buffer buffer :frequency))))
     ;;   (print (list size bits channels frequency))
-    (let ((denom (* channels bits frequency)))
-      (/ (* size 8) denom))
+    (/ (* size 8)
+       (* channels bits frequency))
        ))
 
 ;;;;initialization
