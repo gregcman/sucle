@@ -945,11 +945,7 @@ edge, or no case"
 	(atan y x))))
 
 (defparameter *sandbox-on* t)
-(setf sandbox::*some-saves*
-      (cdr (assoc (machine-instance) 
-		  '(("gm3-iMac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
-		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-		  :test 'equal)))
+
 (defparameter *ticker*
   (tickr:make-ticker
    (floor 1000000 60)
@@ -989,15 +985,8 @@ edge, or no case"
 				     :y 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
-  (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
-    (multiple-value-prog1
-	(values (- x (car data))
-		(- y (cdr data)))
-	(setf (car data) x
-	      (cdr data) y))))
 (defun update-moused (&optional (smoothing-factor 0.5))
-  (multiple-value-bind (dx dy) (moused)
+  (multiple-value-bind (dx dy) (funfair::moused)
     (let ((x (+ *mouse-x* dx))
 	  (y (+ *mouse-y* dy)))
       (let ((value *mouse-multiplier-aux*))
@@ -1102,9 +1091,10 @@ edge, or no case"
 
 (defparameter *reloadables*
   '(gl-init
-    blockshader-text
-    blockshader
-    terrain-png))
+    ;blockshader-text
+    ;blockshader
+    ;terrain-png
+    ))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (deflazy gl-init (funfair::gl-context)
   (declare (ignorable funfair::gl-context))
@@ -1116,15 +1106,10 @@ edge, or no case"
   (progn
     (map nil #'funfair::reload-if-dirty *reloadables*)
     (getfnc 'gl-init))
-  (when (window::skey-j-p (window::keyval :r) *control-state*)
-    (window:toggle-mouse-capture)
-    (moused))
-  (when (window::skey-j-p (window::keyval :x))
-    (toggle *paused*))
   (when (window::skey-j-p (window::keyval :h))
     (setf *selection* nil))
   (when *sandbox-on*
-    (if (or (window:mice-free-p) *paused*)
+    (if *paused*
 	(tick *ticker* (lambda ()))
 	(stuff)))
   (render-stuff))
@@ -1135,47 +1120,46 @@ edge, or no case"
 (defun stuff ()
   (let* ((player-farticle (entity-particle *ent*))
 	 (pos (farticle-position player-farticle))
-	 (control-state *control-state*))
-    ((lambda (control-state entity)
-       (symbol-macrolet ((pos (farticle-position (entity-particle entity)))
-			 (is-jumping (entity-jump? entity))
-			 (is-sneaking (entity-sneak? entity))
-			 (fly (entity-fly? entity))
-			 (gravity (entity-gravity? entity))
-			 (noclip (entity-clip? entity)))
-	 (setf is-jumping (window::skey-p (window::keyval :space) control-state))
-	 (setf is-sneaking (window::skey-p (window::keyval :a) control-state))
-	 (when (window:mice-locked-p)
-	   (when (window::skey-j-p (window::keyval :v) control-state)
-	     (toggle noclip))
-	   (with-vec (x y z) (pos)
-	     (when (window::skey-j-p (window::keyval :p) control-state)
-	       (sandbox::update-world-vao x y z)))
-	   (when (window::skey-j-p (window::keyval :g) control-state)
-	     (toggle fly)
-	     (toggle gravity))))) control-state
-     *ent*)
+	 (entity *ent*)
+	 (window::*control-state* *control-state*))
+    (symbol-macrolet ((pos (farticle-position (entity-particle entity)))
+		      (is-jumping (entity-jump? entity))
+		      (is-sneaking (entity-sneak? entity))
+		      (fly (entity-fly? entity))
+		      (gravity (entity-gravity? entity))
+		      (noclip (entity-clip? entity)))
+      (setf is-jumping (window::skey-p (window::keyval :space)))
+      (setf is-sneaking (window::skey-p (window::keyval :a)))
+      (when (window:mice-locked-p)
+	(when (window::skey-j-p (window::keyval :v))
+	  (toggle noclip))
+	(with-vec (x y z) (pos)
+	  (when (window::skey-j-p (window::keyval :p))
+	    (sandbox::update-world-vao x y z)))
+	(when (window::skey-j-p (window::keyval :g))
+	  (toggle fly)
+	  (toggle gravity))))
     (setf (entity-hips *ent*)
 	  (wasd-mover
-	   (window::skey-p (window::keyval :e) control-state)
-	   (window::skey-p (window::keyval :s) control-state)
-	   (window::skey-p (window::keyval :d) control-state)
-	   (window::skey-p (window::keyval :f) control-state)))
+	   (window::skey-p (window::keyval :e))
+	   (window::skey-p (window::keyval :s))
+	   (window::skey-p (window::keyval :d))
+	   (window::skey-p (window::keyval :f))))
     (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
       (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -1.0)
-      ((lambda (control-state look-vec pos)
+      ((lambda (look-vec pos)
 	 (let ((fist *fist*))
 	   (with-vec (px py pz) (pos)
 	     (with-vec (vx vy vz) (look-vec)	
 	       (when (window:mice-locked-p)
-		 (when (window::skey-j-p (window::keyval :w) control-state)
+		 (when (window::skey-j-p (window::keyval :w))
 		   (toggle *swinging*))
 		 (when *swinging*
 		   (big-swing-fist
 		    px py pz
 		    vx vy vz)))
-	       (let ((a (window::skey-j-p (window::mouseval :left) control-state))
-		     (b (window::skey-j-p (window::mouseval :right) control-state)))
+	       (let ((a (window::skey-j-p (window::mouseval :left)))
+		     (b (window::skey-j-p (window::mouseval :right))))
 		 (when (or a b)
 		   (standard-fist
 		    fist
@@ -1208,7 +1192,7 @@ edge, or no case"
 		    b
 		    *left-fist-fnc*
 		    *right-fist-fnc*)))))))
-       control-state backwardsbug
+       backwardsbug
        pos)))
   (multiple-value-bind (fraction times) (tick *ticker* #'physss)
     (declare (ignorable times))

@@ -158,6 +158,7 @@
     (progn
       (remove-stuff 'gl-context)
       (getfnc 'gl-context))
+    (getfnc 'al-context)
     (remove-stuff 'h)
     (remove-stuff 'w)
     (scrubgl2)
@@ -172,6 +173,22 @@
   window::*width*)
 (deflazy h ()
   window::*height*)
+
+(deflazy al-context ()
+  (sound-stuff::really-start)
+  sound-stuff::*al-context*)
+
+(defun restart-sound-system ()
+  (sound-stuff::restart-al)
+  (remove-stuff 'al-context))
+
+(defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
+  (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
+    (multiple-value-prog1
+	(values (- x (car data))
+		(- y (cdr data)))
+	(setf (car data) x
+	      (cdr data) y))))
 
 (defun num-key-jp (&optional (control-state window::*control-state*))
   (etouq

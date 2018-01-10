@@ -47,7 +47,8 @@
 ;    font-png
 					;   font-texture
     draw-commands
-    terminal256color-lookup))
+ ;   terminal256color-lookup
+    ))
 
 (defparameter *identity-mat*
   (cg-matrix:identity-matrix))

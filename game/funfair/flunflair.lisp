@@ -11,6 +11,12 @@
 (defun floatify (x)
   (coerce x 'single-float))
 
+(setf sandbox::*some-saves*
+      (cdr (assoc (machine-instance) 
+		  '(("gm3-iMac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
+		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
+		  :test 'equal)))
+
 (progn
   (defparameter *textx* 0.0)
   (defparameter *texty* 0.0))
@@ -45,7 +51,7 @@
 
   (let ((num (funfair::num-key-jp)))
     (case num
-      (1 (sound-stuff:play-sound-at "/home/imac/.minecraft/resources/sound3/dig/grass2.ogg"
+      (1 (sound-stuff:play-at "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/Elton John/Unknown Album/Tiny Dancer.mp3"
 				    0.0 0.0 0.0))
       #+nil
       (setf sndbx::*ent* (aref sndbx::*ents* num))))
@@ -59,7 +65,10 @@
       (funfair::quit))
     (when (window::skey-j-p (window::keyval :y))
       (toggle sndbx::*depth-buffer?*))
-
+    (when (window::skey-j-p (window::keyval :r))
+      (window:toggle-mouse-capture)
+      (toggle sndbx::*paused*)
+      (funfair::moused))
     (when (window::skey-j-p (window::keyval :c))
       (sound-stuff::cleanup-poller)))
   
@@ -188,10 +197,17 @@ z: ~10,1F"
 		  :mono8)))
     array))
 
-(defparameter *preloaded-sounds*
+(funfair::deflazy preloaded-sounds (funfair::al-context)
+  (declare (ignorable funfair::al-context))
+ ; (print "loading-sounds")
   (preload))
 
+#+nil
+(map nil
+     (lambda (x) (sound-stuff::free-preloaded x))
+     (funfair::getfnc 'flunflair::PRELOADED-SOUNDS)) 
 (defun wot ()
-  (alexandria:random-elt *preloaded-sounds*))
+  (funfair::reload-if-dirty 'preloaded-sounds)
+  (alexandria:random-elt (funfair::getfnc 'preloaded-sounds)))
 
 (setf funfair::*trampoline* '(sndbx::per-frame funtext::per-frame per-frame))

@@ -394,8 +394,7 @@
     (alc:make-context-current context)))
 (defun close-context ()
   (when (cffi:pointerp *alc-context*)
-    (when (cffi:pointer-eq *alc-context* (alc:get-current-context))
-      (alc:make-context-current (cffi:null-pointer)))
+    (alc:make-context-current (cffi:null-pointer))
     (alc:destroy-context *alc-context*))
   (setf *alc-context* nil))
 (defun start-al ()
@@ -410,16 +409,16 @@
   (setf *free-buffers* nil)
   (clrhash *datobjs*)
   (cleanup-poller)
-  (setf *al-on?* nil))
-(defparameter *al-on?* nil)
+  (setf *al-context* nil))
+(defparameter *al-context* nil)
 (defun really-start ()
-  (unless *al-on?*
+  (unless *al-context*
     (start-al)
-    (setf *al-on?* t)))
-(eval-when (:execute :load-toplevel)
+    (setf *al-context* (cons "OpenAL context" nil))))
+
+(defun restart-al ()
+  (destroy-al)
   (really-start))
-
-
 
 ;;;;ffmpeg format to openal format
 (defun convert (left right len format playblack-format arr)

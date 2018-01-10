@@ -7,6 +7,7 @@
 	       #:terminal625-cgmat
 	       #:bordeaux-threads
 	       #:cl-opengl
+	       #:music
 	       #:glhelp)
   :serial t
   :components
