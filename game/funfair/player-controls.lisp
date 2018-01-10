@@ -645,47 +645,7 @@ edge, or no case"
 		  (necking-yaw neck)))
 
 ;;;;;;;
-(defstruct fister
-  (selected-block (vector 0 0 0))
-  (normal-block (vector 0 0 0))
-  (exists nil)
-  (position (vector 0 0 0))
-  fun)
 
-(defmacro setvec3d (vec x y z)
-  (let ((a (gensym)))
-    `(let ((,a ,vec))
-       (setf (aref ,a 0) ,x
-	     (aref ,a 1) ,y
-	     (aref ,a 2) ,z))))
-
-(defun standard-fist (fist px py pz vx vy vz)
-  (multiple-value-bind (frac xclamp yclamp zclamp)
-      (funcall (fister-fun fist) px py pz vx vy vz)
-    (if (or xclamp yclamp zclamp)
-	(progn
-	  (let ((a (+ px (* frac vx)))
-		(b (+ py (* frac vy)))
-		(c (+ pz (* frac vz))))
-	    (let ((dx (if xclamp (if (plusp vx) 1 -1) 0))
-		  (dy (if yclamp (if (plusp vy) 1 -1) 0))
-		  (dz (if zclamp (if (plusp vz) 1 -1) 0)))
-	      (setvec3d (fister-selected-block fist)
-			(floor (+ dx a))
-			(floor (+ dy b))
-			(floor (+ dz c))))
-	    (setvec3d (fister-position fist)
-		      a 
-		      b
-		      c)
-	    (setvec3d (fister-normal-block fist)
-		      (floor a) 
-		      (floor b)
-		      (floor c)))
-	  (setf (fister-exists fist) t))
-	(setf (fister-exists fist) nil))))
-
-;;;;;;;;;;;;;;;;;;;;
 (defstruct farticle
   (position (cg-matrix:vec 0.0 0.0 0.0))
   (position-old (cg-matrix:vec 0.0 0.0 0.0))
@@ -910,15 +870,6 @@ edge, or no case"
    :maxy 0.005
    :maxz 0.005))
 
-(defun gen-fister (fist-aabb funs)
-  (let ((fist (make-fister)))
-    (multiple-value-bind (fun set-aabb)
-	(collide-fucks funs)
-	(setf (fister-fun fist)
-	      fun)
-	(funcall set-aabb fist-aabb))
-    fist))
-
 ;;;;150 ms delay for sprinting
 ;;;;player eye height is 1.5, subtract 1/8 for sneaking
 
@@ -1019,6 +970,55 @@ edge, or no case"
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 
 ;;;;;
+
+(defstruct fister
+  (selected-block (vector 0 0 0))
+  (normal-block (vector 0 0 0))
+  (exists nil)
+  (position (vector 0 0 0))
+  fun)
+
+(defun standard-fist (fist px py pz vx vy vz)
+  (multiple-value-bind (frac xclamp yclamp zclamp)
+      (funcall (fister-fun fist) px py pz vx vy vz)
+    (if (or xclamp yclamp zclamp)
+	(progn
+	  (macrolet ((setvec3d (vec x y z)
+	     (let ((a (gensym)))
+	       `(let ((,a ,vec))
+		  (setf (aref ,a 0) ,x
+			(aref ,a 1) ,y
+			(aref ,a 2) ,z)))))
+	    (let ((a (+ px (* frac vx)))
+		  (b (+ py (* frac vy)))
+		  (c (+ pz (* frac vz))))
+	      (let ((dx (if xclamp (if (plusp vx) 1 -1) 0))
+		    (dy (if yclamp (if (plusp vy) 1 -1) 0))
+		    (dz (if zclamp (if (plusp vz) 1 -1) 0)))
+		(setvec3d (fister-selected-block fist)
+			  (floor (+ dx a))
+			  (floor (+ dy b))
+			  (floor (+ dz c))))
+	      (setvec3d (fister-position fist)
+			a 
+			b
+			c)
+	      (setvec3d (fister-normal-block fist)
+			(floor a) 
+			(floor b)
+			(floor c))))
+	  (setf (fister-exists fist) t))
+	(setf (fister-exists fist) nil))))
+
+(defun gen-fister (fist-aabb funs)
+  (let ((fist (make-fister)))
+    (multiple-value-bind (fun set-aabb)
+	(collide-fucks funs)
+	(setf (fister-fun fist)
+	      fun)
+	(funcall set-aabb fist-aabb))
+    fist))
+;;;;;;;;;;;;;;;;;;;;
 (defparameter *fist*
   (gen-fister *fist-aabb* (list #'ahook)))
 
@@ -1030,7 +1030,7 @@ edge, or no case"
   (lambda (x y z)
     (let ((value (world::getblock x y z)))
       (when (zerop value)
-	(sound-stuff::play-at (flunflair::wot) x y z)
+;	(sound-stuff::play-at (flunflair::wot) x y z)
 	(let ((blockval 1))
 	  (sandbox::plain-setblock
 	   x
@@ -1040,7 +1040,7 @@ edge, or no case"
 	   (aref mc-blocks:*lightvalue* blockval)))))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
-    (sound-stuff::play-at (flunflair::wot) x y z)
+ ;   (sound-stuff::play-at (flunflair::wot) x y z)
     (sandbox::setblock-with-update x y z 0 0)))
 
 (defparameter *big-fist-fun*
@@ -1057,7 +1057,7 @@ edge, or no case"
 		(= a 2)
 		(= a 3)
 		)
-	(sound-stuff::play-at (flunflair::wot) x y z)
+;	(sound-stuff::play-at (flunflair::wot) x y z)
 	(sandbox::setblock-with-update x y z 0 0))))
    ;;  #'atest::bonder2
 
@@ -1106,8 +1106,6 @@ edge, or no case"
   (progn
     (map nil #'funfair::reload-if-dirty *reloadables*)
     (getfnc 'gl-init))
-  (when (window::skey-j-p (window::keyval :h))
-    (setf *selection* nil))
   (when *sandbox-on*
     (if *paused*
 	(tick *ticker* (lambda ()))
@@ -1198,16 +1196,13 @@ edge, or no case"
     (declare (ignorable times))
     (when (window:mice-locked-p)
       (update-moused 0.5)
-      (multiple-value-call
-	  #'change-entity-neck
-	*ent*
-	(multiple-value-bind (x y) (values *lerp-mouse-x*
-					   *lerp-mouse-y*)
-	  (values (coerce (* x -1.0d0 *mouse-multiplier*)
-			  'single-float)
-		  (coerce (* y *mouse-multiplier*)
-			  'single-float)))
-	))
+      (change-entity-neck
+       *ent*
+       (coerce (* *lerp-mouse-x*
+		  -1.0d0 *mouse-multiplier*)
+	       'single-float)
+       (coerce (* *lerp-mouse-y* *mouse-multiplier*)
+	       'single-float)))
     (entity-to-camera *ent* *camera* fraction)))
 
 (defparameter *render-ticks* 0)
