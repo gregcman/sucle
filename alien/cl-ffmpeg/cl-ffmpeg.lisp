@@ -37,11 +37,15 @@
     (progn 
       (av-frame-free &frame)
       (avcodec-close (cffi:mem-ref &codec :pointer))
+      (avformat-close-input &format)
       (avformat-free-context (cffi:mem-ref &format :pointer)))
     (cffi:foreign-free &format)
     (cffi:foreign-free &codec)
     (cffi:foreign-free &frame)
     (setf live nil)))
+
+(cffi:defcfun (avformat-close-input "avformat_close_input") :void
+  (avformatcontext :pointer))
 
 (defclass music-stuff ()
   ((demuxer :initform nil)

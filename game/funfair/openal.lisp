@@ -60,17 +60,23 @@
 	  (format t "wut ~a" buf)
 	  (push buf *free-buffers*)))))
 
+(defparameter *task* (lparallel:make-channel))
 (defun play-sound-at (filename &optional (x 0.0) (y 0.0) (z 0.0))
-  (multiple-value-bind (datobj source) (load-file filename)
-    (when datobj
-      (%al:source-3f source :position
-		     (floatify x)
-		     (floatify y)
-		     (floatify z))
-      (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
-      (al:source source :gain 1.0)
-      (push-sound datobj)
-      (values datobj source))))
+  (when (> 128 (total-handles))
+    (lparallel:submit-task
+     *task*
+     (lambda (filename x y z)
+       (multiple-value-bind (datobj source) (load-file filename)
+	 (when datobj
+	   (%al:source-3f source :position
+			  (floatify x)
+			  (floatify y)
+			  (floatify z))
+	   (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
+	   (al:source source :gain 1.0)
+	   (push-sound datobj)
+	   (values datobj source))))
+     filename x y z)))
 
 (defparameter *datobj* nil)
 ;;do not switch source formats!!!!
@@ -100,6 +106,10 @@
 	    (not (bordeaux-threads:thread-alive-p *sound-thread*)))
     (start-poller))
   datobj)
+
+(defun total-handles ()
+  (+ (lparallel.queue:queue-count *new-sounds*)
+     (hash-table-count *datobjs*)))
 
 (defparameter *new-sounds* (lparallel.queue:make-queue))
 (defparameter *sound-thread* nil)
