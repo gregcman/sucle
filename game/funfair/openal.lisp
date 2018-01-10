@@ -9,7 +9,7 @@
    #:audio-format
    )
   (:export
-   #:play-sound-at))
+   #:play-at))
 (in-package #:sound-stuff)
 
 
@@ -61,22 +61,25 @@
 	  (push buf *free-buffers*)))))
 
 (defparameter *task* (lparallel:make-channel))
-(defun play-sound-at (filename &optional (x 0.0) (y 0.0) (z 0.0))
+(defun play-at (sound &optional (x 0.0) (y 0.0) (z 0.0))
   (when (> 128 (total-handles))
-    (lparallel:submit-task
-     *task*
-     (lambda (filename x y z)
-       (multiple-value-bind (datobj source) (load-file filename)
-	 (when datobj
-	   (%al:source-3f source :position
-			  (floatify x)
-			  (floatify y)
-			  (floatify z))
-	   (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
-	   (al:source source :gain 1.0)
-	   (push-sound datobj)
-	   (values datobj source))))
-     filename x y z)))
+    (typecase sound
+      ((or pathname string)
+       (lparallel:submit-task
+	*task*
+	(lambda (filename x y z)
+	  (multiple-value-bind (datobj source) (load-file filename)
+	    (when datobj
+	      (%al:source-3f source :position
+			     (floatify x)
+			     (floatify y)
+			     (floatify z))
+	      (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
+	      (al:source source :gain 1.0)
+	      (push-sound datobj)
+	      (values datobj source))))
+	(string sound) x y z))
+      (preloaded-music (play-preloaded-at sound x y z)))))
 
 (defparameter *datobj* nil)
 ;;do not switch source formats!!!!
@@ -128,23 +131,36 @@
 	  (unless *stop*
 	    (let ((flag nil))
 	      (bordeaux-threads:with-lock-held (*datobjs-lock*)
-		(dohash (datobj dummy) *datobjs*
+		(dohash (obj dummy) *datobjs*
 		  (declare (ignorable dummy))
-		  (if (or (slot-value datobj 'cancel)
-			  (update-playable datobj)) ;;finished or cancelled
-		      (progn (remhash datobj *datobjs*)
-			     (free-datobj datobj))
+		  (if (update-obj obj) ;;finished or cancelled
+		      (progn (remhash obj *datobjs*)
+			     (destroy-obj obj))
 		      (setf flag t)))) ;;still playing
 	      (when flag
 		(sleep 0.1)
 		(go repeat)))))
     (cleanup-poller)))
 
+(defun update-obj (obj)
+  (etypecase obj
+    (datobj (or (slot-value obj 'cancel)
+		(update-playable obj)))
+    (integer (eq :stopped
+		 (al:get-source obj :source-state)))))
+
+(defun destroy-obj (obj)
+  (etypecase obj
+    (datobj (free-datobj obj))
+    (integer
+     (al:source-stop obj)
+     (al:delete-source obj))))
+
 (defun cleanup-poller ()
   (bordeaux-threads:with-lock-held (*datobjs-lock*)
     (dohash (k v) *datobjs*
       (declare (ignore v))
-      (free-datobj k))
+      (destroy-obj k))
     (clrhash *datobjs*)
     (setf *datobj* nil)
 
@@ -174,7 +190,7 @@
 	(let ((target-samples (* rate target)))
 	  (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
 	    (flet ((conv (arr)
-		     (multiple-value-bind (array playsize)
+		     (multiple-value-bind (pcm playsize)
 			 (sound-stuff::convert
 			  (case channels
 			    (1 (cffi:mem-aref data :pointer 0))
@@ -184,7 +200,9 @@
 			  audio-format
 			  format
 			  arr)
-		       (sound-stuff::playmem format array playsize rate datobj))))
+		       (let ((buffer (get-buffer)))
+			 (al:buffer-data buffer format pcm playsize rate)
+			 (source-queue-buffer datobj buffer)))))
 	      (let ((arrcount (ecase format
 				((:stereo8 :stereo16) (* samples 2))
 				((:mono8 :mono16) samples))))
@@ -200,20 +218,75 @@
 	    (when (>= 0 target-samples)
 	      (return))))))))
 
-#+nil
-(tagbody rep
-   (when
-       
-       (loop
-	  (progn
-	    
-	    
-	    (let ((almost (* 0.5 rate)))
-	      (if (<= time-remaining almost)
-		  (go rep)
-		  (sleep (/ (max 0 (- time-remaining almost))
-			    rate))
-		  ))))))
+(defclass preloaded-music ()
+  ((buffers :initform nil)
+   (complete :initform nil)
+   (info :initform nil)))
+
+(defun load-all (file format)
+  (let ((music nil))
+    (unwind-protect
+	 (progn
+	   (setf music (cl-ffmpeg::init-music-stuff file))
+	   (let ((rate (slot-value 
+			(slot-value 
+			 music
+			 'cl-ffmpeg::sound)
+			'cl-ffmpeg::rate))
+		 (sound-buffers ())
+		 (completed? nil))
+	     (when (not rate)
+	       (return-from load-all (values nil nil)))
+	     (when
+		 (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
+		   (flet ((conv (arr)
+			    (multiple-value-bind (pcm playsize)
+				(sound-stuff::convert
+				 (case channels
+				   (1 (cffi:mem-aref data :pointer 0))
+				   (otherwise (cffi:mem-aref data :pointer 1)))
+				 (cffi:mem-aref data :pointer 0)
+				 samples
+				 audio-format
+				 format
+				 arr)
+			      (let ((buffer (get-buffer)))
+				(al:buffer-data buffer format pcm playsize rate)
+				(push buffer sound-buffers)))))
+		     (let ((arrcount (ecase format
+				       ((:stereo8 :stereo16) (* samples 2))
+				       ((:mono8 :mono16) samples))))
+		       (ecase format
+			 ((:mono8 :stereo8)
+			  (cffi:with-foreign-object (arr :uint8 arrcount)
+			    (conv arr)))
+			 ((:mono16 :stereo16)
+			  (cffi:with-foreign-object (arr :int16 arrcount)
+			    (conv arr)))))))
+	       (setf completed? t))
+	     (let ((inst
+		    (make-instance 'preloaded-music)))
+	       (with-slots (buffers complete info) inst
+		 (setf buffers (coerce (nreverse sound-buffers) 'vector)
+		       complete completed?
+		       info (slot-value music 'cl-ffmpeg::sound)))
+	       inst)))
+      (cl-ffmpeg::free-music-stuff music))))
+
+(defun play-preloaded-at (preloaded &optional (x 0.0) (y 0.0) (z 0.0))
+  (let ((source (al:gen-source)))
+    (%al:source-3f source :position
+		   (floatify x)
+		   (floatify y)
+		   (floatify z))
+    (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
+    (al:source source :gain 1.0)
+    (al:source-queue-buffers source (slot-value preloaded 'buffers))
+    (al:source-play source)
+    (push-sound source)))
+
+(defun free-preloaded (preloaded)
+  (al:delete-buffers (slot-value preloaded 'buffers)))
 
 
 (defun reset-listener ()
@@ -222,11 +295,6 @@
   (al:listener :velocity (vector 0.0 0.0 0.0))
   (al:listener :orientation (vector 0.0 1.0 0.0 0.0 1.0 0.0)))
 
-(defun playmem (format pcm playsize rate datobj)
-  (with-slots (source) datobj
-    (let ((buffer (get-buffer)))
-      (al:buffer-data buffer format pcm playsize rate)
-      (source-queue-buffer datobj buffer))))
 (defun source-queue-buffer (datobj buffer)
   (with-slots (time-remaining (sid source) used-buffers) datobj
     (incf time-remaining (buffer-samples buffer))
@@ -341,7 +409,7 @@
   (close-device)
   (setf *free-buffers* nil)
   (clrhash *datobjs*)
-  (reset-poller)
+  (cleanup-poller)
   (setf *al-on?* nil))
 (defparameter *al-on?* nil)
 (defun really-start ()

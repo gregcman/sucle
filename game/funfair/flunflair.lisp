@@ -170,18 +170,28 @@ z: ~10,1F"
 	(gl:bind-texture :texture-2d (glhelp::texture (funfair::getfnc 'funtext::text-data)))
 	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
 
-(defun wot ()
-  (concatenate
-   'string
-   "/home/imac/.minecraft/resources/sound/step/"
-   (string-downcase (symbol-name (aref #(stone wood gravel grass)
-				       (random 4)
-				       )))
-   (aref #("1" "2" "3" "4") (random 4)
-	 )
-   ".ogg")
-  
-  )
+(defun preload ()
+  (let ((array (make-array 16)))
+    (dobox ((name 0 4)
+	    (number 0 4))
+	   (setf (aref array (+ name (* number 4)))
+		 (sound-stuff::load-all
+		  (concatenate
+		   'string
+		   "/home/imac/.minecraft/resources/sound/step/"
+		   (string-downcase (symbol-name (aref #(stone wood gravel grass)
+						       name
+						       )))
+		   (aref #("1" "2" "3" "4") number
+			 )
+		   ".ogg")
+		  :mono8)))
+    array))
 
+(defparameter *preloaded-sounds*
+  (preload))
+
+(defun wot ()
+  (alexandria:random-elt *preloaded-sounds*))
 
 (setf funfair::*trampoline* '(sndbx::per-frame funtext::per-frame per-frame))
