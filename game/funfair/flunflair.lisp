@@ -45,11 +45,8 @@
 
   (let ((num (funfair::num-key-jp)))
     (case num
-      (1 (sound-stuff::push-sound
-	  (sound-stuff::load-file
-	   "/home/imac/.minecraft/resources/sound3/dig/grass2.ogg"
-	   #+nil
-	   "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/Waka Flocka Flame/Flockaveli (Deluxe Version)/19 Gun Sounds (Bonus Track).m4a")))
+      (1 (sound-stuff:play-sound-at "/home/imac/.minecraft/resources/sound3/dig/grass2.ogg"
+				    0.0 0.0 0.0))
       #+nil
       (setf sndbx::*ent* (aref sndbx::*ents* num))))
 
@@ -172,6 +169,19 @@ z: ~10,1F"
       (progn
 	(gl:bind-texture :texture-2d (glhelp::texture (funfair::getfnc 'funtext::text-data)))
 	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
+
+(defun wot ()
+  (concatenate
+   'string
+   "/home/imac/.minecraft/resources/sound/step/"
+   (string-downcase (symbol-name (aref #(stone wood gravel grass)
+				       (random 4)
+				       )))
+   (aref #("1" "2" "3" "4") (random 4)
+	 )
+   ".ogg")
+  
+  )
 
 
 (setf funfair::*trampoline* '(sndbx::per-frame funtext::per-frame per-frame))

@@ -1039,6 +1039,7 @@ edge, or no case"
 
 (defparameter *right-fist-fnc*
   (lambda (x y z)
+ ;   (sound-stuff::play-sound-at (flunflair::wot) x y z)
     (let ((blockval 1))
       (sandbox::plain-setblock
        x
@@ -1048,6 +1049,7 @@ edge, or no case"
        (aref mc-blocks:*lightvalue* blockval)))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
+;    (sound-stuff::play-sound-at (flunflair::wot) x y z)
     (sandbox::setblock-with-update x y z 0 0)))
 
 (defparameter *big-fist-fun*
@@ -1063,7 +1065,8 @@ edge, or no case"
       (when (or (= a 1)
 		(= a 2)
 		(= a 3)
-		)	
+		)
+;	(sound-stuff::play-sound-at (flunflair::wot) x y z)
 	(sandbox::setblock-with-update x y z 0 0))))
    ;;  #'atest::bonder2
 

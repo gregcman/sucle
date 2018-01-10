@@ -7,7 +7,9 @@
    #:bytes-per-sample
    #:channels
    #:audio-format
-   ))
+   )
+  (:export
+   #:play-sound-at))
 (in-package #:sound-stuff)
 
 
@@ -58,18 +60,30 @@
 	  (format t "wut ~a" buf)
 	  (push buf *free-buffers*)))))
 
+(defun play-sound-at (filename &optional (x 0.0) (y 0.0) (z 0.0))
+  (multiple-value-bind (datobj source) (load-file filename)
+    (when datobj
+      (%al:source-3f source :position
+		     (floatify x)
+		     (floatify y)
+		     (floatify z))
+      (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
+      (al:source source :gain 1.0)
+      (push-sound datobj)
+      (values datobj source))))
+
 (defparameter *datobj* nil)
 ;;do not switch source formats!!!!
 (defun load-file (music-file)
-  (let ((datobj (make-instance 'datobj)))
-    (setf *datobj* datobj)
-    (with-slots (source data) datobj
-      (setf source (al:gen-source))
-      (setf data (cl-ffmpeg::init-music-stuff music-file))
-      (al:source source :position (vector 0.0 1.0 0.0))
-      (al:source source :velocity (vector 0.0 0.0 0.0))
-      (al:source source :gain 1.0)
-      datobj)))
+  (let ((ffmpeg-stuff (cl-ffmpeg::init-music-stuff music-file)))
+    (when ffmpeg-stuff
+      (let ((datobj (make-instance 'datobj)))
+	(setf *datobj* datobj)
+	(with-slots (source data) datobj
+	  (setf source (al:gen-source))	
+	  (setf data ffmpeg-stuff)
+	  (values datobj
+		  source))))))
 (defun play (&optional (datobj *datobj*))
   (with-slots (source) datobj
     (al:source-play source)))
@@ -142,6 +156,9 @@
 		  'cl-ffmpeg::rate))
 	   (threshold 0.5)
 	   (target 0.5))
+      (when (not rate)
+	(setf cancel t)
+	(return-from update-playable t))
       (free-buffers datobj)
       (when (>= (* rate threshold) time-remaining)
 	(let ((target-samples (* rate target)))
@@ -420,24 +437,26 @@
 	      (scaling-factor (/ 128.0 scale)))
 	 (declare (type single-float scale scaling-factor))
 	 (audio-type :float
-		     (clamp
-		      -128 127
-		      (the fixnum
-			   (round
-			    (* value
-			       scaling-factor)))))))
+		     (+ 128
+			(clamp
+			 -128 127
+			 (the fixnum
+			      (round
+			       (* value
+				  scaling-factor))))))))
       ((:dblp :dbl)
        (let* ((scale 1.0d0)
 	      (scaling-factor (/ 128d0 scale)))
 	 (declare (type double-float scale scaling-factor))
 	 (audio-type :double
-		     (clamp
-		      -128 127
-		      (the fixnum
-			   (round
-			    (*
-			     value
-			     scaling-factor)))))))
+		     (+ 128
+			(clamp
+			 -128 127
+			 (the fixnum
+			      (round
+			       (*
+				value
+				scaling-factor))))))))
       ((:s16 :s16p)
        (audio-type :int16 (+ 128 (ash value -8))))
       ((:s32 :s32p)

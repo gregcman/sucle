@@ -63,15 +63,17 @@
     (let ((aborted? t))
       (unwind-protect
 	   (progn
-	     (init-demux newdemuxer music sound-data)	   
-	     ;;prepare to read data
-	     (av-init-packet newpacket)
-
-	     (setf aborted? nil))
+	     (let ((wowt (init-demux newdemuxer music sound-data)))	   
+	       ;;prepare to read data
+	       (av-init-packet newpacket)
+	       (when wowt
+		 (setf aborted? nil))))
 	;;cleanup
 	(when aborted?
-	  (free-music-stuff music-data)))))
-  music-data)
+	  (free-music-stuff music-data)))
+      (if aborted?
+	  nil
+	  music-data))))
 (defun free-music-stuff (music-data)
   (with-slots (packet demuxer live) music-data
     (cffi:foreign-free packet)
@@ -134,15 +136,15 @@
 		      (cffi:null-pointer)))))
 	  (unless (zerop ret)
 	    (print "could not open file ~a")
-	    (return-from bye -1)))
+	    (return-from bye)))
 	(when (> 0 (avformat-find-stream-info (cffi:mem-ref &format :pointer)
 					      (cffi:null-pointer)))
 	  (print "could not retrive stream info from file")
-	  (return-from bye -1))
+	  (return-from bye))
 	(let ((stream-index (find-first-audio-stream2 (cffi:mem-ref &format :pointer))))
 	  (when (= -1 stream-index)
 	    (print "could not retrieve audio stream from file")
-	    (return-from bye -1))
+	    (return-from bye))
 	  (let* ((stream-array (cffi:foreign-slot-value (cffi:mem-ref &format :pointer)
 							(quote (:struct |AVFormatContext|))
 							(quote cl-ffmpeg-bindings::streams)))
@@ -163,7 +165,7 @@
 					  (quote cl-ffmpeg-bindings::codec_id)))
 					(cffi:null-pointer)))
 		(print "failed to open decoder for stream number stream-index for file path")
-		(return-from bye -1)))))
+		(return-from bye)))))
 	(let ((codec (cffi:mem-ref &codec :pointer)))
 	  (cffi:with-foreign-slots ((cl-ffmpeg-bindings::channels
 				     cl-ffmpeg-bindings::channel_layout
@@ -179,9 +181,8 @@
 	(progn (setf (cffi:mem-ref &frame :pointer) (av-frame-alloc))
 	       (when (cffi:null-pointer-p (cffi:mem-ref &frame :pointer))
 		 (print "error allocating the frame")
-		 (return-from bye -1)))))
-
-    ))
+		 (return-from bye))))))
+  t)
 
 (defun find-first-audio-stream2 (format)
   (let ((stream-index -1)
