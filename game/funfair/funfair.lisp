@@ -181,22 +181,3 @@
 (defun restart-sound-system ()
   (sound-stuff::restart-al)
   (remove-stuff 'al-context))
-
-(defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
-  (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
-    (multiple-value-prog1
-	(values (- x (car data))
-		(- y (cdr data)))
-	(setf (car data) x
-	      (cdr data) y))))
-
-(defun num-key-jp (&optional (control-state window::*control-state*))
-  (etouq
-   (cons
-    'cond
-    (mapcar
-     (lambda (n)
-       `((window::skey-j-p
-	  (window::keyval ,(intern (write-to-string n) :keyword))
-	  control-state) ,n))
-     '(0 1 2 3 4 5 6 7 8 9)))))

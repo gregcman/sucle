@@ -29,6 +29,10 @@
     (defparameter *old-mouse-x* 0.0)
     (defparameter *old-mouse-y* 0.0)))
 
+(defparameter *lastsel* nil)
+(defparameter *selection* nil)
+
+(defparameter *paused* nil)
 (defun per-frame (&optional session)
   (declare (ignorable session))
   
@@ -49,12 +53,10 @@
 	(incf *texty* dy)
 	(funtext::flag-text-dirty))))
 
-  (let ((num (funfair::num-key-jp)))
+  (let ((num (num-key-jp)))
     (case num
       (1 (sound-stuff:play-at "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/Elton John/Unknown Album/Tiny Dancer.mp3"
-				    0.0 0.0 0.0))
-      #+nil
-      (setf sndbx::*ent* (aref sndbx::*ents* num))))
+				    0.0 0.0 0.0))))
 
   (progn
     (when (window::skey-p (window::keyval :n))
@@ -66,16 +68,19 @@
     (when (window::skey-j-p (window::keyval :y))
       (toggle sndbx::*depth-buffer?*))
     (when (window::skey-j-p (window::keyval :h))
-      (setf sndbx::*selection* nil))
+      (setf *selection* nil))
     (when (window::skey-j-p (window::keyval :r))
       (window::toggle-mouse-capture)
-      (funfair::moused))
-    (setf sndbx::*paused* (window::mice-free-p))
+      (moused))
+    (setf *paused* (window::mice-free-p))
+    (if *paused*
+      (funfair::tick *ticker* (lambda ()))
+      (stuff))
     (when (window::skey-j-p (window::keyval :c))
       (sound-stuff::cleanup-poller)))
   
   (map nil #'funfair::reload-if-dirty *reloadables*)
-  (let* ((particle (sndbx::entity-particle sndbx::*ent*))
+  (let* ((particle (sndbx::entity-particle *ent*))
 	 (pos (sndbx::farticle-position particle))
 	 (vel (sndbx::farticle-velocity particle)))
 
@@ -100,13 +105,13 @@
 y: ~10,1F
 z: ~10,1F"
 		      a b c))))
-  (unless (eq sndbx::*lastsel*
-	      sndbx::*selection*)
-    (setf sndbx::*lastsel*
-	  sndbx::*selection*)
+  (unless (eq *lastsel*
+	      *selection*)
+    (setf *lastsel*
+	  *selection*)
     (setfoo2
      (with-output-to-string (*standard-output*)
-       (dolist (item sndbx::*selection*)
+       (dolist (item *selection*)
 	 (pprint item)))))
   (let ((draw-commands (funfair::getfnc 'funtext::draw-commands)))
     (flet ((drawxyz (x y z)
@@ -213,3 +218,203 @@ z: ~10,1F"
   (alexandria:random-elt (funfair::getfnc 'preloaded-sounds)))
 
 (setf funfair::*trampoline* '(sndbx::per-frame funtext::per-frame per-frame))
+
+(defparameter *reach* 128.0)
+(defun stuff ()
+  (let* ((player-farticle (sndbx::entity-particle *ent*))
+	 (pos (sndbx::farticle-position player-farticle))
+	 (entity *ent*)
+	 (window::*control-state* sndbx::*control-state*))
+    (symbol-macrolet ((pos (sndbx::farticle-position (sndbx::entity-particle entity)))
+		      (is-jumping (sndbx::entity-jump? entity))
+		      (is-sneaking (sndbx::entity-sneak? entity))
+		      (fly (sndbx::entity-fly? entity))
+		      (gravity (sndbx::entity-gravity? entity))
+		      (noclip (sndbx::entity-clip? entity)))
+      (setf is-jumping (window::skey-p (window::keyval :space)))
+      (setf is-sneaking (window::skey-p (window::keyval :a)))
+      (when (window:mice-locked-p)
+	(when (window::skey-j-p (window::keyval :v))
+	  (toggle noclip))
+	(with-vec (x y z) (pos)
+	  (when (window::skey-j-p (window::keyval :p))
+	    (sandbox::update-world-vao x y z)))
+	(when (window::skey-j-p (window::keyval :g))
+	  (toggle fly)
+	  (toggle gravity))))
+    (setf (sndbx::entity-hips *ent*)
+	  (wasd-mover
+	   (window::skey-p (window::keyval :e))
+	   (window::skey-p (window::keyval :s))
+	   (window::skey-p (window::keyval :d))
+	   (window::skey-p (window::keyval :f))))
+    (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
+      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward funfair::*camera*) -1.0)
+      ((lambda (look-vec pos)
+	 (let ((fist *fist*))
+	   (with-vec (px py pz) (pos)
+	     (with-vec (vx vy vz) (look-vec)	
+	       (when (window:mice-locked-p)
+		 (when (window::skey-j-p (window::keyval :w))
+		   (toggle *swinging*))
+		 (when *swinging*
+		   (let ((u 16))
+		     (sndbx::aabb-collect-blocks
+		      px py pz (* u vx) (* u vy) (* u vz)
+		      (load-time-value
+		       (aabbcc:make-aabb
+			:minx -0.3
+			:miny -0.5
+			:minz -0.3
+			:maxx 0.3
+			:maxy 1.12
+			:maxz 0.3))   
+		      *big-fist-fun*))))
+	       (let ((left-p (window::skey-j-p (window::mouseval :left)))
+		     (right-p (window::skey-j-p (window::mouseval :right))))
+		 (when (or left-p right-p)
+		   (sndbx::standard-fist
+		    fist
+		    px py pz
+		    (* *reach* vx) (* *reach* vy) (* *reach* vz))
+		   (let ((fist? (sndbx::fister-exists fist))
+			 (selected-block (sndbx::fister-selected-block fist))
+			 (normal-block (sndbx::fister-normal-block fist)))
+		     (when fist?
+		       (when left-p
+			 (with-vec (a b c) (selected-block)
+			   (cond  ((window::skey-p (window::keyval :left-shift))
+				   (push (vector a b c) *selection*))
+				  ((window::skey-p (window::keyval :left-control))
+				   (push (world::getobj a b c) *selection*))
+				  (t
+				   (funcall *left-fist-fnc* a b c)))))
+		       (when right-p
+			 (with-vec (a b c) (normal-block)
+			   (cond ((window::skey-p (window::keyval :left-shift))
+				  (push (vector a b c) *selection*))
+				 ((window::skey-p (window::keyval :left-control))
+				  (push (world::getobj a b c) *selection*))
+				 (t
+				  (funcall *right-fist-fnc* a b c)))))))))))))
+       backwardsbug
+       pos)))
+  (multiple-value-bind (fraction times) (funfair::tick *ticker* #'physss)
+    (declare (ignorable times))
+    (when (window:mice-locked-p)
+      (update-moused 0.5)
+      (sndbx::change-entity-neck
+       *ent*
+       (coerce (* *lerp-mouse-x*
+		  -1.0d0 *mouse-multiplier*)
+	       'single-float)
+       (coerce (* *lerp-mouse-y* *mouse-multiplier*)
+	       'single-float)))
+    (sndbx::entity-to-camera *ent* funfair::*camera* fraction)))
+
+(defparameter *ticker*
+  (tickr:make-ticker
+   (floor 1000000 60)
+   most-positive-fixnum))
+
+(defparameter *right-fist-fnc*
+  (lambda (x y z)
+    (let ((value (world::getblock x y z)))
+      (when (zerop value)
+	(sound-stuff::play-at (flunflair::wot) x y z)
+	(let ((blockval 1))
+	  (sandbox::plain-setblock
+	   x
+	   y
+	   z
+	   blockval
+	   (aref mc-blocks:*lightvalue* blockval)))))))
+(defparameter *left-fist-fnc*
+  (lambda (x y z)
+    (sound-stuff::play-at (flunflair::wot) x y z)
+    (sandbox::setblock-with-update x y z 0 0)))
+
+(defparameter *big-fist-fun*
+  (lambda (x y z)
+    (let ((a (world::getblock x y z)))
+      (when (or (= a 1)
+		(= a 2)
+		(= a 3)
+		)
+	(sound-stuff::play-at (flunflair::wot) x y z)
+	(sandbox::setblock-with-update x y z 0 0))))
+   )
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
+  (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
+    (multiple-value-prog1
+	(values (- x (car data))
+		(- y (cdr data)))
+	(setf (car data) x
+	      (cdr data) y))))
+(defun update-moused (&optional (smoothing-factor 0.5))
+  (multiple-value-bind (dx dy) (moused)
+    (let ((x (+ *tmouse-x* dx))
+	  (y (+ *tmouse-y* dy)))
+      (let ((value *mouse-multiplier-aux*))
+	(when (> y value)
+	  (setf y value))
+	(when (< y (- value))
+	  (setf y (- value))))
+      (setf *tmouse-x* x)
+      (setf *tmouse-y* y)
+      (setf *lerp-mouse-x* (alexandria:lerp smoothing-factor *lerp-mouse-x* x))
+      (setf *lerp-mouse-y* (alexandria:lerp smoothing-factor *lerp-mouse-y* y)))))
+(defparameter *tmouse-x* 0.0d0)
+(defparameter *tmouse-y* 0.0d0)
+(defparameter *lerp-mouse-x* 0.0d0)
+(defparameter *lerp-mouse-y* 0.0d0)
+(progn
+  (declaim (ftype (function (single-float) single-float)
+		  translator))
+  (funland::with-unsafe-speed
+    (defun translator (x)
+      (let* ((a (* x 0.6))
+	     (b (+ 0.2 a))
+	     (c (* b b b))
+	     (d (* 8.0 0.15 (/ (coerce pi 'single-float) 180.0)))
+	     (e (* d c)))
+	(declare (type single-float a b c d e))
+	e))))
+
+(defparameter *mouse-multiplier* (translator 0.5))
+(defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
+(defparameter *swinging* nil)
+(defparameter *fist*
+  (sndbx::gen-fister sndbx::*fist-aabb* (list #'sndbx::ahook)))
+;;;;;
+
+(defun wasd-mover (w? a? s? d?)
+  (let ((x 0)
+	(y 0))
+    (when w? (decf x))
+    (when a? (decf y))
+    (when s? (incf x))
+    (when d? (incf y))
+    (if (and (zerop x)
+	     (zerop y))
+	nil
+	(atan y x))))
+
+(defparameter *ent* (sndbx::gentity))
+
+(defun physss ()
+  (sndbx::physentity *ent*))
+
+(defun num-key-jp (&optional (control-state window::*control-state*))
+  (etouq
+   (cons
+    'cond
+    (mapcar
+     (lambda (n)
+       `((window::skey-j-p
+	  (window::keyval ,(intern (write-to-string n) :keyword))
+	  control-state) ,n))
+     '(0 1 2 3 4 5 6 7 8 9)))))

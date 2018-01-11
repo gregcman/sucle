@@ -883,31 +883,6 @@ edge, or no case"
 
 
 
-(defun wasd-mover (w? a? s? d?)
-  (let ((x 0)
-	(y 0))
-    (when w? (decf x))
-    (when a? (decf y))
-    (when s? (incf x))
-    (when d? (incf y))
-    (if (and (zerop x)
-	     (zerop y))
-	nil
-	(atan y x))))
-
-(defparameter *sandbox-on* t)
-
-(defparameter *ticker*
-  (tickr:make-ticker
-   (floor 1000000 60)
-   most-positive-fixnum))
-
-(defparameter *ents* (map-into (make-array 10) #'gentity))
-(defparameter *ent* (aref *ents* 1))
-
-(defun physss ()
-  (physentity *ent*))
-
 (defun farticle-to-camera (farticle camera fraction)
   (let ((curr (farticle-position farticle))
 	(prev (farticle-position-old farticle)))
@@ -935,41 +910,7 @@ edge, or no case"
 				     :x 0
 				     :y 0))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun update-moused (&optional (smoothing-factor 0.5))
-  (multiple-value-bind (dx dy) (funfair::moused)
-    (let ((x (+ *mouse-x* dx))
-	  (y (+ *mouse-y* dy)))
-      (let ((value *mouse-multiplier-aux*))
-	(when (> y value)
-	  (setf y value))
-	(when (< y (- value))
-	  (setf y (- value))))
-      (setf *mouse-x* x)
-      (setf *mouse-y* y)
-      (setf *lerp-mouse-x* (alexandria:lerp smoothing-factor *lerp-mouse-x* x))
-      (setf *lerp-mouse-y* (alexandria:lerp smoothing-factor *lerp-mouse-y* y)))))
-(defparameter *mouse-x* 0.0d0)
-(defparameter *mouse-y* 0.0d0)
-(defparameter *lerp-mouse-x* 0.0d0)
-(defparameter *lerp-mouse-y* 0.0d0)
-(progn
-  (declaim (ftype (function (single-float) single-float)
-		  translator))
-  (funland::with-unsafe-speed
-    (defun translator (x)
-      (let* ((a (* x 0.6))
-	     (b (+ 0.2 a))
-	     (c (* b b b))
-	     (d (* 8.0 0.15 (/ (coerce pi 'single-float) 180.0)))
-	     (e (* d c)))
-	(declare (type single-float a b c d e))
-	e))))
-
-(defparameter *mouse-multiplier* (translator 0.5))
-(defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
-
-;;;;;
+;;;;;;;
 
 (defstruct fister
   (selected-block (vector 0 0 0))
@@ -1019,72 +960,6 @@ edge, or no case"
 	(funcall set-aabb fist-aabb))
     fist))
 ;;;;;;;;;;;;;;;;;;;;
-(defparameter *fist*
-  (gen-fister *fist-aabb* (list #'ahook)))
-
-
-(defparameter *reach* 128.0)
-(defparameter *swinging* nil)
-
-(defparameter *right-fist-fnc*
-  (lambda (x y z)
-    (let ((value (world::getblock x y z)))
-      (when (zerop value)
-;	(sound-stuff::play-at (flunflair::wot) x y z)
-	(let ((blockval 1))
-	  (sandbox::plain-setblock
-	   x
-	   y
-	   z
-	   blockval
-	   (aref mc-blocks:*lightvalue* blockval)))))))
-(defparameter *left-fist-fnc*
-  (lambda (x y z)
- ;   (sound-stuff::play-at (flunflair::wot) x y z)
-    (sandbox::setblock-with-update x y z 0 0)))
-
-(defparameter *big-fist-fun*
- ; #'atest::tree
-  ;(atest::sheath 1 2)
-  #+nil
-  (lambda (x y z)
-    (unless (= 0 (world::getblock x y z))	
-      (sandbox::plain-setblock x y z 1 0)))
-;  #+nil
-  (lambda (x y z)
-    (let ((a (world::getblock x y z)))
-      (when (or (= a 1)
-		(= a 2)
-		(= a 3)
-		)
-;	(sound-stuff::play-at (flunflair::wot) x y z)
-	(sandbox::setblock-with-update x y z 0 0))))
-   ;;  #'atest::bonder2
-
-  #+nil
-  (lambda (x y z)
-    (atest::dirts x y z)
-    (atest::grassify x y z))
-  ;; (atest::sheath 2 1)
-
-  #+nil
-  (lambda (x y z) ;(print (list x y z))
-    )
-   )
-
-(defun big-swing-fist (px py pz vx vy vz)
-  (let ((u 16))
-    (aabb-collect-blocks
-     px py pz (* u vx) (* u vy) (* u vz)
-     (load-time-value
-      (aabbcc:make-aabb
-       :minx -0.3
-       :miny -0.5
-       :minz -0.3
-       :maxx 0.3
-       :maxy 1.12
-       :maxz 0.3))   
-     *big-fist-fun*)))
 
 ;;;;
 
@@ -1100,110 +975,12 @@ edge, or no case"
   (declare (ignorable funfair::gl-context))
   (clrhash sandbox::*g/chunk-call-list*))
 
-(defparameter *paused* nil)
 (defun per-frame (session)
   (declare (ignorable session))
   (progn
     (map nil #'funfair::reload-if-dirty *reloadables*)
     (getfnc 'gl-init))
-  (when *sandbox-on*
-    (if *paused*
-	(tick *ticker* (lambda ()))
-	(stuff)))
   (render-stuff))
-
-(defparameter *lastsel* nil)
-(defparameter *selection* nil)
-
-(defun stuff ()
-  (let* ((player-farticle (entity-particle *ent*))
-	 (pos (farticle-position player-farticle))
-	 (entity *ent*)
-	 (window::*control-state* *control-state*))
-    (symbol-macrolet ((pos (farticle-position (entity-particle entity)))
-		      (is-jumping (entity-jump? entity))
-		      (is-sneaking (entity-sneak? entity))
-		      (fly (entity-fly? entity))
-		      (gravity (entity-gravity? entity))
-		      (noclip (entity-clip? entity)))
-      (setf is-jumping (window::skey-p (window::keyval :space)))
-      (setf is-sneaking (window::skey-p (window::keyval :a)))
-      (when (window:mice-locked-p)
-	(when (window::skey-j-p (window::keyval :v))
-	  (toggle noclip))
-	(with-vec (x y z) (pos)
-	  (when (window::skey-j-p (window::keyval :p))
-	    (sandbox::update-world-vao x y z)))
-	(when (window::skey-j-p (window::keyval :g))
-	  (toggle fly)
-	  (toggle gravity))))
-    (setf (entity-hips *ent*)
-	  (wasd-mover
-	   (window::skey-p (window::keyval :e))
-	   (window::skey-p (window::keyval :s))
-	   (window::skey-p (window::keyval :d))
-	   (window::skey-p (window::keyval :f))))
-    (let ((backwardsbug (load-time-value (cg-matrix:vec 0.0 0.0 0.0))))
-      (cg-matrix:%vec* backwardsbug (camat:camera-vec-forward *camera*) -1.0)
-      ((lambda (look-vec pos)
-	 (let ((fist *fist*))
-	   (with-vec (px py pz) (pos)
-	     (with-vec (vx vy vz) (look-vec)	
-	       (when (window:mice-locked-p)
-		 (when (window::skey-j-p (window::keyval :w))
-		   (toggle *swinging*))
-		 (when *swinging*
-		   (big-swing-fist
-		    px py pz
-		    vx vy vz)))
-	       (let ((a (window::skey-j-p (window::mouseval :left)))
-		     (b (window::skey-j-p (window::mouseval :right))))
-		 (when (or a b)
-		   (standard-fist
-		    fist
-		    px py pz
-		    (* *reach* vx) (* *reach* vy) (* *reach* vz))
-		   
-		   ((lambda (fist left-p right-p left-fun right-fun)
-		      (let ((fist? (fister-exists fist))
-			    (selected-block (fister-selected-block fist))
-			    (normal-block (fister-normal-block fist)))
-			(when fist?
-			  (when left-p
-			    (with-vec (a b c) (selected-block)
-			      (cond  ((window::skey-p (window::keyval :left-shift))
-				      (push (vector a b c) *selection*))
-				     ((window::skey-p (window::keyval :left-control))
-				      (push (world::getobj a b c) *selection*))
-				     (t
-				      (funcall left-fun a b c)))))
-			  (when right-p
-			    (with-vec (a b c) (normal-block)
-			      (cond ((window::skey-p (window::keyval :left-shift))
-				     (push (vector a b c) *selection*))
-				    ((window::skey-p (window::keyval :left-control))
-				     (push (world::getobj a b c) *selection*))
-				    (t
-				     (funcall right-fun a b c))))))))
-		    fist
-		    a
-		    b
-		    *left-fist-fnc*
-		    *right-fist-fnc*)))))))
-       backwardsbug
-       pos)))
-  (multiple-value-bind (fraction times) (tick *ticker* #'physss)
-    (declare (ignorable times))
-    (when (window:mice-locked-p)
-      (update-moused 0.5)
-      (change-entity-neck
-       *ent*
-       (coerce (* *lerp-mouse-x*
-		  -1.0d0 *mouse-multiplier*)
-	       'single-float)
-       (coerce (* *lerp-mouse-y* *mouse-multiplier*)
-	       'single-float)))
-    (entity-to-camera *ent* *camera* fraction)))
 
 (defparameter *render-ticks* 0)
 (defun render-stuff ()
