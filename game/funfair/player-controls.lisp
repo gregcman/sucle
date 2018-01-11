@@ -276,6 +276,24 @@ edge, or no case"
      (if (touch (az1 bz0) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)) #b000010 0)	;;+z
      (if (touch (az0 bz1) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)) #b000001 0))))	;; -Z
 
+
+
+(in-package :aabbcc)
+(defun aabb-not-overlap (aabb1 x1 y1 z1 aabb2 x2 y2 z2)
+  (or
+   (<= (+ x1 (aabb-maxx aabb1))
+       (+ x2 (aabb-minx aabb2)))
+   (<= (+ x2 (aabb-maxx aabb2))
+       (+ x1 (aabb-minx aabb1)))
+   (<= (+ y1 (aabb-maxy aabb1))
+       (+ y2 (aabb-miny aabb2)))
+   (<= (+ y2 (aabb-maxy aabb2))
+       (+ y1 (aabb-miny aabb1)))
+   (<= (+ z1 (aabb-maxz aabb1))
+       (+ z2 (aabb-minz aabb2)))
+   (<= (+ z2 (aabb-maxz aabb2))
+       (+ z1 (aabb-minz aabb1)))))
+
 ;;less used items below
 
 #+nil

@@ -320,7 +320,8 @@ z: ~10,1F"
 (defparameter *right-fist-fnc*
   (lambda (x y z)
     (let ((value (world::getblock x y z)))
-      (when (zerop value)
+      (when (and (zerop value)
+		 (not-occupied x y z))
 	(sound-stuff::play-at (flunflair::wot) x y z)
 	(let ((blockval 1))
 	  (sandbox::plain-setblock
@@ -343,7 +344,24 @@ z: ~10,1F"
 		)
 	(sound-stuff::play-at (flunflair::wot) x y z)
 	(sandbox::setblock-with-update x y z 0 0))))
-   )
+  )
+
+
+;;;detect more entities
+(defun not-occupied (x y z)
+  (let* ((ent *ent*)
+	 (aabb (sndbx::entity-aabb ent))
+	 (pos (sndbx::farticle-position
+	       (sndbx::entity-particle ent))))
+    (aabbcc::aabb-not-overlap
+     sndbx::*block-aabb*
+     (floatify x)
+     (floatify y)
+     (floatify z)
+     aabb
+     (aref pos 0)
+     (aref pos 1)
+     (aref pos 2))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
