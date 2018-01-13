@@ -41,9 +41,10 @@
   (when window:*status*
     (throw exit-token (values)))
   (window:poll)
+  (window::update-control-state *control-state*)
   (dolist (fun funs)
     (funcall fun exit-token))
-  (window::update-control-state *control-state*)
+  (window::update-control-state2 *control-state*)
   (window:update-display))
 
 (defun quit ()
@@ -51,17 +52,18 @@
 
 ;;;;;
 (defmacro deflazy (name (&rest deps) &rest gen-forms)
-  `(lazy-place::deflazy (gethash (quote ,name) *stuff*)
-       ,(mapcar (lambda (x)
-		  (typecase x
-		    (symbol `(,x (gethash (quote ,x) *stuff*)))
-		    (otherwise
-		     (destructuring-bind (name nick) x
-		       `(,nick (gethash (quote ,name) *stuff*))))))
-		deps)
-     ,@gen-forms))
+  `(eval-when (:load-toplevel :execute)
+    (lazy-place::deflazy (gethash (quote ,name) *stuff*)
+	,(mapcar (lambda (x)
+		   (typecase x
+		     (symbol `(,x (gethash (quote ,x) *stuff*)))
+		     (otherwise
+		      (destructuring-bind (name nick) x
+			`(,nick (gethash (quote ,name) *stuff*))))))
+		 deps)
+      ,@gen-forms)))
 
-(defparameter *stuff* (make-hash-table :test 'eq))
+(defvar *stuff* (make-hash-table :test 'eq))
 (progn
   (defun getfnc (name)
     (lazy-place::fulfill
@@ -120,8 +122,15 @@
     (gl:scissor x y width height)))
 ;;;time in microseconds
 (defun microseconds ()
+  #+sbcl
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)
-    (+ (* (expt 10 6) (- s 1506020000)) m)))
+    (+ (* (expt 10 6) (- s 1506020000)) m))
+  #+nil
+  (* (%cl-glfw3::get-timer-value)
+     (etouq (round (/ (expt 10 6) (%cl-glfw3::get-timer-frequency)))))
+  #-sbcl
+  (* (get-internal-real-time)
+     (etouq (round (/ (expt 10 6) internal-time-units-per-second)))))
 (defun tick (ticker fun &optional (time (microseconds)))
   (tickr:tick-update ticker time)
   (let ((times

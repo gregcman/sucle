@@ -348,6 +348,7 @@ z: ~10,1F"
 
 
 ;;;detect more entities
+;;;detect block types?
 (defun not-occupied (x y z)
   (let* ((ent *ent*)
 	 (aabb (sndbx::entity-aabb ent))

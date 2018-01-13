@@ -89,18 +89,6 @@
 	       :element-type ',type
 	       :initial-element ,defaultval))
 
-(funland::etouq
-  (vox::define-fixnum-ops
-      (let ((uniform-spec (coge:gen-spec)))
-	(vox::layout uniform-spec 25 0 25 26 9 52)
-	(vox::truncation uniform-spec 4 4 4)
-	(vox::derived-parts uniform-spec)
-	(vox::offset uniform-spec 0 0 0)
-	(vox::names uniform-spec
-		    'unhashfunc 'chunkhashfunc
-		    'chop 'anti-chop 'rem-flow '%%ref 'add)
-	uniform-spec)))
-
 (defparameter *freechunkmempoolobj*
   (recycle:make-recycler
    :create-func #'(lambda (&optional (x 0)) (%new-chunk t x 4 4 4))
@@ -121,13 +109,33 @@
 	       (,setter-name i j k new)))))
    (let ((value (logior (ash 15 12))))
      ((lambda (setter getter %setter %getter hash default creator)
-	(let ((new (system)))
-	  (vox::field new `(simple-array t (4096)) hash default creator)
-	  (vox::access new %getter %setter)
+	(let ((uniform-spec (coge:gen-spec)))
+	  
+	  (vox::field uniform-spec `(simple-array t (4096)) hash default creator)
+	  (vox::access uniform-spec %getter %setter)
+	  (let ((bits (logcount most-positive-fixnum)))
+	    (let ((y 10)
+		  (x nil; 26
+		    )
+		  (z nil;26
+		    ))
+	      (decf bits y)
+	      (setf x (floor bits 2))
+	      (setf z (ceiling bits 2))
+	      (vox::layout uniform-spec (1- x) 0 (1- z) x (1- y) (+ x z))))
+	  (vox::truncation uniform-spec 4 4 4)
+	  (vox::derived-parts uniform-spec)
+	  (vox::offset uniform-spec 0 0 0)
+	  (vox::names uniform-spec
+		      'unhashfunc 'chunkhashfunc
+		      'chop 'anti-chop 'rem-flow '%%ref 'add)
 	  (list 'progn
-		(vox::prep-hash new)
-		(define-accessors getter setter %getter %setter)
-		`(defsetf %getter %setter))))
+		(vox::define-fixnum-ops
+		    uniform-spec)
+		(list 'progn
+		      (vox::prep-hash uniform-spec)
+		      (define-accessors getter setter %getter %setter)
+		      `(defsetf %getter %setter)))))
       'setobj 'getobj
       '%setobj '%getobj
       '*lispobj* value

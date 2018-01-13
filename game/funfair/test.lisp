@@ -230,9 +230,9 @@
  "stonebrick" "dirt" "grass" "stone")
 
 #+nil
-(defun define-time ()
-  (eval
-   (defun fine-time ()
+`(defun define-time ()
+   (eval
+    (defun fine-time ()
       (/ (%glfw::get-timer-value)
 	 ,(/ (%glfw::get-timer-frequency) (float (expt 10 6)))))))
 

@@ -82,9 +82,14 @@
   (fill (control-state-diff state) 0))
 
 (defun update-control-state (state)
-  (window::array-step (control-state-curr state)
-		      (control-state-prev state)
-		      (control-state-diff state)))
+  (bit-xor (control-state-curr state)
+	   (control-state-prev state)
+	   (control-state-diff state)))
+
+(defun update-control-state2 (state)
+  (bit-ior (control-state-curr state)
+	   (control-state-curr state)
+	   (control-state-prev state)))
 
 (defmacro mouseval (keyword)
   (window::mouse-enum-index keyword))
@@ -144,16 +149,6 @@
   (setq *status* (glfw:window-should-close-p))
   (poll-events)
   *input-state*)
-
-(progn
-  (declaim (ftype (function (mouse-keyboard-input-array
-			     mouse-keyboard-input-array
-			     mouse-keyboard-input-array))
-		  array-step))
-  (with-unsafe-speed
-    (defun array-step (state prev difference)
-      (bit-xor state prev difference)
-      (bit-ior state state prev))))
 
 (defun get-proc-address ()
   (function glfw:get-proc-address))

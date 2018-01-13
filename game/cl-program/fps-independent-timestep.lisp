@@ -44,9 +44,13 @@
 (defun tick-update (ticker new-time)
   (let* ((frame-time (- new-time (ticker-current-time ticker))))
     (let ((bailout (ticker-bailout ticker)))
-      (when (or (> frame-time bailout)
-		(> 0 frame-time))
-	(setf frame-time bailout)))
+      (let ((toofar (> frame-time bailout))
+	    (toobelow (> 0 frame-time)))
+	(when (or toofar toobelow)
+	  (setf frame-time bailout)
+	  (if toofar
+	      (print "frame ahead")
+	      (print "frame behind")))))
     (setf (ticker-current-time ticker) new-time)
     (incf (ticker-accumulator ticker) frame-time)))
 

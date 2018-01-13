@@ -64,7 +64,7 @@
   (let ((let-one nil)
 	(let-one-declarations nil))
     (let ((body (cons 'tagbody body)))
-      (dolist (form (nreverse interval-forms))
+      (dolist (form (reverse interval-forms))
 	(multiple-value-bind (let-len temp-length let-end temp-end bod)
 	    (apply #'dorange-generator body form)
 	  (push let-len let-one)
