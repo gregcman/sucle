@@ -1046,7 +1046,7 @@ edge, or no case"
 	  (b (* daytime (aref *sky-color* 2))))
       (gl:clear-color r g b 1.0))))
 (defparameter *sky-color*  ;(vector 0.68 0.8 1.0)
-	      (vector 0.3 0.1 0.0)
+	      (vector 0.0 0.0 0.0)
   )
 (defparameter *fog-ratio* 0.75)
 

@@ -3,16 +3,6 @@
 	:funland))
 (in-package :atest)
 (defparameter *box* #(0 128 0 128 0 128))
-(with-unsafe-speed
-  (defun map-box (func &optional (box *box*))
-    (declare (type (function (fixnum fixnum fixnum)) func)
-	     (type simple-vector box))
-    (etouq
-     (with-vec-params (quote (x0 x1 y0 y1 z0 z1)) (quote (box))
-		      (quote (dobox ((x x0 x1)
-				     (y y0 y1)
-				     (z z0 z1))
-				    (funcall func x y z)))))))
 
 (defun grassify (x y z)
   (let ((blockid (world:getblock x y z)))

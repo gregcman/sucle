@@ -48,9 +48,10 @@
 	    (toobelow (> 0 frame-time)))
 	(when (or toofar toobelow)
 	  (setf frame-time bailout)
-	  (if toofar
-	      (print "frame ahead")
-	      (print "frame behind")))))
+	  (format t "tickr:tick-update: ~a"
+		  (if toofar
+		      "ahead"
+		      "behind")))))
     (setf (ticker-current-time ticker) new-time)
     (incf (ticker-accumulator ticker) frame-time)))
 

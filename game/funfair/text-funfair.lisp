@@ -67,9 +67,9 @@
 	(aref trans 13) (/ y 128.0))
   trans)
 
-(defparameter *clear-text-buffer-flag* nil)
+(defparameter *clear-text-buffer-flag* 0)
 (defun flag-text-dirty ()
-  (setf *clear-text-buffer-flag* t))
+  (setf *clear-text-buffer-flag* 2))
 (defun per-frame (session)
   (declare (ignorable session))
   (map nil #'funfair::reload-if-dirty *reloadables*)
@@ -89,11 +89,12 @@
   (progn
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
     (funfair::%set-render-area 0 0 256 256))
-  (when *clear-text-buffer-flag*
-    (setf *clear-text-buffer-flag* nil)
-    (progn
-      (gl:clear-color 0.0 0.0 0.0 0.0)
-      (gl:clear :color-buffer-bit)))
+  (when (not (zerop *clear-text-buffer-flag*))
+    (decf *clear-text-buffer-flag*)
+    (when (Zerop *clear-text-buffer-flag*)
+      (progn
+	(gl:clear-color 0.0 0.0 0.0 0.0)
+	(gl:clear :color-buffer-bit))))
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms
@@ -476,7 +477,7 @@
      255.0))
 
 (defun mesh-string-gl-points (x y string &optional
-					   (bgcol (byte-float (color 3 3 3 0)))
+					   (bgcol (byte-float (color 3 3 3 3)))
 					   (fgcol (byte-float (color 0 0 0 3))))
   (let ((position (scratch-buffer:my-iterator))
        (value (scratch-buffer:my-iterator))
