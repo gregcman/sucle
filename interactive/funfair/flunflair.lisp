@@ -58,11 +58,6 @@
 	(incf *texty* dy)
 	(funtext::flag-text-dirty))))
 
-  (let ((num (num-key-jp)))
-    (case num
-      (1 (sound-stuff:play-at "/media/imac/Mac 2/Users/gregmanabat/Music/iTunes/iTunes Music/Elton John/Unknown Album/Tiny Dancer.mp3"
-				    0.0 0.0 0.0))))
-
   (progn
     (when (window::skey-j-p (window::keyval :n))
       (copy-array-buf))

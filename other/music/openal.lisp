@@ -30,13 +30,14 @@
 (defmacro clamp (min max x)
   `(max ,min (min ,max ,x)))
 
-(defclass datobj ()
-  ((source :initform nil)
-   (playback :initform (or :mono8
+(defparameter *format* (or :mono8
 			   :mono16
 			   :stereo8
 			   :stereo16
 			   ))
+(defclass datobj ()
+  ((source :initform nil)
+   (playback :initform *format*)
    (time-remaining :initform 0)
    (used-buffers :initform (make-hash-table :test 'eql))
    (cancel :initform nil) ;;set to t to stop streaming from disk to al
@@ -67,17 +68,19 @@
       ((or pathname string)
        (lparallel:submit-task
 	*task*
-	(lambda (filename x y z)
-	  (multiple-value-bind (datobj source) (load-file filename)
-	    (when datobj
-	      (%al:source-3f source :position
-			     (floatify x)
-			     (floatify y)
-			     (floatify z))
-	      (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
-	      (al:source source :gain 1.0)
-	      (push-sound datobj)
-	      (values datobj source))))
+	(let ((format *format*))
+	  (lambda (filename x y z)
+	    (let ((*format* format))
+	      (multiple-value-bind (datobj source) (load-file filename)
+		(when datobj
+		  (%al:source-3f source :position
+				 (floatify x)
+				 (floatify y)
+				 (floatify z))
+		  (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
+		  (al:source source :gain 1.0)
+		  (push-sound datobj)
+		  (values datobj source))))))
 	(string sound) x y z))
       (preloaded-music (play-preloaded-at sound x y z)))))
 
@@ -223,7 +226,7 @@
    (complete :initform nil)
    (info :initform nil)))
 
-(defun load-all (file format)
+(defun load-all (file &optional (format *format*))
   (let ((music nil))
     (unwind-protect
 	 (progn
