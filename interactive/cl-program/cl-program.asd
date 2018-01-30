@@ -1,7 +1,6 @@
 (asdf:defsystem #:cl-program
   :depends-on (#:funland
-	       #:terminal625-zeorp
-	       #:bordeaux-threads)
+	       #:terminal625-zeorp)
     :components
     ((:file "rectangular-tilemap")
      (:file "axis-aligned-quads")
