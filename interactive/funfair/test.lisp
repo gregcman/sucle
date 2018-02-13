@@ -2,7 +2,7 @@
   (:use :cl
 	:funland))
 (in-package :atest)
-(defparameter *box* #(0 128 0 128 0 128))
+(defparameter *box* #(0 128 0 128 -128 0))
 
 (defun grassify (x y z)
   (let ((blockid (world:getblock x y z)))
@@ -45,6 +45,14 @@
 	  (y 0 64))
 	 (sandbox::plain-setblock x y z 1 0)))
 
+(defun map-box (func &optional (box *box*))
+  (declare (type (function (fixnum fixnum fixnum)) func)
+	   (type simple-vector box))
+  (with-vec (x0 x1 y0 y1 z0 z1) (box)
+    (dobox ((x x0 x1)
+	    (y y0 y1)
+	    (z z0 z1))
+	   (funcall func x y z))))
 (defun simple-relight (&optional (box *box*))
   (map-box (lambda (x y z)
 	     (let ((blockid (world:getblock x y z)))
@@ -63,7 +71,7 @@
 		 (setf height 0))
 	       (dobox ((upup (1+ height) y))
 		      (world:skysetlight x upup z 15))))
-	   #(0 128 128 129 0 128))
+	   #(0 128 128 129 -128 0))
   (map-box (lambda (x y z)
 	     (when (= 15 (world:skygetlight x y z))
 	       (sandbox::sky-light-node x y z)))

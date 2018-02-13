@@ -483,7 +483,7 @@
 	      (1+ (max y y0))
 	      (min z z0)
 	      (1+ (max z z0))))))
-(with-unsafe-speed)
+
 (defun map-box (func &optional (box *box*))
   (declare (type (function (fixnum fixnum fixnum)) func)
 	   (type simple-vector box))
