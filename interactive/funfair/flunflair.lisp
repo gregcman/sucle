@@ -13,7 +13,7 @@
 
 (setf sandbox::*some-saves*
       (cdr (assoc (machine-instance) 
-		  '(("gm3-iMac" . #P"/home/imac/Documents/lispysaves/saves/sandbox-saves/")
+		  '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
 		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		  :test 'equal)))
 
@@ -212,10 +212,11 @@
 
 (defun preload ()
   (let ((array (make-array 16)))
-    (dobox ((name 0 4)
-	    (number 0 4))
+    (dobox ((number 0 4)
+	    (name 0 4))
 	   (setf (aref array (+ name (* number 4)))
 		 (sound-stuff::load-all
+		(print
 		  (concatenate
 		   'string
 		   "/home/imac/.minecraft/resources/sound/step/"
@@ -224,22 +225,35 @@
 						       )))
 		   (aref #("1" "2" "3" "4") number
 			 )
-		   ".ogg")
+		   ".ogg"))
 		  :mono8)))
     array))
 
 (funfair::deflazy preloaded-sounds (funfair::al-context)
   (declare (ignorable funfair::al-context))
- ; (print "loading-sounds")
+  (print "loading-sounds")
   (preload))
-
 #+nil
 (map nil
      (lambda (x) (sound-stuff::free-preloaded x))
      (funfair::getfnc 'flunflair::PRELOADED-SOUNDS)) 
-(defun wot ()
+(defun wot (value)
   (funfair::reload-if-dirty 'preloaded-sounds)
-  (alexandria:random-elt (funfair::getfnc 'preloaded-sounds)))
+					;(alexandria:random-elt)
+  (aref 
+   (funfair::getfnc 'preloaded-sounds)
+   (+ (* 4 (random 4))
+      (sound-dispatch value))))
+
+(defun sound-dispatch (value)
+  (case value
+    (0 0)
+    (1 0)
+    (2 3)
+    (3 3)
+    (4 0)
+    (5 1)
+    (otherwise 0)))
 
 (setf funfair::*trampoline* '(sndbx::per-frame funtext::per-frame
 			      per-frame
@@ -350,7 +364,7 @@
     (let ((value (world::getblock x y z)))
       (when (and (zerop value)
 		 (not-occupied x y z))
-	(sound-stuff::play-at (flunflair::wot) x y z)
+	(sound-stuff::play-at (flunflair::wot value) x y z)
 	(let ((blockval *blockid*))
 	  (sandbox::plain-setblock
 	   x
@@ -360,7 +374,8 @@
 	   (aref mc-blocks:*lightvalue* blockval)))))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
-    (sound-stuff::play-at (flunflair::wot) x y z)
+    (let ((blockid (world::getblock x y z)))
+      (sound-stuff::play-at (flunflair::wot blockid) x y z))
     (sandbox::setblock-with-update x y z 0 0)))
 
 (defparameter *big-fist-fun*

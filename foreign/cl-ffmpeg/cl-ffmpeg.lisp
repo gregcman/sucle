@@ -103,23 +103,25 @@
 	   (declare (type cffi:foreign-pointer ,format ,codec ,frame))
 	   (let ((,flag nil))
 	     (loop
-		(when (< (av-read-frame ,format ,packet) 0)
-		  (setf ,flag t)
-		  (return))
-		(cffi:with-foreign-object (gotframe :int 1)
-		  (when (< (avcodec-decode-audio4 ,codec ,frame gotframe ,packet) 0)
-		    (continue))
-		  (when (zerop (mem-ref gotframe :int))
-		    (continue)))
-		(let ((,samples (cffi:foreign-slot-value
-				 ,frame
-				 (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				 (quote cl-ffmpeg-bindings::nb_samples)))
-		      (,rawdata (cffi:foreign-slot-value
-				 ,frame
-				 (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
-				 (quote cl-ffmpeg-bindings::data))))
-		  ,@body))
+		(tagbody
+		   continue
+		   (when (< (av-read-frame ,format ,packet) 0)
+		     (setf ,flag t)
+		     (return))
+		   (cffi:with-foreign-object (gotframe :int 1)
+		     (when (< (avcodec-decode-audio4 ,codec ,frame gotframe ,packet) 0)
+		       (go continue))
+		     (when (zerop (mem-ref gotframe :int))
+		       (go continue)))
+		   (let ((,samples (cffi:foreign-slot-value
+				    ,frame
+				    (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+				    (quote cl-ffmpeg-bindings::nb_samples)))
+			 (,rawdata (cffi:foreign-slot-value
+				    ,frame
+				    (quote (:struct cl-ffmpeg-bindings::|AVFrame|))
+				    (quote cl-ffmpeg-bindings::data))))
+		     ,@body)))
 	     ,flag))))))
 
 
