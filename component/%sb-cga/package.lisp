@@ -1,8 +1,7 @@
 (in-package :defpackage+-user-1)
 
-(defpackage+ #:cg-matrix
+(defpackage+ #:%sb-cga
   (:use #:cl)
-  (:nicknames #:gcg)
   (:inherit #:sb-cga)
   (:export
    #:%matrix

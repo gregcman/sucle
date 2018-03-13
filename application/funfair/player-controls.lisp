@@ -665,14 +665,14 @@ edge, or no case"
 ;;;;;;;
 
 (defstruct farticle
-  (position (cg-matrix:vec 0.0 0.0 0.0))
-  (position-old (cg-matrix:vec 0.0 0.0 0.0))
+  (position (%sb-cga:vec 0.0 0.0 0.0))
+  (position-old (%sb-cga:vec 0.0 0.0 0.0))
   (velocity (vector 0.0 0.0 0.0)))
 
 (defun step-farticle (p)
   (let ((old (farticle-position-old p))
 	(curr (farticle-position p)))
-    (cg-matrix:%copy-vec old curr)))
+    (%sb-cga:%copy-vec old curr)))
 
 (define-modify-macro *= (&rest args)
   *)
@@ -906,8 +906,8 @@ edge, or no case"
 	(prev (farticle-position-old farticle)))
     (let ((vec (camat:camera-vec-position camera))
 	  (cev (camat:camera-vec-noitisop camera)))
-      (cg-matrix:%vec-lerp vec prev curr fraction)
-      (cg-matrix:%vec* cev vec -1.0))))
+      (%sb-cga:%vec-lerp vec prev curr fraction)
+      (%sb-cga:%vec* cev vec -1.0))))
 (defun entity-to-camera (entity camera fraction)
   (necktovec (entity-neck entity)
 		      (camat:camera-vec-forward camera))	  
@@ -1057,10 +1057,10 @@ edge, or no case"
 ;;the depth function and matrix. has edge artefacts when using glclear for color
 
 (defparameter *mata*
-  (cg-matrix:matrix*
-   (cg-matrix:translate* 0.0 0.0 1.0)
-   (cg-matrix:scale* 1.0 1.0 -1.0)))
-(defparameter *temp-matrix* (cg-matrix:identity-matrix))
+  (%sb-cga:matrix*
+   (%sb-cga:translate* 0.0 0.0 1.0)
+   (%sb-cga:scale* 1.0 1.0 -1.0)))
+(defparameter *temp-matrix* (%sb-cga:identity-matrix))
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
   (glhelp::use-gl-program (getfnc 'blockshader))
@@ -1080,7 +1080,7 @@ edge, or no case"
 		  ;;	   (gl:clear-depth 0.0)
 		  (gl:depth-func :greater)
 		  (gl:depth-range 0.5 1.0)
-		  (cg-matrix:%matrix* matrix
+		  (%sb-cga:%matrix* matrix
 				      *mata* cam))
 		 (t
 		  ;;	   (gl:clear-depth 1.0)

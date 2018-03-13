@@ -4,7 +4,7 @@
 	       #:terminal625-glfw3
 	       #:cl-program
 	       #:terminal625-camat
-	       #:terminal625-cgmat
+	       #:%sb-cga
 	       #:bordeaux-threads
 	       #:cl-opengl
 	       #:music

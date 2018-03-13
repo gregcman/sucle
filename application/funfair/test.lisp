@@ -264,7 +264,7 @@
      (unless (eq aaah fuck::*ent*)
        (gl:uniform-matrix-4fv
 	pmv
-	(cg-matrix:matrix* (camera-matrix-projection-view-player camera)
+	(%sb-cga:matrix* (camera-matrix-projection-view-player camera)
 			   (compute-entity-aabb-matrix aaah partial))
 	nil)
        (gl:call-list (getfnc :box))))))

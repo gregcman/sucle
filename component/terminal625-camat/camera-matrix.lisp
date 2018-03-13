@@ -15,17 +15,17 @@
 (in-package #:camat)
 
 (defstruct camera
-  (vec-position (cg-matrix:vec 0.0 0.0 0.0) :type cg-matrix:vec)
+  (vec-position (%sb-cga:vec 0.0 0.0 0.0) :type %sb-cga:vec)
 
-  (vec-up (cg-matrix:vec 0.0 1.0 0.0) :type cg-matrix:vec)
-  (vec-forward (cg-matrix:vec 1.0 0.0 0.0) :type cg-matrix:vec)
+  (vec-up (%sb-cga:vec 0.0 1.0 0.0) :type %sb-cga:vec)
+  (vec-forward (%sb-cga:vec 1.0 0.0 0.0) :type %sb-cga:vec)
 
-  (vec-noitisop (cg-matrix:vec 0.0 0.0 0.0) :type cg-matrix:vec) ;;;the negative of position
-  (matrix-player (cg-matrix:identity-matrix)) ;;positional information of camera
-  (matrix-view (cg-matrix:identity-matrix))		    ;;view matrix
-  (matrix-projection (cg-matrix:identity-matrix))	    ;;projection matrix
-  (matrix-projection-view (cg-matrix:identity-matrix)) ;;projection * view matrix
-  (matrix-projection-view-player (cg-matrix:identity-matrix))
+  (vec-noitisop (%sb-cga:vec 0.0 0.0 0.0) :type %sb-cga:vec) ;;;the negative of position
+  (matrix-player (%sb-cga:identity-matrix)) ;;positional information of camera
+  (matrix-view (%sb-cga:identity-matrix))		    ;;view matrix
+  (matrix-projection (%sb-cga:identity-matrix))	    ;;projection matrix
+  (matrix-projection-view (%sb-cga:identity-matrix)) ;;projection * view matrix
+  (matrix-projection-view-player (%sb-cga:identity-matrix))
   
   (fov (coerce (/ pi 2.0) 'single-float) :type single-float)
 
@@ -42,17 +42,17 @@
 		  (sin (/ fovy 2.0)))))
       (let ((sum (+ far near))
 	    (difference (- near far)))
-	(cg-matrix:%matrix result 
+	(%sb-cga:%matrix result 
 			   (/ cot aspect) 0.0 0.0 0.0
 			   0.0 cot 0.0 0.0
 			   0.0 0.0 (/ sum difference) (/ (* 2.0 far near) difference)
 			   0.0 0.0 -1.0 0.0)))))
 
 (defun relative-lookat (result relative-target up)
-  (let ((camright (cg-matrix:cross-product up relative-target)))
+  (let ((camright (%sb-cga:cross-product up relative-target)))
     (declare (dynamic-extent camright))
-    (cg-matrix:%normalize camright camright)
-    (let ((camup (cg-matrix:cross-product relative-target camright)))
+    (%sb-cga:%normalize camright camright)
+    (let ((camup (%sb-cga:cross-product relative-target camright)))
       (declare (dynamic-extent camup))
       (get-lookat result
 		  camright
@@ -69,7 +69,7 @@
 	(dx (aref direction 0))
 	(dy (aref direction 1))
 	(dz (aref direction 2)))    
-    (cg-matrix:%matrix result
+    (%sb-cga:%matrix result
      rx ry rz 0.0
      ux uy uz 0.0
      dx dy dz 0.0
@@ -98,12 +98,12 @@
 	  (relative-lookat view-matrix forward up))
 	(let ((num (logior rotation? projection?)))
 	  (when (logtest num flags)
-	    (cg-matrix:%matrix* projection-view-matrix projection-matrix view-matrix)))
+	    (%sb-cga:%matrix* projection-view-matrix projection-matrix view-matrix)))
 	(when (logtest translation? flags)
-	  (cg-matrix:%translate player-matrix (camera-vec-noitisop camera)))
+	  (%sb-cga:%translate player-matrix (camera-vec-noitisop camera)))
 	(let ((num (logior rotation? projection? translation?)))
 	  (when (logtest num flags)
-	    (cg-matrix:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))))))
+	    (%sb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))))))
 
 
 ;;;
@@ -114,7 +114,7 @@
   (let ((near-2 (* 2 near))
 	(top-bottom (- top bottom))
 	(far-near (- far near)))
-      (cg-matrix:matrix
+      (%sb-cga:matrix
        (/ near-2 (- right left)) 0.0 (/ (+ right left) (- right left)) 0.0
        0.0 (/ near-2 top-bottom) (/ (+ top bottom) top-bottom) 0.0
        0.0 0.0 (- (/ (+ far near) far-near)) (/ (* -2 far near) far-near)

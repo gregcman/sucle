@@ -1,4 +1,4 @@
-(in-package :cg-matrix)
+(in-package :%sb-cga)
 
 ;;;;for some reason sb-cga does not have destructive matrix operations, where
 ;;;;the matrix result is stored in a pre-allocated place.
