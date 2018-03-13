@@ -62,7 +62,7 @@
 	  (push buf *free-buffers*)))))
 
 (defparameter *task* (lparallel:make-channel))
-(defun play-at (sound &optional (x 0.0) (y 0.0) (z 0.0))
+(defun play-at (sound x y z pitch volume)
   (when (> 128 (total-handles))
     (typecase sound
       ((or pathname string)
@@ -78,11 +78,12 @@
 				 (floatify y)
 				 (floatify z))
 		  (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
-		  (al:source source :gain 1.0)
+		  (al:source source :gain volume)
+		  (al:source source :pitch pitch)
 		  (push-sound datobj)
 		  (values datobj source))))))
 	(string sound) x y z))
-      (preloaded-music (play-preloaded-at sound x y z)))))
+      (preloaded-music (play-preloaded-at sound x y z pitch volume)))))
 
 (defparameter *datobj* nil)
 ;;do not switch source formats!!!!
@@ -276,14 +277,15 @@
 	       inst)))
       (cl-ffmpeg::free-music-stuff music))))
 
-(defun play-preloaded-at (preloaded &optional (x 0.0) (y 0.0) (z 0.0))
+(defun play-preloaded-at (preloaded x y z pitch volume)
   (let ((source (al:gen-source)))
     (%al:source-3f source :position
 		   (floatify x)
 		   (floatify y)
 		   (floatify z))
     (al:source source :velocity (load-time-value (vector 0.0 0.0 0.0)))
-    (al:source source :gain 1.0)
+    (al:source source :gain volume)
+    (al:source source :pitch pitch)
     (al:source-queue-buffers source (slot-value preloaded 'buffers))
     (al:source-play source)
     (push-sound source)))

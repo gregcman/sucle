@@ -1045,8 +1045,10 @@ edge, or no case"
 	  (g (* daytime (aref *sky-color* 1)))
 	  (b (* daytime (aref *sky-color* 2))))
       (gl:clear-color r g b 1.0))))
-(defparameter *sky-color*  (vector 0.68 0.8 1.0)
-	     ; (vector 0.0 0.0 0.0)
+(defparameter *sky-color*  
+;(vector 0.68 0.8 1.0)
+;(map 'vector (lambda (x) (/ x 255.0)) (vector 97 138 255))
+	      (vector 0.0 0.0 0.0)
   )
 (defparameter *fog-ratio* 0.75)
 
@@ -1073,6 +1075,7 @@ edge, or no case"
 	   (gl:depth-func :less)
 	   (setf matrix cam))
 	  (t
+	   (gl:clear :color-buffer-bit)
 	   (cond ((evenp *render-ticks*)
 		  ;;	   (gl:clear-depth 0.0)
 		  (gl:depth-func :greater)

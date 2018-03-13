@@ -211,16 +211,16 @@
 	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
 
 (defun preload ()
-  (let ((array (make-array 16)))
+  (let ((array (make-array (* 4 7))))
     (dobox ((number 0 4)
-	    (name 0 4))
-	   (setf (aref array (+ name (* number 4)))
+	    (name 0 7))
+	   (setf (aref array (+ number (* name 4)))
 		 (sound-stuff::load-all
 		(print
 		  (concatenate
 		   'string
-		   "/home/imac/.minecraft/resources/sound/step/"
-		   (string-downcase (symbol-name (aref #(stone wood gravel grass)
+		   "/home/imac/.minecraft/resources/sound3/dig/"
+		   (string-downcase (symbol-name (aref #(stone wood gravel grass sand snow cloth)
 						       name
 						       )))
 		   (aref #("1" "2" "3" "4") number
@@ -242,8 +242,8 @@
 					;(alexandria:random-elt)
   (aref 
    (funfair::getfnc 'preloaded-sounds)
-   (+ (* 4 (random 4))
-      (sound-dispatch value))))
+   (+ (random 4)
+      (* 4 (sound-dispatch value)))))
 
 (defun sound-dispatch (value)
   (case value
@@ -253,7 +253,7 @@
     (3 3)
     (4 0)
     (5 1)
-    (otherwise 0)))
+    (otherwise (random 7))))
 
 (setf funfair::*trampoline* '(sndbx::per-frame funtext::per-frame
 			      per-frame
@@ -364,7 +364,8 @@
     (let ((value (world::getblock x y z)))
       (when (and (zerop value)
 		 (not-occupied x y z))
-	(sound-stuff::play-at (flunflair::wot value) x y z)
+	(sound-stuff::play-at (flunflair::wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
+			      0.8 1.0)
 	(let ((blockval *blockid*))
 	  (sandbox::plain-setblock
 	   x
@@ -375,7 +376,11 @@
 (defparameter *left-fist-fnc*
   (lambda (x y z)
     (let ((blockid (world::getblock x y z)))
-      (sound-stuff::play-at (flunflair::wot blockid) x y z))
+      (unless (= blockid 0)
+      (sound-stuff::play-at (flunflair::wot blockid) 
+			    (+ x 0.5) (+ y 0.5) (+ 0.5 z)
+			    0.8
+			    1.0)))
     (sandbox::setblock-with-update x y z 0 0)))
 
 (defparameter *big-fist-fun*

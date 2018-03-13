@@ -4,3 +4,4 @@ cgmat: adds destructive operators to sb-cga
 glfw3: ??????
 queue: a fifo queue and a unique element queue
 zeorp: an array iterator and reader/writer
+music: openal + ffmpeg bindings
