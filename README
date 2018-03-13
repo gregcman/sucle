@@ -1,4 +1,4 @@
-proto: unmaintained or inactive 
-alien: foreign library bindings/binaries
-game: active maintenance
-misc: ???
+prototype: unmaintained or inactive 
+foreign: foreign library bindings/binaries
+interactive: for interactive programs
+other: miscellaneous

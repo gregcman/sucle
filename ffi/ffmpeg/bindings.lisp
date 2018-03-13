@@ -732,5 +732,3 @@
 		SWR-CONVERT REALLOC MEMCPY AV-FRAME-FREE SWR-FREE AVCODEC-CLOSE
 		AVFORMAT-FREE-CONTEXT)))
 
-;;(funland::export-all-functions-and-symbols)
-

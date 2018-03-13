@@ -3,7 +3,9 @@
 	       :cl-alc
 	       :cl-ffmpeg
 	       :bordeaux-threads
+	       :funland
 	       :singleton-lparallel)
     :serial t
     :components 
-    ((:file "openal")))
+    ((:file "ffmpeg")
+     (:file "openal")))
