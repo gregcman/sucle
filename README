@@ -1,4 +1,4 @@
-prototype: unmaintained or inactive 
-foreign: foreign library bindings/binaries
-interactive: for interactive programs
-other: miscellaneous
+ffi: foreign library bindings
+wrapper: making the ffi bindings easy to use/ adding basic functionality
+component: data structures, macros, utility functions...
+application: something to run as a "standalone" program
