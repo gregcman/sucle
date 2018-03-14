@@ -107,7 +107,7 @@
 	(application::tick *ticker* (lambda ()))
 	(stuff))
     (when (window::skey-j-p (window::keyval :c))
-      (sound-stuff::cleanup-poller)))
+      (music::cleanup-poller)))
   
   (let* ((particle (sandbox-sub::entity-particle *ent*))
 	 (pos (sandbox-sub::farticle-position particle))
@@ -215,7 +215,7 @@
     (dobox ((number 0 4)
 	    (name 0 7))
 	   (setf (aref array (+ number (* name 4)))
-		 (sound-stuff::load-all
+		 (music::load-all
 		(print
 		  (concatenate
 		   'string
@@ -235,7 +235,7 @@
   (preload))
 #+nil
 (map nil
-     (lambda (x) (sound-stuff::free-preloaded x))
+     (lambda (x) (music::free-preloaded x))
      (application::getfnc 'flunflair::PRELOADED-SOUNDS)) 
 (defun wot (value)
   (application::reload-if-dirty 'preloaded-sounds)
@@ -364,7 +364,7 @@
     (let ((value (world::getblock x y z)))
       (when (and (zerop value)
 		 (not-occupied x y z))
-	(sound-stuff::play-at (flunflair::wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
+	(music::play-at (flunflair::wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
 			      0.8 1.0)
 	(let ((blockval *blockid*))
 	  (sandbox::plain-setblock
@@ -377,7 +377,7 @@
   (lambda (x y z)
     (let ((blockid (world::getblock x y z)))
       (unless (= blockid 0)
-      (sound-stuff::play-at (flunflair::wot blockid) 
+      (music::play-at (flunflair::wot blockid) 
 			    (+ x 0.5) (+ y 0.5) (+ 0.5 z)
 			    0.8
 			    1.0)))
@@ -389,7 +389,7 @@
   ;  (atest::grassify x y z)
 ;    #+nil
     (unless (zerop (world::getblock x y z))
-    					;(sound-stuff::play-at (flunflair::wot) x y z)
+    					;(music::play-at (flunflair::wot) x y z)
 	
       (sandbox::setblock-with-update x y z 0 0)))
   )

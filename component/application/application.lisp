@@ -184,9 +184,9 @@
   window::*height*)
 
 (deflazy al-context ()
-  (sound-stuff::really-start)
-  sound-stuff::*al-context*)
+  (music::really-start)
+  music::*al-context*)
 
 (defun restart-sound-system ()
-  (sound-stuff::restart-al)
+  (music::restart-al)
   (remove-stuff 'al-context))

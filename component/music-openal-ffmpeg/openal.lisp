@@ -1,4 +1,4 @@
-(defpackage #:sound-stuff
+(defpackage #:music
   (:use #:cl #:utility
 	)
   (:import-from
@@ -10,7 +10,7 @@
    )
   (:export
    #:play-at))
-(in-package #:sound-stuff)
+(in-package #:music)
 
 
 (defmacro subprocess ((&rest vars) &body body)
@@ -195,7 +195,7 @@
 	  (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
 	    (flet ((conv (arr)
 		     (multiple-value-bind (pcm playsize)
-			 (sound-stuff::convert
+			 (convert
 			  (case channels
 			    (1 (cffi:mem-aref data :pointer 0))
 			    (otherwise (cffi:mem-aref data :pointer 1)))
@@ -245,7 +245,7 @@
 		 (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
 		   (flet ((conv (arr)
 			    (multiple-value-bind (pcm playsize)
-				(sound-stuff::convert
+				(convert
 				 (case channels
 				   (1 (cffi:mem-aref data :pointer 0))
 				   (otherwise (cffi:mem-aref data :pointer 1)))
