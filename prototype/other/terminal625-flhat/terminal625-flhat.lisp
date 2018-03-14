@@ -1,7 +1,7 @@
 (defpackage #:fixed-leaf-hashed-array-tree
   (:use #:cl
 	#:funland
-	#:iter-ator)
+	#:iterator)
   (:nicknames #:flhat)
   (:export
    #:flhat
@@ -117,12 +117,12 @@
 
 (in-package :fixed-leaf-hashed-array-tree)
 
-(declaim (ftype (function (iter-ator))
+(declaim (ftype (function (iterator))
 		next-index)
-	 (ftype (function (iter-ator)
+	 (ftype (function (iterator)
 			  (values fixnum simple-vector))
 		next-subarray)
-	 (ftype (function (iter-ator)
+	 (ftype (function (iterator)
 			  (values fixnum simple-vector))
 		next-flhat))
 
@@ -166,7 +166,7 @@
 	       (setf place new))))))))
 
 (progn
-  (declaim (ftype (function (flhat) iter-ator) make-flhat-iterator))
+  (declaim (ftype (function (flhat) iterator) make-flhat-iterator))
   (defun make-flhat-iterator (flhat)
     (let* ((flhat-iter (make-zeroed-iterator #'next-init flhat))
 	   (array-iter (make-zeroed-iterator #'next-flhat flhat-iter))

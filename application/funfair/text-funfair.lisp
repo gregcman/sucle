@@ -1,6 +1,6 @@
 (defpackage #:funtext
   (:use #:cl
-	#:funfair
+	#:application
 	#:funland))
 (in-package #:funtext)
 
@@ -52,8 +52,8 @@
 
 (defparameter *identity-mat*
   (nsb-cga:identity-matrix))
-(defparameter *view* (make-instance 'funfair::render-area))
-(defparameter *view256x256* (make-instance 'funfair::render-area
+(defparameter *view* (make-instance 'application::render-area))
+(defparameter *view256x256* (make-instance 'application::render-area
 					   :width 256
 					   :height 256))
 (defparameter *block-height* nil)
@@ -72,7 +72,7 @@
   (setf *clear-text-buffer-flag* 2))
 (defun per-frame (session)
   (declare (ignorable session))
-  (map nil #'funfair::reload-if-dirty *reloadables*)
+  (map nil #'application::reload-if-dirty *reloadables*)
   (getfnc 'render-normal-text-refraction)
   (setf (render-area-width *view*) window::*width*
 	(render-area-height *view*) window::*height*)
@@ -80,15 +80,15 @@
   (render-stuff))
 
 
-(deflazy draw-commands (funfair::gl-context)
-  (declare (ignorable funfair::gl-context))
+(deflazy draw-commands (application::gl-context)
+  (declare (ignorable application::gl-context))
   (lparallel.queue:make-queue))
 
 (defun render-stuff ()
   (gl:disable :depth-test)					; #+nil
   (progn
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-    (funfair::%set-render-area 0 0 256 256))
+    (application::%set-render-area 0 0 256 256))
   (when (not (zerop *clear-text-buffer-flag*))
     (decf *clear-text-buffer-flag*)
     (when (Zerop *clear-text-buffer-flag*)
@@ -165,7 +165,7 @@
 (deflazy text-data ()
   (glhelp::make-gl-framebuffer 256 256))
 
-(deflazy render-normal-text-refraction ((funfair::w w) (funfair::h h))
+(deflazy render-normal-text-refraction ((application::w w) (application::h h))
   (let ((upw (uppow2 w))
 	(uph (uppow2 h))
 	(refract (getfnc 'refraction-shader)))
@@ -182,10 +182,10 @@
 		      *block-height*)))
     (gl:disable :cull-face)
     (gl:disable :depth-test)
-    (set-render-area (make-instance 'funfair::render-area
+    (set-render-area (make-instance 'application::render-area
 				    :width upw
 				    :height uph))
-    (funfair::reload 'indirection)
+    (application::reload 'indirection)
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
 
@@ -199,9 +199,9 @@
   (let ((a (scratch-buffer:my-iterator))
 	(b (scratch-buffer:my-iterator))
 	(len 0))
-    (iter-ator:bind-iterator-out
+    (iterator:bind-iterator-out
      (pos single-float) a
-     (iter-ator:bind-iterator-out
+     (iterator:bind-iterator-out
       (tex single-float) b
 
       (progeach
@@ -220,9 +220,9 @@
 	 (scratch-buffer:flush-my-iterator a
 	   (scratch-buffer:flush-my-iterator b
 	     ((lambda (times a b)
-		(iter-ator:bind-iterator-in
+		(iterator:bind-iterator-in
 		 (xyz single-float) a
-		 (iter-ator:bind-iterator-in
+		 (iterator:bind-iterator-in
 		  (tex single-float) b
 		  (dotimes (x times)
 		    (%gl:vertex-attrib-2f 2 (tex) (tex))
@@ -482,9 +482,9 @@
   (let ((position (scratch-buffer:my-iterator))
        (value (scratch-buffer:my-iterator))
        (len 0))
-   (iter-ator:bind-iterator-out
+   (iterator:bind-iterator-out
     (pos single-float) position
-    (iter-ator:bind-iterator-out
+    (iterator:bind-iterator-out
      (value single-float) value
 
      (incf len
@@ -512,9 +512,9 @@
        (scratch-buffer:flush-my-iterator position
 	 (scratch-buffer:flush-my-iterator value
 	   ((lambda (times position value)
-	      (iter-ator:bind-iterator-in
+	      (iterator:bind-iterator-in
 	       (xyz single-float) position
-	       (iter-ator:bind-iterator-in
+	       (iterator:bind-iterator-in
 		(value single-float) value
 		(dotimes (x times)
 		  (%gl:vertex-attrib-4f 2 (value) (value) (value) 1.0)

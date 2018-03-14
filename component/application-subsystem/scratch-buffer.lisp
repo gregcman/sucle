@@ -40,25 +40,25 @@
 	    array)))
 
 (defun reset-my-iterator (iterator)
-  (let ((data (iter-ator:p-data iterator)))
+  (let ((data (iterator:p-data iterator)))
     (setf (cdr data) (car data))
-    (setf (iter-ator:p-index iterator) 0)))
+    (setf (iterator:p-index iterator) 0)))
 (defun my-iterator ()
   (let ((cons (cons "my-iterator" nil)))
-    (iter-ator:make-iterator 0 nil (cons cons cons) #'next-array)))
+    (iterator:make-iterator 0 nil (cons cons cons) #'next-array)))
 ;;todo: make data hold the getmem function,
 ;;and not be a cons cell, or at least a named cons cell
 
 (defun free-my-iterator-memory (iterator)
-  (let* ((cons (iter-ator:p-data iterator))
+  (let* ((cons (iterator:p-data iterator))
 	 (head (car cons)))
     (givemem (cdr (car cons)))
     
     (setf (cdr cons) head)
     (setf (cdr head) nil))
   ;;cleanup
-  (setf (iter-ator:p-array iterator) nil
-	(iter-ator:p-index iterator) 0))
+  (setf (iterator:p-array iterator) nil
+	(iterator:p-index iterator) 0))
 
 (defmacro flush-my-iterator (a &body body)
   (let ((var (gensym)))

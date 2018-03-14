@@ -59,11 +59,11 @@
 (defun mesh-chunk (times a b c)
   (declare (type fixnum times))
   (declare (optimize (speed 3) (safety 0)))
-  (iter-ator:bind-iterator-in
+  (iterator:bind-iterator-in
    (xyz single-float) a
-   (iter-ator:bind-iterator-in
+   (iterator:bind-iterator-in
     (uv single-float) b
-    (iter-ator:bind-iterator-in
+    (iterator:bind-iterator-in
      (dark single-float) c
      (dotimes (x times)
        (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
@@ -93,13 +93,13 @@
 
 ;;;;keeping track of the changes to the world
 (progn
-  (defparameter dirtychunks (q:make-uniq-q))
+  (defparameter dirtychunks (queue:make-uniq-q))
   (defun clean-dirty ()
-    (setf dirtychunks (q:make-uniq-q)))
+    (setf dirtychunks (queue:make-uniq-q)))
   (defun dirty-pop ()
-    (q:uniq-pop dirtychunks))
+    (queue:uniq-pop dirtychunks))
   (defun dirty-push (item)
-    (q:uniq-push item dirtychunks))
+    (queue:uniq-push item dirtychunks))
   (defun block-dirtify (i j k)
     (dirty-push (world:chop (world:chunkhashfunc i k j)))))
 

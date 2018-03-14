@@ -1,6 +1,5 @@
 (defpackage #:queue
   (:use #:cl)
-  (:nicknames #:q)
   (:export 
    #:get-queue
    #:q-push
@@ -14,7 +13,7 @@
    #:clrq
    #:clruniq))
 
-(in-package :q)
+(in-package :queue)
 
 ;;a basic fifo queue first in first out
 (defstruct queue

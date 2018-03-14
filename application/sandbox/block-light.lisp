@@ -3,12 +3,12 @@
 (defun isOpaque (id)
   (eq t (aref mc-blocks:*opaquecubelooukup* id)))
 
-(defparameter *scratch-bfs* (q::make-uniq-q))
-(defparameter *scratch-bfs2* (q::make-uniq-q))
+(defparameter *scratch-bfs* (queue::make-uniq-q))
+(defparameter *scratch-bfs2* (queue::make-uniq-q))
 
 (defun light-node (x z y &optional (bfs *scratch-bfs*))
-  (q::clruniq bfs)
-  (q::uniq-push (world:chunkhashfunc x y z) bfs)  
+  (queue::clruniq bfs)
+  (queue::uniq-push (world:chunkhashfunc x y z) bfs)  
   (%light-node bfs))
 
 (defmacro xyz (mx my mz &body body)
@@ -29,7 +29,7 @@
   (declare (optimize (speed 3) (safety 0)))
   (tagbody
    rep
-     (multiple-value-bind (place exists?) (q::uniq-pop bfs)
+     (multiple-value-bind (place exists?) (queue::uniq-pop bfs)
        (when exists?
 	 (let ((light-level (world:%getlight place)))
 	   (declare (type (unsigned-byte 4) light-level))
@@ -42,7 +42,7 @@
 			       (when (< val lower-level)
 				 (unless (isOpaque (world:%getblock displacement))
 				   (setf (world:%getlight displacement) lower-level)
-				   (q::uniq-push displacement bfs)))))))
+				   (queue::uniq-push displacement bfs)))))))
 	       (%0check i-1 world:add)
 	       (%0check i+1 world:add)
 	       (%0check j-1 world:add)
@@ -54,9 +54,9 @@
 (defun de-light-node (x y z)
   (let ((bfs *scratch-bfs*)
 	(lighting-bfs *scratch-bfs2*))
-    (q:clruniq bfs)
-    (q:clruniq lighting-bfs)
-    (q::kv-uniq-push (world:chunkhashfunc x z y) (world:getlight x y z) bfs)
+    (queue:clruniq bfs)
+    (queue:clruniq lighting-bfs)
+    (queue::kv-uniq-push (world:chunkhashfunc x z y) (world:getlight x y z) bfs)
     (setf (world:getlight x y z) 0)
     (%de-light-node bfs lighting-bfs)
     (%light-node lighting-bfs)))
@@ -67,7 +67,7 @@
   (declare (optimize (speed 3) (safety 0)))
   (tagbody
    rep
-     (multiple-value-bind (place light-value exists?) (q::kv-uniq-pop bfs)
+     (multiple-value-bind (place light-value exists?) (queue::kv-uniq-pop bfs)
        (declare (type fixnum light-value place))
        (when exists?
 	 (macrolet ((check (disp)
@@ -79,9 +79,9 @@
 			     (if (< adj-light-level light-value)
 				 (progn
 				   (setf (world:%getlight displacement) 0)
-				   (q::kv-uniq-push displacement adj-light-level bfs))
+				   (queue::kv-uniq-push displacement adj-light-level bfs))
 				 (when (>= adj-light-level light-value)
-				   (q::uniq-push displacement lighting-bfs))))))))
+				   (queue::uniq-push displacement lighting-bfs))))))))
 	   
 	   (check i-1)
 	   (check i+1)
@@ -93,8 +93,8 @@
   lighting-bfs)
 
 (defun sky-light-node (x y z &optional (bfs *scratch-bfs*))
-  (q::clruniq bfs)
-  (q::uniq-push (world:chunkhashfunc x z y) bfs)  
+  (queue::clruniq bfs)
+  (queue::uniq-push (world:chunkhashfunc x z y) bfs)  
   (%sky-light-node bfs))
 
 ;;flood fill propagation with moving downwards
@@ -102,7 +102,7 @@
   (declare (optimize (speed 3) (safety 0)))
   (tagbody
    rep
-     (multiple-value-bind (place exists?) (q::uniq-pop bfs)
+     (multiple-value-bind (place exists?) (queue::uniq-pop bfs)
        (when exists?
 	 (let ((light-level (world:%skygetlight place)))
 	   (declare (type (unsigned-byte 4) light-level))
@@ -116,7 +116,7 @@
 			       (when (< val lower-level)
 				 (unless (isOpaque (world:%getblock displacement))
 				   (setf (world:%skygetlight displacement) lower-level)
-				   (q::uniq-push displacement bfs))))))
+				   (queue::uniq-push displacement bfs))))))
 			(downcheck (disp)
 			  `(let ((displacement (world:add place ,disp)))
 			     (declare (type fixnum displacement))
@@ -126,7 +126,7 @@
 				 (unless (or (isOpaque (world:%getblock displacement))
 					     (> 4503599627370496 displacement))
 				   (setf (world:%skygetlight displacement) 15)
-				   (q::uniq-push displacement bfs)))))))
+				   (queue::uniq-push displacement bfs)))))))
 	       (%0check i-1)
 	       (%0check i+1)
 	       (if (= 15 light-level)
@@ -140,9 +140,9 @@
 (defun sky-de-light-node (x y z)
   (let ((bfs *scratch-bfs*)
 	(lighting-bfs *scratch-bfs2*))
-    (q:clruniq bfs)
-    (q:clruniq lighting-bfs)
-    (q::kv-uniq-push (world:chunkhashfunc x y z) (world:skygetlight x y z) bfs)
+    (queue:clruniq bfs)
+    (queue:clruniq lighting-bfs)
+    (queue::kv-uniq-push (world:chunkhashfunc x y z) (world:skygetlight x y z) bfs)
     (setf (world:skygetlight x y z) 0)
     (%sky-de-light-node bfs lighting-bfs)
     (%sky-light-node lighting-bfs)))
@@ -153,7 +153,7 @@
   (declare (optimize (speed 3) (safety 0)))
   (tagbody
    rep
-     (multiple-value-bind (place light-value exists?) (q::kv-uniq-pop bfs)
+     (multiple-value-bind (place light-value exists?) (queue::kv-uniq-pop bfs)
        (declare (type (unsigned-byte 4) light-value))
        (when exists?	 
 	 (macrolet ((check (disp)
@@ -165,8 +165,8 @@
 			     (if (< adj-light-level light-value)
 				 (progn
 				   (setf (world:%skygetlight displacement) 0)
-				   (q::kv-uniq-push displacement adj-light-level bfs))
-				 (q::uniq-push displacement lighting-bfs)))))))
+				   (queue::kv-uniq-push displacement adj-light-level bfs))
+				 (queue::uniq-push displacement lighting-bfs)))))))
 	   
 	   (check i-1)
 	   (check i+1)
@@ -176,7 +176,7 @@
 			     (> 4503599627370496 displacement))
 		   (let ((adj-light-level (world:%skygetlight displacement)))
 		     (setf (world:%skygetlight displacement) 0)
-		     (q::kv-uniq-push displacement adj-light-level bfs))))
+		     (queue::kv-uniq-push displacement adj-light-level bfs))))
 	       (check j-1))
 	   (check j+1)
 	   (check k-1)

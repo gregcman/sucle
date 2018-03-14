@@ -1,10 +1,10 @@
 (asdf:defsystem #:sandbox-funfair
-  :depends-on (#:funfair
+  :depends-on (#:application
 	       #:sandbox
 	       #:opticl)
   :serial t
   :components
-  ((:file "test")
+  (;;(:file "test")
    (:file "player-controls")))
 
  

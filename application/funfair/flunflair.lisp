@@ -63,7 +63,7 @@
       (copy-array-buf))
     
     (when (window::skey-j-p (window::keyval :escape))
-      (funfair::quit))
+      (application::quit))
     (when (window::skey-j-p (window::keyval :6))
       (setf *blockid* (multiple-value-call #'world::getblock
 			(vec-values (pop *selection*)))))
@@ -104,7 +104,7 @@
 	*blockid*))
     (setf *paused* (window::mice-free-p))
     (if *paused*
-	(funfair::tick *ticker* (lambda ()))
+	(application::tick *ticker* (lambda ()))
 	(stuff))
     (when (window::skey-j-p (window::keyval :c))
       (sound-stuff::cleanup-poller)))
@@ -127,7 +127,7 @@
 	(setf (aref curr 4) (aref other2 1))
 	(setf (aref curr 5) (aref other2 2))
 	(al:listener :orientation curr)))
-    (map nil #'funfair::reload-if-dirty *reloadables*))
+    (map nil #'application::reload-if-dirty *reloadables*))
   (progn
     (unless (eq *lastsel*
 		*selection*)
@@ -138,26 +138,26 @@
        (with-output-to-string (*standard-output*)
 	 (dolist (item *selection*)
 	   (pprint item)))))
-    (let ((draw-commands (funfair::getfnc 'funtext::draw-commands)))
+    (let ((draw-commands (application::getfnc 'funtext::draw-commands)))
       (flet ((drawxyz (x y z)
 	       (lparallel.queue:with-locked-queue draw-commands
 		 (lparallel.queue:push-queue/no-lock x draw-commands)
 		 (lparallel.queue:push-queue/no-lock y draw-commands)
 		 (lparallel.queue:push-queue/no-lock z draw-commands))))
 	(progn
-	  (drawxyz *textx* *texty* (glhelp::handle (funfair::getfnc 'text)))
-	  (drawxyz 10.0 10.0  (glhelp::handle (funfair::getfnc 'text2))))))))
+	  (drawxyz *textx* *texty* (glhelp::handle (application::getfnc 'text)))
+	  (drawxyz 10.0 10.0  (glhelp::handle (application::getfnc 'text2))))))))
 (progn
   (defun setfoo2 (obj)
     (let ((*print-case* :downcase))
       (setf *foo2*
 	    (write-to-string
 	     obj :pretty t :escape nil)))
-    (funfair::reload 'foo2))
+    (application::reload 'foo2))
   (defparameter *foo2* nil)
-  (funfair::deflazy foo2 ()
+  (application::deflazy foo2 ()
     *foo2*)
-  (funfair::deflazy text2 (foo2)
+  (application::deflazy text2 (foo2)
     (make-instance
      'glhelp::gl-list
      :handle
@@ -169,11 +169,11 @@
       (setf *foo*
 	    (write-to-string
 	     obj :pretty t :escape nil)))
-    (funfair::reload 'foo))
+    (application::reload 'foo))
   (defparameter *foo* nil)
-  (funfair::deflazy foo ()
+  (application::deflazy foo ()
     *foo*)
-  (funfair::deflazy text (foo)
+  (application::deflazy text (foo)
     (make-instance
      'glhelp::gl-list
      :handle
@@ -207,7 +207,7 @@
 			     (cffi:mem-aref b :uint8 (+ offset 3)) (ldb (byte 8 24) num))
 		       )))))
       (progn
-	(gl:bind-texture :texture-2d (glhelp::texture (funfair::getfnc 'funtext::text-data)))
+	(gl:bind-texture :texture-2d (glhelp::texture (application::getfnc 'funtext::text-data)))
 	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
 
 (defun preload ()
@@ -229,19 +229,19 @@
 		  :mono8)))
     array))
 
-(funfair::deflazy preloaded-sounds (funfair::al-context)
-  (declare (ignorable funfair::al-context))
+(application::deflazy preloaded-sounds (application::al-context)
+  (declare (ignorable application::al-context))
   (print "loading-sounds")
   (preload))
 #+nil
 (map nil
      (lambda (x) (sound-stuff::free-preloaded x))
-     (funfair::getfnc 'flunflair::PRELOADED-SOUNDS)) 
+     (application::getfnc 'flunflair::PRELOADED-SOUNDS)) 
 (defun wot (value)
-  (funfair::reload-if-dirty 'preloaded-sounds)
+  (application::reload-if-dirty 'preloaded-sounds)
 					;(alexandria:random-elt)
   (aref 
-   (funfair::getfnc 'preloaded-sounds)
+   (application::getfnc 'preloaded-sounds)
    (+ (random 4)
       (* 4 (sound-dispatch value)))))
 
@@ -255,7 +255,7 @@
     (5 1)
     (otherwise (random 7))))
 
-(setf funfair::*trampoline* '(sndbx::per-frame funtext::per-frame
+(setf application::*trampoline* '(sndbx::per-frame funtext::per-frame
 			      per-frame
 			      ))
 
@@ -289,7 +289,7 @@
 	   (window::skey-p (window::keyval :s))
 	   (window::skey-p (window::keyval :d))))
     (let ((backwardsbug (load-time-value (nsb-cga:vec 0.0 0.0 0.0))))
-      (nsb-cga:%vec* backwardsbug (camera-matrix:camera-vec-forward funfair::*camera*) -1.0)
+      (nsb-cga:%vec* backwardsbug (camera-matrix:camera-vec-forward application::*camera*) -1.0)
       ((lambda (look-vec pos)
 	 (let ((fist *fist*))
 	   (with-vec (px py pz) (pos)
@@ -341,7 +341,7 @@
 				  (funcall *right-fist-fnc* a b c)))))))))))))
        backwardsbug
        pos)))
-  (multiple-value-bind (fraction times) (funfair::tick *ticker* #'physss)
+  (multiple-value-bind (fraction times) (application::tick *ticker* #'physss)
     (declare (ignorable times))
     (when (window:mice-locked-p)
       (update-moused 0.5)
@@ -352,7 +352,7 @@
 	       'single-float)
        (coerce (* *lerp-mouse-y* *mouse-multiplier*)
 	       'single-float)))
-    (sndbx::entity-to-camera *ent* funfair::*camera* fraction)))
+    (sndbx::entity-to-camera *ent* application::*camera* fraction)))
 
 (defparameter *ticker*
   (tickr:make-ticker

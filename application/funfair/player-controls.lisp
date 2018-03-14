@@ -337,7 +337,7 @@ edge, or no case"
 
 
 (defpackage #:sndbx
-  (:use :cl :funland :funfair))
+  (:use :cl :funland :application))
 (in-package #:sndbx)
 (defun floor5 (x)
   (1- (ceiling x)))
@@ -924,7 +924,7 @@ edge, or no case"
      (* deg (coerce (/ pi 180.0) 'single-float)))
    (nth 1 '(95 70))))
 
-(defparameter *black* (make-instance 'funfair::render-area :height 2 :width 2
+(defparameter *black* (make-instance 'application::render-area :height 2 :width 2
 				     :x 0
 				     :y 0))
 
@@ -989,14 +989,14 @@ edge, or no case"
     ;terrain-png
     ))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(deflazy gl-init (funfair::gl-context)
-  (declare (ignorable funfair::gl-context))
+(deflazy gl-init (application::gl-context)
+  (declare (ignorable application::gl-context))
   (clrhash sandbox::*g/chunk-call-list*))
 
 (defun per-frame (session)
   (declare (ignorable session))
   (progn
-    (map nil #'funfair::reload-if-dirty *reloadables*)
+    (map nil #'application::reload-if-dirty *reloadables*)
     (getfnc 'gl-init))
   (render-stuff))
 
@@ -1192,12 +1192,12 @@ edge, or no case"
 (deflazy blockshader (blockshader-text)
   (glhelp::create-gl-program blockshader-text))
 
-;;;; run use-sandbox before running funfair::main
+;;;; run use-sandbox before running application::main
 
 ;;example::
 #+nil
 (progn
-  (ql:quickload :sandbox-funfair)
+  (ql:quickload :sandbox-application)
   (sndbx::use-sandbox)
   (sandbox::mload "third/")
   (main))

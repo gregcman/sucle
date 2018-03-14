@@ -1,4 +1,4 @@
-(defpackage #:funfair
+(defpackage #:application
   (:use #:cl #:funland)
 
   (:export main)
@@ -7,7 +7,7 @@
   (:export microseconds tick *control-state* *camera* *render-area* *pre-trampoline-hooks*
 	  set-render-area render-area-x render-area-y render-area-width render-area-height))
 
-(in-package :funfair)
+(in-package :application)
 
 (defparameter *thread* nil)
 (defun main ()
@@ -80,11 +80,11 @@
   (let ((place (gethash name *stuff*)))
     (if place
 	(when (lazy-place::lazy-place-exists-p place)
-	  (let ((a (funfair::getfnc-no-update name)))
+	  (let ((a (getfnc-no-update name)))
 	    (when (and (typep a 'glhelp::gl-object)
 		       (glhelp:alive-p a))
 	      (glhelp::gl-delete* a))
-	    (funfair::remove-stuff name)))
+	    (remove-stuff name)))
 	(format t "no place ~s" name))))
 
 (defun dirty? (name)
@@ -94,10 +94,10 @@
     (reload name)))
 
 (defun scrubgl2 ()
-  (dohash (k v) funfair::*stuff*
+  (dohash (k v) *stuff*
     (when (typep (lazy-place::lazy-place-value v)
 		 'glhelp::gl-object)
-      (funfair::remove-stuff k))))
+      (remove-stuff k))))
 
 ;;;;;;;;;;;;;;;;;;;;;
 (progn

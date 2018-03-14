@@ -1,3 +1,4 @@
-sandbox: basic minecraft clone
-glhelp: opengl operations
-funfair: ???????
+sandbox:
+	a voxel game
+funfair:
+	?????

@@ -1,6 +1,5 @@
 (defpackage #:recycler
   (:use #:cl)
-  (:nicknames #:recycle)
   (:export
    #:get-from
    #:give-to
@@ -73,7 +72,7 @@
   (maphash
    (lambda (k v)
      (declare (ignore k))
-     (recycle:give-to pool v))
+     (recycler:give-to pool v))
    hash)
   (clrhash hash))
 
@@ -90,7 +89,7 @@
 	       :initial-element ,defaultval))
 
 (defparameter *freechunkmempoolobj*
-  (recycle:make-recycler
+  (recycler:make-recycler
    :create-func #'(lambda (&optional (x 0)) (%new-chunk t x 4 4 4))
    :cleanup-func #'clearchunk
    :size-cap 32))
@@ -139,7 +138,7 @@
       'setobj 'getobj
       '%setobj '%getobj
       '*lispobj* value
-      `(recycle:get-from *freechunkmempoolobj* ,value)))))
+      `(recycler:get-from *freechunkmempoolobj* ,value)))))
 
 (defgeneric lispobj-dispatch (obj))
 

@@ -1,4 +1,11 @@
-ffi: foreign library bindings
-wrapper: making the ffi bindings easy to use/ adding basic functionality
-component: data structures, macros, utility functions...
-application: something to run as a "standalone" program
+application:
+	"standalone" programs
+	
+component:
+	data structures, macros, utility libraries...
+
+ffi:
+	foreign library bindings
+
+prototype:
+	random code which is not necessarily maintained or functional

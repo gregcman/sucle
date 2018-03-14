@@ -1,15 +1,15 @@
 (asdf:defsystem #:sandbox
   :depends-on (#:cl-opengl
-	       #:cl-program
+	       #:application-subsystem
 	       #:funland
-	       #:terminal625-queue
-	       #:terminal625-zeorp
+	       #:iterator
 	       #:singleton-lparallel
 	       #:glhelp)
   :serial t
   :components
 
-  ((:file "package")
+  ((:file "queue")
+   (:file "package")
    (:file "vox") ;;generate a voxel hash structure
   
    (:file "world")

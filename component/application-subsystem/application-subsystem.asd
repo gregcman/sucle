@@ -1,9 +1,10 @@
-(asdf:defsystem #:cl-program
+(asdf:defsystem #:application-subsystem
   :depends-on (#:funland
-	       #:terminal625-zeorp
+	       #:iterator
 	       #:nsb-cga)
     :components
-    ((:file "camera-matrix")
+    ((:file "lazy-place")
+     (:file "camera-matrix")
      (:file "rectangular-tilemap")
      (:file "axis-aligned-quads")
      (:file "flip-image")

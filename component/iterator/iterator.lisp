@@ -1,11 +1,9 @@
-(defpackage :iter-ator
+(defpackage :iterator
   (:use
    #:cl
    #:funland)
-  (:nicknames
-   #:iateor)
   (:export
-   #:iter-ator
+   #:iterator
    
    #:make-iterator
    #:make-zeroed-iterator
@@ -25,7 +23,7 @@
    #:bind-iterator-out
    #:bind-iterator-in))
 
-(in-package :iter-ator)
+(in-package :iterator)
 
 (defmacro backwards-array-iterator3 (index-var array-var completion-form)
   (let ((new-index (gensym))
@@ -40,14 +38,14 @@
 	   (declare (type fixnum ,new-index))
 	   (setf ,index-var ,new-index)))))
 
-(defstruct (iter-ator  (:conc-name p-)
+(defstruct (iterator  (:conc-name p-)
 		       (:constructor make-iterator (index array data func)))
   index
   array
   data
   func)
 
-(declaim (ftype (function (&rest t) iter-ator)
+(declaim (ftype (function (&rest t) iterator)
 		make-default-iterator
 		make-zeroed-iterator))
 (defun make-default-iterator ()
@@ -102,8 +100,8 @@
 	(index (gensym))
 	(iteratorfoo (gensym)))
     `(let ((,iteratorfoo ,iterator))
-       (declare (type iter-ator ,iteratorfoo))
-       (iter-ator:with-bound-iterator
+       (declare (type iterator ,iteratorfoo))
+       (iterator:with-bound-iterator
 	   (,next ,place (,array (or null (simple-array ,type (*)))) (,index))
 	   ,iteratorfoo
 	 ,@body))))
@@ -166,7 +164,7 @@
 
 
 #+nil
-((deftype iter-ator ()
+((deftype iterator ()
    `(simple-vector 4))
  (progn
    (declaim (inline p-index (setf p-index)
