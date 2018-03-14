@@ -132,12 +132,12 @@
   (* (get-internal-real-time)
      (etouq (round (/ (expt 10 6) internal-time-units-per-second)))))
 (defun tick (ticker fun &optional (time (microseconds)))
-  (tickr:tick-update ticker time)
+  (fps-independent-timestep:tick-update ticker time)
   (let ((times
-	 (tickr:tick-physics ticker fun)))
+	 (fps-independent-timestep:tick-physics ticker fun)))
     (values
-     (coerce (* (tickr:ticker-accumulator ticker)
-		(tickr:ticker-aux ticker))
+     (coerce (* (fps-independent-timestep:ticker-accumulator ticker)
+		(fps-independent-timestep:ticker-aux ticker))
 	     'single-float)
      times)))
 

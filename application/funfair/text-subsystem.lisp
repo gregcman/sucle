@@ -1,8 +1,8 @@
-(defpackage #:funtext
+(defpackage #:text-sub
   (:use #:cl
 	#:application
 	#:funland))
-(in-package #:funtext)
+(in-package #:text-sub)
 
 (defvar *this-directory* (filesystem-util:this-directory))
 (deflazy font-png ()

@@ -1,6 +1,7 @@
 (asdf:defsystem #:application-subsystem
   :depends-on (#:funland
 	       #:iterator
+	       #:bordeaux-threads
 	       #:nsb-cga)
     :components
     ((:file "lazy-place")

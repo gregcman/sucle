@@ -336,9 +336,9 @@ edge, or no case"
 	  1 2 5 1 1 1))
 
 
-(defpackage #:sndbx
+(defpackage #:sandbox-sub
   (:use :cl :funland :application))
-(in-package #:sndbx)
+(in-package #:sandbox-sub)
 (defun floor5 (x)
   (1- (ceiling x)))
 (defun get-blocks-around (aabb-posx aabb-posy aabb-posz aabb func)

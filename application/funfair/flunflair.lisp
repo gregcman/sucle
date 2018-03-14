@@ -42,9 +42,9 @@
   (declare (ignorable session))
   
   (when (window::mice-free-p)
-    (let ((newmousex (floatify (/ window::*mouse-x* funtext::*block-width*)))
+    (let ((newmousex (floatify (/ window::*mouse-x* text-sub::*block-width*)))
 	  (newmousey (floatify (/ (- window::*height* window::*mouse-y*)
-				  funtext::*block-height*))))
+				  text-sub::*block-height*))))
       (setf *old-mouse-x* *mouse-x*
 	    *old-mouse-y* *mouse-y*)
       (setf *mouse-x* newmousex
@@ -56,7 +56,7 @@
       (unless (= dx dy 0)
 	(incf *textx* dx)
 	(incf *texty* dy)
-	(funtext::flag-text-dirty))))
+	(text-sub::flag-text-dirty))))
 
   (progn
     (when (window::skey-j-p (window::keyval :n))
@@ -68,7 +68,7 @@
       (setf *blockid* (multiple-value-call #'world::getblock
 			(vec-values (pop *selection*)))))
     (when (window::skey-j-p (window::keyval :y))
-      (toggle sndbx::*depth-buffer?*))
+      (toggle sandbox-sub::*depth-buffer?*))
     (when (window::skey-j-p (window::keyval :r))
       (setf *selection* nil))
     (when (window::skey-j-p (window::keyval :e))
@@ -87,8 +87,8 @@
     (when (window::skey-j-p (window::keyval :4))
       (map-box (sphere (lambda (x y z)
 			 (sandbox::plain-setblock x y z *blockid* 0)))))
-    (with-vec (a b c) ((sndbx::farticle-position
-			(sndbx::entity-particle *ent*)))
+    (with-vec (a b c) ((sandbox-sub::farticle-position
+			(sandbox-sub::entity-particle *ent*)))
       (when (window::skey-j-p (window::keyval :b))
 	(setf *box* (make-box (pop *selection*)
 			      (pop *selection*))))
@@ -109,17 +109,17 @@
     (when (window::skey-j-p (window::keyval :c))
       (sound-stuff::cleanup-poller)))
   
-  (let* ((particle (sndbx::entity-particle *ent*))
-	 (pos (sndbx::farticle-position particle))
-	 (vel (sndbx::farticle-velocity particle)))
+  (let* ((particle (sandbox-sub::entity-particle *ent*))
+	 (pos (sandbox-sub::farticle-position particle))
+	 (vel (sandbox-sub::farticle-velocity particle)))
     (progn  
       (al:listener :position pos)
       (al:listener :velocity vel)
       (let ((curr (load-time-value (vector 1.0 0.0 0.0 ;;look
 					   0.0 1.0 0.0 ;;up
 					   )))
-	    (other (camera-matrix::camera-vec-forward sndbx::*camera*))
-	    (other2 (camera-matrix::camera-vec-up sndbx::*camera*)))
+	    (other (camera-matrix::camera-vec-forward sandbox-sub::*camera*))
+	    (other2 (camera-matrix::camera-vec-up sandbox-sub::*camera*)))
 	(setf (aref curr 0) (- (aref other 0)))
 	(setf (aref curr 1) (- (aref other 1)))
 	(setf (aref curr 2) (- (aref other 2)))
@@ -133,12 +133,12 @@
 		*selection*)
       (setf *lastsel*
 	    *selection*)
-      (funtext::flag-text-dirty)
+      (text-sub::flag-text-dirty)
       (setfoo2
        (with-output-to-string (*standard-output*)
 	 (dolist (item *selection*)
 	   (pprint item)))))
-    (let ((draw-commands (application::getfnc 'funtext::draw-commands)))
+    (let ((draw-commands (application::getfnc 'text-sub::draw-commands)))
       (flet ((drawxyz (x y z)
 	       (lparallel.queue:with-locked-queue draw-commands
 		 (lparallel.queue:push-queue/no-lock x draw-commands)
@@ -161,7 +161,7 @@
     (make-instance
      'glhelp::gl-list
      :handle
-     (funtext::mesh-string-gl-points -128.0 -128.0 foo2))))
+     (text-sub::mesh-string-gl-points -128.0 -128.0 foo2))))
 
 (progn
   (defun setfoo (obj)
@@ -177,7 +177,7 @@
     (make-instance
      'glhelp::gl-list
      :handle
-     (funtext::mesh-string-gl-points -128.0 -128.0 foo))))
+     (text-sub::mesh-string-gl-points -128.0 -128.0 foo))))
 
 (defun copy-array-buf ()
   (let ((width 256)
@@ -207,7 +207,7 @@
 			     (cffi:mem-aref b :uint8 (+ offset 3)) (ldb (byte 8 24) num))
 		       )))))
       (progn
-	(gl:bind-texture :texture-2d (glhelp::texture (application::getfnc 'funtext::text-data)))
+	(gl:bind-texture :texture-2d (glhelp::texture (application::getfnc 'text-sub::text-data)))
 	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
 
 (defun preload ()
@@ -255,22 +255,22 @@
     (5 1)
     (otherwise (random 7))))
 
-(setf application::*trampoline* '(sndbx::per-frame funtext::per-frame
+(setf application::*trampoline* '(sandbox-sub::per-frame text-sub::per-frame
 			      per-frame
 			      ))
 
 (defparameter *reach* 128.0)
 (defun stuff ()
-  (let* ((player-farticle (sndbx::entity-particle *ent*))
-	 (pos (sndbx::farticle-position player-farticle))
+  (let* ((player-farticle (sandbox-sub::entity-particle *ent*))
+	 (pos (sandbox-sub::farticle-position player-farticle))
 	 (entity *ent*)
-	 (window::*control-state* sndbx::*control-state*))
-    (symbol-macrolet ((pos (sndbx::farticle-position (sndbx::entity-particle entity)))
-		      (is-jumping (sndbx::entity-jump? entity))
-		      (is-sneaking (sndbx::entity-sneak? entity))
-		      (fly (sndbx::entity-fly? entity))
-		      (gravity (sndbx::entity-gravity? entity))
-		      (noclip (sndbx::entity-clip? entity)))
+	 (window::*control-state* sandbox-sub::*control-state*))
+    (symbol-macrolet ((pos (sandbox-sub::farticle-position (sandbox-sub::entity-particle entity)))
+		      (is-jumping (sandbox-sub::entity-jump? entity))
+		      (is-sneaking (sandbox-sub::entity-sneak? entity))
+		      (fly (sandbox-sub::entity-fly? entity))
+		      (gravity (sandbox-sub::entity-gravity? entity))
+		      (noclip (sandbox-sub::entity-clip? entity)))
       (setf is-jumping (window::skey-p (window::keyval :space)))
       (setf is-sneaking (window::skey-p (window::keyval :left-shift)))
       (when (window:mice-locked-p)
@@ -282,7 +282,7 @@
 	(when (window::skey-j-p (window::keyval :f))
 	  (toggle fly)
 	  (toggle gravity))))
-    (setf (sndbx::entity-hips *ent*)
+    (setf (sandbox-sub::entity-hips *ent*)
 	  (wasd-mover
 	   (window::skey-p (window::keyval :w))
 	   (window::skey-p (window::keyval :a))
@@ -299,9 +299,9 @@
 		   (toggle *swinging*))
 		 (when *swinging*
 		   (let ((u 32))
-		     (sndbx::aabb-collect-blocks
+		     (sandbox-sub::aabb-collect-blocks
 		      px py pz (* u vx) (* u vy) (* u vz)
-		    ;  sndbx::*fist-aabb*
+		    ;  sandbox-sub::*fist-aabb*
 		    ;  #+nil
 		      (load-time-value
 		       (aabbcc:make-aabb
@@ -315,13 +315,13 @@
 	       (let ((left-p (window::skey-j-p (window::mouseval :left)))
 		     (right-p (window::skey-j-p (window::mouseval :right))))
 		 (when (or left-p right-p)
-		   (sndbx::standard-fist
+		   (sandbox-sub::standard-fist
 		    fist
 		    px py pz
 		    (* *reach* vx) (* *reach* vy) (* *reach* vz))
-		   (let ((fist? (sndbx::fister-exists fist))
-			 (selected-block (sndbx::fister-selected-block fist))
-			 (normal-block (sndbx::fister-normal-block fist)))
+		   (let ((fist? (sandbox-sub::fister-exists fist))
+			 (selected-block (sandbox-sub::fister-selected-block fist))
+			 (normal-block (sandbox-sub::fister-normal-block fist)))
 		     (when fist?
 		       (when left-p
 			 (with-vec (a b c) (selected-block)
@@ -345,17 +345,17 @@
     (declare (ignorable times))
     (when (window:mice-locked-p)
       (update-moused 0.5)
-      (sndbx::change-entity-neck
+      (sandbox-sub::change-entity-neck
        *ent*
        (coerce (* *lerp-mouse-x*
 		  -1.0d0 *mouse-multiplier*)
 	       'single-float)
        (coerce (* *lerp-mouse-y* *mouse-multiplier*)
 	       'single-float)))
-    (sndbx::entity-to-camera *ent* application::*camera* fraction)))
+    (sandbox-sub::entity-to-camera *ent* application::*camera* fraction)))
 
 (defparameter *ticker*
-  (tickr:make-ticker
+  (fps-independent-timestep:make-ticker
    (floor 1000000 60)
    most-positive-fixnum))
 
@@ -399,11 +399,11 @@
 ;;;detect block types?
 (defun not-occupied (x y z)
   (let* ((ent *ent*)
-	 (aabb (sndbx::entity-aabb ent))
-	 (pos (sndbx::farticle-position
-	       (sndbx::entity-particle ent))))
+	 (aabb (sandbox-sub::entity-aabb ent))
+	 (pos (sandbox-sub::farticle-position
+	       (sandbox-sub::entity-particle ent))))
     (aabbcc::aabb-not-overlap
-     sndbx::*block-aabb*
+     sandbox-sub::*block-aabb*
      (floatify x)
      (floatify y)
      (floatify z)
@@ -455,7 +455,7 @@
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defparameter *swinging* nil)
 (defparameter *fist*
-  (sndbx::gen-fister sndbx::*fist-aabb* (list #'sndbx::ahook)))
+  (sandbox-sub::gen-fister sandbox-sub::*fist-aabb* (list #'sandbox-sub::ahook)))
 ;;;;;
 
 (defun wasd-mover (w? a? s? d?)
@@ -470,10 +470,10 @@
 	nil
 	(atan y x))))
 
-(defparameter *ent* (sndbx::gentity))
+(defparameter *ent* (sandbox-sub::gentity))
 
 (defun physss ()
-  (sndbx::physentity *ent*))
+  (sandbox-sub::physentity *ent*))
 
 (defun num-key-jp (&optional (control-state window::*control-state*))
   (etouq
@@ -487,9 +487,9 @@
      '(0 1 2 3 4 5 6 7 8 9)))))
 
 (defun line2 (px py pz vx vy vz blockid)
-  (sndbx::aabb-collect-blocks
+  (sandbox-sub::aabb-collect-blocks
    px py pz (- vx px) (- vy py) (- vz pz)
-   sndbx::*fist-aabb*   
+   sandbox-sub::*fist-aabb*   
    (lambda (x y z)
      (sandbox::plain-setblock x y z blockid 0))))
 

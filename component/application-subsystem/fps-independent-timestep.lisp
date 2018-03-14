@@ -1,4 +1,4 @@
-(defpackage tickr
+(defpackage #:fps-independent-timestep
   (:use #:cl)
   (:export
    #:ticker-dt
@@ -8,7 +8,7 @@
    #:tick-update
    #:ticker-aux))
 
-(in-package :tickr)
+(in-package :fps-independent-timestep)
 
 (defstruct (ticker (:constructor %make-ticker))
   (ticks 0 :type fixnum)
@@ -48,7 +48,8 @@
 	    (toobelow (> 0 frame-time)))
 	(when (or toofar toobelow)
 	  (setf frame-time bailout)
-	  (format t "tickr:tick-update: ~a"
+	  #+nil
+	  (format t "fps-independent-timestep:tick-update: ~a"
 		  (if toofar
 		      "ahead"
 		      "behind")))))
