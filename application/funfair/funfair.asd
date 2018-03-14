@@ -1,9 +1,8 @@
 (asdf:defsystem #:funfair
   :depends-on (
 	       #:funland	       
-	       #:terminal625-glfw3
+	       #:opengl-glfw3
 	       #:cl-program
-	       #:terminal625-camat
 	       #:nsb-cga
 	       #:bordeaux-threads
 	       #:cl-opengl

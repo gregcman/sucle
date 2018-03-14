@@ -1,4 +1,4 @@
-(defpackage #:camat
+(defpackage #:camera-matrix
   (:use #:cl)
   (:export
    #:make-camera
@@ -12,7 +12,7 @@
    #:camera-matrix-projection-view-player)
   (:export
    #:update-matrices))
-(in-package #:camat)
+(in-package #:camera-matrix)
 
 (defstruct camera
   (vec-position (nsb-cga:vec 0.0 0.0 0.0) :type nsb-cga:vec)

@@ -147,7 +147,7 @@
   #+nil
   (window::make-control-state
    :curr window::*input-state*))
-(defparameter *camera* (camat:make-camera
+(defparameter *camera* (camera-matrix:make-camera
 			:frustum-far (* 256.0)
 			:frustum-near (/ 1.0 8.0)))
 (defparameter *render-area* (make-instance 'render-area))

@@ -118,8 +118,8 @@
       (let ((curr (load-time-value (vector 1.0 0.0 0.0 ;;look
 					   0.0 1.0 0.0 ;;up
 					   )))
-	    (other (camat::camera-vec-forward sndbx::*camera*))
-	    (other2 (camat::camera-vec-up sndbx::*camera*)))
+	    (other (camera-matrix::camera-vec-forward sndbx::*camera*))
+	    (other2 (camera-matrix::camera-vec-up sndbx::*camera*)))
 	(setf (aref curr 0) (- (aref other 0)))
 	(setf (aref curr 1) (- (aref other 1)))
 	(setf (aref curr 2) (- (aref other 2)))
@@ -289,7 +289,7 @@
 	   (window::skey-p (window::keyval :s))
 	   (window::skey-p (window::keyval :d))))
     (let ((backwardsbug (load-time-value (nsb-cga:vec 0.0 0.0 0.0))))
-      (nsb-cga:%vec* backwardsbug (camat:camera-vec-forward funfair::*camera*) -1.0)
+      (nsb-cga:%vec* backwardsbug (camera-matrix:camera-vec-forward funfair::*camera*) -1.0)
       ((lambda (look-vec pos)
 	 (let ((fist *fist*))
 	   (with-vec (px py pz) (pos)
