@@ -1,5 +1,5 @@
 (asdf:defsystem #:nsb-cga
-  :description "adds destructive operations to sb-cga"
+  :description "adds destructive matrix functions to sb-cga"
   :depends-on (#:defpackage-plus
 		  #:sb-cga)
 

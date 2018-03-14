@@ -1,5 +1,5 @@
 camat: camera matrix
-nsb-cga: add destructive operators to sb-cga
+nsb-cga: add destructive matrix functions to sb-cga
 queue: a fifo queue and a unique element queue
 zeorp: an array iterator and reader/writer
 funland: common lisp utilities
