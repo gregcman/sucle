@@ -1,5 +1,5 @@
 (defpackage #:window
-  (:use #:cl #:funland)
+  (:use #:cl #:utility)
   (:export
    #:*scroll-x*
    #:*scroll-y*)

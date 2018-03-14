@@ -1,7 +1,7 @@
 (defpackage #:text-sub
   (:use #:cl
 	#:application
-	#:funland))
+	#:utility))
 (in-package #:text-sub)
 
 (defvar *this-directory* (filesystem-util:this-directory))

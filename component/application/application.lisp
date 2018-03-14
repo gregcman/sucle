@@ -1,5 +1,5 @@
 (defpackage #:application
-  (:use #:cl #:funland)
+  (:use #:cl #:utility)
 
   (:export main)
   (:export *trampoline*)

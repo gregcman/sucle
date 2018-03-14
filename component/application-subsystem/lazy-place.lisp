@@ -138,7 +138,7 @@
 (defmacro ensure-lazy-place (place &environment env)
   (multiple-value-bind (vars vals stores setter getter)
       (get-setf-expansion place env)
-    (funland::with-gensyms (value values-form)
+    (utility:with-gensyms (value values-form)
       `(let* (,@ (mapcar #'list vars vals))
 	 (or (let ((,value ,getter))
 	       (when (lazy-place-p ,value)

@@ -2,7 +2,7 @@
   :description "glfw3 opengl context creation, windowing and input"
 
   :depends-on (#:cl-glfw3
-	       #:funland)
+	       #:utility)
 
   :serial t
   :components  

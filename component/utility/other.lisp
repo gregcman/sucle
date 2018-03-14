@@ -1,4 +1,4 @@
-(in-package :funland)
+(in-package :utility)
 (defmacro with-gensyms (names &body forms)
   "Binds each variable named by a symbol in NAMES to a unique symbol around
 FORMS. Each of NAMES must either be either a symbol, or of the form:

@@ -1,5 +1,5 @@
 (asdf:defsystem #:application
-  :depends-on (#:funland	       
+  :depends-on (#:utility
 	       #:opengl-glfw3
 	       #:application-subsystem
 	       #:nsb-cga

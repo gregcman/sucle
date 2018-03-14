@@ -1,4 +1,4 @@
-(in-package #:funland)
+(in-package #:utility)
 #+nil
 (defmacro etouq (form)
   (eval form))

@@ -1,7 +1,7 @@
 (asdf:defsystem #:sandbox
   :depends-on (#:cl-opengl
 	       #:application-subsystem
-	       #:funland
+	       #:utility
 	       #:iterator
 	       #:singleton-lparallel
 	       #:glhelp)

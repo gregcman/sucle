@@ -2,7 +2,7 @@
   :depends-on (:cl-openal
 	       :cl-alc
 	       :bordeaux-threads
-	       :funland
+	       :utility
 	       :ffmpeg-bindings
 	       :singleton-lparallel)
     :serial t

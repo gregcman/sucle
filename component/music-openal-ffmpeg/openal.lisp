@@ -1,5 +1,5 @@
 (defpackage #:sound-stuff
-  (:use #:cl #:funland
+  (:use #:cl #:utility
 	)
   (:import-from
    #:cl-ffmpeg
@@ -317,7 +317,7 @@
 
 (defun free-buffers-hash (hash)
   (bordeaux-threads:with-lock-held (*free-buffers-lock*)
-    (funland::dohash (k v) hash
+    (dohash (k v) hash
       (declare (ignore v))
       (push k *free-buffers*)))
   (clrhash hash))

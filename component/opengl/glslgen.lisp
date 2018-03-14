@@ -1,6 +1,6 @@
 (defpackage #:glslgen
   (:use #:cl
-	#:funland)
+	#:utility)
   (:export
    spaces
    main make-shader-vars funglsl shader-program-data dump-shader-program-data))

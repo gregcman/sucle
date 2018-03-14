@@ -1,6 +1,6 @@
 (defpackage #:filesystem-util
   (:use :cl
-	:funland)
+	:utility)
   (:export save myload save2 myload2 rebase-path)
   (:export this-file this-directory))
 (in-package #:filesystem-util)

@@ -1,4 +1,4 @@
-(defpackage #:funland
+(defpackage #:utility
   (:use #:cl)
   (:export
    #:dobox

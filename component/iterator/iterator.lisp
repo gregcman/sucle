@@ -1,7 +1,7 @@
 (defpackage :iterator
   (:use
    #:cl
-   #:funland)
+   #:utility)
   (:export
    #:iterator
    

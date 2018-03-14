@@ -1,5 +1,5 @@
 (defpackage #:flunflair
-  (:use #:cl #:funland))
+  (:use #:cl #:utility))
 (in-package :flunflair)
 
 (defparameter *reloadables*
@@ -441,7 +441,7 @@
 (progn
   (declaim (ftype (function (single-float) single-float)
 		  translator))
-  (funland::with-unsafe-speed
+  (with-unsafe-speed
     (defun translator (x)
       (let* ((a (* x 0.6))
 	     (b (+ 0.2 a))

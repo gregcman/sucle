@@ -97,7 +97,7 @@
 (defun clearworld ()
   (send-to-free-mem *lispobj* *freechunkmempoolobj*))
 
-(funland::etouq
+(utility:etouq
  (flet ((define-accessors (getter-name setter-name %getter-name %setter-name)
 	  `(progn
 	     (defun ,getter-name (i j k)

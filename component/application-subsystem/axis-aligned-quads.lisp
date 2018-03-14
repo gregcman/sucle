@@ -1,5 +1,5 @@
 (defpackage :axis-aligned-quads
-  (:use :cl :funland)
+  (:use :cl :utility)
   (:export #:duaq #:aalgnqd)
   (:export
    #:quadi-

@@ -1,5 +1,5 @@
 (asdf:defsystem #:application-subsystem
-  :depends-on (#:funland
+  :depends-on (#:utility
 	       #:iterator
 	       #:bordeaux-threads
 	       #:nsb-cga)
