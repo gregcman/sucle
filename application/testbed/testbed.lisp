@@ -1,6 +1,6 @@
-(defpackage #:flunflair
+(defpackage #:testbed
   (:use #:cl #:utility))
-(in-package :flunflair)
+(in-package :testbed)
 
 (defparameter *reloadables*
   '(
@@ -236,7 +236,7 @@
 #+nil
 (map nil
      (lambda (x) (music::free-preloaded x))
-     (application::getfnc 'flunflair::PRELOADED-SOUNDS)) 
+     (application::getfnc 'PRELOADED-SOUNDS)) 
 (defun wot (value)
   (application::reload-if-dirty 'preloaded-sounds)
 					;(alexandria:random-elt)
@@ -364,7 +364,7 @@
     (let ((value (world::getblock x y z)))
       (when (and (zerop value)
 		 (not-occupied x y z))
-	(music::play-at (flunflair::wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
+	(music::play-at (wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
 			      0.8 1.0)
 	(let ((blockval *blockid*))
 	  (sandbox::plain-setblock
@@ -377,7 +377,7 @@
   (lambda (x y z)
     (let ((blockid (world::getblock x y z)))
       (unless (= blockid 0)
-      (music::play-at (flunflair::wot blockid) 
+      (music::play-at (wot blockid) 
 			    (+ x 0.5) (+ y 0.5) (+ 0.5 z)
 			    0.8
 			    1.0)))
@@ -389,7 +389,7 @@
   ;  (atest::grassify x y z)
 ;    #+nil
     (unless (zerop (world::getblock x y z))
-    					;(music::play-at (flunflair::wot) x y z)
+    					;(music::play-at (wot) x y z)
 	
       (sandbox::setblock-with-update x y z 0 0)))
   )

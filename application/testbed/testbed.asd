@@ -1,4 +1,4 @@
-(asdf:defsystem #:flunflair
+(asdf:defsystem #:testbed
   :depends-on (#:application
 	       #:sandbox
 	       #:opticl
@@ -8,4 +8,4 @@
   :components 
   ((:file "text-subsystem")
    (:file "sandbox-subsystem")
-   (:file "flunflair")))
+   (:file "testbed")))
