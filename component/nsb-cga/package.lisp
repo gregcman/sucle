@@ -1,6 +1,6 @@
 (in-package :defpackage+-user-1)
 
-(defpackage+ #:%sb-cga
+(defpackage+ #:nsb-cga
   (:use #:cl)
   (:inherit #:sb-cga)
   (:export

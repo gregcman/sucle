@@ -51,7 +51,7 @@
     ))
 
 (defparameter *identity-mat*
-  (%sb-cga:identity-matrix))
+  (nsb-cga:identity-matrix))
 (defparameter *view* (make-instance 'funfair::render-area))
 (defparameter *view256x256* (make-instance 'funfair::render-area
 					   :width 256
@@ -61,7 +61,7 @@
 (setf (values *block-width* *block-height*)
       (values 8.0 16.0))
 
-(defparameter *trans* (%sb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
+(defparameter *trans* (nsb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
 (defun retrans (x y &optional (trans *trans*))
   (setf (aref trans 12) (/ x 128.0)
 	(aref trans 13) (/ y 128.0))
