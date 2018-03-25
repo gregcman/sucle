@@ -2,8 +2,6 @@
   (:use #:cl #:utility))
 (in-package :basic)
 
-(setf application::*trampoline*
-      '(per-frame))
 (defun per-frame (&optional session)
   (declare (ignorable session))
   (app))
@@ -13,6 +11,8 @@
 	       *window-start-width*
 	       *window-start-height*
 	       *window-start-title*)))
+    (setf application::*trampoline*
+	  '(per-frame))
     (application::main)))
 
 (defparameter *window-start-height* 512)
@@ -23,11 +23,7 @@
   (incf *ticks*)
   (when (window::skey-j-p (window::keyval :escape))
     (application::quit))
-  (let ((slow-time (/ *ticks* 600.0)))
-    (gl:clear-color (sin slow-time)
-		    (sin (* 2.1 (+ 2.0 slow-time)))
-		    (sin (+ 3.5 (* 9.1 slow-time)))
-		    0.0))
+  (gl:clear-color 1.0 1.0 1.0 0.0)
   (gl:clear :color-buffer-bit)
   (gl:line-width 10.0)
   (gl:with-primitive :line-loop

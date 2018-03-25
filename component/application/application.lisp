@@ -189,6 +189,8 @@
   (music::really-start)
   music::*al-context*)
 
+(getfnc 'al-context)
+
 (defun restart-sound-system ()
   (music::restart-al)
   (remove-stuff 'al-context))
