@@ -18,17 +18,19 @@
 	   (just-main)))))
 
 (defun just-main ()
-  (let ((stdo *standard-output*))
+  (let ((stdo *standard-output*)
+	(args *argument-values*))
     (lambda ()
       (progv (cons '*standard-output* *arguments*)
-	  (cons stdo *argument-values*)
+	  (cons stdo args)
 	(window::wrapper #'init)))))
 
 (defparameter *arguments* '(window::*iresizable*
 			    window::*iwidth*
-			    window::*iheight*))
+			    window::*iheight*
+			    window::*ititle*))
 (defparameter *argument-values* (list nil 720 480
-				      ))
+				      "app"))
 
 (defparameter *trampoline* nil)
 (defun call-trampoline ()
