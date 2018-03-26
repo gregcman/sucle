@@ -30,9 +30,9 @@
 (defmacro clamp (min max x)
   `(max ,min (min ,max ,x)))
 
-(defparameter *format* (or ;:mono8
-			   ;:mono16
-			   ;:stereo8
+(defparameter *format* (or :mono8
+			   :mono16
+			   :stereo8
 			   :stereo16
 			   ))
 (defclass datobj ()
@@ -466,8 +466,6 @@
 (defun restart-al ()
   (destroy-al)
   (really-start))
-
-(restart-al)
 
 (defun planar-p (format)
   (case format
