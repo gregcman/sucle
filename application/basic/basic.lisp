@@ -14,20 +14,19 @@
     (setf application::*trampoline*
 	  '(per-frame))
     (application::main)))
+(defvar *this-directory* (filesystem-util:this-directory))
 
 (defparameter *window-start-height* 512)
 (defparameter *window-start-width* 512)
 (defparameter *window-start-title* "basic app")
 (defparameter *ticks* 0)
-(defvar *this-directory* (filesystem-util:this-directory))
-					;#+nil
-#+nil
-(defparameter *preloaded-sound*
-  (music::load-all (merge-pathnames "wilhelm_scream.wav" *this-directory*)))
 (defun app ()
   (incf *ticks*)
   (when (window::skey-j-p (window::keyval :escape))
     (application::quit))
+  (when (window::skey-j-p (window::keyval :a))
+    (music::reset-listener)
+    (music::play-at (merge-pathnames "wilhelm_scream.wav" *this-directory*) 0.0 0.0 0.0 1.0 1.0))
   (application::%set-render-area 0 0 window:*width* window:*height*)
   (gl:clear-color 1.0 1.0 1.0 0.0)
   (gl:clear :color-buffer-bit)
