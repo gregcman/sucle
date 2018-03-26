@@ -108,12 +108,16 @@
 
 (defmacro bind-iterator-out ((emit &optional (type t)) iterator &rest body)
   (let ((next (gensym))
-	(place (gensym)))
+	(place (gensym))
+	(actual-emit (gensym)))
     `(with-simply-bound-iterator (,next ,place ,type) ,iterator
-	 (flet ((,emit (value)
+       (macrolet ((,emit (&rest forms)
+		    (cons 'progn (mapcar (lambda (x) (list (quote ,actual-emit) x))
+					 forms))))
+	 (flet ((,actual-emit (value)
 		  (,next)
 		  (setf ,place value)))
-	   ,@body))))
+	   ,@body)))))
 
 (defmacro bind-iterator-in ((deref &optional (type t)) iterator &rest body)
   (let ((next (gensym))

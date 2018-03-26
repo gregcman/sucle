@@ -1051,29 +1051,20 @@ edge, or no case"
 	      (vector 0.0 0.0 0.0)
   )
 (defparameter *fog-ratio* 0.75)
-
+#+nil
 (defparameter *depth-buffer?* t)
 ;;when set to nil does not clear the depth buffer, but instead flip-flops
 ;;the depth function and matrix. has edge artefacts when using glclear for color
 
+#+nil
 (defparameter *mata*
   (nsb-cga:matrix*
    (nsb-cga:translate* 0.0 0.0 1.0)
    (nsb-cga:scale* 1.0 1.0 -1.0)))
-(defparameter *temp-matrix* (nsb-cga:identity-matrix))
-(defun camera-shader (camera)
-  (declare (optimize (safety 3) (debug 3)))
-  (glhelp::use-gl-program (getfnc 'blockshader))
-
-  (let ((cam (camera-matrix:camera-matrix-projection-view-player camera))
-	(matrix *temp-matrix*))
-    (cond (*depth-buffer?*
-	   (gl:clear-depth 1.0)
-	   (gl:clear
-	   :color-buffer-bit
-	   :depth-buffer-bit)
-	   (gl:depth-func :less)
-	   (setf matrix cam))
+#+nil
+(cond (*depth-buffer?*
+	   )
+	  #+nil
 	  (t
 	   (gl:clear :color-buffer-bit)
 	   (cond ((evenp *render-ticks*)
@@ -1087,6 +1078,19 @@ edge, or no case"
 		  (gl:depth-func :less)
 		  (gl:depth-range 0.0 0.5)
 		  (setf matrix cam)))))
+
+(defparameter *temp-matrix* (nsb-cga:identity-matrix))
+(defun camera-shader (camera)
+  (declare (optimize (safety 3) (debug 3)))
+  (glhelp::use-gl-program (getfnc 'blockshader))
+
+  (let ((matrix
+	 (camera-matrix:camera-matrix-projection-view-player camera)))
+    (gl:clear-depth 1.0)
+    (gl:clear
+     :color-buffer-bit
+     :depth-buffer-bit)
+    (gl:depth-func :less)
 
     (glhelp:with-uniforms uniform (getfnc 'blockshader)
       (gl:uniform-matrix-4fv 

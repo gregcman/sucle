@@ -4,10 +4,11 @@
 
 (defparameter *reloadables*
   '(
-    text
-    foo
-    foo2
-    text2))
+    ;text
+    ;foo
+    ;foo2
+    ;text2
+    ))
 (defun floatify (x)
   (coerce x 'single-float))
 
@@ -40,7 +41,8 @@
   (apply #'values (coerce vec 'list)))
 (defun per-frame (&optional session)
   (declare (ignorable session))
-  
+
+  #+nil
   (when (window::mice-free-p)
     (let ((newmousex (floatify (/ window::*mouse-x* text-sub::*block-width*)))
 	  (newmousey (floatify (/ (- window::*height* window::*mouse-y*)
@@ -49,6 +51,7 @@
 	    *old-mouse-y* *mouse-y*)
       (setf *mouse-x* newmousex
 	    *mouse-y* newmousey)))
+  #+nil
   (when (and (window::mice-free-p)
 	     (window::skey-p (window::mouseval :left)))
     (let ((dx (- *mouse-x* *old-mouse-x*))
@@ -58,56 +61,16 @@
 	(incf *texty* dy)
 	(text-sub::flag-text-dirty))))
 
-  (progn
-    (when (window::skey-j-p (window::keyval :n))
-      (copy-array-buf))
-    
-    (when (window::skey-j-p (window::keyval :escape))
-      (application::quit))
-    (when (window::skey-j-p (window::keyval :6))
-      (setf *blockid* (multiple-value-call #'world::getblock
-			(vec-values (pop *selection*)))))
-    (when (window::skey-j-p (window::keyval :y))
-      (toggle sandbox-sub::*depth-buffer?*))
-    (when (window::skey-j-p (window::keyval :r))
-      (setf *selection* nil))
-    (when (window::skey-j-p (window::keyval :e))
+  (when (window::skey-j-p (window::keyval :escape))
+    (application::quit))
+  (when (window::skey-j-p (window::keyval :e))
       (window::toggle-mouse-capture)
       (moused))
-    (when (window::skey-j-p (window::keyval :q))
-      (pop *selection*))
-    (when (window::skey-j-p (window::keyval :2))
-      (map-box (hollowbox (lambda (x y z)
-			    (sandbox::plain-setblock x y z *blockid* 0))
-			  2)))
-    (when (window::skey-j-p (window::keyval :5))
-      (map-box (hollowbox (lambda (x y z)
-			    (sandbox::plain-setblock x y z *blockid* 0))
-			  0)))
-    (when (window::skey-j-p (window::keyval :4))
-      (map-box (sphere (lambda (x y z)
-			 (sandbox::plain-setblock x y z *blockid* 0)))))
-    (with-vec (a b c) ((sandbox-sub::farticle-position
-			(sandbox-sub::entity-particle *ent*)))
-      (when (window::skey-j-p (window::keyval :b))
-	(setf *box* (make-box (pop *selection*)
-			      (pop *selection*))))
-      (when (window::skey-j-p (window::keyval :x))      
-	(push (vector (floor a) (floor b) (floor c)) *selection*))
-      (when (window::skey-p (window::keyval :z))      
-	(setfoo (setf *lastpos* (vector (floor a) (floor b) (floor c))))))
-    
-    (when (window::skey-j-p (window::keyval :1))
-      (multiple-value-call #'line2
-	(vec-values (pop *selection*))
-	(vec-values (pop *selection*))
-	*blockid*))
-    (setf *paused* (window::mice-free-p))
-    (if *paused*
+  ;(more-controls)
+  (setf *paused* (window::mice-free-p))
+  (if *paused*
 	(application::tick *ticker* (lambda ()))
 	(stuff))
-    (when (window::skey-j-p (window::keyval :c))
-      (music::cleanup-poller)))
   
   (let* ((particle (sandbox-sub::entity-particle *ent*))
 	 (pos (sandbox-sub::farticle-position particle))
@@ -128,6 +91,7 @@
 	(setf (aref curr 5) (aref other2 2))
 	(al:listener :orientation curr)))
     (map nil #'application::reload-if-dirty *reloadables*))
+  #+nil
   (progn
     (unless (eq *lastsel*
 		*selection*)
@@ -147,6 +111,7 @@
 	(progn
 	  (drawxyz *textx* *texty* (glhelp::handle (application::getfnc 'text)))
 	  (drawxyz 10.0 10.0  (glhelp::handle (application::getfnc 'text2))))))))
+#+nil
 (progn
   (defun setfoo2 (obj)
     (let ((*print-case* :downcase))
@@ -163,6 +128,7 @@
      :handle
      (text-sub::mesh-string-gl-points -128.0 -128.0 foo2))))
 
+#+nil
 (progn
   (defun setfoo (obj)
     (let ((*print-case* :downcase))
@@ -179,6 +145,7 @@
      :handle
      (text-sub::mesh-string-gl-points -128.0 -128.0 foo))))
 
+#+nil
 (defun copy-array-buf ()
   (let ((width 256)
 	(height 256))
@@ -209,6 +176,49 @@
       (progn
 	(gl:bind-texture :texture-2d (glhelp::texture (application::getfnc 'text-sub::text-data)))
 	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
+
+#+nil
+(defun more-controls ()
+  (progn
+    (when (window::skey-j-p (window::keyval :n))
+      (copy-array-buf))
+    (when (window::skey-j-p (window::keyval :6))
+      (setf *blockid* (multiple-value-call #'world::getblock
+			(vec-values (pop *selection*)))))
+    (when (window::skey-j-p (window::keyval :y))
+      (toggle sandbox-sub::*depth-buffer?*))
+    (when (window::skey-j-p (window::keyval :r))
+      (setf *selection* nil))
+    (when (window::skey-j-p (window::keyval :q))
+      (pop *selection*))
+    (when (window::skey-j-p (window::keyval :2))
+      (map-box (hollowbox (lambda (x y z)
+			    (sandbox::plain-setblock x y z *blockid* 0))
+			  2)))
+    (when (window::skey-j-p (window::keyval :5))
+      (map-box (hollowbox (lambda (x y z)
+			    (sandbox::plain-setblock x y z *blockid* 0))
+			  0)))
+    (when (window::skey-j-p (window::keyval :4))
+      (map-box (sphere (lambda (x y z)
+			 (sandbox::plain-setblock x y z *blockid* 0)))))
+    (with-vec (a b c) ((sandbox-sub::farticle-position
+			(sandbox-sub::entity-particle *ent*)))
+      (when (window::skey-j-p (window::keyval :b))
+	(setf *box* (make-box (pop *selection*)
+			      (pop *selection*))))
+      (when (window::skey-j-p (window::keyval :x))      
+	(push (vector (floor a) (floor b) (floor c)) *selection*))
+      (when (window::skey-p (window::keyval :z))      
+	(setfoo (setf *lastpos* (vector (floor a) (floor b) (floor c))))))
+    
+    (when (window::skey-j-p (window::keyval :1))
+      (multiple-value-call #'line2
+	(vec-values (pop *selection*))
+	(vec-values (pop *selection*))
+	*blockid*))
+    (when (window::skey-j-p (window::keyval :c))
+      (music::cleanup-poller))))
 
 (defun preload ()
   (let ((array (make-array (* 4 7))))
@@ -256,7 +266,7 @@
     (otherwise (random 7))))
 
 (defun start ()
-  (setf application::*trampoline* '(sandbox-sub::per-frame text-sub::per-frame
+  (setf application::*trampoline* '(sandbox-sub::per-frame ;text-sub::per-frame
 				    per-frame
 				    ))
   (application::main))

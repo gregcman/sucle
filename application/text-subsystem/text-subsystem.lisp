@@ -40,13 +40,15 @@
     ;;shader-test
 ;    text-shader
     render-normal-text-refraction
- ;   refraction-shader-text
- ;   refraction-shader
- ;   flat-shader-text
+;    refraction-shader-text
+;    refraction-shader
+;    fullscreen-quad
+;    indirection
+;    flat-shader-text
 ;    flat-shader
 ;    font-png
 					;   font-texture
-    draw-commands
+;    draw-commands
  ;   terminal256color-lookup
     ))
 
@@ -67,7 +69,9 @@
 	(aref trans 13) (/ y 128.0))
   trans)
 
+#+nil
 (defparameter *clear-text-buffer-flag* 0)
+#+nil
 (defun flag-text-dirty ()
   (setf *clear-text-buffer-flag* 2))
 (defun per-frame (session)
@@ -79,7 +83,7 @@
 
   (render-stuff))
 
-
+#+nil
 (deflazy draw-commands (application::gl-context)
   (declare (ignorable application::gl-context))
   (lparallel.queue:make-queue))
@@ -89,22 +93,68 @@
   (progn
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
     (application::%set-render-area 0 0 256 256))
+  #+nil
   (when (not (zerop *clear-text-buffer-flag*))
     (decf *clear-text-buffer-flag*)
     (when (Zerop *clear-text-buffer-flag*)
       (progn
 	(gl:clear-color 0.0 0.0 0.0 0.0)
 	(gl:clear :color-buffer-bit))))
+					;#+nil
+  #+nil
+  (progn
+    (gl:clear-color (byte-float (char-code #\a))
+		    (byte-float (color 0 3 2 1))
+		    (byte-float (color 3 1 0 3))
+		    1.0)
+    (gl:clear :color-buffer-bit))
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms
 	uniform program
-	(flet ((draw-xyz (x y call-list)
+      (labels (
+	       #+nil
+	       (draw-xyz (x y call-list)
+		 (rebase x y)
+		 (gl:call-list call-list))
+	       (rebase (x y)
 		 (gl:uniform-matrix-4fv
 		  (uniform :pmv)
 		  (retrans x y)
-		  nil)
-		 (gl:call-list call-list)))
+		  nil)))
+	;#+nil
+	(flet ((pos (x y z)
+		 (;%gl:vertex-attrib-4f 3
+				       gl:vertex
+				       x y z 1.0))
+	       (value (x y z)
+		 (;%gl:vertex-attrib-4f 0
+				       gl:color 
+				       x y z 1.0)))
+	  (rebase 10.0 10.0)
+	  (gl:with-primitives :points
+	    (let ((bgcol (byte-float (color 3 3 3 3)))
+		  (fgcol (byte-float (color 0 0 0 3))))
+	      ((lambda (x y string)
+		 (let ((start x))
+		   (let ((len (length string)))
+		     (dotimes (index len)
+		       (let ((char (aref string index)))
+			 (cond ((char= char #\Newline)
+				(setf x start)
+				(decf y))
+			       (t
+				(value (byte-float (char-code char))
+				       bgcol
+				       fgcol)
+				(pos (floatify x)
+				     (floatify y)
+				     0.0)
+				
+				(setf x (1+ x))))))
+		     len)))
+	       -128.0 -128.0 "hello world, greg here"))))
+	#+nil
 	  (let ((draw-commands (getfnc 'draw-commands)))
 	    (lparallel.queue:with-locked-queue draw-commands
 	      (let ((times (/ (lparallel.queue:queue-count/no-lock draw-commands) 3)))
@@ -150,17 +200,21 @@
     (gl:enable :blend)
     (gl:blend-func :src-alpha :one-minus-src-alpha)
 					;  #+nil
-    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
+    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))
+    ))
 
 
 (defun uppow2 (n)
   (ash 1 (ceiling (log n 2))))
  ;;up to next power of two
 
+(defparameter *indirection-width* 0)
+(defparameter *indirection-height* 0)
+
 (deflazy indirection ()
   (glhelp::make-gl-framebuffer
-   (uppow2 window::*width*)
-   (uppow2 window::*height*)))
+   *indirection-width*
+   *indirection-height*))
 
 (deflazy text-data ()
   (glhelp::make-gl-framebuffer 256 256))
@@ -182,11 +236,18 @@
 		      *block-height*)))
     (gl:disable :cull-face)
     (gl:disable :depth-test)
+    (gl:disable :blend
+     )
     (set-render-area (make-instance 'application::render-area
 				    :width upw
 				    :height uph))
-    (application::reload 'indirection)
+    (when (not (and (= *indirection-width* upw)
+		    (= *indirection-height* uph)))
+      (setf *indirection-width* upw
+	    *indirection-height* uph)
+      (application::reload 'indirection))
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
+    (gl:clear :color-buffer-bit)
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
 
 (defmacro progeach (fun body)
@@ -517,9 +578,10 @@
 	       (iterator:bind-iterator-in
 		(value single-float) value
 		(dotimes (x times)
-		  (%gl:vertex-attrib-4f 2 (value) (value) (value) 1.0)
+		  (%gl:vertex-attrib-4f 3 (value) (value) (value) 1.0)
 		  (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
 	    len position value)))))))
+
 
 (deflazy flat-shader-text ()
   (glslgen:ashader
@@ -545,7 +607,7 @@
        )))
    :attributes
    '((position . 0) 
-     (value . 2))
+     (value . 3))
    :varyings
    '((value-out . value))
    :uniforms
