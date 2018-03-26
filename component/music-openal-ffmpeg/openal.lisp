@@ -30,9 +30,9 @@
 (defmacro clamp (min max x)
   `(max ,min (min ,max ,x)))
 
-(defparameter *format* (or :mono8
-			   :mono16
-			   :stereo8
+(defparameter *format* (or ;:mono8
+			   ;:mono16
+			   ;:stereo8
 			   :stereo16
 			   ))
 (defclass datobj ()
@@ -196,10 +196,8 @@
 	    (flet ((conv (arr)
 		     (multiple-value-bind (pcm playsize)
 			 (convert
-			  (case channels
-			    (1 (cffi:mem-aref data :pointer 0))
-			    (otherwise (cffi:mem-aref data :pointer 1)))
-			  (cffi:mem-aref data :pointer 0)
+			  channels
+			  data
 			  samples
 			  audio-format
 			  format
@@ -207,6 +205,7 @@
 		       (let ((buffer (get-buffer)))
 			 (al:buffer-data buffer format pcm playsize rate)
 			 (source-queue-buffer datobj buffer)))))
+	      
 	      (let ((arrcount (ecase format
 				((:stereo8 :stereo16) (* samples 2))
 				((:mono8 :mono16) samples))))
@@ -228,6 +227,8 @@
    (info :initform nil)))
 
 (defun load-all (file &optional (format *format*))
+  (when (pathnamep file)
+    (setf file (namestring file)))
   (let ((music nil))
     (unwind-protect
 	 (progn
@@ -246,12 +247,10 @@
 		   (flet ((conv (arr)
 			    (multiple-value-bind (pcm playsize)
 				(convert
-				 (case channels
-				   (1 (cffi:mem-aref data :pointer 0))
-				   (otherwise (cffi:mem-aref data :pointer 1)))
-				 (cffi:mem-aref data :pointer 0)
+				 channels
+				 data
 				 samples
-				 audio-format
+				 (print audio-format)
 				 format
 				 arr)
 			      (let ((buffer (get-buffer)))
@@ -425,21 +424,58 @@
   (destroy-al)
   (really-start))
 
+(defun planar-p (format)
+  (case format
+    ((:fltp :dblp :s16p :s32p :u8p :s64p) t)))
+
 ;;;;ffmpeg format to openal format
-(defun convert (left right len format playblack-format arr)
-  (case playblack-format
-    (:mono8
-     (values (convert8 left len format arr)
-	     len))
-    (:mono16
-     (values (convert16 left len format arr)
-	     (* 2 len)))
-    (:stereo8
-     (values (interleave8 left right format (* 2 len) arr)
-	     (* len 2)))
-    (:stereo16
-     (values (interleave16 left right format (* 2 len) arr)
-	     (* len 4)))))
+(defun convert (channels data len format playback-format arr) 
+  (ecase channels
+    (1 (let ((channel (cffi:mem-aref data :pointer 0)))
+	 (case playback-format
+	   (:mono8
+	    (values (array->uint8 channel format len arr)
+		    len))
+	   (:mono16
+	    (values (array->int16 channel format len arr)
+		    (* 2 len)))
+	   (:stereo8
+	    (values (mono->stereo8 channel format (* 2 len) arr)
+		    (* len 2)))
+	   (:stereo16
+	    (values (mono->stereo16 channel format (* 2 len) arr)
+		    (* len 4))))))
+    (2
+     (if (planar-p format)
+	 (let ((left (cffi:mem-aref data :pointer 0))
+	       (right (cffi:mem-aref data :pointer 1)))
+	   (case playback-format
+	     (:mono8
+	      (values (planar-stereo->mono8 left right format len arr)
+		      len))
+	     (:mono16
+	      (values (planar-stereo->mono16 left right format len arr)
+		      (* 2 len)))
+	     (:stereo8
+	      (values (planar-stereo->stereo8 left right format (* 2 len) arr)
+		      (* len 2)))
+	     (:stereo16
+	      (values (planar-stereo->stereo16 left right format (* 2 len) arr)
+		      (* len 4)))))
+	 (let ((channel (cffi:mem-aref data :pointer 0)))
+	   (case playback-format
+	     (:mono8
+	      (values (interleaved-stereo->mono8 channel format len arr)
+		      len))
+	     (:mono16
+	      (values (interleaved-stereo->mono16 channel format len arr)
+		      (* 2 len)))
+	     (:stereo8
+	      (values (array->uint8 channel format (* 2 len) arr)
+		      (* len 2)))
+	     (:stereo16
+	      (values (array->int16 channel format (* 2 len) arr)
+		      (* len 4)))))))))
 
 ;;	DC DAC Modeled -> [-1.0 1.0] -> [-32768 32767]
 ;;      apple core audo, alsa, matlab, sndlib -> (lambda (x) (* x #x8000))
@@ -449,7 +485,7 @@
 (eval-when (:compile-toplevel)
   (defparameter *int16-dispatch*
     '(ecase format
-      ((:fltp :flt)
+      ((:flt :fltp)
        (let* ((scale 1.0)
 	      (scaling-factor (/ 32768.0 scale)))
 	 (declare (type single-float scale scaling-factor))
@@ -461,7 +497,7 @@
 			    (* value
 			       scaling-factor)))))))
       
-      ((:dblp :dbl)
+      ((:dbl :dblp)
        (let* ((scale 1.0d0)
 	      (scaling-factor (/ 32768.0d0 scale)))
 	 (declare (type double-float scale scaling-factor))
@@ -486,7 +522,7 @@
 (deftype carray-index ()
   `(integer 0 ,(load-time-value (ash most-positive-fixnum -3))))
 ;;;length -> samples per channel
-(defun interleave16 (left right format numcount arr)
+(defun planar-stereo->stereo16 (left right format numcount arr)
   (declare (optimize (speed 3) (safety 0)))
   (declare (type carray-index numcount))
   (macrolet ((audio-type (type form)
@@ -500,7 +536,86 @@
     (etouq *int16-dispatch*))
   arr)
 
-(defun convert16 (buffer newlen format arr)
+(defun interleaved-stereo->mono16 (channel format numcount arr)
+  (declare (optimize (speed 3) (safety 0)))
+  (declare (type carray-index numcount))
+  (macrolet ((audio-type (type form)
+	       `(dotimes (index numcount)
+		  (setf (cffi:mem-aref arr :int16 index)
+			(let* ((indexa (ash index 1))
+			       (indexb (+ 1 indexa))
+			       (a (cffi:mem-aref channel ,type indexa))
+			       (b (cffi:mem-aref channel ,type indexb))
+			       (c (the ,(case type
+					      (:double 'double-float)
+					      (:float 'single-float)
+					      (otherwise 'fixnum))
+				       (+ a b)))
+			       (value ,(case type
+					     (:double '(/ c 2.0d0))
+					     (:float '(/ c 2.0))
+					     (otherwise '(ash c -1)))))
+			  ,form)))))
+    (etouq *int16-dispatch*))
+  arr)
+
+(defun interleaved-stereo->mono8 (channel format numcount arr)
+  (declare (optimize (speed 3) (safety 0)))
+  (declare (type carray-index numcount))
+  (macrolet ((audio-type (type form)
+	       `(dotimes (index numcount)
+		  (setf (cffi:mem-aref arr :int16 index)
+			(let* ((indexa (ash index 1))
+			       (indexb (+ 1 indexa))
+			       (a (cffi:mem-aref channel ,type indexa))
+			       (b (cffi:mem-aref channel ,type indexb))
+			       (c (the ,(case type
+					      (:double 'double-float)
+					      (:float 'single-float)
+					      (otherwise 'fixnum))
+				       (+ a b)))
+			       (value ,(case type
+					     (:double '(/ c 2.0d0))
+					     (:float '(/ c 2.0))
+					     (otherwise '(ash c -1)))))
+			  ,form)))))
+    (etouq *uint8-dispatch*))
+  arr)
+
+(defun planar-stereo->mono16 (left right format numcount arr)
+  (declare (optimize (speed 3) (safety 0)))
+  (declare (type carray-index numcount))
+  (macrolet ((audio-type (type form)
+	       `(dotimes (index numcount)
+		  (setf (cffi:mem-aref arr :int16 index)
+			(let* ((a (cffi:mem-aref left ,type index))
+			       (b (cffi:mem-aref right ,type index))
+			       (c (the ,(case type
+					      (:double 'double-float)
+					      (:float 'single-float)
+					      (otherwise 'fixnum))
+				       (+ a b)))
+			       (value ,(case type
+					     (:double '(/ c 2.0d0))
+					     (:float '(/ c 2.0))
+					     (otherwise '(ash c -1)))))
+			  ,form)))))
+    (etouq *int16-dispatch*))
+  arr)
+
+(defun mono->stereo16 (channel format numcount arr)
+  (declare (optimize (speed 3) (safety 0)))
+  (declare (type carray-index numcount))
+  (macrolet ((audio-type (type form)
+	       `(dotimes (index numcount)
+		  (setf (cffi:mem-aref arr :int16 index)
+			(let* ((little-index (ash index -1))
+			       (value (cffi:mem-aref channel ,type little-index)))
+			  ,form)))))
+    (etouq *int16-dispatch*))
+  arr)
+
+(defun array->int16 (buffer format newlen arr)
   (declare (optimize (speed 3) (safety 0)))
   (declare (type carray-index newlen))
   (macrolet ((audio-type (type form)
@@ -514,7 +629,7 @@
 (eval-when (:compile-toplevel)
   (defparameter *uint8-dispatch*
     '(ecase format
-      ((:fltp :flt)
+      ((:flt :fltp)
        (let* ((scale 1.0)
 	      (scaling-factor (/ 128.0 scale)))
 	 (declare (type single-float scale scaling-factor))
@@ -526,7 +641,7 @@
 			      (round
 			       (* value
 				  scaling-factor))))))))
-      ((:dblp :dbl)
+      ((:dbl :dblp)
        (let* ((scale 1.0d0)
 	      (scaling-factor (/ 128d0 scale)))
 	 (declare (type double-float scale scaling-factor))
@@ -550,7 +665,7 @@
 	(+ 128 (ash (the (unsigned-byte 64) value) -56))))
       (:nb (error "wtf is nb?")))))
 
-(defun interleave8 (left right format numcount arr)
+(defun planar-stereo->stereo8 (left right format numcount arr)
   (declare (optimize (speed 3) (safety 0)))
   (declare (type carray-index numcount))
   (macrolet ((audio-type (type form)
@@ -564,7 +679,40 @@
     (etouq *uint8-dispatch*))
   arr)
 
-(defun convert8 (buffer newlen format arr)
+(defun planar-stereo->mono8 (left right format numcount arr)
+  (declare (optimize (speed 3) (safety 0)))
+  (declare (type carray-index numcount))
+  (macrolet ((audio-type (type form)
+	       `(dotimes (index numcount)
+		  (setf (cffi:mem-aref arr :int16 index)
+			(let* ((a (cffi:mem-aref left ,type index))
+			       (b (cffi:mem-aref right ,type index))
+			       (c (the ,(case type
+					      (:double 'double-float)
+					      (:float 'single-float)
+					      (otherwise 'fixnum))
+				       (+ a b)))
+			       (value ,(case type
+					     (:double '(/ c 2.0d0))
+					     (:float '(/ c 2.0))
+					     (otherwise '(ash c -1)))))
+			  ,form)))))
+    (etouq *uint8-dispatch*))
+  arr)
+
+(defun mono->stereo8 (channel format numcount arr)
+  (declare (optimize (speed 3) (safety 0)))
+  (declare (type carray-index numcount))
+  (macrolet ((audio-type (type form)
+	       `(dotimes (index numcount)
+		  (setf (cffi:mem-aref arr :uint8 index)
+			(let* ((little-index (ash index -1))
+			       (value (cffi:mem-aref channel ,type little-index)))
+			  ,form)))))
+    (etouq *uint8-dispatch*))
+  arr)
+
+(defun array->uint8 (buffer format newlen arr)
   (declare (optimize (speed 3) (safety 0)))
   (declare (type carray-index newlen))
   (macrolet ((audio-type (type form)
