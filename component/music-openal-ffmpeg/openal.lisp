@@ -40,32 +40,48 @@
    (playback :initform *format*)
    (time-remaining :initform 0)
    (used-buffers :initform (make-hash-table :test 'eql))
-   (cancel :initform nil) ;;set to t to stop streaming from disk to al
+   ;;set to t or 'aborted to stop streaming from disk to al
+   ;;cleaned up when source stops with t, exits immediately with 'aborted
+   (status :initform nil) 
    (data :initform nil)))
 
+(defun datobj-freeable? (&optional (datobj *datobj*))
+  (eq :stopped
+      (al:get-source (slot-value datobj 'source) :source-state)))
+
 (defun free-datobj (&optional (datobj *datobj*))
-  (with-slots (cancel source used-buffers data time-remaining) datobj
+  (with-slots (source used-buffers data time-remaining) datobj
     (al:source-stop source)
     (al:source source :buffer 0)
     (free-buffers-hash used-buffers)
     (setf time-remaining 0)
-    (cl-ffmpeg::free-music-stuff data)
-    
+    (cl-ffmpeg::free-music-stuff data)   
     (al:delete-source source)))
 
+(defun delete-one-buffer (buffer)
+  (cffi:with-foreign-object (buffer-array :uint 1)
+    (setf
+     (cffi:mem-aref buffer-array :uint 0)
+     buffer)
+    (%al:delete-buffers 1 buffer-array)))
+
 (defun free-a-buffer (datobj)
-  (bordeaux-threads:with-lock-held (*free-buffers-lock*)
-    (let ((buf (al:get-source (slot-value datobj 'source) :buffer)))
-      (if (or (= buf 0)
-	      (= buf 1))
-	  (format t "wut ~a" buf)
-	  (push buf *free-buffers*)))))
+  ;;;(bordeaux-threads:with-lock-held (*free-buffers-lock*))
+  (let ((buf (al:get-source (slot-value datobj 'source) :buffer)))
+    (if (or (= buf 0)
+	    (= buf 1))
+	(format t "wut ~a" buf)
+	(delete-one-buffer buf)
+					;	  (push buf *free-buffers*)
+	)))
 
 (defparameter *task* (lparallel:make-channel))
 (defun play-at (sound x y z pitch volume)
   (when (> 128 (total-handles))
     (typecase sound
       ((or pathname string)
+       (when (pathnamep sound)
+	 (setf sound (namestring sound)))
        (lparallel:submit-task
 	*task*
 	(let ((format *format*))
@@ -82,7 +98,7 @@
 		  (al:source source :pitch pitch)
 		  (push-sound datobj)
 		  (values datobj source))))))
-	(string sound) x y z))
+	sound x y z))
       (preloaded-music (play-preloaded-at sound x y z pitch volume)))))
 
 (defparameter *datobj* nil)
@@ -104,8 +120,8 @@
   (with-slots (source) datobj
     (al:source-pause source)))
 (defun stop (&optional (datobj *datobj*))
-  (with-slots (cancel) datobj
-    (setf cancel t)))
+  (with-slots (status) datobj
+    (setf status 'aborted)))
 
 (defun push-sound (datobj)
   (lparallel.queue:push-queue datobj *new-sounds*)
@@ -137,10 +153,11 @@
 	      (bordeaux-threads:with-lock-held (*datobjs-lock*)
 		(dohash (obj dummy) *datobjs*
 		  (declare (ignorable dummy))
-		  (if (update-obj obj) ;;finished or cancelled
-		      (progn (remhash obj *datobjs*)
-			     (destroy-obj obj))
-		      (setf flag t)))) ;;still playing
+		  (multiple-value-bind (destructible?) (update-obj obj) ;;finished or cancelled
+		    (if destructible?
+			(progn (destroy-obj obj)
+			       (remhash obj *datobjs*))
+			(setf flag t))))) ;;still playing
 	      (when flag
 		(sleep 0.1)
 		(go repeat)))))
@@ -148,17 +165,25 @@
 
 (defun update-obj (obj)
   (etypecase obj
-    (datobj (or (slot-value obj 'cancel)
-		(update-playable obj)))
+    (datobj
+     (or (eq 'aborted (slot-value obj 'status))
+	 (progn
+	   (update-playable obj)
+	   (let ((value (slot-value obj 'status)))
+	     (or (eq value 'aborted)
+		 (and (eq value t)
+		      (datobj-freeable? obj)))))))
     (integer (eq :stopped
 		 (al:get-source obj :source-state)))))
 
 (defun destroy-obj (obj)
   (etypecase obj
-    (datobj (free-datobj obj))
+    (datobj
+     (free-datobj obj))
     (integer
      (al:source-stop obj)
-     (al:delete-source obj))))
+     (al:delete-source obj)
+     )))
 
 (defun cleanup-poller ()
   (bordeaux-threads:with-lock-held (*datobjs-lock*)
@@ -178,48 +203,59 @@
   (setf *sound-thread* (iosub (poller))))
 
 (defun update-playable (datobj)
-  (with-slots (cancel time-remaining (format playback) (music data)) datobj
-    (let* ((rate (slot-value 
-		  (slot-value 
-		   music
-		   'cl-ffmpeg::sound)
-		  'cl-ffmpeg::rate))
-	   (threshold 0.5)
-	   (target 0.5))
-      (when (not rate)
-	(setf cancel t)
-	(return-from update-playable t))
-      (free-buffers datobj)
-      (when (>= (* rate threshold) time-remaining)
-	(let ((target-samples (* rate target)))
-	  (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
-	    (flet ((conv (arr)
-		     (multiple-value-bind (pcm playsize)
-			 (convert
-			  channels
-			  data
-			  samples
-			  audio-format
-			  format
-			  arr)
-		       (let ((buffer (get-buffer)))
-			 (al:buffer-data buffer format pcm playsize rate)
-			 (source-queue-buffer datobj buffer)))))
-	      
-	      (let ((arrcount (ecase format
-				((:stereo8 :stereo16) (* samples 2))
-				((:mono8 :mono16) samples))))
-		(ecase format
-		  ((:mono8 :stereo8)
-		   (cffi:with-foreign-object (arr :uint8 arrcount)
-		     (conv arr)))
-		  ((:mono16 :stereo16)
-		   (cffi:with-foreign-object (arr :int16 arrcount)
-		     (conv arr))))))
-	    (when cancel (return-from update-playable t))
-	    (decf target-samples samples)
-	    (when (>= 0 target-samples)
-	      (return))))))))
+  (macrolet ((exit (x)
+	       `(return-from exit ,x)))
+    (block exit
+      (with-slots (status time-remaining (format playback) (music data)) datobj
+	(let* ((rate (slot-value 
+		      (slot-value 
+		       music
+		       'cl-ffmpeg::sound)
+		      'cl-ffmpeg::rate))
+	       (threshold 10.0)
+	       (target 10.0))
+	  (when (not rate)
+	    (setf status 'aborted)
+	    (exit 'aborted))
+	  (when (eq status 'aborted)
+	    (exit 'aborted))
+	  (tagbody move
+	     (free-buffers datobj)
+	     (when (>= (* rate threshold) time-remaining)
+	       (let ((target-samples (* rate target)))
+		 (setf
+		  status 
+		  (cl-ffmpeg::%get-sound-buff (data samples channels audio-format rate) music
+		    (flet ((conv (arr)
+			     (multiple-value-bind (pcm playsize)
+				 (convert
+				  channels
+				  data
+				  samples
+				  audio-format
+				  format
+				  arr)
+			       (let ((buffer (get-buffer)))
+				 (al:buffer-data buffer format pcm playsize rate)
+				 (source-queue-buffer datobj buffer)))))	      
+		      (let ((arrcount (ecase format
+					((:stereo8 :stereo16) (* samples 2))
+					((:mono8 :mono16) samples))))
+			(ecase format
+			  ((:mono8 :stereo8)
+			   (cffi:with-foreign-object (arr :uint8 arrcount)
+			     (conv arr)))
+			  ((:mono16 :stereo16)
+			   (cffi:with-foreign-object (arr :int16 arrcount)
+			     (conv arr))))))
+		    (when (eq status 'aborted)
+		      (return 'aborted))
+		    (decf target-samples samples)
+		    (when (>= 0 target-samples)
+		      (return nil)))))
+	       (when
+		   (eq status nil)
+		 (go move)))))))))
 
 (defclass preloaded-music ()
   ((buffers :initform nil)
@@ -315,10 +351,12 @@
       (values time bufs))))
 
 (defun free-buffers-hash (hash)
-  (bordeaux-threads:with-lock-held (*free-buffers-lock*)
-    (dohash (k v) hash
-      (declare (ignore v))
-      (push k *free-buffers*)))
+  ;(bordeaux-threads:with-lock-held (*free-buffers-lock*))
+  (dohash (k v) hash
+    (declare (ignore v))
+    (delete-one-buffer k)
+					;      (push k *free-buffers*)
+    )
   (clrhash hash))
 
 #+nil ;;;sources and buffers share namespace?
@@ -331,10 +369,13 @@
      t
      (format t "max: ~a len: ~a" a b))))
 (defun get-buffer ()
+  #+nil
   (or (bordeaux-threads:with-lock-held (*free-buffers-lock*)
-	(pop *free-buffers*))
-      (al:gen-buffer)))
+	(pop *free-buffers*)))
+  (al:gen-buffer))
+#+nil
 (defparameter *free-buffers* nil)
+#+nil
 (defparameter *free-buffers-lock* (bordeaux-threads:make-lock "free albuffers"))
 (defun %free-buffers (sid datobj)
   (let ((bufs (al:get-source sid :buffers-processed))
@@ -350,8 +391,10 @@
 	    (when (not (zerop buf))
 	      (remhash buf used-buffers)
 	      (incf time (buffer-samples buf))
-	      (bordeaux-threads:with-lock-held (*free-buffers-lock*)
-		(push buf *free-buffers*)))))))
+	      ;(bordeaux-threads:with-lock-held (*free-buffers-lock*))
+	      (delete-one-buffer buf)
+;		(push buf *free-buffers*)
+		)))))
     (values
      time
      bufs)))
@@ -424,6 +467,8 @@
   (destroy-al)
   (really-start))
 
+(restart-al)
+
 (defun planar-p (format)
   (case format
     ((:fltp :dblp :s16p :s32p :u8p :s64p) t)))
@@ -482,7 +527,7 @@
 ;;
 ;;;;crackling noise when floats above 1.0 or below -1.0?
 ;;;; clamp or scale floats outside of [-1.0 1.0]?
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *int16-dispatch*
     '(ecase format
       ((:flt :fltp)
@@ -559,28 +604,6 @@
     (etouq *int16-dispatch*))
   arr)
 
-(defun interleaved-stereo->mono8 (channel format numcount arr)
-  (declare (optimize (speed 3) (safety 0)))
-  (declare (type carray-index numcount))
-  (macrolet ((audio-type (type form)
-	       `(dotimes (index numcount)
-		  (setf (cffi:mem-aref arr :int16 index)
-			(let* ((indexa (ash index 1))
-			       (indexb (+ 1 indexa))
-			       (a (cffi:mem-aref channel ,type indexa))
-			       (b (cffi:mem-aref channel ,type indexb))
-			       (c (the ,(case type
-					      (:double 'double-float)
-					      (:float 'single-float)
-					      (otherwise 'fixnum))
-				       (+ a b)))
-			       (value ,(case type
-					     (:double '(/ c 2.0d0))
-					     (:float '(/ c 2.0))
-					     (otherwise '(ash c -1)))))
-			  ,form)))))
-    (etouq *uint8-dispatch*))
-  arr)
 
 (defun planar-stereo->mono16 (left right format numcount arr)
   (declare (optimize (speed 3) (safety 0)))
@@ -626,7 +649,7 @@
     (etouq *int16-dispatch*))
   arr)
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *uint8-dispatch*
     '(ecase format
       ((:flt :fltp)
@@ -684,9 +707,32 @@
   (declare (type carray-index numcount))
   (macrolet ((audio-type (type form)
 	       `(dotimes (index numcount)
-		  (setf (cffi:mem-aref arr :int16 index)
+		  (setf (cffi:mem-aref arr :uint8 index)
 			(let* ((a (cffi:mem-aref left ,type index))
 			       (b (cffi:mem-aref right ,type index))
+			       (c (the ,(case type
+					      (:double 'double-float)
+					      (:float 'single-float)
+					      (otherwise 'fixnum))
+				       (+ a b)))
+			       (value ,(case type
+					     (:double '(/ c 2.0d0))
+					     (:float '(/ c 2.0))
+					     (otherwise '(ash c -1)))))
+			  ,form)))))
+    (etouq *uint8-dispatch*))
+  arr)
+
+(defun interleaved-stereo->mono8 (channel format numcount arr)
+  (declare (optimize (speed 3) (safety 0)))
+  (declare (type carray-index numcount))
+  (macrolet ((audio-type (type form)
+	       `(dotimes (index numcount)
+		  (setf (cffi:mem-aref arr :uint8 index)
+			(let* ((indexa (ash index 1))
+			       (indexb (+ 1 indexa))
+			       (a (cffi:mem-aref channel ,type indexa))
+			       (b (cffi:mem-aref channel ,type indexb))
 			       (c (the ,(case type
 					      (:double 'double-float)
 					      (:float 'single-float)
