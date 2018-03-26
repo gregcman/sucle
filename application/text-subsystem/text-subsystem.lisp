@@ -180,11 +180,11 @@
 	(aref trans 13) (/ y 128.0))
   trans)
 
+(defparameter *numbuf* (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character))
 (defun render-stuff ()
-  (gl:disable :depth-test)					; #+nil
-  (progn
-    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-    (application::%set-render-area 0 0 256 256))
+  (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
+  (application::%set-render-area 0 0 256 256)
+  (gl:clear :color-buffer-bit)
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms
@@ -201,9 +201,14 @@
 				       x y z 1.0))
 	       (value (x y z)
 		 (;%gl:vertex-attrib-4f 0
-				       gl:color 
-				       x y z 1.0)))
+		  gl:color 
+		  x y z 1.0)))
+	  (setf (fill-pointer *numbuf*) 0)
+	  (with-output-to-string (stream *numbuf* :element-type 'character)
+	    (print (get-internal-run-time) stream)
+	    *numbuf*)
 	  (rebase 10.0 10.0)
+	  (gl:disable :depth-test)
 	  (gl:with-primitives :points
 	    (let ((bgcol (byte-float (color 3 3 3 3)))
 		  (fgcol (byte-float (color 0 0 0 3))))
@@ -225,7 +230,7 @@
 				
 				(setf x (1+ x))))))
 		     len)))
-	       -128.0 -128.0 "hello world, greg here")))))))
+	       -128.0 -128.0 *numbuf*)))))))
   (let ((program (getfnc 'text-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -387,8 +392,19 @@
 	     x y string))))
     (glhelp:with-gl-list
       (gl:with-primitives :points
-	(flush-flat-shader-iterators position value len)))))
-;;;;;;;;;;;;;
+	((lambda (position value len)
+	   (scratch-buffer:flush-my-iterator position
+	     (scratch-buffer:flush-my-iterator value
+	       ((lambda (times position value)
+		  (iterator:bind-iterator-in
+		   (xyz single-float) position
+		   (iterator:bind-iterator-in
+		    (value single-float) value
+		    (dotimes (x times)
+		      (%gl:vertex-attrib-4f 3 (value) (value) (value) 1.0)
+		      (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
+		len position value)))) position value len)))))
+
 (deflazy flat-shader-source ()
   (glslgen:ashader
    :version 120
@@ -420,18 +436,6 @@
    '((:pmv (:vertex-shader projection-model-view)))))
 (deflazy flat-shader (flat-shader-source)
   (glhelp::create-gl-program flat-shader-source))
-(defun flush-flat-shader-iterators (position value len)
-  (scratch-buffer:flush-my-iterator position
-    (scratch-buffer:flush-my-iterator value
-      ((lambda (times position value)
-	 (iterator:bind-iterator-in
-	  (xyz single-float) position
-	  (iterator:bind-iterator-in
-	   (value single-float) value
-	   (dotimes (x times)
-	     (%gl:vertex-attrib-4f 3 (value) (value) (value) 1.0)
-	     (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
-       len position value))))
 
 ;;;;;;;;;;;;;;;;;;;;
 (deflazy indirection-shader-source ()
