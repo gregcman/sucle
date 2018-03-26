@@ -3,9 +3,10 @@
 
   (:export main)
   (:export *trampoline*)
-  (:export bornfnc getfnc deflazy)
+  (:export bornfnc getfnc deflazy get-fresh)
   (:export microseconds tick *control-state* *camera* *render-area* *pre-trampoline-hooks*
-	  set-render-area render-area-x render-area-y render-area-width render-area-height))
+	   set-render-area render-area-x render-area-y render-area-width render-area-height
+	   %set-render-area))
 
 (in-package :application)
 
@@ -77,6 +78,10 @@
     (multiple-value-bind (value exists?) (gethash k *stuff*)
       (when exists?
 	(lazy-place::destroy value)))))
+
+(defun get-fresh (name)
+  (reload-if-dirty name)
+  (getfnc name))
 
 (defun reload (name)
   (let ((place (gethash name *stuff*)))

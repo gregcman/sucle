@@ -365,6 +365,10 @@
 			  (go again)))))
     (nreverse acc)))
 
+(defparameter *debug-shader-gen*
+ ; t
+  nil
+  )
 (defun gl-dump-shader (data)
   (let* ((preprocessed (preprocess-attribs (shader-program-data-attributes data)))
 	 (raw-attributes
@@ -374,15 +378,15 @@
 		    preprocessed))))
     (setf (shader-program-data-vars-attributes data) preprocessed)
     (setf (shader-program-data-raw-attributes data) raw-attributes)
-    (glhelp:make-shader-program-from-strings
-     (;print
-      progn
-      (shader-program-data-vs-string data))
-     
-     (;print
-      progn
-      (shader-program-data-frag-string data))
-     raw-attributes)))
+    (let ((vs (shader-program-data-vs-string data))
+	  (frag (shader-program-data-frag-string data)))
+      (when *debug-shader-gen*
+	(print vs)
+	(print frag))
+      (glhelp:make-shader-program-from-strings
+       vs
+       frag
+       raw-attributes))))
 
 (defun ashader (&rest rest &key &allow-other-keys)
   (let (a)

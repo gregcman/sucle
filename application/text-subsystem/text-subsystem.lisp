@@ -4,293 +4,10 @@
 	#:utility))
 (in-package #:text-sub)
 
-(defvar *this-directory* (filesystem-util:this-directory))
-(deflazy font-png ()
-  (let ((array
-	 (opticl:read-png-file
-	  (filesystem-util:rebase-path #P"font.png"
-				       *this-directory*))))
-    (destructuring-bind (w h) (array-dimensions array)
-      (let ((new
-	     (make-array (list w h 4) :element-type '(unsigned-byte 8))))
-	(dobox ((width 0 w)
-		(height 0 h))
-	       (let ((value (aref array width height)))
-		 (dotimes (i 4)
-		   (setf (aref new width height i) value))))
-	new))))
-
-(deflazy font-texture (font-png)
-  (prog1
-      (make-instance
-       'glhelp::gl-texture
-       :handle
-       (glhelp:pic-texture
-	font-png
-	:rgba
-	))
-    (glhelp:apply-tex-params
-     (quote ((:texture-min-filter . :nearest)
-	     (:texture-mag-filter . :nearest)
-	     (:texture-wrap-s . :repeat)
-	     (:texture-wrap-t . :repeat))))))
-
-(defparameter *reloadables*
-  '(
-    ;;shader-test
-;    text-shader
-    render-normal-text-refraction
-;    refraction-shader-text
-;    refraction-shader
-;    fullscreen-quad
-;    indirection
-;    flat-shader-text
-;    flat-shader
-;    font-png
-					;   font-texture
-;    draw-commands
- ;   terminal256color-lookup
-    ))
-
-(defparameter *identity-mat*
-  (nsb-cga:identity-matrix))
-(defparameter *view* (make-instance 'application::render-area))
-(defparameter *view256x256* (make-instance 'application::render-area
-					   :width 256
-					   :height 256))
-(defparameter *block-height* nil)
-(defparameter *block-width* nil)
-(setf (values *block-width* *block-height*)
-      (values 8.0 16.0))
-
-(defparameter *trans* (nsb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
-(defun retrans (x y &optional (trans *trans*))
-  (setf (aref trans 12) (/ x 128.0)
-	(aref trans 13) (/ y 128.0))
-  trans)
-
-#+nil
-(defparameter *clear-text-buffer-flag* 0)
-#+nil
-(defun flag-text-dirty ()
-  (setf *clear-text-buffer-flag* 2))
-(defun per-frame (session)
-  (declare (ignorable session))
-  (map nil #'application::reload-if-dirty *reloadables*)
-  (getfnc 'render-normal-text-refraction)
-  (setf (render-area-width *view*) window::*width*
-	(render-area-height *view*) window::*height*)
-
-  (render-stuff))
-
-#+nil
-(deflazy draw-commands (application::gl-context)
-  (declare (ignorable application::gl-context))
-  (lparallel.queue:make-queue))
-
-(defun render-stuff ()
-  (gl:disable :depth-test)					; #+nil
-  (progn
-    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-    (application::%set-render-area 0 0 256 256))
-  #+nil
-  (when (not (zerop *clear-text-buffer-flag*))
-    (decf *clear-text-buffer-flag*)
-    (when (Zerop *clear-text-buffer-flag*)
-      (progn
-	(gl:clear-color 0.0 0.0 0.0 0.0)
-	(gl:clear :color-buffer-bit))))
-					;#+nil
-  #+nil
-  (progn
-    (gl:clear-color (byte-float (char-code #\a))
-		    (byte-float (color 0 3 2 1))
-		    (byte-float (color 3 1 0 3))
-		    1.0)
-    (gl:clear :color-buffer-bit))
-  (let ((program (getfnc 'flat-shader)))
-    (glhelp::use-gl-program program)
-    (glhelp:with-uniforms
-	uniform program
-      (labels (
-	       #+nil
-	       (draw-xyz (x y call-list)
-		 (rebase x y)
-		 (gl:call-list call-list))
-	       (rebase (x y)
-		 (gl:uniform-matrix-4fv
-		  (uniform :pmv)
-		  (retrans x y)
-		  nil)))
-	;#+nil
-	(flet ((pos (x y z)
-		 (;%gl:vertex-attrib-4f 3
-				       gl:vertex
-				       x y z 1.0))
-	       (value (x y z)
-		 (;%gl:vertex-attrib-4f 0
-				       gl:color 
-				       x y z 1.0)))
-	  (rebase 10.0 10.0)
-	  (gl:with-primitives :points
-	    (let ((bgcol (byte-float (color 3 3 3 3)))
-		  (fgcol (byte-float (color 0 0 0 3))))
-	      ((lambda (x y string)
-		 (let ((start x))
-		   (let ((len (length string)))
-		     (dotimes (index len)
-		       (let ((char (aref string index)))
-			 (cond ((char= char #\Newline)
-				(setf x start)
-				(decf y))
-			       (t
-				(value (byte-float (char-code char))
-				       bgcol
-				       fgcol)
-				(pos (floatify x)
-				     (floatify y)
-				     0.0)
-				
-				(setf x (1+ x))))))
-		     len)))
-	       -128.0 -128.0 "hello world, greg here"))))
-	#+nil
-	  (let ((draw-commands (getfnc 'draw-commands)))
-	    (lparallel.queue:with-locked-queue draw-commands
-	      (let ((times (/ (lparallel.queue:queue-count/no-lock draw-commands) 3)))
-		(dotimes (x times)
-		  (let ((x (lparallel.queue:try-pop-queue/no-lock draw-commands))
-			(y (lparallel.queue:try-pop-queue/no-lock draw-commands))
-			(list (lparallel.queue:try-pop-queue/no-lock draw-commands)))
-		    (draw-xyz x y list)))))))))
-  (let ((program (getfnc 'text-shader)))
-    (glhelp::use-gl-program program)
-    (glhelp:with-uniforms uniform program
-      (gl:uniform-matrix-4fv
-       (uniform :pmv)
-       *identity-mat*
-       nil)
-      (progn
-	(gl:uniformi (uniform 'indirection) 0)
-	(glhelp::set-active-texture 0)
-	(gl:bind-texture :texture-2d
-			 ;;		 (getfnc 'font-texture)
-			 (glhelp::texture (getfnc 'indirection))
-			 ))
-      (progn
-	(gl:uniformi (uniform 'font-texture) 2)
-	(glhelp::set-active-texture 2)
-	(gl:bind-texture :texture-2d
-					;(texture (getfnc 'text-data))
-			 (glhelp::handle (getfnc 'font-texture))
-			 ))
-
-      (progn
-	(gl:uniformi (uniform 'text-data) 1)
-	(glhelp::set-active-texture 1)
-	(gl:bind-texture :texture-2d
-			 ;;(getfnc 'terrain-texture)
-			 ;;	 (getfnc 'font-texture)
-			 (glhelp::texture (getfnc 'text-data))
-			 )))
-    (glhelp::bind-default-framebuffer)
-    (set-render-area *view*)
-    ;;   (gl:enable :depth-test)
-    ;;   (gl:depth-func :always)
-    (gl:enable :blend)
-    (gl:blend-func :src-alpha :one-minus-src-alpha)
-					;  #+nil
-    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))
-    ))
-
-
-(defun uppow2 (n)
-  (ash 1 (ceiling (log n 2))))
- ;;up to next power of two
-
-(defparameter *indirection-width* 0)
-(defparameter *indirection-height* 0)
-
-(deflazy indirection ()
-  (glhelp::make-gl-framebuffer
-   *indirection-width*
-   *indirection-height*))
-
 (deflazy text-data ()
   (glhelp::make-gl-framebuffer 256 256))
 
-(deflazy render-normal-text-refraction ((application::w w) (application::h h))
-  (let ((upw (uppow2 w))
-	(uph (uppow2 h))
-	(refract (getfnc 'refraction-shader)))
-    (glhelp::use-gl-program refract)
-    (glhelp:with-uniforms uniform refract
-      (gl:uniform-matrix-4fv
-       (uniform :pmv)
-       *identity-mat*
-       nil)
-      (gl:uniformf (uniform 'size)
-		   (/ w
-		      *block-width*)
-		   (/ h
-		      *block-height*)))
-    (gl:disable :cull-face)
-    (gl:disable :depth-test)
-    (gl:disable :blend
-     )
-    (set-render-area (make-instance 'application::render-area
-				    :width upw
-				    :height uph))
-    (when (not (and (= *indirection-width* upw)
-		    (= *indirection-height* uph)))
-      (setf *indirection-width* upw
-	    *indirection-height* uph)
-      (application::reload 'indirection))
-    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
-    (gl:clear :color-buffer-bit)
-    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
-
-(defmacro progeach (fun body)
-  `(etouq
-    (cons 'progn
-	  (mapcar ,fun
-		  ,body))))
-
-(deflazy fullscreen-quad ()
-  (let ((a (scratch-buffer:my-iterator))
-	(b (scratch-buffer:my-iterator))
-	(len 0))
-    (iterator:bind-iterator-out
-     (pos single-float) a
-     (iterator:bind-iterator-out
-      (tex single-float) b
-
-      (progeach
-       (lambda (x) (list 'pos x))
-       (axis-aligned-quads:quadk+ 0.5 '(-1.0 1.0 -1.0 1.0)))
-      (progeach
-       (lambda (x) (list 'tex x))
-       (axis-aligned-quads:duaq 1 nil '(0.0 1.0 0.0 1.0))))
-     (incf len 4)
-     )
-    (make-instance
-     'glhelp::gl-list
-     :handle
-     (glhelp:with-gl-list
-       (gl:with-primitives :quads
-	 (scratch-buffer:flush-my-iterator a
-	   (scratch-buffer:flush-my-iterator b
-	     ((lambda (times a b)
-		(iterator:bind-iterator-in
-		 (xyz single-float) a
-		 (iterator:bind-iterator-in
-		  (tex single-float) b
-		  (dotimes (x times)
-		    (%gl:vertex-attrib-2f 2 (tex) (tex))
-		    (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
-	      len a b))))))))
-
-(deflazy shader-test ()
+(deflazy text-shader-source ()
   (glslgen:ashader
    :version 120
    :vs
@@ -314,7 +31,7 @@
     :program
     '(defun "main" void ()
 
-	 ;;;refraction
+	 ;;;indirection
       (/**/ vec4 ind)
       (= ind ("texture2D" indirection texcoord))
 
@@ -371,6 +88,210 @@
      (font-data (:fragment-shader font-atlas))
      (font-texture (:fragment-shader font-texture)))))
 
+(defvar *this-directory* (filesystem-util:this-directory))
+(deflazy font-png ()
+  (let ((array
+	 (opticl:read-png-file
+	  (filesystem-util:rebase-path #P"font.png"
+				       *this-directory*))))
+    (destructuring-bind (w h) (array-dimensions array)
+      (let ((new
+	     (make-array (list w h 4) :element-type '(unsigned-byte 8))))
+	(dobox ((width 0 w)
+		(height 0 h))
+	       (let ((value (aref array width height)))
+		 (dotimes (i 4)
+		   (setf (aref new width height i) value))))
+	new))))
+(deflazy font-texture (font-png)
+  (prog1
+      (make-instance
+       'glhelp::gl-texture
+       :handle
+       (glhelp:pic-texture
+	font-png
+	:rgba
+	))
+    (glhelp:apply-tex-params
+     (quote ((:texture-min-filter . :nearest)
+	     (:texture-mag-filter . :nearest)
+	     (:texture-wrap-s . :repeat)
+	     (:texture-wrap-t . :repeat))))))
+(defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16))
+(deflazy glsl-code-lookup ()
+  (let ((a (make-array (* 4 256) :element-type 'single-float)))
+    (dotimes (x 256)
+      (let ((offset (* 4 x))
+	    (tilemap-lookup *16x16-tilemap*))
+	(etouq
+	 (with-vec-params
+	     '((offset x0 y0 x1 y1))
+	   '(tilemap-lookup)
+	   '(etouq
+	     (with-vec-params
+		 '((offset ax0 ay0 ax1 ay1))
+	       '(a symbol-macrolet)
+	       '(setf
+		 ax0 x0
+		 ay0 y0
+		 ax1 x1
+		 ay1 y1))
+	     )))))
+    a))
+
+(defun floatify (x)
+  (coerce x 'single-float))
+
+(defun byte-float (x)
+  (/ (floatify x)
+     255.0))
+
+(defun color-rgb (color)
+  (let ((one-third (etouq (coerce 1/3 'single-float))))
+    (macrolet ((k (num)
+		 `(* one-third (floatify (ldb (byte 2 ,num) color)))))
+      (values (k 0)
+	      (k 2)
+	      (k 4)
+	      (k 6)))))
+
+(defun color (r g b a)
+  (dpb a (byte 2 6)
+       (dpb b (byte 2 4)
+	    (dpb g (byte 2 2)
+		 (dpb r (byte 2 0) 0)))))
+
+#+nil
+(progn
+  (gl:clear-color (byte-float (char-code #\a))
+		  (byte-float (color 0 3 2 1))
+		  (byte-float (color 3 1 0 3))
+		  1.0)
+  (gl:clear :color-buffer-bit))
+
+(defun per-frame (session)
+  (declare (ignorable session))
+  (get-fresh 'render-normal-text-indirection)
+  (render-stuff))
+
+(defparameter *trans* (nsb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
+(defun retrans (x y &optional (trans *trans*))
+  (setf (aref trans 12) (/ x 128.0)
+	(aref trans 13) (/ y 128.0))
+  trans)
+
+(defun render-stuff ()
+  (gl:disable :depth-test)					; #+nil
+  (progn
+    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
+    (application::%set-render-area 0 0 256 256))
+  (let ((program (getfnc 'flat-shader)))
+    (glhelp::use-gl-program program)
+    (glhelp:with-uniforms
+	uniform program
+      (labels ((rebase (x y)
+		 (gl:uniform-matrix-4fv
+		  (uniform :pmv)
+		  (retrans x y)
+		  nil)))
+	;#+nil
+	(flet ((pos (x y z)
+		 (;%gl:vertex-attrib-4f 3
+				       gl:vertex
+				       x y z 1.0))
+	       (value (x y z)
+		 (;%gl:vertex-attrib-4f 0
+				       gl:color 
+				       x y z 1.0)))
+	  (rebase 10.0 10.0)
+	  (gl:with-primitives :points
+	    (let ((bgcol (byte-float (color 3 3 3 3)))
+		  (fgcol (byte-float (color 0 0 0 3))))
+	      ((lambda (x y string)
+		 (let ((start x))
+		   (let ((len (length string)))
+		     (dotimes (index len)
+		       (let ((char (aref string index)))
+			 (cond ((char= char #\Newline)
+				(setf x start)
+				(decf y))
+			       (t
+				(value (byte-float (char-code char))
+				       bgcol
+				       fgcol)
+				(pos (floatify x)
+				     (floatify y)
+				     0.0)
+				
+				(setf x (1+ x))))))
+		     len)))
+	       -128.0 -128.0 "hello world, greg here")))))))
+  (let ((program (getfnc 'text-shader)))
+    (glhelp::use-gl-program program)
+    (glhelp:with-uniforms uniform program
+      (gl:uniform-matrix-4fv
+       (uniform :pmv)
+       (load-time-value (nsb-cga:identity-matrix))
+       nil)
+      (progn
+	(gl:uniformi (uniform 'indirection) 0)
+	(glhelp::set-active-texture 0)
+	(gl:bind-texture :texture-2d
+			 (glhelp::texture (getfnc 'indirection))
+			 ))
+      (progn
+	(gl:uniformi (uniform 'font-texture) 2)
+	(glhelp::set-active-texture 2)
+	(gl:bind-texture :texture-2d
+			 (glhelp::handle (getfnc 'font-texture))
+			 ))
+
+      (progn
+	(gl:uniformi (uniform 'text-data) 1)
+	(glhelp::set-active-texture 1)
+	(gl:bind-texture :texture-2d
+			 (glhelp::texture (getfnc 'text-data))
+			 )))
+    
+    (glhelp::bind-default-framebuffer)
+    (application::%set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
+    (gl:enable :blend)
+    (gl:blend-func :src-alpha :one-minus-src-alpha)
+    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))
+    ))
+
+(deflazy fullscreen-quad ()
+  (let ((a (scratch-buffer:my-iterator))
+	(b (scratch-buffer:my-iterator))
+	(len 0))
+    (iterator:bind-iterator-out
+     (pos single-float) a
+     (iterator:bind-iterator-out
+      (tex single-float) b
+      (etouq (cons 'pos (axis-aligned-quads:quadk+ 0.5 '(-1.0 1.0 -1.0 1.0))))
+      (etouq
+       (cons 'tex
+	     (axis-aligned-quads:duaq 1 nil '(0.0 1.0 0.0 1.0)))))
+     (incf len 4)
+     )
+    (make-instance
+     'glhelp::gl-list
+     :handle
+     (glhelp:with-gl-list
+       (gl:with-primitives :quads
+	 (scratch-buffer:flush-my-iterator a
+	   (scratch-buffer:flush-my-iterator b
+	     ((lambda (times a b)
+		(iterator:bind-iterator-in
+		 (xyz single-float) a
+		 (iterator:bind-iterator-in
+		  (tex single-float) b
+		  (dotimes (x times)
+		    (%gl:vertex-attrib-2f 2 (tex) (tex))
+		    (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
+	      len a b))))))))
+
+
 (defmacro with-foreign-array ((var lisp-array type &optional (len (gensym)))
 			      &rest body)
   (with-gensyms (i)
@@ -381,10 +302,9 @@
 	     (setf (cffi:mem-aref ,var ,type ,i)
 		   (row-major-aref ,lisp-array ,i)))
 	   ,@body)))))
-
 (deflazy text-shader ((glsl-code-lookup code) (terminal256color-lookup color)
-		      shader-test)
-  (let ((shader (glhelp::create-gl-program shader-test)))
+		      text-shader-source)
+  (let ((shader (glhelp::create-gl-program text-shader-source)))
     (glhelp::use-gl-program shader)
     (glhelp:with-uniforms uniform shader
       (with-foreign-array (var code :float len)
@@ -397,6 +317,7 @@
 			 var)))
     shader))
 
+#+nil
 (eval-always
   (defparameter *vec-types* (make-hash-table :test 'equalp))
   (defun vec-slots (type args &optional (lookup *vec-types*))
@@ -421,30 +342,6 @@
   (register-vec-slots :point (quote ((:x 0)
 				     (:y 1)))))
 
-
-(defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16))
-
-;;
-(deflazy glsl-code-lookup ()
-  (let ((a (make-array (* 4 256) :element-type 'single-float)))
-    (dotimes (x 256)
-      (let ((offset (* 4 x))
-	    (tilemap-lookup *16x16-tilemap*))
-	(etouq
-	 (with-vec-params
-	     `((offset ,@(vec-slots :rectangle
-				    '((x0 :x0) (y0 :y0) (x1 :x1) (y1 :y1)
-				      ))))
-	   '(tilemap-lookup)
-	   '(progn
-	     (setf
-	      (aref a (+ offset 0)) x0
-	      (aref a (+ offset 1)) y0
-	      (aref a (+ offset 2)) x1
-	      (aref a (+ offset 3)) y1)
-	     )))))
-    a))
-
 ;;color uniform
 (deflazy terminal256color-lookup ()
  (let ((arr (make-array (* 4 256) :element-type 'single-float)))
@@ -456,22 +353,88 @@
 	       (aref arr (+ offset 2)) b
 	       (aref arr (+ offset 3)) a))))
    arr))
-(defun color-rgb (color)
-  (let ((one-third (etouq (coerce 1/3 'single-float))))
-    (macrolet ((k (num)
-		 `(* one-third (floatify (ldb (byte 2 ,num) color)))))
-      (values (k 0)
-	      (k 2)
-	      (k 4)
-	      (k 6)))))
 
-(defun color (r g b a)
-  (dpb a (byte 2 6)
-       (dpb b (byte 2 4)
-	    (dpb g (byte 2 2)
-		 (dpb r (byte 2 0) 0)))))
+;;;;;;;;;;;;;;;
+(defun mesh-string-gl-points (x y string &optional
+					   (bgcol (byte-float (color 3 3 3 3)))
+					   (fgcol (byte-float (color 0 0 0 3))))
+  (let ((position (scratch-buffer:my-iterator))
+	(value (scratch-buffer:my-iterator))
+	(len 0))
+    (iterator:bind-iterator-out
+     (pos single-float) position
+     (iterator:bind-iterator-out
+      (value single-float) value
 
-(deflazy refraction-shader-text ()
+      (incf len
+	    ((lambda (x y string)
+	       (let ((start x))
+		 (let ((len (length string)))
+		   (dotimes (index len)
+		     (let ((char (aref string index)))
+		       (cond ((char= char #\Newline)
+			      (setf x start)
+			      (decf y))
+			     (t
+			      (value (byte-float (char-code char))
+				     bgcol
+				     fgcol)
+			      (pos (floatify x)
+				   (floatify y)
+				   0.0)
+			      (setf x (1+ x))))))
+		   len)))
+	     x y string))))
+    (glhelp:with-gl-list
+      (gl:with-primitives :points
+	(flush-flat-shader-iterators position value len)))))
+;;;;;;;;;;;;;
+(deflazy flat-shader-source ()
+  (glslgen:ashader
+   :version 120
+   :vs
+   (glslgen2::make-shader-stage
+    :out '((value-out "vec4"))
+    :in '((position "vec4")
+	  (value "vec4")
+	  (projection-model-view "mat4"))
+    :program
+    '(defun "main" void ()
+      (= "gl_Position" (* projection-model-view position))
+      (= value-out value)))
+   :frag
+   (glslgen2::make-shader-stage
+    :in '((value "vec4"))
+    :program
+    '(defun "main" void ()	 
+      (=
+       :gl-frag-color
+       value
+       )))
+   :attributes
+   '((position . 0) 
+     (value . 3))
+   :varyings
+   '((value-out . value))
+   :uniforms
+   '((:pmv (:vertex-shader projection-model-view)))))
+(deflazy flat-shader (flat-shader-source)
+  (glhelp::create-gl-program flat-shader-source))
+(defun flush-flat-shader-iterators (position value len)
+  (scratch-buffer:flush-my-iterator position
+    (scratch-buffer:flush-my-iterator value
+      ((lambda (times position value)
+	 (iterator:bind-iterator-in
+	  (xyz single-float) position
+	  (iterator:bind-iterator-in
+	   (value single-float) value
+	   (dotimes (x times)
+	     (%gl:vertex-attrib-4f 3 (value) (value) (value) 1.0)
+	     (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
+       len position value))))
+
+;;;;;;;;;;;;;;;;;;;;
+(deflazy indirection-shader-source ()
   (glslgen:ashader
    :version 120
    :vs
@@ -526,93 +489,46 @@
    :uniforms
    '((:pmv (:vertex-shader projection-model-view))
      (size (:fragment-shader size)))))
+(deflazy indirection-shader (indirection-shader-source)
+  (glhelp::create-gl-program indirection-shader-source))
 
-(deflazy refraction-shader (refraction-shader-text)
-  (glhelp::create-gl-program refraction-shader-text))
-
-(defun floatify (x)
-  (coerce x 'single-float))
-
-(defun byte-float (x)
-  (/ (floatify x)
-     255.0))
-
-(defun mesh-string-gl-points (x y string &optional
-					   (bgcol (byte-float (color 3 3 3 3)))
-					   (fgcol (byte-float (color 0 0 0 3))))
-  (let ((position (scratch-buffer:my-iterator))
-       (value (scratch-buffer:my-iterator))
-       (len 0))
-   (iterator:bind-iterator-out
-    (pos single-float) position
-    (iterator:bind-iterator-out
-     (value single-float) value
-
-     (incf len
-	   ((lambda (x y string)
-	      (let ((start x))
-		(let ((len (length string)))
-		  (dotimes (index len)
-		    (let ((char (aref string index)))
-		      (cond ((char= char #\Newline)
-			     (setf x start)
-			     (decf y))
-			    (t
-			     (pos (floatify x))
-			     (pos (floatify y))
-			     (pos 0.0)
-			     (value (byte-float (char-code char)))
-			     (value bgcol)
-			     (value fgcol)
-			     
-			     (setf x (1+ x))))))
-		  len)))
-	    x y string))))
-   (glhelp:with-gl-list
-     (gl:with-primitives :points
-       (scratch-buffer:flush-my-iterator position
-	 (scratch-buffer:flush-my-iterator value
-	   ((lambda (times position value)
-	      (iterator:bind-iterator-in
-	       (xyz single-float) position
-	       (iterator:bind-iterator-in
-		(value single-float) value
-		(dotimes (x times)
-		  (%gl:vertex-attrib-4f 3 (value) (value) (value) 1.0)
-		  (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
-	    len position value)))))))
-
-
-(deflazy flat-shader-text ()
-  (glslgen:ashader
-   :version 120
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((value-out "vec4"))
-    :in '((position "vec4")
-	  (value "vec4")
-	  (projection-model-view "mat4"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= value-out value)))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((value "vec4"))
-    :program
-    '(defun "main" void ()	 
-      (=
-       :gl-frag-color
-       value
-       )))
-   :attributes
-   '((position . 0) 
-     (value . 3))
-   :varyings
-   '((value-out . value))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view)))))
-
-(deflazy flat-shader (flat-shader-text)
-  (glhelp::create-gl-program flat-shader-text))
-
+;;;;;;;;;;;;;;;;
+(defparameter *block-height* 16.0)
+(defparameter *block-width* 8.0)
+(defparameter *indirection-width* 0)
+(defparameter *indirection-height* 0)
+(deflazy indirection ()
+  (glhelp::make-gl-framebuffer
+   *indirection-width*
+   *indirection-height*))
+;;;Round up to next power of two
+(defun power-of-2-ceiling (n)
+  (ash 1 (ceiling (log n 2))))
+(deflazy render-normal-text-indirection ((application::w w) (application::h h))
+  (let ((upw (power-of-2-ceiling w))
+	(uph (power-of-2-ceiling h))
+	(refract (getfnc 'indirection-shader)))
+    (glhelp::use-gl-program refract)
+    (glhelp:with-uniforms uniform refract
+      (gl:uniform-matrix-4fv
+       (uniform :pmv)
+       (load-time-value (nsb-cga:identity-matrix))
+       nil)
+      (gl:uniformf (uniform 'size)
+		   (/ w
+		      *block-width*)
+		   (/ h
+		      *block-height*)))
+    (gl:disable :cull-face)
+    (gl:disable :depth-test)
+    (gl:disable :blend
+     )
+    (application::%set-render-area 0 0 upw uph)
+    (when (not (and (= *indirection-width* upw)
+		    (= *indirection-height* uph)))
+      (setf *indirection-width* upw
+	    *indirection-height* uph)
+      (application::reload 'indirection))
+    (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
+    (gl:clear :color-buffer-bit)
+    (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
