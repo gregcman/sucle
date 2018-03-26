@@ -250,7 +250,7 @@
 				 channels
 				 data
 				 samples
-				 (print audio-format)
+				 audio-format
 				 format
 				 arr)
 			      (let ((buffer (get-buffer)))
