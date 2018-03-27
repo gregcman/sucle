@@ -2,8 +2,12 @@
   (:use #:cl #:utility #:application))
 (in-package :basic)
 
+(defparameter *saved-session* nil)
 (defun per-frame (&optional session)
   (declare (ignorable session))
+  (unless (eq *saved-session* session)
+    (setf *saved-session* session)
+    (init))
   (app))
 (defun start ()
   (let ((application::*argument-values*
@@ -17,10 +21,16 @@
     (application::main)))
 (defvar *this-directory* (filesystem-util:this-directory))
 
+(defmacro floatify (x)
+  `(coerce ,x 'single-float))
+
 (defparameter *window-start-height* 480)
-(defparameter *window-start-width* 720)
+(defparameter *window-start-width* 780)
 (defparameter *window-start-title* "basic app")
 (defparameter *ticks* 0)
+(defparameter *ndc-mouse-x* 0.0)
+(defparameter *ndc-mouse-y* 0.0)
+(defparameter *sprites* nil)
 
 (defparameter *reloadables*
   '(flat-shader-source
@@ -31,9 +41,30 @@
     cons-texture))
 
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
+(defparameter *selection* nil)
+(defparameter *drag-offset-x* 0.0)
+(defparameter *drag-offset-y* 0.0)
+
+(defun init ()
+  (setf *sprites* (circular-dlink "sentinel"))
+  (let ((chain *sprites*))
+    (dotimes (x 10)
+      (dlink-insert-right chain
+	    (make-dlink :payload
+	     (make-instance
+	      'sprite
+	      :texture (getfnc 'cons-texture)
+	      :position (make-instance 'point :x (1- (random 2.0)) :y (1- (random 2.0)))
+	      :bounding-box (make-instance 'rectangle
+					   :x0 0.0 :y0 0.0
+					   :x1 (+ 0.1 (random 0.5)) :y1 (+ 0.1 (random 0.5)))))))))
 (defun app ()
   (incf *ticks*)
   (map nil #'application::reload-if-dirty *reloadables*)
+  (setf *ndc-mouse-x* (+ -1 (* 2.0 (/ (floatify window::*mouse-x*)
+				      window:*width*)))
+	*ndc-mouse-y* (- 1 (* 2.0 (/ (floatify window::*mouse-y*)
+				     window:*height*))))
   (when (window::skey-j-p (window::keyval :q))
     (application::quit))
   (when (window::skey-j-p (window::keyval :r))
@@ -45,6 +76,45 @@
   (gl:clear-color 0.5 0.5 0.5 0.0)
   (gl:clear :color-buffer-bit)
   (gl:disable :cull-face)
+  (gl:disable :blend)
+
+  (let ((mousex *ndc-mouse-x*)
+	(mousey *ndc-mouse-y*))
+    (when (window::skey-j-p (window::mouseval :left))
+      ;;search for topmost sprite to drag
+      (tagbody 
+	 (let ((last *sprites*))
+	   (do ((sprite-cell (dlink-right last) (dlink-right sprite-cell)))
+	       ((eq sprite-cell *sprites*))
+	     (let ((sprite (dlink-payload sprite-cell)))
+	       (with-slots (absolute-rectangle position) sprite
+		 (when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
+		   (with-slots (x y) position
+		     (setf *drag-offset-x* (- x mousex)
+			   *drag-offset-y* (- y mousey)))
+		   (setf *selection* sprite)
+		   (dlink-remove sprite-cell)
+		   (dlink-insert-right *sprites* sprite-cell)
+		   (go end))))
+	     (setf last sprite-cell)))
+	 end))
+    (typecase *selection*
+      (sprite (with-slots (x y) (slot-value *selection* 'position)
+		(setf x (+ *drag-offset-x* mousex)
+		      y (+ *drag-offset-y* mousey))))))
+  (when (window::skey-j-r (window::mouseval :left))
+    (setf *selection* nil))
+  (let ((program (getfnc 'flat-texture-shader)))
+    (glhelp::use-gl-program program)
+    (glhelp:with-uniforms uniform program
+      (gl:uniformi (uniform 'sampler) 0)
+      (glhelp::set-active-texture 0))
+    (do ((sprite-cell (dlink-left *sprites*) (dlink-left sprite-cell)))
+	((eq sprite-cell *sprites*))
+      (let ((sprite (dlink-payload sprite-cell)))
+	(render-sprite sprite)))))
+#+nil
+(defun foo0 ()
   (gl:line-width 10.0)
   (gl:point-size 10.0)
   (let ((program (getfnc 'flat-shader)))
@@ -53,17 +123,17 @@
     (gl:color 1.0 0.0 0.0)
     (gl:vertex -1.0 -1.0)
     (gl:color 0.0 1.0 0.0)
-    (gl:vertex 0.0 1.0)
+    (gl:vertex *ndc-mouse-x* *ndc-mouse-y*)
     (gl:color 0.0 0.0 1.0)
     (gl:vertex 1.0 -1.0))
   (let ((foo (sin (/ *ticks* 60.0))))
     (gl:with-primitive :line-loop
-      (draw-quad -0.5 (+ foo -0.5)
-		 0.5 (+ foo 0.5)))
+      (draw-quad *ndc-mouse-x* *ndc-mouse-y*
+		 0.0 (+ foo 0.5)))
     (let ((*pen-color* '(0.0 0.0 0.0 1.0)))
       (gl:line-width 2.0)
       (gl:with-primitive :triangle-fan
-	(draw-circle 0.0 0.0 (* foo 1.0) 32 0.0)))
+	(draw-circle *ndc-mouse-x* *ndc-mouse-y* (* foo 0.1) 32 0.0)))
     (let ((program (getfnc 'flat-texture-shader)))
       (glhelp::use-gl-program program)
       (glhelp:with-uniforms uniform program
@@ -106,9 +176,6 @@
     (gl:color r g b a)
     (gl:vertex x1 y0)))
 
-(defmacro floatify (x)
-  `(coerce ,x 'single-float))
-
 (defmacro complex-cis ((place placei theta) &body body)
   `(let ((,place (cos ,theta))
 	 (,placei (sin ,theta)))
@@ -135,7 +202,6 @@
 	    (gl:color r g b a)
 	    (gl:vertex point-x point-y))
 	  (complex-multiply offset offseti d di offset offseti))))))
-
 (progn
   (deflazy flat-shader-source ()
     (glslgen:ashader
@@ -227,3 +293,119 @@
 		(:texture-mag-filter . :nearest)
 		(:texture-wrap-s . :clamp)
 		(:texture-wrap-t . :clamp))))))))
+
+(defclass rectangle ()
+  ((x0 :accessor rectangle.x0
+       :initform 0.0
+       :initarg :x0)
+   (y0 :accessor rectangle.y0
+       :initform 0.0
+       :initarg :y0)
+   (x1 :accessor rectangle.x1
+       :initform 0.0
+       :initarg :x1)
+   (y1 :accessor rectangle.y1
+       :initform 0.0
+       :initarg :y1)))
+
+(defclass point ()
+  ((x :accessor point.x
+       :initform 0.0
+       :initarg :x)
+   (y :accessor point.y
+       :initform 0.0
+       :initarg :y)))
+
+(defun coordinate-inside-rectangle-p (x y rectangle)
+  (with-slots (x0 y0 x1 y1) rectangle
+    (and (< x0 x x1)
+	 (< y0 y y1))))
+
+(defclass sprite ()
+  ((bounding-box :accessor sprite.bounding-box
+		 :initform (make-instance 'rectangle
+					  :x0 -0.25 :y0 -0.25
+					  :x1 0.25 :y1 0.25)
+		 :initarg :bounding-box)
+   (texture-section :accessor sprite.texture-section
+		    :initform (make-instance 'rectangle
+					     :x0 0.0 :y0 0.0
+					     :x1 1.0 :y1 1.0)
+		    :initarg :texture-section)
+   (absolute-rectangle :accessor sprite.absolute-rectangle
+		       :initform (make-instance 'rectangle)
+		       :initarg :absolute-rectangle)
+   (texture :accessor sprite.texture
+	    :initform nil
+	    :initarg :texture)
+   (color :accessor sprite.color
+	  :initform '(1.0 1.0 1.0 1.0)
+	  :initarg :color)
+   (position :accessor sprite.position
+	     :initform (make-instance 'point)
+	     :initarg :position)))
+
+(defun render-sprite (sprite)
+  (with-slots (texture-section bounding-box position color texture absolute-rectangle)
+      sprite
+      (when texture
+	(gl:bind-texture :texture-2d
+			 (glhelp::handle texture)))
+      (flet ((render-stuff ()
+	       (gl:with-primitive :quads
+		 (with-slots ((s0 x0) (t0 y0) (s1 x1) (t1 y1)) texture-section
+		   (with-slots (x0 y0 x1 y1) bounding-box
+		     (with-slots ((xpos x) (ypos y)) position
+		       (let ((px0 (+ x0 xpos))
+			     (py0 (+ y0 ypos))
+			     (px1 (+ x1 xpos))
+			     (py1 (+ y1 ypos)))
+			 (with-slots (x0 y0 x1 y1) absolute-rectangle
+			   (setf x0 px0 y0 py0 x1 px1 y1 py1))
+			 (draw-textured-quad px0 py0 
+					     px1 py1
+					     s0 t0
+					     s1 t1))))))))
+	(if color
+	    (let ((*pen-color* color))
+	      (render-stuff))
+	    (render-stuff)))
+      ))
+
+(defstruct dlink
+  (left nil)
+  (right nil)
+  (payload nil))
+
+(defun dlink-insert-right (link new)
+  (let ((right (dlink-right link)))
+    (dlink-link link new)
+    (when (dlink-p right)
+      (dlink-link new right))
+    new))
+(defun dlink-insert-left (new link)
+  (let ((left (dlink-left link)))
+    (dlink-link new link)
+    (when (dlink-p left)
+      (dlink-link left new))
+    new))
+(defun dlink-remove (link)
+  (let ((left (dlink-left link))
+	(right (dlink-right link)))
+    (dlink-link left right)
+    link))
+
+(defun dlink-link (left right)
+  (when (dlink-p left)
+    (setf (dlink-right left) right))
+  (when (dlink-p right)
+    (setf (dlink-left right) left)))
+
+(defun dlink-cons (item right)
+  (make-dlink :payload item :right right))
+
+(defun circular-dlink (&optional (payload nil))
+  (let ((cell (make-dlink :payload payload)))
+    (setf (dlink-right cell) cell
+	  (dlink-left cell) cell)
+    cell))

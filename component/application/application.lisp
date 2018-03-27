@@ -70,7 +70,7 @@
 (progn
   (defun getfnc (name)
     (lazy-place::fulfill
-     (gethash name *stuff*)))
+	(gethash name *stuff*)))
   (defun getfnc-no-update (name)
     (lazy-place::lazy-place-value
      (gethash name *stuff*)))

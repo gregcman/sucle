@@ -27,4 +27,7 @@
    #:*height*
    #:*status*)
   (:export
-   #:*resize-hook*))
+   #:*resize-hook*)
+  (:export
+   #:*mouse-x*
+   #:*mouse-y*))
