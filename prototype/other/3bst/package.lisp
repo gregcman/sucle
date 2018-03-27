@@ -1,5 +1,5 @@
 (defpackage #:3bst
-  (:use :cl :funland)
+  (:use :cl :utility)
   (:export
    #:term
    #:glyph-at

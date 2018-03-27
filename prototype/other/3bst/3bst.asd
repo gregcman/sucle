@@ -2,8 +2,7 @@
   :description "CL port of the terminal emulation part of st (http://st.suckless.org/)"
   :depends-on (#:alexandria
                #:split-sequence
-	       
-	       #:funland)
+	       #:utility)
   :license "MIT"
   :author "Bart Botta <00003b at gmail.com>"
   :serial t

@@ -7,4 +7,5 @@
   :components 
   ((:file "keys-to-chars")
    (:file "double-link")
+   (:file "more")
    (:file "basic")))
