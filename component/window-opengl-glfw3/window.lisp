@@ -80,13 +80,13 @@
      back-map)))
 
 
-(defmacro do-character-keys ((array-form true-p index) &body body)
+(defmacro do-character-keys ((array-form true-p code) &body body)
   (with-gensyms (array)   
     `(let ((,array ,array-form))
        (declare (type mouse-keyboard-input-array ,array))
-       (dotimes (,index 128)
-	 (when (character-key-p ,index)
-	   (let ((,true-p (= 1 (sbit ,array ,index))))
+       (dotimes (,code 128)
+	 (when (character-key-p ,code)
+	   (let ((,true-p (= 1 (sbit ,array ,code))))
 	     ,@body))))))
 (defmacro character-key-p (x)
   `(= 1
@@ -125,6 +125,17 @@
 (defparameter *width* nil)
 (defparameter *height* nil)
 
+(defconstant +shift+ 1)
+(defconstant +control+ 2)
+(defconstant +alt+ 4)
+(defconstant +super+ 8)
+(defparameter *mod-keys* 0)
+
+(defparameter *shift* nil)
+(defparameter *control* nil)
+(defparameter *alt* nil)
+(defparameter *super* nil)
+
 ;;;
 (defmacro def-key-callback (name (window key scancode action mod-keys) &body body)
   `(%glfw:define-glfw-callback ,name
@@ -133,6 +144,8 @@
 	(,action :int) (,mod-keys :unsigned-int))
      ,@body))
 (def-key-callback key-callback (window key scancode action mod-keys)
+  (declare (ignorable window scancode))
+  (setf *mod-keys* mod-keys)
   (unless (= key -1)
     (setf (sbit *input-state*
 		(aref (etouq *key-array*) key))
@@ -148,6 +161,8 @@
 	(,action :int) (,mod-keys :unsigned-int))
      ,@body))
 (def-mouse-button-callback mouse-callback (window button action mod-keys)
+  (declare (ignorable window))
+  (setf *mod-keys* mod-keys)
   (setf (sbit *input-state*
 	      (aref (etouq *mouse-array*) button))
 	(if (zerop action)
@@ -193,7 +208,15 @@
   (glfw:poll-events))
 (defun poll ()
   (setq *status* (glfw:window-should-close-p))
-  (poll-events))
+  (poll-events)
+
+  (let ((mods *mod-keys*))
+    (setf *shift* (logtest +shift+ mods)
+	  *control* (logtest +control+ mods)
+	  *alt* (logtest +alt+ mods)
+	  *super* (logtest +super+ mods)))
+  
+  (more-test))
 (defun get-proc-address ()
   (function glfw:get-proc-address))
 
@@ -275,3 +298,76 @@
 (cffi:defcfun ("glfwGetTimerFrequency" %glfw::get-timer-frequency) :uint64)
 (cffi:defcfun ("glfwGetTimerValue" %glfw::get-timer-value) :uint64)
 
+(defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
+  
+(defun more-test ()
+  (when (get-control-sequence (char *shift* *control* *alt* *super*)
+	  (vector-push-extend char *command-buffer*))
+    (print *command-buffer*)
+    (setf (fill-pointer *command-buffer*) 0)))
+
+(defun ascii-control (char)
+  (logxor (ash 1 6) char))
+(progn
+  (defparameter *shifted-keys* (make-array 128))
+  (defparameter *controlled-keys* (make-array 128))
+  (let ((shift-keys
+	 "`~1!2@3#4$5%6^7&8*9(0)-_=+qQwWeErRtTyYuUiIoOpP[{]}\\|aAsSdDfFgGhHjJkKlL;:'\"zZxXcCvVbBnNmM,<.>/?"))
+    (loop for i from 0 below (length shift-keys) by 2 do	 
+	 (let ((code (char-code (aref shift-keys i))))
+	   (setf (aref *shifted-keys* code)
+		 (char-code (aref shift-keys (1+ i)))))))
+  (dotimes (x 128)
+    (setf (aref *controlled-keys* x)
+	  (ascii-control x))))
+
+(defun convert-char (char shift control alt super)
+  (declare (ignorable super))
+  (when shift
+    (setf char (aref *shifted-keys* char)))
+  (let ((meta alt))
+    (when (or meta control)
+      (setf char (char-code (char-upcase (code-char char)))))
+    (when control
+      (setf char (aref *controlled-keys* char)))
+    (values char
+	    (if meta
+		(etouq (char-code #\esc))
+		nil))))
+
+(defmacro get-control-sequence ((char-var shift control alt super) &body body)
+  (once-only (shift control alt super)
+    `(let ((something-flag nil))
+       (labels ((enter-string (string)
+		  (let ((len (length string)))
+		    (unless (zerop len)
+		      (setf something-flag t)
+		      (dotimes (index len)
+			(enter-char (aref string index))))))
+		(enter-char (,char-var)
+		  ,@body)
+		(enter (x)
+		  (setf something-flag t)
+		  (enter-char x)))
+	 (macrolet ((foo (x a b)
+		      `(when (skey-j-p (keyval ,a))
+			 ,(list (ecase x
+				  (0 'enter)
+				  (1 'enter-string)) b))))
+	   (foo 0 :enter #\return)
+	   (foo 0 :backspace #\del)
+	   (foo 0 :tab #\Tab)
+	   (foo 1 :up "[A")
+	   (foo 1 :down "[B")
+	   (foo 1 :left "[D")
+	   (foo 1 :right "[C"))      
+
+	 (do-character-keys ((control-state-jp *control-state*) true? code)
+	   (when true?
+	     (multiple-value-bind (char esc)
+		 (convert-char (char-code (char-downcase (code-char code)))
+			       ,shift ,control ,alt ,super)
+	       (when esc
+		 (enter #\esc))
+	       (enter (code-char char))))))
+       something-flag)))
