@@ -30,6 +30,7 @@
     cons-png
     cons-texture))
 
+(defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defun app ()
   (incf *ticks*)
   (map nil #'application::reload-if-dirty *reloadables*)
@@ -59,12 +60,10 @@
     (gl:with-primitive :line-loop
       (draw-quad -0.5 (+ foo -0.5)
 		 0.5 (+ foo 0.5)))
-    
     (let ((*pen-color* '(0.0 0.0 0.0 1.0)))
       (gl:line-width 2.0)
       (gl:with-primitive :triangle-fan
 	(draw-circle 0.0 0.0 (* foo 1.0) 32 0.0)))
-
     (let ((program (getfnc 'flat-texture-shader)))
       (glhelp::use-gl-program program)
       (glhelp:with-uniforms uniform program
@@ -95,8 +94,6 @@
     (gl:tex-coord s1 t0)
     (gl:vertex x1 y0)
     ))
-
-(defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 
 (defun draw-quad (x0 y0 x1 y1)
   (destructuring-bind (r g b a) *pen-color*

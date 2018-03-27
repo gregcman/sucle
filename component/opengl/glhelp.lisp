@@ -43,7 +43,6 @@
 		  (let ((base1 (* hi byte-width))
 			(base2 (* hi foured)))
 		    (dotimes (wi byte-width)
-					;	    (print (list wi byte-width))
 		      (setf (aref array (+ wi base2))
 			    (row-major-aref thepic (+ wi base1))))))
 		(create-texture array w h type))))))))
