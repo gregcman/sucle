@@ -1,5 +1,5 @@
 (defpackage #:basic
-  (:use #:cl #:utility #:application))
+  (:use #:cl #:utility #:application #:double-link))
 (in-package :basic)
 
 (defparameter *saved-session* nil)
@@ -78,7 +78,8 @@
   (gl:clear :color-buffer-bit)
   (gl:disable :cull-face)
   (gl:disable :blend)
-
+  (more-test)
+  
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
     (when (window::skey-j-p (window::mouseval :left))
@@ -114,6 +115,20 @@
 	((eq sprite-cell *sprites*))
       (let ((sprite (dlink-payload sprite-cell)))
 	(render-sprite sprite)))))
+
+
+(defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
+(defun more-test ()
+  (when (keys-to-chars::get-control-sequence (window::*control-state*
+					      char
+					      window::*shift*
+					      window::*control*
+					      window::*alt*
+					      window::*super*)
+	  (vector-push-extend char *command-buffer*))
+    (print *command-buffer*)
+    (setf (fill-pointer *command-buffer*) 0)))
+
 #+nil
 (defun foo0 ()
   (gl:line-width 10.0)
@@ -372,41 +387,3 @@
 	      (render-stuff))
 	    (render-stuff)))
       ))
-
-(defstruct dlink
-  (left nil)
-  (right nil)
-  (payload nil))
-
-(defun dlink-insert-right (link new)
-  (let ((right (dlink-right link)))
-    (dlink-link link new)
-    (when (dlink-p right)
-      (dlink-link new right))
-    new))
-(defun dlink-insert-left (new link)
-  (let ((left (dlink-left link)))
-    (dlink-link new link)
-    (when (dlink-p left)
-      (dlink-link left new))
-    new))
-(defun dlink-remove (link)
-  (let ((left (dlink-left link))
-	(right (dlink-right link)))
-    (dlink-link left right)
-    link))
-
-(defun dlink-link (left right)
-  (when (dlink-p left)
-    (setf (dlink-right left) right))
-  (when (dlink-p right)
-    (setf (dlink-left right) left)))
-
-(defun dlink-cons (item right)
-  (make-dlink :payload item :right right))
-
-(defun circular-dlink (&optional (payload nil))
-  (let ((cell (make-dlink :payload payload)))
-    (setf (dlink-right cell) cell
-	  (dlink-left cell) cell)
-    cell))

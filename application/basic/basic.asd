@@ -5,4 +5,6 @@
 	       #:opticl)
   :serial t
   :components 
-  ((:file "basic")))
+  ((:file "keys-to-chars")
+   (:file "double-link")
+   (:file "basic")))
