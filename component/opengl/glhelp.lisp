@@ -3,6 +3,7 @@
 
 (in-package :glhelp)
 
+;;;;in opengl horizontal lines must be multiples of 4 bytes
 (defun array-flatten (array)
   (make-array (array-total-size array)
 	      :displaced-to array
@@ -11,7 +12,7 @@
 (defun create-texture (tex-data width height format &optional (type :unsigned-byte))
   (let ((tex (car (gl:gen-textures 1))))
     (gl:bind-texture :texture-2d tex)
-    (gl:tex-image-2d :texture-2d 0 format width height 0 format type tex-data)
+    (gl:tex-image-2d :texture-2d 0 :rgba width height 0 format type tex-data)
     tex))
 
 
@@ -25,9 +26,27 @@
 (defun pic-texture (thepic type)
   (let ((dims (array-dimensions thepic)))
     (let ((h (pop dims))
-	  (w (pop dims)))
-      (let ((texture (create-texture (array-flatten thepic) w h type)))
-	texture))))
+	  (w (pop dims))
+	  (channels (pop dims)))
+      (when (eq nil channels)
+	(setf channels 1))
+      (let* ((byte-width (* channels w))
+	     (foured (ash (ash byte-width -2) 2)))
+	(if (= byte-width foured)
+	    (create-texture (array-flatten thepic) w h type)
+	    (progn
+	      (incf foured 4)
+	      (let ((array (make-array (* foured h)
+				       :element-type (array-element-type thepic))))
+		(declare (dynamic-extent array))
+		(dotimes (hi h)
+		  (let ((base1 (* hi byte-width))
+			(base2 (* hi foured)))
+		    (dotimes (wi byte-width)
+					;	    (print (list wi byte-width))
+		      (setf (aref array (+ wi base2))
+			    (row-major-aref thepic (+ wi base1))))))
+		(create-texture array w h type))))))))
 
 (export '(apply-tex-params))
 (defun apply-tex-params (tex-parameters)

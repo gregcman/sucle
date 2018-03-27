@@ -205,10 +205,11 @@
 		  x y z 1.0)))
 	  (setf (fill-pointer *numbuf*) 0)
 	  (with-output-to-string (stream *numbuf* :element-type 'character)
-	    (print (get-internal-run-time) stream)
+	    (print (get-internal-real-time) stream)
 	    *numbuf*)
 	  (rebase 10.0 10.0)
 	  (gl:disable :depth-test)
+	  (gl:point-size 1.0)
 	  (gl:with-primitives :points
 	    (let ((bgcol (byte-float (color 3 3 3 3)))
 		  (fgcol (byte-float (color 0 0 0 3))))

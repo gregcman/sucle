@@ -383,8 +383,7 @@
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
 	  (incf times 4)
-	  (side-j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) texid
+	  (side-j i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock i (1+ j) k)))
 	(when (show-sidep id adj-id)
 	  (incf times 4)

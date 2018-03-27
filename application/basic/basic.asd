@@ -1,7 +1,8 @@
 (asdf:defsystem #:basic
   :depends-on (#:application
 	       #:utility
-	       #:text-subsystem)
+	       #:text-subsystem
+	       #:opticl)
   :serial t
   :components 
   ((:file "basic")))
