@@ -2,7 +2,8 @@
   :depends-on (#:application
 	       #:utility
 	       #:text-subsystem
-	       #:opticl)
+	       #:opticl
+	       #:3bst)
   :serial t
   :components 
   ((:file "keys-to-chars")

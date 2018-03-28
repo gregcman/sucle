@@ -1,5 +1,6 @@
-(in-package :basic)
-
+(defpackage :terminal-test
+  (:use #:cl))
+(in-package :terminal-test)
 
 (defun run-program (command)
   (sb-ext:run-program  (car command)
