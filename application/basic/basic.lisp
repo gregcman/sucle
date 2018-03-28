@@ -84,6 +84,7 @@
   (gl:disable :blend)
   (more-test)
   (render-stuff)
+  (foo0)
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
     (when (window::skey-j-p (window::mouseval :left))
@@ -155,26 +156,28 @@
     (setf (fill-pointer *command-buffer*) 0))
   (terminal-test::update-terminal-stuff))
 
-#+nil
 (defun foo0 ()
   (gl:line-width 10.0)
   (gl:point-size 10.0)
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program))
-  (gl:with-primitive :line-loop
-    (gl:color 1.0 0.0 0.0)
-    (gl:vertex -1.0 -1.0)
-    (gl:color 0.0 1.0 0.0)
-    (gl:vertex *ndc-mouse-x* *ndc-mouse-y*)
-    (gl:color 0.0 0.0 1.0)
-    (gl:vertex 1.0 -1.0))
+  (with-primitives :line-loop
+      'mesh-vertex-color
+    (color 1.0 0.0 0.0)
+    (vertex -1.0 -1.0)
+    (color 0.0 1.0 0.0)
+    (vertex *ndc-mouse-x* *ndc-mouse-y*)
+    (color 0.0 0.0 1.0)
+    (vertex 1.0 -1.0))
   (let ((foo (sin (/ *ticks* 60.0))))
-    (gl:with-primitive :line-loop
+    (with-primitives :line-loop
+	'mesh-vertex-color
       (draw-quad *ndc-mouse-x* *ndc-mouse-y*
 		 0.0 (+ foo 0.5)))
     (let ((*pen-color* '(0.0 0.0 0.0 1.0)))
       (gl:line-width 2.0)
-      (gl:with-primitive :triangle-fan
+      (with-primitives :triangle-fan
+	  'mesh-vertex-color
 	(draw-circle *ndc-mouse-x* *ndc-mouse-y* (* foo 0.1) 32 0.0)))
     (let ((program (getfnc 'flat-texture-shader)))
       (glhelp::use-gl-program program)
@@ -185,38 +188,39 @@
 	(gl:bind-texture :texture-2d
 			 (glhelp::handle (getfnc 'cons-texture))))
       (let ((*pen-color* '(1.0 0.0 1.0 1.0)))
-	(gl:with-primitive :quads
+	(with-primitives :quads
+	    'mesh-vertex-tex-coord-color
 	  (draw-textured-quad 0.5 0.5 0.9 0.9 0.0 0.0 1.0 1.0))))))
 
 (defun draw-textured-quad (x0 y0 x1 y1 s0 t0 s1 t1)
   (destructuring-bind (r g b a) *pen-color*
-    (gl:color r g b a)
-    (gl:tex-coord s0 t0)
-    (gl:vertex x0 y0)
+    (color r g b a)
+    (tex-coord s0 t0)
+    (vertex x0 y0)
 
-    (gl:color r g b a)
-    (gl:tex-coord s0 t1)
-    (gl:vertex x0 y1)   
+    (color r g b a)
+    (tex-coord s0 t1)
+    (vertex x0 y1)   
 
-    (gl:color r g b a)
-    (gl:tex-coord s1 t1)
-    (gl:vertex x1 y1)
+    (color r g b a)
+    (tex-coord s1 t1)
+    (vertex x1 y1)
 
-    (gl:color r g b a)
-    (gl:tex-coord s1 t0)
-    (gl:vertex x1 y0)
+    (color r g b a)
+    (tex-coord s1 t0)
+    (vertex x1 y0)
     ))
 
 (defun draw-quad (x0 y0 x1 y1)
   (destructuring-bind (r g b a) *pen-color*
-    (gl:color r g b a)
-    (gl:vertex x0 y0)
-    (gl:color r g b a)
-    (gl:vertex x0 y1)
-    (gl:color r g b a)
-    (gl:vertex x1 y1)
-    (gl:color r g b a)
-    (gl:vertex x1 y0)))
+    (color r g b a)
+    (vertex x0 y0)
+    (color r g b a)
+    (vertex x0 y1)
+    (color r g b a)
+    (vertex x1 y1)
+    (color r g b a)
+    (vertex x1 y0)))
 
 (defmacro complex-cis ((place placei theta) &body body)
   `(let ((,place (cos ,theta))
@@ -241,8 +245,8 @@
 			    divisions))
 	(dotimes (i (floor divisions))
 	  (complex-add (offset offseti x y point-x point-y)
-	    (gl:color r g b a)
-	    (gl:vertex point-x point-y))
+	    (color r g b a)
+	    (vertex point-x point-y))
 	  (complex-multiply offset offseti d di offset offseti))))))
 (progn
   (deflazy flat-shader-source ()
@@ -307,7 +311,7 @@
 	 )))
      :attributes
      '((position . 0)
-       (tex . 8)
+       (tex . 2)
        (value . 3))
      :varyings
      '((value-out . value)
@@ -390,28 +394,29 @@
 (defun render-sprite (sprite)
   (with-slots (texture-section bounding-box position color texture absolute-rectangle)
       sprite
-      (when texture
-	(gl:bind-texture :texture-2d
-			 (glhelp::handle texture)))
       (flet ((render-stuff ()
-	       (gl:with-primitive :quads
-		 (with-slots ((s0 x0) (t0 y0) (s1 x1) (t1 y1)) texture-section
-		   (with-slots (x0 y0 x1 y1) bounding-box
-		     (with-slots ((xpos x) (ypos y)) position
-		       (let ((px0 (+ x0 xpos))
-			     (py0 (+ y0 ypos))
-			     (px1 (+ x1 xpos))
-			     (py1 (+ y1 ypos)))
-			 (with-slots (x0 y0 x1 y1) absolute-rectangle
-			   (setf x0 px0 y0 py0 x1 px1 y1 py1))
-			 (draw-textured-quad px0 py0 
-					     px1 py1
-					     s0 t0
-					     s1 t1))))))))
+	       (with-slots ((s0 x0) (t0 y0) (s1 x1) (t1 y1)) texture-section
+		 (with-slots (x0 y0 x1 y1) bounding-box
+		   (with-slots ((xpos x) (ypos y)) position
+		     (let ((px0 (+ x0 xpos))
+			   (py0 (+ y0 ypos))
+			   (px1 (+ x1 xpos))
+			   (py1 (+ y1 ypos)))
+		       (with-slots (x0 y0 x1 y1) absolute-rectangle
+			 (setf x0 px0 y0 py0 x1 px1 y1 py1))
+		       (draw-textured-quad px0 py0 
+					   px1 py1
+					   s0 t0
+					   s1 t1)))))))
 	(if color
 	    (let ((*pen-color* color))
 	      (render-stuff))
-	    (render-stuff)))
+	    (render-stuff))
+	(when texture
+	  (gl:bind-texture :texture-2d
+			   (glhelp::handle texture)))
+	(gl:with-primitive :quads
+	  (mesh-vertex-tex-coord-color)))
       ))
 
 (progn

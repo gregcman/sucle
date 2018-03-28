@@ -8,7 +8,9 @@
    #:mesh-vertex
    #:mesh-vertex-color
    #:mesh-vertex-tex-coord
-   #:mesh-vertex-tex-coord-color))
+   #:mesh-vertex-tex-coord-color)
+  (:export
+   #:with-primitives))
 (in-package :opengl-immediate)
 
 ;;vertex = 0
@@ -79,5 +81,11 @@
 
 (gen mesh-vertex vertex)
 (gen mesh-vertex-color vertex color)
-(gen mesh-vertex-tex-coord vertex tex-coord color)
+(gen mesh-vertex-tex-coord vertex tex-coord)
 (gen mesh-vertex-tex-coord-color vertex tex-coord color)
+
+(defmacro with-primitives (mode meshing-fun &body body)
+  `(progn
+     ,@body
+     (gl:with-primitives ,mode
+	 (,(second meshing-fun)))))
