@@ -1,5 +1,3 @@
-(in-package :sandbox)
-
 (defstruct (zymbol (:constructor %make-zymbol (name hash)))
   (name (error "must provide name!") :type (or null (simple-array character (*))))
   (hash (error "NO") :type fixnum)

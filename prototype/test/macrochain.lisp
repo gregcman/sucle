@@ -1,5 +1,3 @@
-(in-package :funland)
-
 (defmacro macrontinue (cont-list sub-form)
   (if cont-list
       (let ((cont (pop cont-list)))
@@ -15,17 +13,18 @@
   (list (quote macrontinue) cont
 	(let ((tail-var (gensym)))
 	  (block orcam
-	    (multiple-value-bind
-		  (def name parm decl doc bod)
-		(destructure-def body)
-	      `(,def ,name (,parm &optional ,subformvar ,contvar) 
-		 ,@decl
-		 (declare (ignorable ,subformvar ,contvar))
-		 ,doc
-		 (let ((,tail-var ,(list* (quote block) name bod)))
-		   (list (quote macrontinue)
-			 ,contvar
-			 ,tail-var))))))))
+	    (destructuring-bind (def name parm &rest rest) body
+		(multiple-value-bind
+		      (bod decl doc)
+		    (utility:parse-body rest)
+		  `(,def ,name (,parm &optional ,subformvar ,contvar) 
+		     ,@decl
+		     (declare (ignorable ,subformvar ,contvar))
+		     ,doc
+		     (let ((,tail-var ,(list* (quote block) name bod)))
+		       (list (quote macrontinue)
+			     ,contvar
+			     ,tail-var)))))))))
 
 (defmacro chain (input &rest conts)
   `(macrontinue ,conts ,input))
@@ -60,7 +59,7 @@
 
 (orcam (subform cont)
        (defmacro lave ((subvar contvar) &body body)
-	 (multiple-value-bind (dec doc bod) (destructure-body body)
+	 (multiple-value-bind (bod dec doc) (utility:parse-body body)
 	   (declare (ignorable doc))
 	   (multiple-value-bind (sub con)
 	       (eval (let ((val-var (gensym)))
