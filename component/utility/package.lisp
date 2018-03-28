@@ -18,4 +18,7 @@
 
   (:export
    #:spill-hash
-   #:dohash))
+   #:dohash)
+
+  (:export
+   #:floatify))

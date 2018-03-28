@@ -21,9 +21,6 @@
     (application::main)))
 (defvar *this-directory* (filesystem-util:this-directory))
 
-(defmacro floatify (x)
-  `(coerce ,x 'single-float))
-
 (defparameter *window-start-height* 480)
 (defparameter *window-start-width* 780)
 (defparameter *window-start-title* "basic app")

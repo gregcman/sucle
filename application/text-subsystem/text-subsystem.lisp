@@ -117,43 +117,10 @@
 	     (:texture-mag-filter . :nearest)
 	     (:texture-wrap-s . :repeat)
 	     (:texture-wrap-t . :repeat))))))
-(defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16))
-(deflazy glsl-code-lookup ()
-  (let ((a (make-array (* 4 256) :element-type 'single-float)))
-    (dotimes (x 256)
-      (let ((offset (* 4 x))
-	    (tilemap-lookup *16x16-tilemap*))
-	(etouq
-	 (with-vec-params
-	     '((offset x0 y0 x1 y1))
-	   '(tilemap-lookup)
-	   '(etouq
-	     (with-vec-params
-		 '((offset ax0 ay0 ax1 ay1))
-	       '(a symbol-macrolet)
-	       '(setf
-		 ax0 x0
-		 ay0 y0
-		 ax1 x1
-		 ay1 y1))
-	     )))))
-    a))
-
-(defun floatify (x)
-  (coerce x 'single-float))
 
 (defun byte-float (x)
   (/ (floatify x)
      255.0))
-
-(defun color-rgb (color)
-  (let ((one-third (etouq (coerce 1/3 'single-float))))
-    (macrolet ((k (num)
-		 `(* one-third (floatify (ldb (byte 2 ,num) color)))))
-      (values (k 0)
-	      (k 2)
-	      (k 4)
-	      (k 6)))))
 
 (defun color (r g b a)
   (dpb a (byte 2 6)
@@ -297,6 +264,14 @@
 		    (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
 	      len a b))))))))
 
+(defun color-rgb (color)
+  (let ((one-third (etouq (coerce 1/3 'single-float))))
+    (macrolet ((k (num)
+		 `(* one-third (floatify (ldb (byte 2 ,num) color)))))
+      (values (k 0)
+	      (k 2)
+	      (k 4)
+	      (k 6)))))
 
 (defmacro with-foreign-array ((var lisp-array type &optional (len (gensym)))
 			      &rest body)
@@ -308,18 +283,29 @@
 	     (setf (cffi:mem-aref ,var ,type ,i)
 		   (row-major-aref ,lisp-array ,i)))
 	   ,@body)))))
-(deflazy text-shader ((glsl-code-lookup code) (terminal256color-lookup color)
-		      text-shader-source)
+(defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16))
+(defparameter *color-fun* 'color-rgb)
+(defparameter *terminal256color-lookup* 
+  (let ((arr (make-array (* 4 256) :element-type 'single-float)))
+    (dotimes (x 256)
+      (let ((offset (* 4 x)))
+	(multiple-value-bind (r g b a) (funcall *color-fun* x) 
+	  (setf (aref arr (+ offset 0)) r)
+	  (setf (aref arr (+ offset 1)) g)
+	  (setf (aref arr (+ offset 2)) b)
+	  (setf (aref arr (+ offset 3)) (if a a 1.0)))))
+    arr))
+(deflazy text-shader (text-shader-source)
   (let ((shader (glhelp::create-gl-program text-shader-source)))
     (glhelp::use-gl-program shader)
     (glhelp:with-uniforms uniform shader
-      (with-foreign-array (var code :float len)
+      (with-foreign-array (var *16x16-tilemap* :float len)
 	(%gl:uniform-4fv (uniform 'font-data)
 			 (/ len 4)
 			 var))
-      (with-foreign-array (var color :float len)
+      (with-foreign-array (var *terminal256color-lookup* :float len)
 	(%gl:uniform-4fv (uniform 'color-data)
-			 (/ len 3)
+			 (/ len 4)
 			 var)))
     shader))
 
@@ -348,17 +334,6 @@
   (register-vec-slots :point (quote ((:x 0)
 				     (:y 1)))))
 
-;;color uniform
-(deflazy terminal256color-lookup ()
- (let ((arr (make-array (* 4 256) :element-type 'single-float)))
-   (dotimes (x 256)
-     (let ((offset (* 4 x)))
-       (multiple-value-bind (r g b a) (color-rgb x) 
-	 (setf (aref arr (+ offset 0)) r
-	       (aref arr (+ offset 1)) g
-	       (aref arr (+ offset 2)) b
-	       (aref arr (+ offset 3)) a))))
-   arr))
 
 ;;;;;;;;;;;;;;;
 (defun mesh-string-gl-points (x y string &optional

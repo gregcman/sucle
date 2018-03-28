@@ -9,8 +9,6 @@
     ;foo2
     ;text2
     ))
-(defun floatify (x)
-  (coerce x 'single-float))
 
 (setf sandbox::*some-saves*
       (cdr (assoc (machine-instance) 

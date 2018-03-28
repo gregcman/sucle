@@ -24,9 +24,6 @@
   `(subprocess (*standard-output* *standard-input* *terminal-io*)
      ,@body))
 
-
-(defmacro floatify (x)
-  `(coerce ,x 'single-float))
 (defmacro clamp (min max x)
   `(max ,min (min ,max ,x)))
 

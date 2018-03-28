@@ -17,19 +17,28 @@
 	  (values u v
 		  (+ u usize) 
 		  (+ v vsize)))))))
+
+;;;;3 4
+;;;;1 2
+;;flip-y switches the top and bottom y coord when the texture is unflipped,
+;;making it like:
+;;1 2
+;;3 4
 (progn
-  (declaim (ftype (function (fixnum fixnum) simple-array)
+  (declaim (ftype (function (fixnum fixnum &key (:flip-y t)) simple-array)
 		  regular-enumeration))
-  (defun regular-enumeration (width height)
+  (defun regular-enumeration (width height &key (flip-y t))
     (let ((tot (* width height)))
       (let ((ret (make-array (* tot 4))))
 	(dotimes (x tot)
 	  (multiple-value-bind (x0 y0 x1 y1) (sequential-index-generator width height x)
+	    (when flip-y
+	      (rotatef y0 y1))
 	    (let ((p (* x 4)))
 	      (setf (aref ret (+ 0 p)) x0
-		    (aref ret (+ 1 p)) y1
+		    (aref ret (+ 1 p)) y0
 		    (aref ret (+ 2 p)) x1
-		    (aref ret (+ 3 p)) y0))))
+		    (aref ret (+ 3 p)) y1))))
 	ret))))
 (progn
   (declaim (ftype (function (simple-vector fixnum)
