@@ -22,6 +22,9 @@
   (when proc
     (sb-ext:process-kill proc 9)))
 
+(defun kill ()
+  (kill-proc *proc*))
+
 (defparameter *init*
   (format nil "
 stty rows ~a
@@ -37,10 +40,14 @@ export TERM=~a
   *init*)
   (update-terminal-stuff))
 
+(defun living-process-p (proc)
+  (and (sb-ext:process-p proc)
+       (sb-ext:process-alive-p proc)))
+
 (defparameter *text* (make-array 0 :fill-pointer t :element-type 'character))
 (defun update-terminal-stuff (&optional (term *term*) (proc *proc*))
   (let ((command *text*))
-    (when (sb-ext:process-alive-p proc)
+    (when (living-process-p proc)
       (collect-all-output (sb-ext:process-output proc)
 			  command))
     (cond ((zerop (fill-pointer command))
@@ -59,10 +66,12 @@ export TERM=~a
 	     (go rep))))))
 
 (defun enter (args &optional (proc *proc*))
-  (progn
-    (let ((in (sb-ext:process-input proc)))
-      (write-string args in)
-      (finish-output in))))
+  (let ((alive? (living-process-p proc)))
+    (when alive?
+      (let ((in (sb-ext:process-input proc)))
+	(write-string args in)
+	(finish-output in)))
+    alive?))
 
 (defun color-fun (color)
     (labels ((bcolor (r g b)

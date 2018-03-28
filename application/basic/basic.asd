@@ -2,6 +2,7 @@
   :depends-on (#:application
 	       #:utility
 	       #:text-subsystem
+	       #:opengl-immediate
 	       #:opticl
 	       #:3bst)
   :serial t

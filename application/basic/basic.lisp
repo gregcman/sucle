@@ -1,5 +1,5 @@
 (defpackage #:basic
-  (:use #:cl #:utility #:application #:double-link))
+  (:use #:cl #:utility #:application #:double-link #:opengl-immediate))
 (in-package :basic)
 
 (defparameter *saved-session* nil)
@@ -16,8 +16,7 @@
 	       *window-start-height*
 	       *window-start-title*)))
     (setf application::*trampoline*
-	  '(per-frame text-sub::per-frame
-	    ))
+	  '(per-frame))
     (application::main)))
 (defvar *this-directory* (filesystem-util:this-directory))
 
@@ -65,6 +64,12 @@
 				     window:*height*))))
   (when (window::skey-j-p (window::keyval #\esc))
     (application::quit))
+  (when (window::skey-j-p (window::keyval :f2))
+    (terminal-test::reset-term)
+    )
+  (when (window::skey-j-p (window::keyval :f1))
+    (terminal-test::kill)
+    )
   #+nil
   (when (window::skey-j-p (window::keyval :r))
     (application::reload 'cons-texture))
@@ -77,7 +82,8 @@
   (gl:clear :color-buffer-bit)
   (gl:disable :cull-face)
   (gl:disable :blend)
- ; (more-test)
+  (more-test)
+  (render-stuff)
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
     (when (window::skey-j-p (window::mouseval :left))
@@ -116,10 +122,12 @@
 
 (defun render-terminal (x y &optional (term terminal-test::*term*))
   (flet ((value (r g b x y)
-	   (gl:color (byte/255 r)
-		     (byte/255 g)
-		     (byte/255 b))
-	   (gl:vertex x y)))
+	   (color (byte/255 r)
+		  (byte/255 g)
+		  (byte/255 b))
+	   (vertex
+	    (floatify x)
+	    (floatify y))))
     (with-slots ((cx 3bst::x) (cy 3bst::y)) (with-slots (3bst::cursor) term 3bst::cursor)
       (terminal-test::do-term-values (glyph col row)
 	(let ((char (3bst:c glyph))
@@ -142,6 +150,7 @@
 					      window::*alt*
 					      window::*super*)
 	  (vector-push-extend char *command-buffer*))
+    
     (terminal-test::enter *command-buffer*)
     (setf (fill-pointer *command-buffer*) 0))
   (terminal-test::update-terminal-stuff))
@@ -404,3 +413,66 @@
 	      (render-stuff))
 	    (render-stuff)))
       ))
+
+(progn
+  (defparameter *numbuf* (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character))
+  (defun render-stuff ()
+    (text-sub::with-data-shader (uniform rebase)
+      (gl:clear :color-buffer-bit)
+      (gl:disable :depth-test)
+      (setf (fill-pointer *numbuf*) 0)
+      (with-output-to-string (stream *numbuf* :element-type 'character)
+	(princ (get-internal-real-time) stream)
+	*numbuf*)
+      (rebase -128.0 -128.0)
+      (gl:point-size 1.0)
+      (let ((count 0))
+	(dotimes (x 16)
+	  (dotimes (y 16)
+	    (let ((val (byte/255 count)))
+	      (color val
+		     val
+		     val))
+	    (vertex (floatify x)
+		    (floatify y)
+		    0.0)
+	    (incf count))))
+					;   (basic::render-terminal 0 24)
+      (let ((bgcol (byte/255 (text-sub::color-rgba 3 3 3 3)))
+	    (fgcol (byte/255 (text-sub::color-rgba 0 0 0 3))))
+	((lambda (x y string)
+	   (let ((start x))
+	     (let ((len (length string)))
+	       (dotimes (index len)
+		 (let ((char (aref string index)))
+		   (cond ((char= char #\Newline)
+			  (setf x start)
+			  (decf y))
+			 (t
+			  (color (byte/255 (char-code char))
+				 bgcol
+				 fgcol)
+			  (vertex (floatify x)
+				  (floatify y)
+				  0.0)
+			  
+			  (setf x (1+ x))))))
+	       len)))
+	 10.0 10.0 *numbuf*)))
+					; #+nil
+    (gl:with-primitives :points
+      (opengl-immediate::mesh-vertex-color))
+    (when terminal-test::*term*
+      (render-terminal 0 24)
+      (gl:with-primitives :points
+	(mesh-vertex-color)))
+    (text-sub::with-text-shader (uniform)
+      (gl:uniform-matrix-4fv
+       (uniform :pmv)
+       (load-time-value (nsb-cga:identity-matrix))
+       nil)   
+      (glhelp::bind-default-framebuffer)
+      (application::%set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
+      (gl:enable :blend)
+      (gl:blend-func :src-alpha :one-minus-src-alpha)
+      (gl:call-list (glhelp::handle (getfnc 'text-sub::fullscreen-quad))))))
