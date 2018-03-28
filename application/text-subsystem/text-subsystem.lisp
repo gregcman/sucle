@@ -145,10 +145,12 @@
 		  (retrans x y)
 		  nil)))
 	(flet ((pos (x y z)
-		 (gl:vertex-attrib 3
+		 (;gl:vertex-attrib 3
+				   gl:color
 				   x y z 1.0))
 	       (value (x y z)
-		 (gl:vertex-attrib 0
+		 (;gl:vertex-attrib 0
+				   gl:vertex
 		  x y z 1.0)))
 	  (setf (fill-pointer *numbuf*) 0)
 	  (with-output-to-string (stream *numbuf* :element-type 'character)
@@ -170,7 +172,7 @@
 		       (floatify y)
 		       0.0)
 		  (incf count))))
-	    ;(basic::render-terminal 0 24)
+	 ;   (basic::render-terminal 0 24)
 	    (let ((bgcol (byte/255 (color 3 3 3 3)))
 		  (fgcol (byte/255 (color 0 0 0 3))))
 	      ((lambda (x y string)
@@ -474,15 +476,3 @@
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
     (gl:clear :color-buffer-bit)
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
-
-
-(defun test69 ()
-  (let ((position (scratch-buffer:my-iterator))
-	(times 0))
-    (iterator:bind-iterator-out
-     (pos single-float) position
-     (scratch-buffer:flush-my-iterator position
-       (iterator:bind-iterator-in
-	(xyz single-float) position
-	(dotimes (x times)
-	  (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))))

@@ -40,21 +40,22 @@
 		  (- k 8)
 		  (- j 8)))))))
 
-(defun update-chunk-mesh (len coords iter)
+(defun update-chunk-mesh (coords iter)
   (when coords
     (let ((old-call-list (get-chunk-display-list coords)))     
       (when old-call-list (gl:delete-lists old-call-list 1)))
-    (if (zerop len)
-	(remove-chunk-display-list coords)	  
-	(set-chunk-display-list
-	 coords
-	 (glhelp:with-gl-list
-	   (gl:with-primitives :quads	     
-	     (with-vec (a b c) (iter)
-	       (scratch-buffer:flush-my-iterator a
-		 (scratch-buffer:flush-my-iterator b
-		   (scratch-buffer:flush-my-iterator c
-		     (mesh-chunk len a b c)))))))))))
+    (with-vec (a b c) (iter)
+      (let ((len (scratch-buffer:iterator-fill-pointer c)))
+	(if (zerop len)
+	    (remove-chunk-display-list coords)	  
+	    (set-chunk-display-list
+	     coords
+	     (glhelp:with-gl-list
+	       (gl:with-primitives :quads	     
+		 (scratch-buffer:flush-my-iterator a
+		   (scratch-buffer:flush-my-iterator b
+		     (scratch-buffer:flush-my-iterator c
+		       (mesh-chunk len a b c))))))))))))
 
 (defun mesh-chunk (times a b c)
   (declare (type fixnum times))
@@ -86,10 +87,10 @@
 	       *achannel*
 	       (lambda (iter space)
 		 (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
-		 (multiple-value-bind (a b c) (chunk-shape thechunk iter)
-		   (%list space #'update-chunk-mesh a b c)))
+		 (multiple-value-bind (a b) (chunk-shape thechunk iter)
+		   (%list space #'update-chunk-mesh a b)))
 	       (attrib-buffer-iterators)
-	       (make-list 4))))))))
+	       (make-list 3))))))))
 
 ;;;;keeping track of the changes to the world
 (progn

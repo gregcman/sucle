@@ -3,7 +3,8 @@
   (:export
    my-iterator
    free-my-iterator-memory
-   flush-my-iterator))
+   flush-my-iterator
+   iterator-fill-pointer))
 
 (in-package #:scratch-buffer)
 (defparameter *scratch-space* nil)
@@ -67,3 +68,8 @@
        ,@body
        (free-my-iterator-memory ,var))))
  
+(defun iterator-fill-pointer (iterator)
+  (let ((len (- (iterator:p-index iterator))))
+    (dolist (item (cdr (car (iterator:p-data iterator))))
+      (incf len (array-total-size item)))
+    len))
