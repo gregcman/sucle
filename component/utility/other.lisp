@@ -70,10 +70,13 @@ Example:
 
 ;;from uiop
 (defmacro nest (&rest things)
-    "Macro to do keep code nesting and indentation under control." ;; Thanks to mbaringer
-    (reduce #'(lambda (outer inner) `(,@outer ,inner))
-            things :from-end t))
- 
+  "Macro to do keep code nesting and indentation under control." ;; Thanks to mbaringer
+  (%nest things))
+
+(defun %nest (things)
+  (reduce #'(lambda (outer inner) `(,@outer ,inner))
+	  things :from-end t))
+
 (defun parse-body (body &key documentation whole)
   "Parses BODY into (values remaining-forms declarations doc-string).
 Documentation strings are recognized only if DOCUMENTATION is true.

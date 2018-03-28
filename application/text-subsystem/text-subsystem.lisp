@@ -135,6 +135,7 @@
   (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
   (application::%set-render-area 0 0 256 256)
   (gl:clear :color-buffer-bit)
+  (gl:disable :depth-test)
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms
@@ -145,55 +146,53 @@
 		  (retrans x y)
 		  nil)))
 	(flet ((pos (x y z)
-		 (;gl:vertex-attrib 3
-				   gl:color
-				   x y z 1.0))
+		 (vertex
+		  x y z 1.0))
 	       (value (x y z)
-		 (;gl:vertex-attrib 0
-				   gl:vertex
+		 (color
 		  x y z 1.0)))
 	  (setf (fill-pointer *numbuf*) 0)
 	  (with-output-to-string (stream *numbuf* :element-type 'character)
 	    (princ (get-internal-real-time) stream)
 	    *numbuf*)
 	  (rebase -128.0 -128.0)
-	  (gl:disable :depth-test)
 	  (gl:point-size 1.0)
-	 
-	  (gl:with-primitives :points	    
-	    (let ((count 0))
-	      (dotimes (x 16)
-		(dotimes (y 16)
-		  (let ((val (byte/255 count)))
-		    (value val
-			   val
-			   val))
-		  (pos (floatify x)
-		       (floatify y)
-		       0.0)
-		  (incf count))))
-	 ;   (basic::render-terminal 0 24)
-	    (let ((bgcol (byte/255 (color 3 3 3 3)))
-		  (fgcol (byte/255 (color 0 0 0 3))))
-	      ((lambda (x y string)
-		 (let ((start x))
-		   (let ((len (length string)))
-		     (dotimes (index len)
-		       (let ((char (aref string index)))
-			 (cond ((char= char #\Newline)
-				(setf x start)
-				(decf y))
-			       (t
-				(value (byte/255 (char-code char))
-				       bgcol
-				       fgcol)
-				(pos (floatify x)
-				     (floatify y)
-				     0.0)
-				
-				(setf x (1+ x))))))
-		     len)))
-	       0.0 0.0 *numbuf*)))))))
+	  (let ((count 0))
+	    (dotimes (x 16)
+	      (dotimes (y 16)
+		(let ((val (byte/255 count)))
+		  (value val
+			 val
+			 val))
+		(pos (floatify x)
+		     (floatify y)
+		     0.0)
+		(incf count))))
+					;   (basic::render-terminal 0 24)
+	  (let ((bgcol (byte/255 (color-rgba 3 3 3 3)))
+		(fgcol (byte/255 (color-rgba 0 0 0 3))))
+	    ((lambda (x y string)
+	       (let ((start x))
+		 (let ((len (length string)))
+		   (dotimes (index len)
+		     (let ((char (aref string index)))
+		       (cond ((char= char #\Newline)
+			      (setf x start)
+			      (decf y))
+			     (t
+			      (value (byte/255 (char-code char))
+				     bgcol
+				     fgcol)
+			      (pos (floatify x)
+				   (floatify y)
+				   0.0)
+			      
+			      (setf x (1+ x))))))
+		   len)))
+	     10.0 10.0 *numbuf*))))))
+ ; #+nil
+  (gl:with-primitives :points
+    (mesh))
   (let ((program (getfnc 'text-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -268,7 +267,7 @@
 	      (k 2)
 	      (k 4)
 	      (k 6)))))
-(defun color (r g b a)
+(defun color-rgba (r g b a)
   (dpb a (byte 2 6)
        (dpb b (byte 2 4)
 	    (dpb g (byte 2 2)
@@ -317,52 +316,72 @@
 			 var)))
     shader))
 
-;;;;;;;;;;;;;;;
-#+nil
-(defun mesh-string-gl-points (x y string &optional
-					   (bgcol (byte-float (color 3 3 3 3)))
-					   (fgcol (byte-float (color 0 0 0 3))))
-  (let ((position (scratch-buffer:my-iterator))
-	(value (scratch-buffer:my-iterator))
-	(len 0))
-    (iterator:bind-iterator-out
-     (pos single-float) position
-     (iterator:bind-iterator-out
-      (value single-float) value
+;;vertex = 0
+;;tex-coord = 2
+;;color = 3
+(defparameter *vertex-scratch* (scratch-buffer:my-iterator))
+(defparameter *tex-coord-scratch* (scratch-buffer:my-iterator))
+(defparameter *color-scratch* (scratch-buffer:my-iterator))
 
-      (incf len
-	    ((lambda (x y string)
-	       (let ((start x))
-		 (let ((len (length string)))
-		   (dotimes (index len)
-		     (let ((char (aref string index)))
-		       (cond ((char= char #\Newline)
-			      (setf x start)
-			      (decf y))
-			     (t
-			      (value (byte-float (char-code char))
-				     bgcol
-				     fgcol)
-			      (pos (floatify x)
-				   (floatify y)
-				   0.0)
-			      (setf x (1+ x))))))
-		   len)))
-	     x y string))))
-    (glhelp:with-gl-list
-      (gl:with-primitives :points
-	((lambda (position value len)
-	   (scratch-buffer:flush-my-iterator position
-	     (scratch-buffer:flush-my-iterator value
-	       ((lambda (times position value)
-		  (iterator:bind-iterator-in
-		   (xyz single-float) position
-		   (iterator:bind-iterator-in
-		    (value single-float) value
-		    (dotimes (x times)
-		      (%gl:vertex-attrib-4f 3 (value) (value) (value) 1.0)
-		      (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
-		len position value)))) position value len)))))
+(defun vertex (&optional (x 0.0) (y 0.0) (z 0.0) (w 1.0))
+  (iterator:bind-iterator-out
+   (emit single-float) *vertex-scratch*
+   (emit x y z w)))
+(defun tex-coord (&optional (x 0.0) (y 0.0) (z 0.0) (w 1.0))
+  (iterator:bind-iterator-out
+   (emit single-float) *tex-coord-scratch*
+   (emit x y z w)))
+(defun color (&optional (x 0.0) (y 0.0) (z 0.0) (w 1.0))
+  (iterator:bind-iterator-out
+   (emit single-float) *color-scratch*
+   (emit x y z w)))
+(eval-always
+  (defparameter *default-attrib-locations*
+    '((*vertex-scratch* 0)
+      (*tex-coord-scratch* 2)
+      (*color-scratch* 3)))
+  (defun gen-mesher (&optional (items *default-attrib-locations*))
+    (let ((sorted (sort (copy-list items) #'< :key #'second)))
+      (map-into sorted (lambda (x) (cons (gensym) x)) sorted)
+      (let ((first (first sorted))
+	    (times-var (gensym "TIMES"))
+	    (flushes nil)
+	    (binds nil)
+	    (attribs nil)
+	    (names nil))
+	(dolist (item sorted)
+	  (destructuring-bind (name form num) item
+	    (push `(scratch-buffer:flush-my-iterator ,name) flushes)
+	    (push `(,name ,form) names)
+	    (let ((emit (gensym "EMIT")))
+	      (push `(iterator:bind-iterator-in
+		      (,emit single-float) ,name) binds)
+	      (push `(%gl:vertex-attrib-4f ,num (,emit) (,emit) (,emit) (,emit))
+		    attribs))))
+	(let ((header1
+	       `(let ,names))
+	      (header2
+	       `(let ((,times-var (/ (scratch-buffer:iterator-fill-pointer ,(first first)) 4))))))
+	  (%nest
+	   (nconc
+	    (list
+	     header1
+	     header2)
+	    flushes
+	    binds
+	    (list
+	     `(dotimes (x ,times-var)
+		,(cons 'progn attribs))))))))))
+(defmacro gen (name &rest items)
+  (let (acc)
+    (dolist (item items)
+      (let* ((string (symbol-name item))
+	     (namesake (find-symbol (concatenate 'string "*" string "-SCRATCH*"))))
+	(when namesake
+	  (push (assoc namesake *default-attrib-locations*) acc))))
+    `(defun ,name ()
+       ,(gen-mesher acc))))
+(gen mesh vertex color)
 
 (deflazy flat-shader-source ()
   (glslgen:ashader

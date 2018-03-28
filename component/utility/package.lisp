@@ -29,5 +29,6 @@
    #:symbolicate2
    #:with-gensyms
    #:nest
+   #:%nest
    #:once-only
    #:parse-body))
