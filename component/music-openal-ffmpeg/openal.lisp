@@ -1,13 +1,11 @@
 (defpackage #:music
-  (:use #:cl #:utility
-	)
+  (:use #:cl #:utility)
   (:import-from
    #:cl-ffmpeg
    #:rate
    #:bytes-per-sample
    #:channels
-   #:audio-format
-   )
+   #:audio-format)
   (:export
    #:play-at))
 (in-package #:music)
@@ -23,9 +21,6 @@
 (defmacro iosub (&body body)
   `(subprocess (*standard-output* *standard-input* *terminal-io*)
      ,@body))
-
-(defmacro clamp (min max x)
-  `(max ,min (min ,max ,x)))
 
 (defparameter *format* (or :mono8
 			   :mono16

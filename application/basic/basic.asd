@@ -8,5 +8,5 @@
   :components 
   ((:file "keys-to-chars")
    (:file "double-link")
-   (:file "more")
+   (:file "terminal-test")
    (:file "basic")))

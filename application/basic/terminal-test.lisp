@@ -22,10 +22,19 @@
   (when proc
     (sb-ext:process-kill proc 9)))
 
+(defparameter *init*
+  (format nil "
+stty rows ~a
+stty columns ~a
+export TERM=~a
+" 24 80 (or "xterm" "xterm-256color")))
+
 (defparameter *term* nil)
 (defun reset-term ()
   (reset-ssh)
   (setf *term* (make-instance '3bst:term :rows 24 :columns 80))
+  (enter
+  *init*)
   (update-terminal-stuff))
 
 (defparameter *text* (make-array 0 :fill-pointer t :element-type 'character))
@@ -93,9 +102,12 @@
 		 (c6 c)
 		 (g (- c 216))))))))
 
-(defun term-cursor-info ()
-  (with-slots (3bst::x 3bst::y 3bst::state 3bst::attributes) (with-slots (3bst::cursor) *term* 3bst::cursor)
-    (values 3bst::x 3bst::y 3bst::state 3bst::attributes)))
+(defmacro do-term-values ((glyph x y &optional (term '*term*)) &body body)
+  (once-only (term)
+    `(dobox ((,y 0 (3bst:rows ,term)))
+	    (dobox ((,x 0 (3bst:columns ,term)))
+		   (let ((,glyph (3bst:glyph-at (3bst::screen ,term) ,y ,x)))
+		     ,@body)))))
 
 (defun print-term (&optional (term *term*))
   (loop with dirty = (3bst:dirty term)

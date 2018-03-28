@@ -95,9 +95,6 @@ arguments when given."
          (go :declarations)))
     (values body (nreverse decls) doc)))
 
-(export '(with-gensyms nest once-only parse-body symbolicate2))
-
-
 (defun symbolicate2 (things &optional (package *package*))
   "Concatenate together the names of some strings and symbols,
 producing a symbol in the current package."

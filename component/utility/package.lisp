@@ -21,4 +21,13 @@
    #:dohash)
 
   (:export
-   #:floatify))
+   #:floatify
+   #:byte/255
+   #:clamp)
+
+  (:export
+   #:symbolicate2
+   #:with-gensyms
+   #:nest
+   #:once-only
+   #:parse-body))

@@ -8,14 +8,6 @@
 	 (setf acc (ash (logior acc value) 8)))
        (logand acc most-positive-fixnum)))
 
-   (progn
-     (declaim (inline byte-color)
-	      (ftype (function (fixnum) single-float)
-		     byte-color))
-     (with-unsafe-speed
-       (defun byte-color (x)
-	 (/ (float x) 255.0))))
-
    (defun strip-char (color)
      (logandc1 255 color)))
 

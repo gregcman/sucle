@@ -118,24 +118,6 @@
 	     (:texture-wrap-s . :repeat)
 	     (:texture-wrap-t . :repeat))))))
 
-(defun byte-float (x)
-  (/ (floatify x)
-     255.0))
-
-(defun color (r g b a)
-  (dpb a (byte 2 6)
-       (dpb b (byte 2 4)
-	    (dpb g (byte 2 2)
-		 (dpb r (byte 2 0) 0)))))
-
-#+nil
-(progn
-  (gl:clear-color (byte-float (char-code #\a))
-		  (byte-float (color 0 3 2 1))
-		  (byte-float (color 3 1 0 3))
-		  1.0)
-  (gl:clear :color-buffer-bit))
-
 (defun per-frame (session)
   (declare (ignorable session))
   (get-fresh 'render-normal-text-indirection)
@@ -162,14 +144,11 @@
 		  (uniform :pmv)
 		  (retrans x y)
 		  nil)))
-	;#+nil
 	(flet ((pos (x y z)
-		 (;%gl:vertex-attrib-4f 3
-				       gl:vertex
-				       x y z 1.0))
+		 (gl:vertex-attrib 3
+				   x y z 1.0))
 	       (value (x y z)
-		 (;%gl:vertex-attrib-4f 0
-		  gl:color 
+		 (gl:vertex-attrib 0
 		  x y z 1.0)))
 	  (setf (fill-pointer *numbuf*) 0)
 	  (with-output-to-string (stream *numbuf* :element-type 'character)
@@ -178,23 +157,22 @@
 	  (rebase -128.0 -128.0)
 	  (gl:disable :depth-test)
 	  (gl:point-size 1.0)
-	  (gl:with-primitives :points
-	    
-					;#+nil
-	    (let ((bgcol (byte-float (color 3 3 3 3)))
-		  (fgcol (byte-float (color 0 0 0 3))))
-	      (let ((count 0))
-		(dotimes (x 16)
-		  (dotimes (y 16)
-		    (let ((val (byte-float count)))
-		      (value val
-			     val
-			     val))
-		    (pos (floatify x)
-			 (floatify y)
-			 0.0)
-		    (incf count))))
-	      
+	 
+	  (gl:with-primitives :points	    
+	    (let ((count 0))
+	      (dotimes (x 16)
+		(dotimes (y 16)
+		  (let ((val (byte/255 count)))
+		    (value val
+			   val
+			   val))
+		  (pos (floatify x)
+		       (floatify y)
+		       0.0)
+		  (incf count))))
+	    ;(basic::render-terminal 0 24)
+	    (let ((bgcol (byte/255 (color 3 3 3 3)))
+		  (fgcol (byte/255 (color 0 0 0 3))))
 	      ((lambda (x y string)
 		 (let ((start x))
 		   (let ((len (length string)))
@@ -204,7 +182,7 @@
 				(setf x start)
 				(decf y))
 			       (t
-				(value (byte-float (char-code char))
+				(value (byte/255 (char-code char))
 				       bgcol
 				       fgcol)
 				(pos (floatify x)
@@ -279,6 +257,7 @@
 		    (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))
 	      len a b))))))))
 
+;;;;4 shades each of r g b a 0.0 1/3 2/3 and 1.0
 (defun color-fun (color)
   (let ((one-third (etouq (coerce 1/3 'single-float))))
     (macrolet ((k (num)
@@ -287,6 +266,11 @@
 	      (k 2)
 	      (k 4)
 	      (k 6)))))
+(defun color (r g b a)
+  (dpb a (byte 2 6)
+       (dpb b (byte 2 4)
+	    (dpb g (byte 2 2)
+		 (dpb r (byte 2 0) 0)))))
 
 (defmacro with-foreign-array ((var lisp-array type &optional (len (gensym)))
 			      &rest body)
@@ -331,33 +315,8 @@
 			 var)))
     shader))
 
-#+nil
-(eval-always
-  (defparameter *vec-types* (make-hash-table :test 'equalp))
-  (defun vec-slots (type args &optional (lookup *vec-types*))
-    (let ((type-hash (gethash type lookup)))
-      (mapcar (lambda (x)
-		(let ((a (first x))
-		      (b (second x)))
-		  (list (gethash b type-hash) a)))
-	      args)))
-  (defun register-vec-slots (type args &optional (lookup *vec-types*))
-    (let ((new-hash (make-hash-table :test 'equalp)))
-      (dolist (x args)
-	(setf (gethash (first x) new-hash)
-	      (second x)))
-      (setf (gethash type lookup) new-hash)))
-
-  (register-vec-slots :rectangle (quote ((:x0 0)
-					 (:y0 1)
-					 (:x1 2)
-					 (:y1 3))))
-
-  (register-vec-slots :point (quote ((:x 0)
-				     (:y 1)))))
-
-
 ;;;;;;;;;;;;;;;
+#+nil
 (defun mesh-string-gl-points (x y string &optional
 					   (bgcol (byte-float (color 3 3 3 3)))
 					   (fgcol (byte-float (color 0 0 0 3))))
@@ -421,10 +380,7 @@
     :in '((value "vec4"))
     :program
     '(defun "main" void ()	 
-      (=
-       :gl-frag-color
-       value
-       )))
+      (= :gl-frag-color value)))
    :attributes
    '((position . 0) 
      (value . 3))
@@ -455,11 +411,8 @@
 	  (size "vec2"))
     :program
     '(defun "main" void ()
-
       ;;rg = fraction
       ;;ba = text lookup
-
-      ;;
       (/**/ vec2 foo)
       (= foo (/ (floor (* texcoord size))
 	      (vec2 255.0)))	 
@@ -468,21 +421,11 @@
        (fract
 	(* 
 	 texcoord
-	 size)))
-      
-      ;;font lookup
-      (/**/ vec4 pixcolor)
-
-      ;;fraction
-      (= (|.| pixcolor "rg") bar
-       )
-      ;;text lookup
-      (= (|.| pixcolor "ba") foo
-       )
-      
-      (= :gl-frag-color
-       pixcolor
-       )))
+	 size)))         
+      (/**/ vec4 pixcolor) ;;font lookup
+      (= (|.| pixcolor "rg") bar)       ;;fraction
+      (= (|.| pixcolor "ba") foo)      ;;text lookup 
+      (= :gl-frag-color pixcolor)))
    :attributes
    '((position . 0) 
      (texcoord . 2))
@@ -517,14 +460,11 @@
        (load-time-value (nsb-cga:identity-matrix))
        nil)
       (gl:uniformf (uniform 'size)
-		   (/ w
-		      *block-width*)
-		   (/ h
-		      *block-height*)))
+		   (/ w *block-width*)
+		   (/ h *block-height*)))
     (gl:disable :cull-face)
     (gl:disable :depth-test)
-    (gl:disable :blend
-     )
+    (gl:disable :blend)
     (application::%set-render-area 0 0 upw uph)
     (when (not (and (= *indirection-width* upw)
 		    (= *indirection-height* uph)))
@@ -534,3 +474,15 @@
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
     (gl:clear :color-buffer-bit)
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))
+
+
+(defun test69 ()
+  (let ((position (scratch-buffer:my-iterator))
+	(times 0))
+    (iterator:bind-iterator-out
+     (pos single-float) position
+     (scratch-buffer:flush-my-iterator position
+       (iterator:bind-iterator-in
+	(xyz single-float) position
+	(dotimes (x times)
+	  (%gl:vertex-attrib-4f 0 (xyz) (xyz) (xyz) 1.0)))))))

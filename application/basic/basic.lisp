@@ -44,6 +44,7 @@
 
 (defun init ()
   (setf *sprites* (circular-dlink "sentinel"))
+  (text-sub::change-color-lookup 'terminal-test::color-fun)
   (let ((chain *sprites*))
     (dotimes (x 10)
       (dlink-insert-right chain
@@ -62,11 +63,12 @@
 				      window:*width*)))
 	*ndc-mouse-y* (- 1 (* 2.0 (/ (floatify window::*mouse-y*)
 				     window:*height*))))
-  (when (window::skey-j-p (window::keyval #\Q))
+  (when (window::skey-j-p (window::keyval #\esc))
     (application::quit))
   #+nil
   (when (window::skey-j-p (window::keyval :r))
     (application::reload 'cons-texture))
+  #+nil
   (when (window::skey-j-p (window::keyval #\A))
     (music::reset-listener)
     (music::play-at (merge-pathnames "wilhelm_scream.wav" *this-directory*) 0.0 0.0 0.0 1.0 1.0))
@@ -75,8 +77,7 @@
   (gl:clear :color-buffer-bit)
   (gl:disable :cull-face)
   (gl:disable :blend)
-  (more-test)
-  
+ ; (more-test)
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
     (when (window::skey-j-p (window::mouseval :left))
@@ -113,7 +114,25 @@
       (let ((sprite (dlink-payload sprite-cell)))
 	(render-sprite sprite)))))
 
-
+(defun render-terminal (x y &optional (term terminal-test::*term*))
+  (flet ((value (r g b x y)
+	   (gl:color (byte/255 r)
+		     (byte/255 g)
+		     (byte/255 b))
+	   (gl:vertex x y)))
+    (with-slots ((cx 3bst::x) (cy 3bst::y)) (with-slots (3bst::cursor) term 3bst::cursor)
+      (terminal-test::do-term-values (glyph col row)
+	(let ((char (3bst:c glyph))
+	      (bg (3bst:bg glyph))
+	      (fg (3bst:fg glyph)))
+	  (when (and (= cx col)
+		     (= cy row))
+	    (rotatef bg fg))
+	  (value (char-code char)
+		 bg
+		 fg
+		 (+ x col)
+		 (- y row)))))))
 (defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
 (defun more-test ()
   (when (keys-to-chars::get-control-sequence (window::*control-state*
@@ -123,8 +142,9 @@
 					      window::*alt*
 					      window::*super*)
 	  (vector-push-extend char *command-buffer*))
-    (print *command-buffer*)
-    (setf (fill-pointer *command-buffer*) 0)))
+    (terminal-test::enter *command-buffer*)
+    (setf (fill-pointer *command-buffer*) 0))
+  (terminal-test::update-terminal-stuff))
 
 #+nil
 (defun foo0 ()
