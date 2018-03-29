@@ -1,54 +1,12 @@
-;;;;;;unused below
-
-(defparameter *gl-thread* nil)
-(defun threaded-main (func)
-  (unless (and *gl-thread*
-	       (bordeaux-threads:thread-alive-p *gl-thread*))
-    (setf *gl-thread*
-	  (bordeaux-threads:make-thread
-	   (lambda ()
-	     (window:wrapper func))))))
-
-(defun qwer (func)
-  (window:wrapper func))
-
-;;(defparameter init-hook (hook:create-hook))
-
-(defun handoff-three ()
-  (initialization1)
-  (injection))
-
-(defun injection ()
- ;; (window:poll)
-  (thunkit)
-  (window:update-display)
-  (unless window:*status* 
-    (injection)))
-
-(defparameter *ticks* 0)
-(defun main ()
-  (threaded-main #'handoff-three))
-
-
-(defun spill-hash (hash)
-  (loop for key being the hash-keys of hash
-     using (hash-value value)
-     do (format t "~S ~S~%" key value)))
-
-(defun int-scale (int scale)
-  (truncate (* int scale)))
-
 (defun fun-setup ()
   (test-world)
   (erase-bottom))
 (progno
  (color-grasses)
  (goto 16 80 -16))
-
 (defun erase-bottom ()
   (dobox ((x 0 128) (y 0 64) (z -128 0))
 	 (plain-setblock x y z 0 0)))
-
 (defun spawn ()
   (goto 64 80 -64))
 

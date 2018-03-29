@@ -1,10 +1,6 @@
 (in-package :sandbox)
 
 #+nil
-(defun complex-modulus (c)
-  (sqrt (realpart (* c (conjugate c)))))
-
-#+nil
 (defun averager (amount)
   (let ((the-array (make-array amount :element-type 'fixnum))
 	(index 0)
@@ -15,23 +11,6 @@
 	(setf (aref the-array index) x))
       (setf index (mod (1+ index) amount))
       (values (/ (coerce tot 'single-float) amount) the-array))))
-
-#+nil
-(defun ease (x target fraction)
-  (+ x (* fraction (- target x))))
-
-#+nil
-(defparameter *fixnum-compare*
-  #+sbcl 'eq
-  #-sbcl 'eql)
-
-#+nil
-(define-modify-macro *= (&rest args)
-  *)
-
-#+nil
-(defun clamp (x min max)
-  (max (min x max) min))
 
 #+nil
 (progno

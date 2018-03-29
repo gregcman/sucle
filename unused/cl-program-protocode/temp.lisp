@@ -1,19 +1,6 @@
 (in-package :sandbox)
 
 (progno
-
- (defparameter +gl-primitives+
-  (vector
-   :points
-   :lines
-   :line-strip
-   :line-loop
-   :triangles
-   :triangle-strip
-   :triangle-fan
-   :quads
-   :quad-strip
-   :polygon))
  (progn
    (defun draw-background (tex-buf pos-buf lit-buf)
      (declare (optimize (safety 0) (speed 3)))
@@ -73,31 +60,6 @@
        24)))
 
  (progno
-  (set-sky-color)
-  (defun set-sky-color ()
-    (let ((r (* *daytime* (aref *sky-color* 0)))
-	  (g (* *daytime* (aref *sky-color* 1)))
-	  (b (* *daytime* (aref *sky-color* 2))))
-      (gl:clear-color r g b 1.0)))
-  (defparameter *daytime* 0.4)
-  (defparameter *sky-color* (vector 1.0 0.8 0.68))
-  (defparameter *fog-ratio* 0.75)
-  (defun set-overworld-fog (time)
-    (flet ((fractionalize (x)
-	     (clamp x 0.0 1.0)))
-      (let ((x (fractionalize (* (aref *sky-color* 0) time)))
-	    (y (fractionalize (* (aref *sky-color* 1) time)))
-	    (z (fractionalize (* (aref *sky-color* 2) time))))
-	(%gl:uniform-3f (gl:get-uniform-location *shader-program* "fogcolor")
-			x y z)
-	(gl:uniformfv (gl:get-uniform-location *shader-program* "cameraPos")
-		      (camera-vec-position *camera*))
-	(%gl:uniform-1f (gl:get-uniform-location *shader-program* "foglet")
-			(/ -1.0 (camera-frustum-far *camera*) *fog-ratio*))
-	(%gl:uniform-1f (gl:get-uniform-location *shader-program* "aratio")
-			(/ 1.0 *fog-ratio*))))))
-
- (progno
   
   (defparameter *framebuffer-width* 512)
   (defparameter *framebuffer-height* 512)
@@ -129,36 +91,6 @@
   
   (ldrawlist :skybox))
  )
-
-(progno
-  (setf *camera* (make-camera))
-   (setf (camera-aspect-ratio *camera*) (/ window:*width* window:*height* 1.0))
-   (update-matrices *camera*)
-   (defparameter *camera* nil)
-   (progno
-    (defun set-render-cam-pos (camera)
-      (let ((vec (camera-vec-position camera))
-	    (cev (camera-vec-noitisop camera)))
-	(setf (aref vec 0) *xpos*)
-	(setf (aref vec 1) *ypos*)
-	(setf (aref vec 2) *zpos*)
-
-	(setf (aref cev 0) (- *xpos*))
-	(setf (aref cev 1) (- *ypos*))
-	(setf (aref cev 2) (- *zpos*))
-
-	(unit-pitch-yaw (camera-vec-forward *camera*)
-			(coerce *pitch* 'single-float)
-			(coerce *yaw* 'single-float))
-	
-	(setf (camera-fov *camera*) defaultfov)))
-
-    (defun unit-pitch-yaw (result pitch yaw)
-      (let ((cos-pitch (cos pitch)))
-	(setf (aref result 0) (* cos-pitch (cos yaw))
-	      (aref result 1) (sin pitch)
-	      (aref result 2) (* cos-pitch (sin yaw))))
-      result)))
 
 (progno
      (name-shader :blockshader :bs-vs :bs-frag '(("position" . 0)
@@ -229,27 +161,7 @@
 	   (incf *xvel* (* *speed* (realpart normalized)))
 	   (incf *zvel* (* *speed* (imagpart normalized))))))))
 
- (defun mouse-looking ()
-   (multiple-value-bind (dx dy) (delta)
-     (let ((x (* mouse-sensitivity (/ dx 360.0)))
-	   (y (* mouse-sensitivity (/ dy 360.0))))
-       (multiple-value-bind (dyaw dpitch) (%sphere-mouse-help x y)
-	 (setf *yaw* (mod (+ *yaw* dyaw) +single-float-two-pi+))
-	 (setf *pitch* (clamp (+ *pitch* dpitch)
-			      (* -0.99 +single-float-half-pi+)
-			      (* 0.99 +single-float-half-pi+)))))))
-
- (defun %sphere-mouse-help (x y)
-   (if (zerop x)
-       (if (zerop y)
-	   (values 0.0 0.0)
-	   (values 0.0 y))
-       (if (zerop y)
-	   (values x 0.0)
-	   (new-direction (coerce x 'single-float)
-			  (coerce y 'single-float)))))
-
- (defparameter *new-dir* (cg-matrix:vec 0.0 0.0 0.0))
+  (defparameter *new-dir* (cg-matrix:vec 0.0 0.0 0.0))
  (defun new-direction (dx dy)
    (let ((size (sqrt (+ (* dx dx) (* dy dy)))))
      (let ((dir *x-unit*))
@@ -318,34 +230,6 @@
 	   (emit x)
 	   (emit2 x)
 	   (emit3 x)))))))
-
-(progno
- (defparameter *save* #P"third/")
-
- (defparameter *saves-dir* (merge-pathnames #P"saves/" ourdir))
-
- (defun save (filename &rest things)
-   (let ((path (merge-pathnames filename *saves-dir*)))
-     (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
-       (dolist (thing things)
-	 (prin1 thing stream)))))
-
- (defun save2 (thingfilename &rest things)
-   (apply #'save (merge-pathnames (format nil "~s" thingfilename) *save*) things))
-
- (defun myload2 (thingfilename)
-   (myload (merge-pathnames (format nil "~s" thingfilename) *save*)))
-
- (defun myload (filename)
-   (let ((path (merge-pathnames filename *saves-dir*)))
-     (let ((things nil))
-       (with-open-file (stream path :direction :input :if-does-not-exist nil)
-	 (tagbody rep
-	    (let ((thing (read stream nil nil)))
-	      (when thing
-		(push thing things)
-		(go rep)))))
-       (nreverse things)))))
 
 (progno
  (defun totally-destroy-package (package)
@@ -479,42 +363,6 @@
 	       :depth-buffer-bit)
      (gl:enable :depth-test :multisample)
      (values texture framebuffer))))
-
-(progno
- (defun ldrawlist (name)
-   (let ((the-list (get-display-list name)))
-     (if the-list
-	 (gl:call-list the-list)
-	 (print "error")))))
-
-(progno
- (defun lpic-ltexture (image-name &optional (texture-name image-name))
-   (let ((thepic (get-image image-name)))
-     (when thepic
-       (set-texture texture-name 
-		    (pic-texture thepic))))))
-
-(progno
- (defun create-texture (tex-data width height &optional (type :rgba))
-   "creates an opengl texture from data"
-   (let ((the-shit (gl:gen-texture)))
-     (gl:bind-texture :texture-2d the-shit)
-     (gl:tex-parameter :texture-2d :texture-min-filter  :nearest
-		       )
-     (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
-     (gl:tex-parameter :texture-2d :texture-wrap-s :clamp)
-     (gl:tex-parameter :texture-2d :texture-wrap-t :clamp)
-     (gl:tex-parameter :texture-2d :texture-border-color '(0 0 0 0))
-					; (gl:tex-parameter :texture-2d :generate-mipmap :true)
-     (gl:tex-image-2d :texture-2d 0 type width height 0 type :unsigned-byte tex-data)
-					;(gl:generate-mipmap :texture-2d)
-     the-shit)))
-
-(progno
- (defun lcalllist-invalidate (name)
-   (let ((old (get-display-list name)))
-     (remhash name *g/call-list*)
-     (when old (gl:delete-lists old 1)))))
 
 (progno
  (namexpr backup :ss-frag
@@ -748,14 +596,6 @@
 			      (etex tex-buf)
 			      (efg fg-buf)
 			      (ebg bg-buf))))
-
-(progno
- (sb-ext:run-program "/usr/bin/ssh"
-		     (list "-t" "terminal256@0.0.0.0")
-		     :wait nil
-		     :output :stream
-		     :input :stream
-		     :external-format :utf-8))
 
 (progno
  (when (skey-r-or-p :up) (incf *cursor-y*) (setf *cursor-moved* *ticks*))

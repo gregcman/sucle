@@ -18,3 +18,16 @@
      (setf glhelp::*gl-context* nil)))
 
 (export '(with-gl-context))
+
+(defparameter *gl-primitives*
+  (list
+   :points
+   :lines
+   :line-strip
+   :line-loop
+   :triangles
+   :triangle-strip
+   :triangle-fan
+   :quads
+   :quad-strip
+   :polygon))
