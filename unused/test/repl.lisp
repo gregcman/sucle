@@ -1,5 +1,6 @@
 (in-package :sandbox)
 
+;;;;repl1
 (defmacro handling-errors (&body body)
   `(handler-case (progn ,@body)
      (simple-condition (err) 
@@ -11,8 +12,7 @@
      (condition (err) 
        (format *error-output* "~&~A: ~%  ~S~%"
                (class-name (class-of err)) err))))
-
-(defun repl ()
+(defun repl2 ()
   (do ((+eof+ (gensym))
        (hist 1 (1+ hist)))
       (nil)
@@ -25,3 +25,27 @@
      (setf /// //   // /   / (multiple-value-list (eval -)))
      (setf *** **   ** *   * (first /))
      (format t "~& --> ~{~S~^ ;~%     ~}~%" /)))) 
+
+;;;;repl2
+(defun repl2 (&optional (end :end))
+  (catch end
+    (loop
+       (progn
+;	 (princ (package-name *package*))
+;	 (write-char #\>)
+;	 (write-char #\Space)
+	 )
+       (force-output)
+       (let* ((form (read))
+	      (results
+	       (multiple-value-list
+		(eval form))))
+	 (setf - form)
+	 (shiftf /// // / results)
+	 (shiftf +++ ++ + -)
+	 (shiftf *** ** * (first results))
+
+	 (dolist (item results)
+	   (print item))
+
+	 (terpri)))))
