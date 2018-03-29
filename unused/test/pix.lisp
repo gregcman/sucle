@@ -1,18 +1,20 @@
 (defpackage #:pix
-  (:use #:cl)
+  (:use #:cl #:utility)
   (:export))
 
 (in-package :pix)
 
 (declaim (inline plus2^30 minus2^30))
-(let ((anum (ash 1 30)))
-  (defun plus2^30 (n)
-    (declare (type fixnum n))
-    (the fixnum (+ n anum)))
+(etouq
+ (let ((anum (ash 1 30)))
+   `(progn
+      (defun plus2^30 (n)
+	(declare (type fixnum n))
+	(the fixnum (+ n ,anum)))
 
-  (defun minus2^30 (n)
-    (declare (type fixnum n))
-    (- n anum)))
+      (defun minus2^30 (n)
+	(declare (type fixnum n))
+	(- n ,anum)))))
 
 (defun chunkhashfunc (x y)
   (declare (type fixnum x y))
@@ -55,7 +57,7 @@
 	(empty-chunk))))
 
 (defun clearchunk (achunk value)
-  (nsubstitute-if value (lambda (x) t) achunk)
+  (fill achunk value)
   achunk)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -123,41 +125,3 @@
 ;;type is the type of the array
 ;;the array is flat, but it is an illusion that it has
 ;;the dimensions of 16 x 16
-
-(defun nope (an-object a-property)
-  (remhash a-property an-object))
-
-(defun what (an-object a-property)
-  (gethash a-property an-object))
-
-(defun (setf what) (new an-object a-property)
-  (setf (gethash a-property an-object) new))
-
-(defun shit ()
-  (make-hash-table :test (function eq)))
-
-(defun spill (shit)
-  (let ((props nil))
-    (maphash
-     (lambda (k v) (push (cons k v) props))
-     shit)
-    props))
-
-(defmacro dorange ((var start length) &rest body)
-  (let ((temp (gensym))
-	(temp2 (gensym))
-	(tempstart (gensym))
-	(templength (gensym)))
-    `(block nil
-       (let* ((,templength ,length)
-	      (,tempstart ,start)
-	      (,var ,tempstart))
-	 (declare (type signed-byte ,var))
-	 (tagbody
-	    (go ,temp2)
-	    ,temp
-	    (tagbody ,@body)
-	    (psetq ,var (1+ ,var))
-	    ,temp2
-	    (unless (>= ,var (+ ,tempstart ,templength)) (go ,temp))
-	    (return-from nil (progn nil)))))))

@@ -1,0 +1,11 @@
+(defun simple-moving-averager (amount)
+  (let ((the-array (make-array amount :element-type 'fixnum))
+	(index 0)
+	(tot 0))
+    (lambda (x)
+      (let ((old (aref the-array index)))
+	(setf tot (+ tot x (- old)))
+	(setf (aref the-array index) x))
+      (setf index (mod (1+ index) amount))
+      (values (/ (coerce tot 'single-float) amount) the-array))))
+
