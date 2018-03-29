@@ -1,0 +1,6 @@
+;;;[ function call + data ] vs funcallable closure
+;;;conclusion: stay away from closures if fast code, inlining with no function
+;;;overhead, no float boxing on x86 on sbcl, is what is wanted. use vectors?
+;;;instead? but what about structs? vectors = fast and flexible, but lambdas
+;;;are also flexible? but flexible often means weak - flexibility comes at the
+;;;price of strength and vice versa? 

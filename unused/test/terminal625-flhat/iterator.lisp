@@ -1,30 +1,30 @@
-(in-package :fixed-leaf-hashed-array-tree)
+(in-package :reverse-array-array)
 
-(declaim (ftype (function (iter-ator))
+(declaim (ftype (function (iterator))
 		next-index)
-	 (ftype (function (iter-ator)
+	 (ftype (function (iterator)
 			  (values fixnum simple-vector))
 		next-subarray)
-	 (ftype (function (iter-ator)
+	 (ftype (function (iterator)
 			  (values fixnum simple-vector))
-		next-flhat))
+		next-raa))
 
 (with-unsafe-speed
   (defun next-init (p)
     (values -1 p)))
 
 (with-unsafe-speed
-  (defun next-flhat (p)
-    (with-bound-iterator (next place (flhat flhat) (meta-index)) p
+  (defun next-raa (p)
+    (with-bound-iterator (next place (raa raa) (meta-index)) p
       (next)
       
       (if (= -1 meta-index)
-	  (let ((size (1- (flhat-length flhat))))
+	  (let ((size (1- (raa-length raa))))
 	    (declare (type fixnum size))
-	    (values size (flhat-data flhat)))
-	  (let ((old-size (flhat-length flhat)))
+	    (values size (raa-data raa)))
+	  (let ((old-size (raa-length raa)))
 	    (declare (type fixnum old-size))
-	    (multiple-value-bind (size data) (reverse-fit-resize flhat old-size)
+	    (multiple-value-bind (size data) (reverse-fit-resize raa old-size)
 	      (declare (type fixnum size))
 	      (let ((size (1- (- size old-size))))
 		(declare (type fixnum size))
@@ -49,32 +49,32 @@
 	       (setf place new))))))))
 
 (progn
-  (declaim (ftype (function (flhat) iter-ator) make-flhat-iterator))
-  (defun make-flhat-iterator (flhat)
-    (let* ((flhat-iter (make-zeroed-iterator #'next-init flhat))
-	   (array-iter (make-zeroed-iterator #'next-flhat flhat-iter))
+  (declaim (ftype (function (raa) iterator) make-raa-iterator))
+  (defun make-raa-iterator (raa)
+    (let* ((raa-iter (make-zeroed-iterator #'next-init raa))
+	   (array-iter (make-zeroed-iterator #'next-raa raa-iter))
 	   (value-iter (make-zeroed-iterator #'next-subarray array-iter)))
       value-iter)))
 
 
-(defmacro with-flhat-iterator ((name value-place flhat) &body body)
+(defmacro with-raa-iterator ((next-fun value-place raa) &body body)
   (let ((iterator (gensym))
 	(array (gensym))
 	(index (gensym)))
-    `(let ((,iterator (make-flhat-iterator ,flhat)))
-       (with-bound-iterator (,name ,value-place (,array) (,index)) ,iterator
+    `(let ((,iterator (make-raa-iterator ,raa)))
+       (with-bound-iterator (,next-fun ,value-place (,array) (,index)) ,iterator
 	 ,@body))))
 
 (defun relocate-iterator (value-iter n)
   (let* ((array-iter (p-data value-iter))
-	 (flhat-iter (p-data array-iter))
-	 (flhat (p-data flhat-iter)))
-    (multiple-value-bind (chunk-index offset-index) (xindex flhat n)
+	 (raa-iter (p-data array-iter))
+	 (raa (p-data raa-iter)))
+    (multiple-value-bind (chunk-index offset-index) (xindex raa n)
       (setf (p-index array-iter) chunk-index
 	    (p-index value-iter) offset-index
-	    (p-array flhat-iter) flhat
-	    (p-index flhat-iter) -1)
-      (let ((array (flhat-data flhat)))
+	    (p-array raa-iter) raa
+	    (p-index raa-iter) -1)
+      (let ((array (raa-data raa)))
 	(setf (p-array array-iter) array)
 	(setf (p-array value-iter)
 	      (let ((sub-array (aref array chunk-index)))
@@ -87,21 +87,21 @@
 
 (defun reset-iterator (value-iter)
   (let* ((array-iter (p-data value-iter))
-	 (flhat-iter (p-data array-iter)))
+	 (raa-iter (p-data array-iter)))
     (setf (p-index value-iter) 0
 	  (p-array value-iter) nil
 	  (p-index array-iter) 0
 	  (p-array array-iter) nil
-	  (p-index flhat-iter) 0
-	  (p-array flhat-iter) nil)
+	  (p-index raa-iter) 0
+	  (p-array raa-iter) nil)
     value-iter))
 
 (defun iterator-position (value-iter)
   (let* ((array-iter (p-data value-iter))
-	 (flhat-iter (p-data array-iter))
-	 (flhat (p-data flhat-iter)))
+	 (raa-iter (p-data array-iter))
+	 (raa (p-data raa-iter)))
     (let ((value-index (p-index value-iter))
 	  (array-index (p-index array-iter))
-	  (total-size (flhat-length flhat)))
+	  (total-size (raa-length raa)))
       (+ (ash (- total-size array-index 1) +log-size+)
-	 (- +size+ value-index 1)))))
+	 (- +size+ value-index 1))))) 
