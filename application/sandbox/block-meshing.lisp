@@ -231,11 +231,11 @@
   `(defun ,name (i j k u0 v0 u1 v1)
      (declare (type fixnum i j k)
 	      (type single-float u0 v0 u1 v1))
-     (iterator:bind-iterator-out
+     (bind-iterator-out
       (epos single-float) *mesh-epos*
-      (iterator:bind-iterator-out
+      (bind-iterator-out
        (etex single-float) *mesh-etex*
-       (iterator:bind-iterator-out
+       (bind-iterator-out
 	(dark single-float) *mesh-dark*	
 	,@body)))))
 

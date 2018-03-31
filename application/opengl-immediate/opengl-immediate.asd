@@ -1,7 +1,7 @@
 (asdf:defsystem #:opengl-immediate
   :depends-on (#:utility
 	       #:cl-opengl
-	       #:iterator
+	       #:reverse-array-iterator
 	       #:application-subsystem)
   :components 
   ((:file "opengl-immediate"))) 

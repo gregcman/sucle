@@ -1,5 +1,5 @@
 (defpackage :opengl-immediate
-  (:use #:cl #:utility)
+  (:use #:cl #:utility #:reverse-array-iterator-user)
   (:export
    #:vertex
    #:tex-coord
@@ -21,15 +21,15 @@
 (defparameter *color-scratch* (scratch-buffer:my-iterator))
 
 (defun vertex (&optional (x 0.0) (y 0.0) (z 0.0) (w 1.0))
-  (iterator:bind-iterator-out
+  (bind-iterator-out
    (emit single-float) *vertex-scratch*
    (emit x y z w)))
 (defun tex-coord (&optional (x 0.0) (y 0.0) (z 0.0) (w 1.0))
-  (iterator:bind-iterator-out
+  (bind-iterator-out
    (emit single-float) *tex-coord-scratch*
    (emit x y z w)))
 (defun color (&optional (x 0.0) (y 0.0) (z 0.0) (w 1.0))
-  (iterator:bind-iterator-out
+  (bind-iterator-out
    (emit single-float) *color-scratch*
    (emit x y z w)))
 (eval-always
@@ -51,7 +51,7 @@
 	    (push `(scratch-buffer:flush-my-iterator ,name) flushes)
 	    (push `(,name ,form) names)
 	    (let ((emit (gensym "EMIT")))
-	      (push `(iterator:bind-iterator-in
+	      (push `(bind-iterator-in
 		      (,emit single-float) ,name) binds)
 	      (push `(%gl:vertex-attrib-4f ,num (,emit) (,emit) (,emit) (,emit))
 		    attribs))))

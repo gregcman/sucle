@@ -1,6 +1,6 @@
 (asdf:defsystem #:reverse-array-array
   :depends-on
-  (#:iterator
+  (#:reverse-array-iterator
    #:utility)
   :serial t
   :components    

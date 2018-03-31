@@ -1,4 +1,4 @@
-(defpackage #:hook
+(defpackage #:elisp-style-hook
   (:use #:cl)
   (:export
    #:create-hook

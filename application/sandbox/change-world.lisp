@@ -60,11 +60,11 @@
 (defun mesh-chunk (times a b c)
   (declare (type fixnum times))
   (declare (optimize (speed 3) (safety 0)))
-  (iterator:bind-iterator-in
+  (bind-iterator-in
    (xyz single-float) a
-   (iterator:bind-iterator-in
+   (bind-iterator-in
     (uv single-float) b
-    (iterator:bind-iterator-in
+    (bind-iterator-in
      (dark single-float) c
      (dotimes (x times)
        (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))

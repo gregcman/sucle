@@ -1,11 +1,20 @@
 application:
-	"standalone" programs
-	
+	"standalone" programs, what a person would interact with
+		
 component:
-	data structures, macros, utility libraries...
+	macros, utility libraries, combinations of libraries...
+
+data-structures:
+	things which are simple enough that they would commonly be called "data structures"
 
 ffi:
 	foreign library bindings
 
-prototype:
+forks:
+	remixes/downloads of other people's libraries
+
+unused:
 	random code which is not necessarily maintained or functional
+
+other:
+	binaries, notes, c code

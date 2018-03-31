@@ -1,4 +1,4 @@
-(defpackage :iterator
+(defpackage :reverse-array-iterator
   (:use
    #:cl
    #:utility)
@@ -14,16 +14,12 @@
    #:p-data
    #:p-func
    
-   #:pelt
-   #:pstep
-   #:pread
-   #:pemit
    #:with-bound-iterator
    #:with-simply-bound-iterator
    #:bind-iterator-out
    #:bind-iterator-in))
 
-(in-package :iterator)
+(in-package :reverse-array-iterator)
 
 (defmacro backwards-array-iterator3 (index-var array-var completion-form)
   (let ((new-index (gensym))
@@ -39,7 +35,7 @@
 	   (setf ,index-var ,new-index)))))
 
 (defstruct (iterator  (:conc-name p-)
-		       (:constructor make-iterator (index array data func)))
+		      (:constructor make-iterator (index array data func)))
   index
   array
   data
@@ -49,9 +45,10 @@
 		make-default-iterator
 		make-zeroed-iterator))
 (defun make-default-iterator ()
-  (make-iterator 0 nil (load-time-value (vector nil))
-		 (lambda (x)
-		   (values (1- (array-total-size x)) x))))
+  (make-zeroed-iterator   
+   (lambda (x)
+     (values (1- (array-total-size x)) x))
+   (load-time-value (vector nil))))
 (defun make-zeroed-iterator (func data)
   (make-iterator 0 nil data func))
 
@@ -78,30 +75,13 @@
        (symbol-macrolet ((,place (aref ,array ,index)))
 	 ,@body))))
 
-(declaim (inline pelt (setf pelt)))
-(defun pelt (p)
-  (aref (p-array p) (p-index p)))
-(defun (setf pelt) (value p)
-  (setf (aref (p-array p) (p-index p)) value))
-(defun pstep (p)
-  (with-bound-iterator (next place (array) (index)) p
-    (next)))
-
-(defun pread (iterator)
-  (pstep iterator)
-  (pelt iterator))
-(defun pemit (iterator item)
-  (pstep iterator)
-  (setf (pelt iterator) item))
-
-
 (defmacro with-simply-bound-iterator ((next place &optional (type t)) iterator &body body)
   (let ((array (gensym))
 	(index (gensym))
 	(iteratorfoo (gensym)))
     `(let ((,iteratorfoo ,iterator))
        (declare (type iterator ,iteratorfoo))
-       (iterator:with-bound-iterator
+       (with-bound-iterator
 	   (,next ,place (,array (or null (simple-array ,type (*)))) (,index))
 	   ,iteratorfoo
 	 ,@body))))
@@ -127,45 +107,6 @@
 		  (,next)
 		  ,place))
 	   ,@body))))
-
-#+nil
-(progno
-;;;;o means output
- (defmacro wasabio ((emit iterator) &body body)
-   (let ((next (gensym))
-	 (place (gensym)))
-     `(with-simply-bound-iterator (,next ,place ,iterator)
-	(flet ((,emit (value)
-		 (,next)
-		 (setf ,place value)))
-	  ,@body))))
-
-;;;i means input
- (defmacro wasabii ((deref iterator) &body body)
-   (let ((next (gensym))
-	 (place (gensym)))
-     `(with-simply-bound-iterator (,next ,place ,iterator)
-	(flet ((,deref ()
-		 (,next)
-		 ,place))
-	  ,@body))))
-
- (defmacro wasabiis ((&rest wasabi-pears) &body body)
-   (let ((fin (cons 'progn body)))
-     (dolist (pear wasabi-pears)
-       (setf fin (list fin))
-       (push pear fin)
-       (push 'wasabii fin))
-     fin))
-
- (defmacro wasabios ((&rest wasabi-pears) &body body)
-   (let ((fin (cons 'progn body)))
-     (dolist (pear wasabi-pears)
-       (setf fin (list fin))
-       (push pear fin)
-       (push 'wasabio fin))
-     fin)))
-
 
 #+nil
 ((deftype iterator ()

@@ -1,7 +1,8 @@
 (defpackage #:text-sub
   (:use #:cl
 	#:application
-	#:utility))
+	#:utility
+	#:reverse-array-iterator-user))
 (in-package #:text-sub)
 
 (deflazy text-data ()
@@ -167,9 +168,9 @@
   (let ((a (scratch-buffer:my-iterator))
 	(b (scratch-buffer:my-iterator))
 	(len 0))
-    (iterator:bind-iterator-out
+    (bind-iterator-out
      (pos single-float) a
-     (iterator:bind-iterator-out
+     (bind-iterator-out
       (tex single-float) b
       (etouq (cons 'pos (axis-aligned-quads:quadk+ 0.5 '(-1.0 1.0 -1.0 1.0))))
       (etouq
@@ -185,9 +186,9 @@
 	 (scratch-buffer:flush-my-iterator a
 	   (scratch-buffer:flush-my-iterator b
 	     ((lambda (times a b)
-		(iterator:bind-iterator-in
+		(bind-iterator-in
 		 (xyz single-float) a
-		 (iterator:bind-iterator-in
+		 (bind-iterator-in
 		  (tex single-float) b
 		  (dotimes (x times)
 		    (%gl:vertex-attrib-2f 2 (tex) (tex))

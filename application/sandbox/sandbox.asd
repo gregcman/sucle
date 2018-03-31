@@ -2,7 +2,7 @@
   :depends-on (#:cl-opengl
 	       #:application-subsystem
 	       #:utility
-	       #:iterator
+	       #:reverse-array-iterator
 	       #:singleton-lparallel
 	       #:glhelp)
   :serial t

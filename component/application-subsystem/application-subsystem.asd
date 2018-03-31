@@ -1,6 +1,6 @@
 (asdf:defsystem #:application-subsystem
   :depends-on (#:utility
-	       #:iterator
+	       #:reverse-array-iterator
 	       #:bordeaux-threads
 	       #:nsb-cga)
     :components

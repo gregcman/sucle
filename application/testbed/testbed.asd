@@ -2,7 +2,7 @@
   :depends-on (#:application
 	       #:sandbox
 	       #:opticl
-	       #:iterator
+	       #:reverse-array-iterator
 	       #:singleton-lparallel)
   :serial t
   :components 

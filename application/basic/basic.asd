@@ -4,10 +4,9 @@
 	       #:text-subsystem
 	       #:opengl-immediate
 	       #:opticl
-	       #:3bst)
+	       #:terminal-3bst-sbcl)
   :serial t
   :components 
   ((:file "keys-to-chars")
    (:file "double-link")
-   (:file "terminal-test")
    (:file "basic")))
