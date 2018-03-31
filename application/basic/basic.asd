@@ -1,6 +1,7 @@
 (asdf:defsystem #:basic
   :depends-on (#:application
 	       #:utility
+	       #:doubly-linked-list
 	       #:text-subsystem
 	       #:opengl-immediate
 	       #:opticl
@@ -8,5 +9,4 @@
 	       #:terminal-3bst-sbcl)
   :serial t
   :components 
-  ((:file "double-link")
-   (:file "basic")))
+  ((:file "basic")))

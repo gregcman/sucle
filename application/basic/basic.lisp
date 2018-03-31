@@ -1,5 +1,5 @@
 (defpackage #:basic
-  (:use #:cl #:utility #:application #:double-link #:opengl-immediate))
+  (:use #:cl #:utility #:application #:opengl-immediate))
 (in-package :basic)
 
 (defparameter *saved-session* nil)
@@ -42,12 +42,12 @@
 (defparameter *drag-offset-y* 0.0)
 
 (defun init ()
-  (setf *sprites* (circular-dlink "sentinel"))
+  (setf *sprites* (doubly-linked-list:circular "sentinel"))
   (text-sub::change-color-lookup 'terminal-test::color-fun)
   (let ((chain *sprites*))
     (dotimes (x 10)
-      (dlink-insert-right chain
-	    (make-dlink :payload
+      (doubly-linked-list:insert-next chain
+	    (doubly-linked-list:make-node :payload
 	     (make-instance
 	      'sprite
 	      :texture (getfnc 'cons-texture)
@@ -91,17 +91,18 @@
       ;;search for topmost sprite to drag
       (tagbody 
 	 (let ((last *sprites*))
-	   (do ((sprite-cell (dlink-right last) (dlink-right sprite-cell)))
+	   (do ((sprite-cell (doubly-linked-list:node-next last)
+			     (doubly-linked-list:node-next sprite-cell)))
 	       ((eq sprite-cell *sprites*))
-	     (let ((sprite (dlink-payload sprite-cell)))
+	     (let ((sprite (doubly-linked-list:node-payload sprite-cell)))
 	       (with-slots (absolute-rectangle position) sprite
 		 (when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
 		   (with-slots (x y) position
 		     (setf *drag-offset-x* (- x mousex)
 			   *drag-offset-y* (- y mousey)))
 		   (setf *selection* sprite)
-		   (dlink-remove sprite-cell)
-		   (dlink-insert-right *sprites* sprite-cell)
+		   (doubly-linked-list:detach sprite-cell)
+		   (doubly-linked-list:insert-next *sprites* sprite-cell)
 		   (go end))))
 	     (setf last sprite-cell)))
 	 end))
@@ -116,9 +117,10 @@
     (glhelp:with-uniforms uniform program
       (gl:uniformi (uniform 'sampler) 0)
       (glhelp::set-active-texture 0))
-    (do ((sprite-cell (dlink-left *sprites*) (dlink-left sprite-cell)))
+    (do ((sprite-cell (doubly-linked-list:node-prev *sprites*)
+		      (doubly-linked-list:node-prev sprite-cell)))
 	((eq sprite-cell *sprites*))
-      (let ((sprite (dlink-payload sprite-cell)))
+      (let ((sprite (doubly-linked-list:node-payload sprite-cell)))
 	(render-sprite sprite)))))
 
 (defun render-terminal (x y &optional (term terminal-test::*term*))
