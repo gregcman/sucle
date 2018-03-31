@@ -4,9 +4,9 @@
 	       #:text-subsystem
 	       #:opengl-immediate
 	       #:opticl
+	       #:character-modifier-bits
 	       #:terminal-3bst-sbcl)
   :serial t
   :components 
-  ((:file "keys-to-chars")
-   (:file "double-link")
+  ((:file "double-link")
    (:file "basic")))
