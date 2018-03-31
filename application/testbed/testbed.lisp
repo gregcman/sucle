@@ -263,10 +263,12 @@
     (5 1)
     (otherwise (random 7))))
 
-(defun start ()
+(defun set-trampoline ()
   (setf application::*trampoline* '(sandbox-sub::per-frame ;text-sub::per-frame
 				    per-frame
-				    ))
+				    )))
+(defun start ()
+  (set-trampoline)
   (application::main))
 
 (defparameter *reach* 128.0)
