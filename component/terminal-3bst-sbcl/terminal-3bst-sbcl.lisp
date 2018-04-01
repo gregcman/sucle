@@ -25,19 +25,19 @@
 (defun kill ()
   (kill-proc *proc*))
 
-(defparameter *init*
-  (format nil "
-stty rows ~a
-stty columns ~a
-export TERM=~a
-" 24 80 (or "xterm" "xterm-256color")))
+(defparameter *width* 80)
+(defparameter *height* 25)
 
 (defparameter *term* nil)
 (defun reset-term ()
   (reset-ssh)
-  (setf *term* (make-instance '3bst:term :rows 24 :columns 80))
+  (setf *term* (make-instance '3bst:term :rows *height* :columns *width*))
   (enter
-  *init*)
+   (format nil "
+stty rows ~a
+stty columns ~a
+export TERM=~a
+" *height* *width* (etouq (nth 0 '("xterm" "xterm-256color")))))
   (update-terminal-stuff))
 
 (defun living-process-p (proc)
