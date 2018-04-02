@@ -4,8 +4,7 @@
 	       #:bordeaux-threads
 	       #:nsb-cga)
     :components
-    ((:file "lazy-place")
-     (:file "camera-matrix")
+    ((:file "camera-matrix")
      (:file "rectangular-tilemap")
      (:file "axis-aligned-quads")
      (:file "flip-image")

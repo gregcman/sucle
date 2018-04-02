@@ -340,7 +340,7 @@
 ;;;Round up to next power of two
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
-(deflazy render-normal-text-indirection ((application::w w) (application::h h))
+(deflazy render-normal-text-indirection ((w application::w) (h application::h))
   (let ((upw (power-of-2-ceiling w))
 	(uph (power-of-2-ceiling h))
 	(refract (getfnc 'indirection-shader)))

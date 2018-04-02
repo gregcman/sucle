@@ -69,16 +69,6 @@
       (clear 'lazy-place-args-values-old)
       (clear 'lazy-place-args-timestamps))))
 
-(defmacro with-t (place &body body)
-  `(unwind-protect
-	(progn
-	  (setf ,place t) ;;;to catch circular dependencies
-	  ,@body)
-     (setf ,place nil)))
-
-(defmacro any (&rest forms)
-  (nth (random (length forms)) forms))
-
 (defun fulfill (lazy-place)
   (if (lazy-place-exists-p lazy-place)
       (lazy-place-value lazy-place) 
@@ -111,29 +101,6 @@
 			    new-value)
 		    (setf lazy-place-exists-p t)))))))))
 
-(defun dirty-p (lazy-place)
-  (with-slots (lazy-place-genfun
-	       lazy-place-genfun-old
-	       lazy-place-args-timestamps
-	       lazy-place-args) lazy-place
-    (or (not (eq lazy-place-genfun ;;;check for updated fun
-		 lazy-place-genfun-old))
-	(block nil
-	  (do ((stamp lazy-place-args-timestamps (cdr stamp))
-	       (arg lazy-place-args (cdr arg)))
-	      ((not (any arg
-			 stamp)) nil)
-	      ;;;iterate old timestamps and see if any differ now
-	    (when (not (= (car stamp)
-			  (lazy-place-timestamp (car arg))))
-	      (return t)))))))
-(defun touch (lazy-place)
-  (with-slots (lazy-place-timestamp) lazy-place
-    (incf lazy-place-timestamp)))
-(defun dirtify (lazy-place)
-  (with-slots (lazy-place-exists-p) lazy-place
-    (setf lazy-place-exists-p nil)))
-
 ;;ensure place contains a lazy value, and return that object
 (defmacro ensure-lazy-place (place &environment env)
   (multiple-value-bind (vars vals stores setter getter)
@@ -147,18 +114,6 @@
 	       (multiple-value-bind ,stores ,values-form
 		 ,setter)))))))
 
-;;set the values in the lazy cell
-(defun %deflazy-aux (len fun deps inst)
-  (with-slots (lazy-place-genfun
-	       lazy-place-args
-	       lazy-place-args-values-old
-	       lazy-place-args-timestamps) inst
-    (setf lazy-place-genfun fun
-	  lazy-place-args-timestamps (make-list len :initial-element -1)
-	  lazy-place-args-values-old (make-list len)
-	  lazy-place-args deps))
-  inst)
-
 (defmacro deflazy (place (&rest deps) &rest gen-forms)
   (let ((places (mapcar #'second deps))
 	(vars (mapcar #'first deps)))
@@ -171,26 +126,6 @@
 	       (mapcar (lambda (x) (list 'ensure-lazy-place x))
 		       places))
 	inst))))
-
-#+nil
-(defmacro my-setf (place values-form &environment env)
-  (multiple-value-bind (vars vals stores setter getter)
-      (get-setf-expansion place env)
-    (declare (ignorable getter))
-    (print (list vars vals stores setter getter))
-    (print env)
-    `(let* (,@ (mapcar #'list vars vals))
-       (multiple-value-bind ,stores ,values-form
-	 ,setter))))
-
-#+nil
-(defmacro my-setf (place values-form &environment env)
-  (multiple-value-bind (vars vals stores setter getter)
-      (get-setf-expansion place env)
-    (declare (ignorable getter))
-    `(let* (,@ (mapcar #'list vars vals))
-       (multiple-value-bind ,stores ,values-form
-	 ,setter))))
 
 ;;;;;;;;;;;;;;;;
 ;;;;each item stores a:
@@ -269,11 +204,4 @@
 				  (otherwise (second x))))
 			      deps)
 	       ,@gen-forms))))
-#+nil
-(defun bornfnc (name func)
-  (setf (gethash *backup* name) func))
 
-#+nil
-(defparameter *backup* (make-hash-table :test 'eq))
-    ;;(car (get-stuff name *stuff* *backup*))
-    					;(car (gethash name *stuff*))

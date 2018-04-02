@@ -6,7 +6,8 @@
 	       #:bordeaux-threads
 	       #:cl-opengl
 	       #:music
-	       #:glhelp)
+	       #:glhelp
+	       #:dependency-graph)
   :components
   ((:file "application")))
 

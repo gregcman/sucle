@@ -1175,18 +1175,23 @@ edge, or no case"
 
 (defvar *ourdir* (filesystem-util:this-directory))
 
-(deflazy terrain-png (grass-png)
+(deflazy terrain-png ()
+  (load-png 
+   (filesystem-util:rebase-path #P"terrain.png" *ourdir*)))
+
+
+(deflazy modified-terrain-png (terrain-png grass-png)
   (color-grasses
-   (load-png 
-    (filesystem-util:rebase-path #P"terrain.png" *ourdir*))
+   (alexandria::copy-array terrain-png)
    (getapixel 255 255 grass-png)))
-(deflazy terrain (terrain-png)
+
+(deflazy terrain (modified-terrain-png)
   (make-instance
    'glhelp::gl-texture
    :handle
    (prog1
        (glhelp:pic-texture
-	terrain-png
+	modified-terrain-png
 	:rgba)
      (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :nearest)

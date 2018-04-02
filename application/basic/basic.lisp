@@ -50,7 +50,7 @@
 	    (doubly-linked-list:make-node :payload
 	     (make-instance
 	      'sprite
-	      :texture (getfnc 'cons-texture)
+	      :texture 'cons-texture
 	      :position (make-instance 'point :x (1- (random 2.0)) :y (1- (random 2.0)))
 	      :bounding-box (make-instance 'rectangle
 					   :x0 0.0 :y0 0.0
@@ -363,24 +363,23 @@
   (deflazy flat-texture-shader (flat-texture-shader-source)
     (glhelp::create-gl-program flat-texture-shader-source)))
 
-(progn
-  (deflazy cons-png ()
-    (flip-image:flip-image
-     (opticl:read-png-file
-      (filesystem-util:rebase-path #P"cons-cell.png" *this-directory*))))
-  (deflazy cons-texture (cons-png)
-    (make-instance
-     'glhelp::gl-texture
-     :handle
-     (prog1
-	 (glhelp:pic-texture
-	  cons-png
-	  :rgb)
-       (glhelp:apply-tex-params
-	(quote ((:texture-min-filter . :nearest)
-		(:texture-mag-filter . :nearest)
-		(:texture-wrap-s . :clamp)
-		(:texture-wrap-t . :clamp))))))))
+(deflazy cons-png ()
+  (flip-image:flip-image
+   (opticl:read-png-file
+    (filesystem-util:rebase-path #P"cons-cell.png" *this-directory*))))
+(deflazy cons-texture (cons-png)
+  (make-instance
+   'glhelp::gl-texture
+   :handle
+   (prog1
+       (glhelp:pic-texture
+	cons-png
+	:rgb)
+     (glhelp:apply-tex-params
+      (quote ((:texture-min-filter . :nearest)
+	      (:texture-mag-filter . :nearest)
+	      (:texture-wrap-s . :clamp)
+	      (:texture-wrap-t . :clamp)))))))
 
 (defclass rectangle ()
   ((x0 :accessor rectangle.x0
@@ -456,7 +455,7 @@
 	    (render-stuff))
 	(when texture
 	  (gl:bind-texture :texture-2d
-			   (glhelp::handle texture)))
+			   (glhelp::handle (getfnc texture))))
 	(gl:with-primitive :quads
 	  (mesh-vertex-tex-coord-color)))
       ))

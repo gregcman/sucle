@@ -45,6 +45,7 @@
     (throw exit-token (values)))
   (window:poll)
   (window::update-control-state *control-state*)
+  (run-command-buffer)
   (dolist (fun funs)
     (funcall fun exit-token))
   (window::update-control-state2 *control-state*)
@@ -53,40 +54,58 @@
 (defun quit ()
   (setf window:*status* t))
 
-;;;;;
+(defparameter *command-buffer* (lparallel.queue:make-queue))
+(defun run-command-buffer ()
+  (let ((queue *command-buffer*))
+    (lparallel.queue:with-locked-queue queue
+      (dotimes (x (/ (lparallel.queue:queue-count/no-lock queue) 2))
+	(let ((var (lparallel.queue:try-pop-queue/no-lock queue))
+	      (var2 (lparallel.queue:try-pop-queue/no-lock queue)))
+	  (apply var var2))))))
+(defun send-command (fun &rest args)
+  (let ((queue *command-buffer*))
+    (lparallel.queue:with-locked-queue queue
+      (lparallel.queue:push-queue/no-lock fun queue)
+      (lparallel.queue:push-queue/no-lock args queue))))
+
+;;;;;TODO: clean this area up with dependency graph 
+(defvar *stuff* (make-hash-table :test 'eq))
 (defmacro deflazy (name (&rest deps) &rest gen-forms)
   `(eval-when (:load-toplevel :execute)
-    (lazy-place::deflazy (gethash (quote ,name) *stuff*)
-	,(mapcar (lambda (x)
-		   (typecase x
-		     (symbol `(,x (gethash (quote ,x) *stuff*)))
-		     (otherwise
-		      (destructuring-bind (name nick) x
-			`(,nick (gethash (quote ,name) *stuff*))))))
-		 deps)
-      ,@gen-forms)))
+     (let ((dependency-graph::*namespace* *stuff*))
+       (let ((node (dependency-graph::ensure-node ',name)))
+	 (unless (= 0 (dependency-graph::timestamp node))
+	   (send-command #'refresh ',name)))
+       (dependency-graph::defnode ,name (,@deps) ,@gen-forms))))
 
-(defvar *stuff* (make-hash-table :test 'eq))
 (progn
   (defun getfnc (name)
-    (lazy-place::fulfill
-	(gethash name *stuff*)))
+    (let ((dependency-graph::*namespace* *stuff*))
+      (dependency-graph::get-value name)))
   (defun getfnc-no-update (name)
-    (lazy-place::lazy-place-value
-     (gethash name *stuff*)))
+    (let ((dependency-graph::*namespace* *stuff*))
+      (slot-value (dependency-graph::get-node name)
+		  'dependency-graph::value)))
   (defun remove-stuff (k)
     (multiple-value-bind (value exists?) (gethash k *stuff*)
       (when exists?
-	(lazy-place::destroy value)))))
+	(destroy-node value)))))
 
-(defun get-fresh (name)
-  (reload-if-dirty name)
-  (getfnc name))
+(defun touch-node (node)
+  (with-slots ((timestamp dependency-graph::timestamp)) node
+    (incf timestamp)))
+
+(defun destroy-node (node)
+  (with-slots ((value dependency-graph::value)
+	       (state dependency-graph::state)) node
+    (touch-node node)
+    (setf value nil
+	  state nil)))
 
 (defun reload (name)
   (let ((place (gethash name *stuff*)))
     (if place
-	(when (lazy-place::lazy-place-exists-p place)
+	(when (dependency-graph::state place)
 	  (let ((a (getfnc-no-update name)))
 	    (when (and (typep a 'glhelp::gl-object)
 		       (glhelp:alive-p a))
@@ -94,17 +113,32 @@
 	    (remove-stuff name)))
 	(format t "no place ~s" name))))
 
-(defun dirty? (name)
-  (lazy-place::dirty-p (gethash name *stuff*)))
 (defun reload-if-dirty (name)
-  (when (dirty? name)
+  (when (dependency-graph::dirty-p (gethash name *stuff*))
     (reload name)))
+(defun get-fresh (name)
+  (reload-if-dirty name)
+  (getfnc name))
 
 (defun scrubgl2 ()
   (dohash (k v) *stuff*
-    (when (typep (lazy-place::lazy-place-value v)
+    (when (typep (dependency-graph::value v)
 		 'glhelp::gl-object)
       (remove-stuff k))))
+
+(defun refresh (name)
+  (let ((dependency-graph::*namespace* *stuff*))
+    (let ((node (gethash name *stuff*)))
+      (when node
+	(touch-node node)
+	(reload-if-dirty name)
+	(dependency-graph::map-dependents
+	 name
+	 (lambda (x) (reload-if-dirty (dependency-graph::name x))))))))
+
+(defun print-dependents (name)
+  (let ((dependency-graph::*namespace* *stuff*))
+    (dependency-graph::map-dependents name #'print)))
 
 ;;;;;;;;;;;;;;;;;;;;;
 (progn
