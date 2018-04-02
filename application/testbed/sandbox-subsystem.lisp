@@ -1179,11 +1179,11 @@ edge, or no case"
   (load-png 
    (filesystem-util:rebase-path #P"terrain.png" *ourdir*)))
 
-
 (deflazy modified-terrain-png (terrain-png grass-png)
   (color-grasses
    (alexandria::copy-array terrain-png)
-   (getapixel 255 255 grass-png)))
+   (let ((value (random 256)))
+     (getapixel value (random (1+ value)) grass-png))))
 
 (deflazy terrain (modified-terrain-png)
   (make-instance

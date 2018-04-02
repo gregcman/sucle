@@ -21,6 +21,7 @@
    (arguments
     :accessor arguments
     :initform nil)
+   #+nil
    (dependencies-symbols
     :accessor dependencies-symbols
     :initform nil)
@@ -39,6 +40,7 @@
    (dependents
     :accessor dependents
     :initform nil)
+   #+nil
    (height ;height of node in dependency tree
     :accessor height
     :initform nil)
@@ -53,33 +55,21 @@
 
 (defvar *namespace* (make-hash-table :test 'eq))
 (etouq
- (let ((place '(gethash id *namespace*)))
+ (let ((place '(gethash id namespace)))
    `(progn
-      (defun get-node (id)
+      (defun get-node (id &optional (namespace *namespace*))
 	,place)
-      (defun set-node (id node)
+      (defun set-node (id node &optional (namespace *namespace*))
 	(setf ,place node)))))
 
-;;no longer keep track of node
-(defun remove-node (id)
-  (let ((node (get-node id)))
-    (when node
-      (remhash id *namespace*)
-      (map nil
-	   (lambda (x) (remove-dependent node x))
-	   (dependencies node)))))
 
-(defun ensure-node (name)
-  (or (get-node name)
+(defun ensure-node (name &optional (namespace *namespace*))
+  (or (multiple-value-bind (node existsp)
+	  (get-node name)
+	(if existsp node nil))
       (let ((new (make-instance 'node)))
-	(set-node name new)
+	(set-node name new namespace)
 	new)))
-
-(defun get-value (id)
-  (multiple-value-bind (node existsp) (get-node id)
-    (if existsp
-	(%get-value node)
-	(error "no lazy load named as ~a" id))))
 
 (defmacro with-t (place &body body)
   `(unwind-protect
@@ -109,16 +99,18 @@
 	    (map-into (dependencies-timestamps node)
 		      #'timestamp
 		      dependencies)
+	    #+nil
 	    (update-node-height node)
 	    (let ((value (apply (fun node)
 				args)))
 	      (prog1 value
 		(setf (value node) value)
-		(incf (timestamp node))
+		(touch-node node)
 		(setf (fun-old node)
 		      (fun node))
 		(setf (state node) t))))))))
 
+#+nil
 (defun update-node-height (node)
   (setf (height node)
 	(1+ (reduce #'max (dependencies node)
@@ -132,6 +124,7 @@
       (let ((deps-same? (equal deps dependencies))
 	    (fun-same? (eq fun func))
 	    (deps-len (list-length deps)))
+	#+nil
 	(when (zerop deps-len)
 	  (setf (height node) 0))
 	(setf (arguments node)
@@ -150,19 +143,21 @@
 (defun ensure-dependent (dependent dependency)
   (with-locked-lock (dependent)
     (with-locked-lock (dependency)
-      (unless (find dependent (dependents dependency))
-	(push dependent (dependents dependency))))))
+      (symbol-macrolet ((place (dependents dependency)))
+	(unless (find dependent place)
+	  (push dependent place))))))
 (defun remove-dependent (dependent dependency)
   (with-locked-lock (dependent)
     (with-locked-lock (dependency)
       (symbol-macrolet ((place (dependents dependency)))
 	(setf place (delete dependent place))))))
 
-(defun reload-node (fun deps name)
-  (let ((dependencies (mapcar #'ensure-node deps))
-	(node (ensure-node name)))
+(defun reload-node (fun deps name &optional (namespace *namespace*))
+  (let ((dependencies (mapcar (lambda (x) (ensure-node x namespace)) deps))
+	(node (ensure-node name namespace)))
     (with-locked-lock (node)
       (let ((old-dependencies (dependencies node)))
+	#+nil
 	(setf (dependencies-symbols node) deps)
 	(setf (name node) name)
 	(map nil (lambda (x) (remove-dependent node x)) (set-difference old-dependencies dependencies))
@@ -170,7 +165,7 @@
 	(make-node fun dependencies node)
 	node))))
 
-(defmacro defnode (name deps &body body)
+(defun %defnode (deps body)
   (let ((lambda-args ())
 	(node-deps ()))
     (dolist (item deps)
@@ -180,7 +175,8 @@
 	  (destructuring-bind (var dep) item
 	    (push var lambda-args)
 	    (push dep node-deps))))
-    `(reload-node (lambda ,lambda-args ,@body) ',node-deps ',name)))
+    (values `(lambda ,lambda-args ,@body)
+	    node-deps)))
 
 (defun %map-dependents (node fun)
   (with-locked-node (node nil)
@@ -188,8 +184,15 @@
       (funcall fun dependent)
       (%map-dependents dependent fun))))
 
-(defun map-dependents (name fun)
-  (%map-dependents (get-node name) fun))
+(defun touch-node (node)
+  (incf (timestamp node)))
+
+(defun destroy-node (node)
+  (with-slots ((value dependency-graph::value)
+	       (state dependency-graph::state)) node
+    (touch-node node)
+    (setf value nil
+	  state nil)))
 
 (defmacro any (&rest forms)
   (nth (random (length forms)) forms))
@@ -207,6 +210,52 @@
 			  (timestamp (car arg))))
 	      (return t)))))))
 
+
+
+
+(defmacro with-named-node ((node-var &optional (namespace 'namespace))
+				       name &optional t-form
+					      (nil-form
+					       `(no-named-node ,name)))
+  (let ((existsp (gensym)))
+    `(multiple-value-bind (,node-var ,existsp) (get-node ,name ,namespace)
+       (if ,existsp
+	   ,t-form
+	   ,nil-form))))
+;;no longer keep track of node
+#+nil
+(defun remove-node (id &optional (namespace *namespace*))
+  (with-named-node
+      (node) id
+      (progn
+	(remhash id namespace)
+	(map nil
+	     (lambda (x) (remove-dependent node x))
+	     (dependencies node)))))
+
+(defun no-named-node (id)
+  (error "no lazy load named as ~a" id))
+
+(defun get-value (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (%get-value node)))
+
+(defun get-value-no-update (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (value node)))
+
+(defun destroy-value (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (destroy-node node)))
+
+(defun map-dependents (name fun &optional (namespace *namespace*))
+  (with-named-node (node) name
+		   (%map-dependents node fun)))
+
+#+nil
+(defmacro defnode (name deps &body body)
+  (multiple-value-bind (fun node-deps) (%defnode deps body)
+    `(reload-node ,fun ',node-deps ',name)))
 #+nil
 (progn
   (defnode b () (print 2893))
@@ -216,3 +265,4 @@
 (progn
   (remove-node 'c)
   (defnode c (c) c))
+

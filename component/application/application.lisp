@@ -3,7 +3,7 @@
 
   (:export main)
   (:export *trampoline*)
-  (:export bornfnc getfnc deflazy get-fresh)
+  (:export getfnc deflazy get-fresh)
   (:export microseconds tick *control-state* *camera* *render-area* *pre-trampoline-hooks*
 	   set-render-area render-area-x render-area-y render-area-width render-area-height
 	   %set-render-area))
@@ -53,7 +53,7 @@
 
 (defun quit ()
   (setf window:*status* t))
-
+;;;;;;;;;;;;;;;
 (defparameter *command-buffer* (lparallel.queue:make-queue))
 (defun run-command-buffer ()
   (let ((queue *command-buffer*))
@@ -73,37 +73,36 @@
 (defmacro deflazy (name (&rest deps) &rest gen-forms)
   `(eval-when (:load-toplevel :execute)
      (let ((dependency-graph::*namespace* *stuff*))
-       (let ((node (dependency-graph::ensure-node ',name)))
-	 (unless (= 0 (dependency-graph::timestamp node))
-	   (send-command #'refresh ',name)))
-       (dependency-graph::defnode ,name (,@deps) ,@gen-forms))))
+       (refresh-new-node ',name)
+       ,(multiple-value-bind
+	 (fun node-deps) (dependency-graph::%defnode deps gen-forms)
+	 `(dependency-graph::reload-node ,fun ',node-deps ',name)))))
+
+(defun refresh-new-node (name)
+  (let ((node (dependency-graph::ensure-node name *stuff*)))
+    (unless (= 0 (dependency-graph::timestamp node))
+      (send-command #'refresh name))))
+
+(defun refresh (name)
+  (let ((node (dependency-graph::get-node name *stuff*)))
+    (when node
+      (dependency-graph::touch-node node)
+      (reload-if-dirty name)
+      (dependency-graph::map-dependents
+       name
+       (lambda (x) (reload-if-dirty (dependency-graph::name x)))
+       *stuff*))))
 
 (progn
   (defun getfnc (name)
-    (let ((dependency-graph::*namespace* *stuff*))
-      (dependency-graph::get-value name)))
+    (dependency-graph::get-value name *stuff*))
   (defun getfnc-no-update (name)
-    (let ((dependency-graph::*namespace* *stuff*))
-      (slot-value (dependency-graph::get-node name)
-		  'dependency-graph::value)))
-  (defun remove-stuff (k)
-    (multiple-value-bind (value exists?) (gethash k *stuff*)
-      (when exists?
-	(destroy-node value)))))
-
-(defun touch-node (node)
-  (with-slots ((timestamp dependency-graph::timestamp)) node
-    (incf timestamp)))
-
-(defun destroy-node (node)
-  (with-slots ((value dependency-graph::value)
-	       (state dependency-graph::state)) node
-    (touch-node node)
-    (setf value nil
-	  state nil)))
+    (dependency-graph::get-value-no-update name *stuff*))
+  (defun remove-stuff (name)
+    (dependency-graph::destroy-value name *stuff*)))
 
 (defun reload (name)
-  (let ((place (gethash name *stuff*)))
+  (let ((place (dependency-graph::get-node name *stuff*)))
     (if place
 	(when (dependency-graph::state place)
 	  (let ((a (getfnc-no-update name)))
@@ -114,7 +113,7 @@
 	(format t "no place ~s" name))))
 
 (defun reload-if-dirty (name)
-  (when (dependency-graph::dirty-p (gethash name *stuff*))
+  (when (dependency-graph::dirty-p (dependency-graph::get-node name *stuff*))
     (reload name)))
 (defun get-fresh (name)
   (reload-if-dirty name)
@@ -126,19 +125,8 @@
 		 'glhelp::gl-object)
       (remove-stuff k))))
 
-(defun refresh (name)
-  (let ((dependency-graph::*namespace* *stuff*))
-    (let ((node (gethash name *stuff*)))
-      (when node
-	(touch-node node)
-	(reload-if-dirty name)
-	(dependency-graph::map-dependents
-	 name
-	 (lambda (x) (reload-if-dirty (dependency-graph::name x))))))))
-
 (defun print-dependents (name)
-  (let ((dependency-graph::*namespace* *stuff*))
-    (dependency-graph::map-dependents name #'print)))
+  (dependency-graph::map-dependents name #'print *stuff*))
 
 ;;;;;;;;;;;;;;;;;;;;;
 (progn
