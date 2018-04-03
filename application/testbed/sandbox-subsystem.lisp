@@ -10,8 +10,6 @@
   (:export
    #:type-collapser
    #:aabb-collide
-   #:step-motion
-   #:clamp-vec
    #:aabb-contact
    #:make-aabb))
 (in-package #:aabbcc)
@@ -476,6 +474,7 @@ edge, or no case"
       (values new-x new-y new-z new-dx new-dy new-dz))))
 (defun step-motion (get-collision-data px py pz vx vy vz &optional (xyzclamp 0))
   (multiple-value-bind (ratio clamp) (funcall get-collision-data px py pz vx vy vz)
+;    (print clamp)
     (multiple-value-bind (newvx newvy newvz) (clamp-vec vx vy vz clamp)
       (let ((npx (+ px (* ratio vx)))
 	    (npy (+ py (* ratio vy)))
@@ -508,6 +507,7 @@ edge, or no case"
    (min-ratio 1.0)))
 (defun reset-touch-collector (touch-collector)
   (setf (touch-collector-acc touch-collector) #b0000000)
+  (setf (touch-collector-invalids touch-collector) #b0000000)
   (setf (touch-collector-min-ratio touch-collector) 1.0))
 (define-modify-macro logiorf (&rest args)
   logior)
@@ -535,7 +535,7 @@ edge, or no case"
 		(#b011 (register #b0001000
 				 #b1000000))
 		(#b100 (register #b0000100
-				 #b1110000))
+				 #b1110000)) 
 		(#b010 (register #b0000010
 				 #b1101000))
 		(#b001 (register #b0000001
@@ -544,7 +544,7 @@ edge, or no case"
 
 (defun collapse-touch (dx dy dz touch-collector)
   (let ((acc (touch-collector-acc touch-collector)))
-    (setf acc (logorc2 acc (touch-collector-invalids touch-collector)))
+    (setf acc (logandc2 acc (touch-collector-invalids touch-collector)))
     (aabbcc:type-collapser
      dx dy dz 
      (logtest acc #b1000000)
@@ -705,7 +705,7 @@ edge, or no case"
 	  (let ((fun (if noclip
 			 (lambda (&rest args)
 			   (declare (ignore args))
-			   (values 1 nil nil nil))
+			   (values 1 #b000))
 			 (progn
 			   (funcall configure-aabb-fun aabb)
 			   world-collision-fun))))
