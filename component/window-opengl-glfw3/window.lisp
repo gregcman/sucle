@@ -8,16 +8,20 @@
   (defun make-mouse-keyboard-input-array ()
     (make-array 128 :element-type 'bit)))
 (progn
-  (declaim (type mouse-keyboard-input-array *input-state*))
-  (defparameter *input-state* (make-mouse-keyboard-input-array)))
+  (declaim (type mouse-keyboard-input-array *input-state* *repeat-state*))
+  (defparameter *input-state* (make-mouse-keyboard-input-array))
+  (defparameter *repeat-state* (make-mouse-keyboard-input-array)))
 
 (defstruct control-state
   (prev (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
   (curr (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
   (diff (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
   (jp (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
-  (jr (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array))
-(defparameter *control-state* (make-control-state :curr *input-state*))
+  (jr (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
+  (repeat (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array)
+  (jp-or-repeat (make-mouse-keyboard-input-array) :type mouse-keyboard-input-array))
+(defparameter *control-state* (make-control-state :curr *input-state*
+						  :repeat *repeat-state*))
 (defun reset-control-state (state)
   (fill (control-state-curr state) 0)
   (fill (control-state-prev state) 0)
@@ -35,8 +39,12 @@
   (bit-andc2 
    (control-state-diff state)
    (control-state-curr state)
-   (control-state-jr state)))
+   (control-state-jr state))
+  (bit-ior (control-state-jp state)
+	   (control-state-repeat state)
+	   (control-state-jp-or-repeat state)))
 (defun update-control-state2 (state)
+  (fill (control-state-repeat state) 0)
   (bit-ior (control-state-curr state)
 	   (control-state-curr state)
 	   (control-state-prev state)))
@@ -116,7 +124,9 @@
   (defun skey-j-p (value &optional (state *control-state*))
     (= 1 (sbit (control-state-jp state) value)))
   (defun skey-j-r (value &optional (state *control-state*))
-    (= 1 (sbit (control-state-jr state) value))))
+    (= 1 (sbit (control-state-jr state) value)))
+  (defun skey-j-p-or-repeat (value &optional (state *control-state*))
+    (= 1 (sbit (control-state-jp-or-repeat state) value))))
 
 (defparameter *scroll-x* nil)
 (defparameter *scroll-y* nil)
@@ -147,11 +157,14 @@
   (declare (ignorable window scancode))
   (setf *mod-keys* mod-keys)
   (unless (= key -1)
-    (setf (sbit *input-state*
-		(aref (etouq *key-array*) key))
-	  (if (zerop action)
-	      0
-	      1))))
+    (let ((location (aref (etouq *key-array*) key)))
+      (when (= action 2)
+	(setf (sbit *repeat-state* location) 1))
+      (setf (sbit *input-state*
+		  location)
+	    (if (zerop action)
+		0
+		1)))))
 ;;;
 (defmacro def-mouse-button-callback (name (window button action mod-keys) &body body)
   `(%glfw:define-glfw-callback ,name

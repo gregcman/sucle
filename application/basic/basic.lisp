@@ -151,7 +151,7 @@
 		  (setf something-flag t)
 		  (enter-char x)))
 	 (macrolet ((foo (x a b)
-		      `(when (window::skey-j-p (window::keyval ,a))
+		      `(when (window::skey-j-p-or-repeat (window::keyval ,a))
 			 ,(list (ecase x
 				  (0 'enter)
 				  (1 'enter-string)) b))))
@@ -163,7 +163,7 @@
 	   (foo 1 :left "[D")
 	   (foo 1 :right "[C"))      
 
-	 (window::do-character-keys ((window::control-state-jp ,control-state) true? code)
+	 (window::do-character-keys ((window::control-state-jp-or-repeat ,control-state) true? code)
 	   (when true?
 	     (multiple-value-bind (char esc)
 		 (character-modifier-bits:character-modifier-bits
