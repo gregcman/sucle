@@ -337,8 +337,10 @@ edge, or no case"
 
 
 (defpackage #:sandbox-sub
-  (:use :cl :utility :application))
+  (:use :cl :utility :application :struct-to-clos))
 (in-package #:sandbox-sub)
+
+
 (defun floor5 (x)
   (1- (ceiling x)))
 (defun get-blocks-around (aabb-posx aabb-posy aabb-posz aabb func)
@@ -526,9 +528,10 @@ edge, or no case"
 (defun untouched (ratio)
   (= ratio 69.0))
 
-(defstruct touch-collector
-  (acc #b0000000)
-  (min-ratio 1.0))
+(struct->class
+ (defstruct touch-collector
+   (acc #b0000000)
+   (min-ratio 1.0)))
 (defun reset-touch-collector (taco)
   (setf (touch-collector-acc taco) #b0000000)
   (setf (touch-collector-min-ratio taco) 1.0))
@@ -650,9 +653,10 @@ edge, or no case"
 	  (aref result 2) (* cos-pitch (cos yaw))))
   result)
 
-(defstruct necking
-  (yaw 0.0)
-  (pitch 0.0))
+(struct->class
+ (defstruct necking
+   (yaw 0.0)
+   (pitch 0.0)))
 
 (defun lookaround2 (neck newyaw newpitch)
   (setf (necking-yaw neck) newyaw
@@ -664,10 +668,11 @@ edge, or no case"
 
 ;;;;;;;
 
-(defstruct farticle
-  (position (nsb-cga:vec 0.0 0.0 0.0))
-  (position-old (nsb-cga:vec 0.0 0.0 0.0))
-  (velocity (vector 0.0 0.0 0.0)))
+(struct->class
+ (defstruct farticle
+   (position (nsb-cga:vec 0.0 0.0 0.0))
+   (position-old (nsb-cga:vec 0.0 0.0 0.0))
+   (velocity (vector 0.0 0.0 0.0))))
 
 (defun step-farticle (p)
   (let ((old (farticle-position-old p))
@@ -831,20 +836,21 @@ edge, or no case"
 ;;	     (plain-setblock x y z (+ 2 (random 4)) 0)
 	     (funcall collect x y z *block-aabb*))))))))
 
-(defstruct entity
-  particle
-  neck
-  hips
-  aabb
-  contact
-  fly?
-  gravity?
-  clip?
-  jump?
-  sneak?
-  collision-fun
-  configure-collision-fun
-  contact-fun)
+(struct->class
+ (defstruct entity
+   particle
+   neck
+   hips
+   aabb
+   contact
+   fly?
+   gravity?
+   clip?
+   jump?
+   sneak?
+   collision-fun
+   configure-collision-fun
+   contact-fun))
 
 (defun gentity ()
   (multiple-value-bind (collisionfun config-fun)
@@ -930,12 +936,13 @@ edge, or no case"
 
 ;;;;;;;
 
-(defstruct fister
-  (selected-block (vector 0 0 0))
-  (normal-block (vector 0 0 0))
-  (exists nil)
-  (position (vector 0 0 0))
-  fun)
+(struct->class
+ (defstruct fister
+   (selected-block (vector 0 0 0))
+   (normal-block (vector 0 0 0))
+   (exists nil)
+   (position (vector 0 0 0))
+   fun))
 
 (defun standard-fist (fist px py pz vx vy vz)
   (multiple-value-bind (frac xclamp yclamp zclamp)

@@ -6,5 +6,6 @@
 	       #:singleton-lparallel)
   :serial t
   :components 
-  ((:file "sandbox-subsystem")
+  ((:file "struct-to-clos")
+   (:file "sandbox-subsystem")
    (:file "testbed")))

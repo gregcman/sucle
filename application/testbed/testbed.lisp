@@ -292,27 +292,27 @@
     (let ((backwardsbug (load-time-value (nsb-cga:vec 0.0 0.0 0.0))))
       (nsb-cga:%vec* backwardsbug (camera-matrix:camera-vec-forward application::*camera*) -1.0)
       ((lambda (look-vec pos)
-	 (let ((fist *fist*))
-	   (with-vec (px py pz) (pos)
-	     (with-vec (vx vy vz) (look-vec)	
-	       (when (window:mice-locked-p)
-		 (when (window::skey-j-p (window::keyval 3))
-		   (toggle *swinging*))
-		 (when *swinging*
-		   (let ((u 32))
-		     (sandbox-sub::aabb-collect-blocks
-		      px py pz (* u vx) (* u vy) (* u vz)
-		    ;  sandbox-sub::*fist-aabb*
-		    ;  #+nil
-		      (load-time-value
-		       (aabbcc:make-aabb
-			:minx -0.5
-			:miny -0.5
-			:minz -0.5
-			:maxx 0.5
-			:maxy 0.5
-			:maxz 0.5))   
-		      *big-fist-fun*))))
+	 (with-vec (px py pz) (pos)
+	   (with-vec (vx vy vz) (look-vec)	
+	     (when (window:mice-locked-p)
+	       (when (window::skey-j-p (window::keyval 3))
+		 (toggle *swinging*))
+	       (when *swinging*
+		 (let ((u 32))
+		   (sandbox-sub::aabb-collect-blocks
+		    px py pz (* u vx) (* u vy) (* u vz)
+					;  sandbox-sub::*fist-aabb*
+					;  #+nil
+		    (load-time-value
+		     (aabbcc:make-aabb
+		      :minx -0.5
+		      :miny -0.5
+		      :minz -0.5
+		      :maxx 0.5
+		      :maxy 0.5
+		      :maxz 0.5))   
+		    *big-fist-fun*))))
+	     (let ((fist *fist*))
 	       (let ((left-p (window::skey-j-p (window::mouseval :left)))
 		     (right-p (window::skey-j-p (window::mouseval :right))))
 		 (when (or left-p right-p)
@@ -326,20 +326,26 @@
 		     (when fist?
 		       (when left-p
 			 (with-vec (a b c) (selected-block)
-			   (cond  ((window::skey-p (window::keyval :left-control))
-				   (push (vector a b c) *selection*))
-				  ((window::skey-p (window::keyval :left-alt))
-				   (push (world::getobj a b c) *selection*))
-				  (t
-				   (funcall *left-fist-fnc* a b c)))))
+			   (cond
+			     #+nil
+			     ((window::skey-p (window::keyval :left-control))
+			      (push (vector a b c) *selection*))
+			     #+nil
+			     ((window::skey-p (window::keyval :left-alt))
+			      (push (world::getobj a b c) *selection*))
+			     (t
+			      (funcall *left-fist-fnc* a b c)))))
 		       (when right-p
 			 (with-vec (a b c) (normal-block)
-			   (cond ((window::skey-p (window::keyval :left-control))
-				  (push (vector a b c) *selection*))
-				 ((window::skey-p (window::keyval :left-alt))
-				  (push (world::getobj a b c) *selection*))
-				 (t
-				  (funcall *right-fist-fnc* a b c)))))))))))))
+			   (cond
+			     #+nil
+			     ((window::skey-p (window::keyval :left-control))
+			      (push (vector a b c) *selection*))
+			     #+nil
+			     ((window::skey-p (window::keyval :left-alt))
+			      (push (world::getobj a b c) *selection*))
+			     (t
+			      (funcall *right-fist-fnc* a b c)))))))))))))
        backwardsbug
        pos)))
   (multiple-value-bind (fraction times) (application::tick *ticker* #'physss)
@@ -422,7 +428,7 @@
 		(- y (cdr data)))
 	(setf (car data) x
 	      (cdr data) y))))
-(defun update-moused (&optional (smoothing-factor 0.5))
+(defun update-moused (&optional (smoothing-factor 1.0))
   (multiple-value-bind (dx dy) (moused)
     (let ((x (+ *tmouse-x* dx))
 	  (y (+ *tmouse-y* dy)))
