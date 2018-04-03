@@ -475,6 +475,12 @@ edge, or no case"
 						 dx dy dz
 						 xyzclamp)
       (values new-x new-y new-z new-dx new-dy new-dz))))
+(defmacro with-clamp-and-ratio ((clamp-var ratio-var) (get-collision-data px py pz vx vy vz)
+				&body body)
+  `(multiple-value-bind (,clamp-var ,ratio-var)
+       (collapse-touch ,vx ,vy ,vz
+		       (funcall ,get-collision-data ,px ,py ,pz ,vx ,vy ,vz))
+     ,@body))
 (defun step-motion (get-collision-data px py pz vx vy vz &optional (xyzclamp 0))
   (with-clamp-and-ratio (clamp ratio) (get-collision-data px py pz vx vy vz)
     (multiple-value-bind (newvx newvy newvz) (clamp-vec vx vy vz clamp)
@@ -496,12 +502,6 @@ edge, or no case"
 	       (* newvy whats-left)
 	       (* newvz whats-left)
 	       newclamp)))))))
-(defmacro with-clamp-and-ratio ((clamp-var ratio-var) (get-collision-data px py pz vx vy vz)
-				&body body)
-  `(multiple-value-bind (,clamp-var ,ratio-var)
-       (collapse-touch ,vx ,vy ,vz
-		       (funcall ,get-collision-data ,px ,py ,pz ,vx ,vy ,vz))
-     ,@body))
 
 (defun clamp-vec (vx vy vz xyzclamp)
   (values
@@ -573,15 +573,13 @@ edge, or no case"
 	     (vector-push-extend y blockvec)
 	     (vector-push-extend z blockvec)
 	     (vector-push-extend aabb blockvec)))
-      (let ((hooks (mapcar (lambda (func)
-			    (funcall func #'bladd-x-y-z))
-			   some-hooks)))
+      (let ((hooks some-hooks))
 	(values
 	 (lambda (px py pz vx vy vz)
 	   (reset-touch-collector touch-collector)
 	   (setf (fill-pointer blockvec) 0)
 	   (dolist (fun hooks)
-	     (funcall fun px py pz vx vy vz aabb))
+	     (funcall fun #'bladd-x-y-z px py pz vx vy vz aabb))
 	   (dobox
 	    ((index 0 (fill-pointer blockvec) :inc 4))
 	    (let ((foox (aref blockvec (+ 0 index)))
@@ -614,7 +612,7 @@ edge, or no case"
 		     aabb naabb)
 	       (setf acc 0)
 	       (dolist (fun funs)
-		 (funcall fun npx npy npz naabb))
+		 (funcall fun #'add npx npy npz naabb))
 	       acc)
 	     (add (mx my mz maabb)
 	       (setf
@@ -634,7 +632,9 @@ edge, or no case"
 	(add (getf data 'add)))
     (funcall
      set-fun
-     (mapcar (lambda (func) (funcall func add)) fun))
+     fun
+    ;(mapcar (lambda (func) (funcall func add)) fun)
+     )
     full))
 
 ;;;;;
@@ -786,13 +786,13 @@ edge, or no case"
    :maxy 0.12
    :maxz 0.3))
 
-(defun ahook (bladd)
+(defun ahook ()
   (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
     (flet ((add-x-y-z (x y z)
 	     (vector-push-extend x vec)
 	     (vector-push-extend y vec)
 	     (vector-push-extend z vec)))
-      (lambda (px py pz vx vy vz aabb)
+      (lambda (bladd px py pz vx vy vz aabb)
 	(setf (fill-pointer vec) 0)
 	(aabb-collect-blocks
 	 px py pz vx vy vz aabb
@@ -810,13 +810,13 @@ edge, or no case"
 		   (fooaabb *block-aabb*))
 	       (funcall bladd foox fooy fooz fooaabb)))))))))
 
-(defun a-contact-fun (collect)
+(defun a-contact-fun ()
   (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
     (flet ((add-x-y-z (x y z)
 	     (vector-push-extend x vec)
 	     (vector-push-extend y vec)
 	     (vector-push-extend z vec)))
-      (lambda (px py pz aabb)
+      (lambda (collect px py pz aabb)
 	(setf (fill-pointer vec) 0)
 	(get-blocks-around px py pz aabb #'add-x-y-z)
 	(dobox
@@ -845,11 +845,10 @@ edge, or no case"
    contact-fun))
 
 (defun gentity ()
-  (multiple-value-bind (collisionfun config-fun)
-      (collide-fucks (list #'ahook))
+  (multiple-value-bind (collisionfun config-fun) (collide-fucks (list (ahook)))
     (make-entity :configure-collision-fun config-fun
 		 :collision-fun collisionfun
-		 :contact-fun (configure-contact-handler (list #'a-contact-fun))
+		 :contact-fun (configure-contact-handler (list (a-contact-fun)))
 		 :particle (make-farticle)
 		 :neck (make-necking)
 		 :aabb *player-aabb*
