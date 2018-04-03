@@ -80,109 +80,94 @@
 (defun %collision-type (x y z)
   "determines whether the collision is a face, corner,
 edge, or no case"
-  (let ((minimum 1))
-      (if (numberp x)
-	  (setq minimum (min minimum x))
-	  (setq x -69))
-      (if (numberp y)
-	  (setq minimum (min minimum y))
-	  (setq y -42))
-      (if (numberp z)
-	  (setq minimum (min minimum z))
-	  (setq z -64))
-      ;;set the values to magic numnbers to be compared
-      (let ((xt (= minimum x))
-	    (yt (= minimum y))
-	    (zt (= minimum z)))
-	(values minimum
-		(if xt
-		    (if yt
-			(if zt
-			    :xyz
-			    :xy)
-			(if zt
-			    :xz
-			    :x))
-		    (if yt
-			(if zt
-			    :yz
-			    :y)
-			(if zt
-			    :z
-			    nil)))))))
+  (let ((minimum 1)
+	(values #b00))
+    (flet ((minimize (n value)
+	     (cond ((> minimum n)
+		    (setf minimum n)
+		    (setf values value))
+		   ((= minimum n)
+		    (setf values (logior values value))))))
+      (when x
+	(minimize x #b100))
+      (when y
+	(minimize y #b010))
+      (when z
+	(minimize z #b001)))
+    ;;set the values to magic numnbers to be compared
+    (values minimum
+	    values)))
 
-(defun type-translator (type ddx ddy ddz)
-  (let ((dx (abs ddx))
-	(dy (abs ddy))
-	(dz (abs ddz)))
-    (case type
-      (:xyz (if (= dx dy)
-	       (if (= dx dz)
-		   (values t t t) ;;all equal sitting on corner
-		   (values t t nil));;dx dy equal dz wins
-	       (if (= dx dz)
-		   (values t nil t);; dx dz equal dy wins
-		   (if (= dy dz)
-		       (values nil t t);; dy dz equal dx wins
-		       (if (> dx dy)
-			   (if (> dy dz)
-			       (values nil nil t);;dx is largest dz is smallest, so bye dz
-			       (values nil t nil);;dy is smallest
+(defmacro type-translator (type dx dy dz)
+  (case type
+    (:xyz `(if (= ,dx ,dy)
+	       (if (= ,dx ,dz)
+		   #b111 ;;all equal sitting on corner
+		   #b110);;dx dy equal dz wins
+	       (if (= ,dx ,dz)
+		   #b101;; dx dz equal dy wins
+		   (if (= ,dy ,dz)
+		       #b011;; dy dz equal dx wins
+		       (if (> ,dx ,dy)
+			   (if (> ,dy ,dz)
+			       #b001;;dx is largest dz is smallest, so bye dz
+			       #b010;;dy is smallest
 			       )
-			   (if (> dx dz)
-			       (values nil nil t);;dz smallest
-			       (values t nil nil);;dx beaten twice
+			   (if (> ,dx ,dz)
+			       #b001;;dz smallest
+			       #b100;;dx beaten twice
 			       ))))))
-      (:xy (if (= dx dy)
-	      (values t t nil)
-	      (if (> dx dy)
-		  (values nil t nil)
-		  (values t nil nil))))
-      (:xz (if (= dx dz)
-	      (values t nil t)
-	      (if (> dx dz)
-		  (values nil nil t)
-		  (values t nil nil))))
-      (:yz (if (= dy dz)
-	      (values nil t t)
-	      (if (> dy dz)
-		  (values nil nil t)
-		  (values nil t nil))))
-      (:x (values t nil nil))
-      (:y (values nil t nil))
-      (:z (values nil nil t))
-      (nil (values nil nil nil)))))
+    (:xy `(if (= ,dx ,dy)
+	      #b110
+	      (if (> ,dx ,dy)
+		  #b010
+		  #b100)))
+    (:xz `(if (= ,dx ,dz)
+	      #b101
+	      (if (> ,dx ,dz)
+		  #b001
+		  #b100)))
+    (:yz `(if (= ,dy ,dz)
+	      #b011
+	      (if (> ,dy ,dz)
+		  #b001
+		  #b010)))
+    (:x #b100)
+    (:y #b010)
+    (:z #b001)
+    (nil #b000)
+    (otherwise `(%type-translator type dx dy dz))))
+
+(defun %type-translator (type dx dy dz)
+  (utility:etouq
+   `(case type
+      ,@(mapcar (lambda (x)
+		  `(,x (type-translator ,x dx dy dz)))
+		'(:xyz :xy :xz :yz :x :y :z nil))
+      (otherwise #b000))))
 
 
 ;;rationale: there cannot be an xy collision when there is an x face collision.
 ;;similarly, there cannot be a xyz when there is xy or a subset
 (defun type-collapser (dx dy dz xyz? xy? xz? yz? x? y? z?)
-  (if (or xy? xz? yz? x? y? z?)
-      (setq xyz? nil))
-  (if (or x? y?)
-      (setq xy? nil))
-  (if (or x? z?)
-      (setq xz? nil))
-  (if (or y? z?)
-      (setq yz? nil))
-  (let ((xclamp nil)
-	(yclamp nil)
-	(zclamp nil))
+  (let ((ddx (abs dx))
+	(ddy (abs dy))
+	(ddz (abs dz)))
     (macrolet
 	((add (type)
-	   `(multiple-value-bind (xc yc zc)
-		(type-translator ,type dx dy dz)
-	      (if xc (setq xclamp t))
-	      (if yc (setq yclamp t))
-	      (if zc (setq zclamp t)))))
-      (if xyz? (add :xyz))
-      (if xy? (add :xy))
-      (if xz? (add :xz))
-      (if yz? (add :yz))
-      (if x? (add :x))
-      (if y? (add :y))
-      (if z? (add :z)))
-    (values xclamp yclamp zclamp)))
+	   `(type-translator ,type ddx ddy ddz)))
+      (let ((value
+	     (logior
+	      (if xyz? (add :xyz) 0)
+	      (if xy? (add :xy) 0)
+	      (if xz? (add :xz) 0)
+	      (if yz? (add :yz) 0)
+	      (if x? (add :x) 0)
+	      (if y? (add :y) 0)
+	      (if z? (add :z) 0))))
+	(values (logtest value #b100)
+		(logtest value #b010)
+		(logtest value #b001))))))
 
 
 ;;pattern of checking each face
@@ -531,6 +516,7 @@ edge, or no case"
 (struct->class
  (defstruct touch-collector
    (acc #b0000000)
+   (invalids #b0000000)
    (min-ratio 1.0)))
 (defun reset-touch-collector (taco)
   (setf (touch-collector-acc taco) #b0000000)
@@ -541,23 +527,36 @@ edge, or no case"
   (let ((tot-min (touch-collector-min-ratio touch-collector)))
     (if (> minimum tot-min)
 	(values nil nil)
-	(with-let-mapped-places ((acc (touch-collector-acc touch-collector)))
+	(with-let-mapped-places ((acc (touch-collector-acc touch-collector))
+				 (invalids (touch-collector-invalids touch-collector)))
 	  (let ((is-minimum? (< minimum tot-min)))
 	    (when is-minimum?
 	      (setf (touch-collector-min-ratio touch-collector) minimum)
-	      (setf acc #b0000000))
-	    (case type
-	      (:xyz (logiorf acc #b1000000))
-	      (:xy  (logiorf acc #b0100000))
-	      (:xz  (logiorf acc #b0010000))
-	      (:yz  (logiorf acc #b0001000))
-	      (:x   (logiorf acc #b0000100))
-	      (:y   (logiorf acc #b0000010))
-	      (:z   (logiorf acc #b0000001)))
+	      (setf acc #b0000000)
+	      (setf invalids #b0000000))
+	    (flet ((register (type nope)
+		     (logiorf acc type)
+		     (logiorf invalids nope)))
+	      (case type
+		(#b111 (register #b1000000
+				 #b0000000))
+		(#b110 (register #b0100000
+				 #b1000000))
+		(#b101 (register #b0010000
+				 #b1000000))
+		(#b011 (register #b0001000
+				 #b1000000))
+		(#b100 (register #b0000100
+				 #b1110000))
+		(#b010 (register #b0000010
+				 #b1101000))
+		(#b001 (register #b0000001
+				 #b1011000))))
 	    (values is-minimum? t))))))
 
 (defun collapse-touch (dx dy dz touch-collector)
   (let ((acc (touch-collector-acc touch-collector)))
+    (setf acc (logorc2 acc (touch-collector-invalids touch-collector)))
     (aabbcc:type-collapser
      dx dy dz 
      (logtest acc #b1000000)
