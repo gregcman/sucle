@@ -3,7 +3,8 @@
 
   (:export main)
   (:export *trampoline*)
-  (:export getfnc deflazy get-fresh)
+  (:export getfnc deflazy)
+  (:export w h gl-context al-context)
   (:export microseconds tick *control-state* *camera* *render-area* *pre-trampoline-hooks*
 	   set-render-area render-area-x render-area-y render-area-width render-area-height
 	   %set-render-area))
@@ -45,7 +46,7 @@
     (throw exit-token (values)))
   (window:poll)
   (window::update-control-state *control-state*)
-  (run-command-buffer)
+  (flush-refreshes)
   (dolist (fun funs)
     (funcall fun exit-token))
   (window::update-control-state2 *control-state*)
@@ -53,20 +54,6 @@
 
 (defun quit ()
   (setf window:*status* t))
-;;;;;;;;;;;;;;;
-(defparameter *command-buffer* (lparallel.queue:make-queue))
-(defun run-command-buffer ()
-  (let ((queue *command-buffer*))
-    (lparallel.queue:with-locked-queue queue
-      (dotimes (x (/ (lparallel.queue:queue-count/no-lock queue) 2))
-	(let ((var (lparallel.queue:try-pop-queue/no-lock queue))
-	      (var2 (lparallel.queue:try-pop-queue/no-lock queue)))
-	  (apply var var2))))))
-(defun send-command (fun &rest args)
-  (let ((queue *command-buffer*))
-    (lparallel.queue:with-locked-queue queue
-      (lparallel.queue:push-queue/no-lock fun queue)
-      (lparallel.queue:push-queue/no-lock args queue))))
 
 ;;;;;TODO: clean this area up with dependency graph 
 (defvar *stuff* (make-hash-table :test 'eq))
@@ -76,58 +63,58 @@
        (refresh-new-node ',name)
        ,(multiple-value-bind
 	 (fun node-deps) (dependency-graph::%defnode deps gen-forms)
-	 `(dependency-graph::reload-node ,fun ',node-deps ',name)))))
+	 `(dependency-graph::redefine-node ,fun ',node-deps ',name)))))
 
+;;;;queue node to be unloaded if it already has stuff in it 
 (defun refresh-new-node (name)
   (let ((node (dependency-graph::ensure-node name *stuff*)))
     (unless (= 0 (dependency-graph::timestamp node))
-      (send-command #'refresh name))))
+      (refresh name))))
 
-(defun refresh (name)
+(defparameter *refresh* (make-hash-table :test 'eq))
+(defparameter *refresh-lock* (bordeaux-threads:make-recursive-lock "refresh"))
+(defun refresh (name &optional (main-thread nil))
+  (if main-thread
+      (%refresh name)
+      (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+	(setf (gethash name *refresh*) t))))
+(defun flush-refreshes ()
+  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+    (let ((length (hash-table-count *refresh*)))
+      (unless (zerop length)
+	(dohash (name value) *refresh*
+		(declare (ignore value))
+		(%refresh name))
+	(clrhash *refresh*)))))
+
+(defun %refresh (name)
   (let ((node (dependency-graph::get-node name *stuff*)))
     (when node
       (dependency-graph::touch-node node)
-      (reload-if-dirty name)
-      (dependency-graph::map-dependents
+      (clean-and-invalidate-node node)
+      (dependency-graph::map-dependents2
        name
-       (lambda (x) (reload-if-dirty (dependency-graph::name x)))
+       #'clean-and-invalidate-node
+       #'dependency-graph::dirty-p
        *stuff*))))
 
-(progn
-  (defun getfnc (name)
-    (dependency-graph::get-value name *stuff*))
-  (defun getfnc-no-update (name)
-    (dependency-graph::get-value-no-update name *stuff*))
-  (defun remove-stuff (name)
-    (dependency-graph::destroy-value name *stuff*)))
+(defun getfnc (name)
+  (dependency-graph::get-value name *stuff*))
 
-(defun reload (name)
-  (let ((place (dependency-graph::get-node name *stuff*)))
-    (if place
-	(when (dependency-graph::state place)
-	  (let ((a (getfnc-no-update name)))
-	    (when (and (typep a 'glhelp::gl-object)
-		       (glhelp:alive-p a))
-	      (glhelp::gl-delete* a))
-	    (remove-stuff name)))
-	(format t "no place ~s" name))))
+(defgeneric cleanup-node-value (object))
+(defmethod cleanup-node-value ((object t))
+  (declare (ignorable object)))
+(defmethod cleanup-node-value ((object glhelp::gl-object))
+  (when (glhelp:alive-p object)
+    (glhelp::gl-delete* object)))
+(defun cleanup-node (node)
+  (let ((value (dependency-graph::value node)))
+    (cleanup-node-value value)))
 
-(defun reload-if-dirty (name)
-  (when (dependency-graph::dirty-p (dependency-graph::get-node name *stuff*))
-    (reload name)))
-(defun get-fresh (name)
-  (reload-if-dirty name)
-  (getfnc name))
-
-(defun scrubgl2 ()
-  (dohash (k v) *stuff*
-    (when (typep (dependency-graph::value v)
-		 'glhelp::gl-object)
-      (remove-stuff k))))
-
-(defun print-dependents (name)
-  (dependency-graph::map-dependents name #'print *stuff*))
-
+(defun clean-and-invalidate-node (node)
+  (when (dependency-graph::state node)
+    (cleanup-node node))
+  (dependency-graph::%invalidate-node node))
 ;;;;;;;;;;;;;;;;;;;;;
 (progn
   (defclass render-area ()
@@ -182,30 +169,24 @@
 (defparameter *render-area* (make-instance 'render-area))
 
 (defun root-window-change (w h)
-  (let ((value (getfnc 'h)))
-    (unless (= value h)
-      (reload 'h)))
-  (let ((value (getfnc 'w)))
-    (unless (= value w)
-      (reload 'w))))
+  (unless (= (getfnc 'h) h)
+    (refresh 'h t))
+  (unless (= (getfnc 'w) w)
+    (refresh 'w t)))
 
 (defun init ()
   (glhelp:with-gl-context
     (setf %gl:*gl-get-proc-address* (window:get-proc-address))
     (setf window::*resize-hook* 'root-window-change)
-    (progn
-      (remove-stuff 'gl-context)
-      (getfnc 'gl-context))
-    (getfnc 'al-context)
-    (remove-stuff 'h)
-    (remove-stuff 'w)
-    (scrubgl2)
+    (dolist (item '(h w gl-context))
+      (refresh item t))
     (window:set-vsync t)
     (gl:enable :scissor-test)
     (call-trampoline)))
 
 (deflazy gl-context ()
-  glhelp::*gl-context*)
+  (unless glhelp::*gl-context*
+    (error "no opengl context you idiot!")))
 
 (deflazy w ()
   window::*width*)
@@ -220,4 +201,4 @@
 
 (defun restart-sound-system ()
   (music::restart-al)
-  (remove-stuff 'al-context))
+  (refresh 'al-context t))

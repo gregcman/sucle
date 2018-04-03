@@ -2,14 +2,6 @@
   (:use #:cl #:utility))
 (in-package :testbed)
 
-(defparameter *reloadables*
-  '(
-    ;text
-    ;foo
-    ;foo2
-    ;text2
-    ))
-
 (setf sandbox::*some-saves*
       (cdr (assoc (machine-instance) 
 		  '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
@@ -87,8 +79,7 @@
 	(setf (aref curr 3) (aref other2 0))
 	(setf (aref curr 4) (aref other2 1))
 	(setf (aref curr 5) (aref other2 2))
-	(al:listener :orientation curr)))
-    (map nil #'application::reload-if-dirty *reloadables*))
+	(al:listener :orientation curr))))
   #+nil
   (progn
     (unless (eq *lastsel*
@@ -246,8 +237,6 @@
      (lambda (x) (music::free-preloaded x))
      (application::getfnc 'PRELOADED-SOUNDS)) 
 (defun wot (value)
-  (application::reload-if-dirty 'preloaded-sounds)
-					;(alexandria:random-elt)
   (aref 
    (application::getfnc 'preloaded-sounds)
    (+ (random 4)

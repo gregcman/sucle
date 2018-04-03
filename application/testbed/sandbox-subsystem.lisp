@@ -989,15 +989,13 @@ edge, or no case"
     ;terrain-png
     ))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(deflazy gl-init (application::gl-context)
+(deflazy gl-init (gl-context)
   (declare (ignorable application::gl-context))
   (clrhash sandbox::*g/chunk-call-list*))
 
 (defun per-frame (session)
   (declare (ignorable session))
-  (progn
-    (map nil #'application::reload-if-dirty *reloadables*)
-    (getfnc 'gl-init))
+  (getfnc 'gl-init)
   (render-stuff))
 
 (defparameter *render-ticks* 0)
@@ -1185,7 +1183,7 @@ edge, or no case"
    (let ((value (random 256)))
      (getapixel value (random (1+ value)) grass-png))))
 
-(deflazy terrain (modified-terrain-png)
+(deflazy terrain (modified-terrain-png gl-context)
   (make-instance
    'glhelp::gl-texture
    :handle
@@ -1201,7 +1199,7 @@ edge, or no case"
 (deflazy grass-png ()
   (load-png 
    (filesystem-util:rebase-path #P"grasscolor.png" *ourdir*)))
-(deflazy blockshader (blockshader-text)
+(deflazy blockshader (blockshader-text gl-context)
   (glhelp::create-gl-program blockshader-text))
 
 ;;;; run use-sandbox before running application::main

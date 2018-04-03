@@ -28,14 +28,6 @@
 (defparameter *ndc-mouse-y* 0.0)
 (defparameter *sprites* nil)
 
-(defparameter *reloadables*
-  '(flat-shader-source
-    flat-shader
-    flat-texture-shader-source
-    flat-texture-shader
-    cons-png
-    cons-texture))
-
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
 (defparameter *drag-offset-x* 0.0)
@@ -57,7 +49,6 @@
 					   :x1 (+ 0.1 (random 0.5)) :y1 (+ 0.1 (random 0.5)))))))))
 (defun app ()
   (incf *ticks*)
-  (map nil #'application::reload-if-dirty *reloadables*)
   (setf *ndc-mouse-x* (+ -1 (* 2.0 (/ (floatify window::*mouse-x*)
 				      window:*width*)))
 	*ndc-mouse-y* (- 1 (* 2.0 (/ (floatify window::*mouse-y*)
@@ -319,7 +310,7 @@
      '((value-out . value))
      :uniforms
      '()))
-  (deflazy flat-shader (flat-shader-source)
+  (deflazy flat-shader (flat-shader-source gl-context)
     (glhelp::create-gl-program flat-shader-source)))
 
 (progn
@@ -360,14 +351,14 @@
        (tex-out . tex))
      :uniforms
      '((sampler (:fragment-shader sampler)))))
-  (deflazy flat-texture-shader (flat-texture-shader-source)
+  (deflazy flat-texture-shader (flat-texture-shader-source gl-context)
     (glhelp::create-gl-program flat-texture-shader-source)))
 
 (deflazy cons-png ()
   (flip-image:flip-image
    (opticl:read-png-file
     (filesystem-util:rebase-path #P"cons-cell.png" *this-directory*))))
-(deflazy cons-texture (cons-png)
+(deflazy cons-texture (cons-png gl-context)
   (make-instance
    'glhelp::gl-texture
    :handle

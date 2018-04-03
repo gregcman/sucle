@@ -152,7 +152,7 @@
       (symbol-macrolet ((place (dependents dependency)))
 	(setf place (delete dependent place))))))
 
-(defun reload-node (fun deps name &optional (namespace *namespace*))
+(defun redefine-node (fun deps name &optional (namespace *namespace*))
   (let ((dependencies (mapcar (lambda (x) (ensure-node x namespace)) deps))
 	(node (ensure-node name namespace)))
     (with-locked-lock (node)
@@ -178,21 +178,13 @@
     (values `(lambda ,lambda-args ,@body)
 	    node-deps)))
 
-(defun %map-dependents (node fun)
-  (with-locked-node (node nil)
-    (dolist (dependent (dependents node))
-      (funcall fun dependent)
-      (%map-dependents dependent fun))))
-
 (defun touch-node (node)
   (incf (timestamp node)))
 
-(defun destroy-node (node)
-  (with-slots ((value dependency-graph::value)
-	       (state dependency-graph::state)) node
+(defun %invalidate-node (node)
+  (with-slots ((state dependency-graph::state)) node
     (touch-node node)
-    (setf value nil
-	  state nil)))
+    (setf state nil)))
 
 (defmacro any (&rest forms)
   (nth (random (length forms)) forms))
@@ -210,7 +202,7 @@
 			  (timestamp (car arg))))
 	      (return t)))))))
 
-
+;;;;convenience stuff below
 
 
 (defmacro with-named-node ((node-var &optional (namespace 'namespace))
@@ -244,13 +236,36 @@
   (with-named-node (node) id
 		   (value node)))
 
-(defun destroy-value (id &optional (namespace *namespace*))
+(defun invalidate-node (id &optional (namespace *namespace*))
   (with-named-node (node) id
-		   (destroy-node node)))
+		   (%invalidate-node node)))
 
+#+nil
+(defun %map-dependents (node fun)
+  (with-locked-node (node nil)
+    (dolist (dependent (dependents node))
+      (funcall fun dependent)
+      (%map-dependents dependent fun))))
+
+(defun %map-dependents2 (node fun test)
+  (with-locked-node (node nil)
+    (dolist (dependent (dependents node))
+      (when (funcall test dependent)
+	(funcall fun dependent)
+	(%map-dependents2 dependent fun test)))))
+
+#+nil
 (defun map-dependents (name fun &optional (namespace *namespace*))
   (with-named-node (node) name
 		   (%map-dependents node fun)))
+
+#+nil
+(defun print-dependents (name)
+  (dependency-graph::map-dependents name #'print *stuff*))
+
+(defun map-dependents2 (name fun test &optional (namespace *namespace*))
+  (with-named-node (node) name
+		   (%map-dependents2 node fun test)))
 
 #+nil
 (defmacro defnode (name deps &body body)
