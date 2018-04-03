@@ -40,37 +40,6 @@
 	     (+ py1 (aabb-maxy aabb1))
 	     (+ pz1 (aabb-maxz aabb1))))
 
-(defun step-motion (get-collision-data px py pz vx vy vz &optional xclamp yclamp zclamp)
-  (multiple-value-bind (ratio xc yc zc)
-      (funcall get-collision-data px py pz vx vy vz)
-    (multiple-value-bind (newvx newvy newvz)
-	(clamp-vec vx vy vz xc yc zc)
-      (let ((npx (+ px (* ratio vx)))
-	    (npy (+ py (* ratio vy)))
-	    (npz (+ pz (* ratio vz))))
-	(if (and (zerop newvx)
-		 (zerop newvy)
-		 (zerop newvz))
-	    (values npx npy npz (or xc xclamp) (or yc yclamp) (or zc zclamp))
-	    (let ((whats-left (- 1 ratio)))
-	      (step-motion
-	       get-collision-data
-	       npx
-	       npy
-	       npz
-	       (* newvx whats-left)
-	       (* newvy whats-left)
-	       (* newvz whats-left)
-	       (or xclamp xc)
-	       (or yclamp yc)
-	       (or zclamp zc))))))))
-
-(defun clamp-vec (vx vy vz xclamp yclamp zclamp)
-  (values
-   (if xclamp 0 vx)
-   (if yclamp 0 vy)
-   (if zclamp 0 vz)))
-
 
 (defun %%collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
   (multiple-value-bind (x y z)
@@ -81,8 +50,8 @@
   "determines whether the collision is a face, corner,
 edge, or no case"
   (let ((minimum 1)
-	(values #b00))
-    (flet ((minimize (n value)
+	(values #b000))
+     (flet ((minimize (n value)
 	     (cond ((> minimum n)
 		    (setf minimum n)
 		    (setf values value))
@@ -156,18 +125,14 @@ edge, or no case"
     (macrolet
 	((add (type)
 	   `(type-translator ,type ddx ddy ddz)))
-      (let ((value
-	     (logior
-	      (if xyz? (add :xyz) 0)
-	      (if xy? (add :xy) 0)
-	      (if xz? (add :xz) 0)
-	      (if yz? (add :yz) 0)
-	      (if x? (add :x) 0)
-	      (if y? (add :y) 0)
-	      (if z? (add :z) 0))))
-	(values (logtest value #b100)
-		(logtest value #b010)
-		(logtest value #b001))))))
+      (logior
+       (if xyz? (add :xyz) 0)
+       (if xy? (add :xy) 0)
+       (if xz? (add :xz) 0)
+       (if yz? (add :yz) 0)
+       (if x? (add :x) 0)
+       (if y? (add :y) 0)
+       (if z? (add :z) 0)))))
 
 
 ;;pattern of checking each face
@@ -502,25 +467,48 @@ edge, or no case"
 
 ;;;;;;;;;;;;;
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
-  (multiple-value-bind (new-x new-y new-z xclamp yclamp zclamp)
-      (aabbcc:step-motion aabb-gen-fnc
+  (multiple-value-bind (new-x new-y new-z xyzclamp)
+      (step-motion aabb-gen-fnc
 			   x y z dx dy dz)
-    (multiple-value-bind (new-dx new-dy new-dz) (aabbcc:clamp-vec
+    (multiple-value-bind (new-dx new-dy new-dz) (clamp-vec
 						 dx dy dz
-						 xclamp yclamp zclamp)
+						 xyzclamp)
       (values new-x new-y new-z new-dx new-dy new-dz))))
-
-(defun untouched (ratio)
-  (= ratio 69.0))
+(defun step-motion (get-collision-data px py pz vx vy vz &optional (xyzclamp 0))
+  (multiple-value-bind (ratio clamp) (funcall get-collision-data px py pz vx vy vz)
+    (multiple-value-bind (newvx newvy newvz) (clamp-vec vx vy vz clamp)
+      (let ((npx (+ px (* ratio vx)))
+	    (npy (+ py (* ratio vy)))
+	    (npz (+ pz (* ratio vz)))
+	    (newclamp (logior clamp xyzclamp)))
+	(if (and (zerop newvx)
+		 (zerop newvy)
+		 (zerop newvz))
+	    (values npx npy npz newclamp)
+	    (let ((whats-left (- 1 ratio)))
+	      (step-motion
+	       get-collision-data
+	       npx
+	       npy
+	       npz
+	       (* newvx whats-left)
+	       (* newvy whats-left)
+	       (* newvz whats-left)
+	       newclamp)))))))
+(defun clamp-vec (vx vy vz xyzclamp)
+  (values
+   (if (logtest #b100 xyzclamp) 0 vx)
+   (if (logtest #b010 xyzclamp) 0 vy)
+   (if (logtest #b001 xyzclamp) 0 vz)))
 
 (struct->class
  (defstruct touch-collector
    (acc #b0000000)
    (invalids #b0000000)
    (min-ratio 1.0)))
-(defun reset-touch-collector (taco)
-  (setf (touch-collector-acc taco) #b0000000)
-  (setf (touch-collector-min-ratio taco) 1.0))
+(defun reset-touch-collector (touch-collector)
+  (setf (touch-collector-acc touch-collector) #b0000000)
+  (setf (touch-collector-min-ratio touch-collector) 1.0))
 (define-modify-macro logiorf (&rest args)
   logior)
 (defun collect-touch (minimum type touch-collector)
@@ -607,7 +595,7 @@ edge, or no case"
 
 (defun collide-fucks (some-hooks)
   (let (aabb
-	(taco (make-touch-collector))
+	(touch-collector (make-touch-collector))
 	(blockvec (make-array 0 :adjustable t :fill-pointer 0)))
     (flet ((bladd-x-y-z (x y z aabb)
 	     (vector-push-extend x blockvec)
@@ -619,7 +607,7 @@ edge, or no case"
 			   some-hooks)))
 	(values
 	 (lambda (px py pz vx vy vz)
-	   (reset-touch-collector taco)
+	   (reset-touch-collector touch-collector)
 	   (setf (fill-pointer blockvec) 0)
 	   (dolist (fun hooks)
 	     (funcall fun px py pz vx vy vz aabb))
@@ -636,12 +624,11 @@ edge, or no case"
 		   fooaabb
 		   foox fooy fooz
 		   vx vy vz)
-		(collect-touch minimum type taco))))
-	   (multiple-value-bind (xclamp yclamp zclamp)
-	       (collapse-touch vx vy vz taco)
+		(collect-touch minimum type touch-collector))))
+	   (let ((value (collapse-touch vx vy vz touch-collector)))
 	     (values
-	      (touch-collector-min-ratio taco)
-	      xclamp yclamp zclamp)))
+	      (touch-collector-min-ratio touch-collector)
+	      value)))
 	 (lambda (newaabb) (setf aabb newaabb)))))))
 
 ;;;;;
@@ -944,9 +931,10 @@ edge, or no case"
    fun))
 
 (defun standard-fist (fist px py pz vx vy vz)
-  (multiple-value-bind (frac xclamp yclamp zclamp)
+  (multiple-value-bind (frac xyzclamp)
       (funcall (fister-fun fist) px py pz vx vy vz)
-    (if (or xclamp yclamp zclamp)
+    (if (= #b000 xyzclamp)
+	(setf (fister-exists fist) nil)
 	(progn
 	  (macrolet ((setvec3d (vec x y z)
 	     (let ((a (gensym)))
@@ -957,9 +945,12 @@ edge, or no case"
 	    (let ((a (+ px (* frac vx)))
 		  (b (+ py (* frac vy)))
 		  (c (+ pz (* frac vz))))
-	      (let ((dx (if xclamp (if (plusp vx) 1 -1) 0))
-		    (dy (if yclamp (if (plusp vy) 1 -1) 0))
-		    (dz (if zclamp (if (plusp vz) 1 -1) 0)))
+	      (let ((dx (if (logtest xyzclamp #b100)
+			    (if (plusp vx) 1 -1) 0))
+		    (dy (if (logtest xyzclamp #b010)
+			    (if (plusp vy) 1 -1) 0))
+		    (dz (if (logtest xyzclamp #b001)
+			    (if (plusp vz) 1 -1) 0)))
 		(setvec3d (fister-selected-block fist)
 			  (floor (+ dx a))
 			  (floor (+ dy b))
@@ -972,8 +963,7 @@ edge, or no case"
 			(floor a) 
 			(floor b)
 			(floor c))))
-	  (setf (fister-exists fist) t))
-	(setf (fister-exists fist) nil))))
+	  (setf (fister-exists fist) t)))))
 
 (defun gen-fister (fist-aabb funs)
   (let ((fist (make-fister)))
