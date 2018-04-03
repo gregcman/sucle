@@ -467,14 +467,16 @@ edge, or no case"
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
   (multiple-value-bind (new-x new-y new-z xyzclamp)
       (step-motion aabb-gen-fnc
-			   x y z dx dy dz)
+		   x y z dx dy dz
+		   (logior (if (zerop dx) #b100 #b000)
+			   (if (zerop dy) #b010 #b000)
+			   (if (zerop dz) #b001 #b000)))
     (multiple-value-bind (new-dx new-dy new-dz) (clamp-vec
 						 dx dy dz
 						 xyzclamp)
       (values new-x new-y new-z new-dx new-dy new-dz))))
 (defun step-motion (get-collision-data px py pz vx vy vz &optional (xyzclamp 0))
-  (multiple-value-bind (ratio clamp) (funcall get-collision-data px py pz vx vy vz)
-;    (print clamp)
+  (with-clamp-and-ratio (clamp ratio) (get-collision-data px py pz vx vy vz)
     (multiple-value-bind (newvx newvy newvz) (clamp-vec vx vy vz clamp)
       (let ((npx (+ px (* ratio vx)))
 	    (npy (+ py (* ratio vy)))
@@ -494,6 +496,13 @@ edge, or no case"
 	       (* newvy whats-left)
 	       (* newvz whats-left)
 	       newclamp)))))))
+(defmacro with-clamp-and-ratio ((clamp-var ratio-var) (get-collision-data px py pz vx vy vz)
+				&body body)
+  `(multiple-value-bind (,clamp-var ,ratio-var)
+       (collapse-touch ,vx ,vy ,vz
+		       (funcall ,get-collision-data ,px ,py ,pz ,vx ,vy ,vz))
+     ,@body))
+
 (defun clamp-vec (vx vy vz xyzclamp)
   (values
    (if (logtest #b100 xyzclamp) 0 vx)
@@ -509,8 +518,6 @@ edge, or no case"
   (setf (touch-collector-acc touch-collector) #b0000000)
   (setf (touch-collector-invalids touch-collector) #b0000000)
   (setf (touch-collector-min-ratio touch-collector) 1.0))
-(define-modify-macro logiorf (&rest args)
-  logior)
 (defun collect-touch (minimum type touch-collector)
   (let ((tot-min (touch-collector-min-ratio touch-collector)))
     (if (> minimum tot-min)
@@ -523,8 +530,8 @@ edge, or no case"
 	      (setf acc #b0000000)
 	      (setf invalids #b0000000))
 	    (flet ((register (type nope)
-		     (logiorf acc type)
-		     (logiorf invalids nope)))
+		     (setf acc (logior acc type))
+		     (setf invalids (logior invalids nope))))
 	      (case type
 		(#b111 (register #b1000000
 				 #b0000000))
@@ -541,58 +548,22 @@ edge, or no case"
 		(#b001 (register #b0000001
 				 #b1011000))))
 	    (values is-minimum? t))))))
-
 (defun collapse-touch (dx dy dz touch-collector)
   (let ((acc (touch-collector-acc touch-collector)))
     (setf acc (logandc2 acc (touch-collector-invalids touch-collector)))
-    (aabbcc:type-collapser
-     dx dy dz 
-     (logtest acc #b1000000)
-     (logtest acc #b0100000)
-     (logtest acc #b0010000)
-     (logtest acc #b0001000)
-     (logtest acc #b0000100)
-     (logtest acc #b0000010)
-     (logtest acc #b0000001))))
+    (values
+     (aabbcc:type-collapser
+      dx dy dz 
+      (logtest acc #b1000000)
+      (logtest acc #b0100000)
+      (logtest acc #b0010000)
+      (logtest acc #b0001000)
+      (logtest acc #b0000100)
+      (logtest acc #b0000010)
+      (logtest acc #b0000001))
+     (touch-collector-min-ratio touch-collector))))
 
-(defun make-contact-suite ()
-  (let ((px 0.0)
-	(py 0.0)
-	(pz 0.0)
-	(aabb nil))
-    (let ((funs nil))
-      (let ((acc 0))
-	(labels
-	    ((run (npx npy npz naabb)
-	       (setf px npx
-		     py npy
-		     pz npz
-		     aabb naabb)
-	       (setf acc 0)
-	       (dolist (fun funs)
-		 (funcall fun npx npy npz naabb))
-	       acc)
-	     (add (mx my mz maabb)
-	       (logiorf
-		acc
-		(aabbcc:aabb-contact px py pz aabb mx my mz maabb)))
-	     (set-fun (newfun)
-	       (setf funs newfun)))
-	  (list 'full #'run
-		'add #'add
-		'set-fun #'set-fun))))))
-
-(defun configure-contact-handler
-    (fun &optional (data (make-contact-suite)))
-  (let ((full (getf data 'full))
-	(set-fun (getf data 'set-fun))
-	(add (getf data 'add)))
-    (funcall
-     set-fun
-     (mapcar (lambda (func) (funcall func add)) fun))
-    full))
-
-
+;;;;;;;;;
 (defun collide-fucks (some-hooks)
   (let (aabb
 	(touch-collector (make-touch-collector))
@@ -625,11 +596,46 @@ edge, or no case"
 		   foox fooy fooz
 		   vx vy vz)
 		(collect-touch minimum type touch-collector))))
-	   (let ((value (collapse-touch vx vy vz touch-collector)))
-	     (values
-	      (touch-collector-min-ratio touch-collector)
-	      value)))
+	   touch-collector)
 	 (lambda (newaabb) (setf aabb newaabb)))))))
+
+(defun make-contact-suite ()
+  (let ((px 0.0)
+	(py 0.0)
+	(pz 0.0)
+	(aabb nil))
+    (let ((funs nil))
+      (let ((acc 0))
+	(labels
+	    ((run (npx npy npz naabb)
+	       (setf px npx
+		     py npy
+		     pz npz
+		     aabb naabb)
+	       (setf acc 0)
+	       (dolist (fun funs)
+		 (funcall fun npx npy npz naabb))
+	       acc)
+	     (add (mx my mz maabb)
+	       (setf
+		acc
+		(logior acc
+			(aabbcc:aabb-contact px py pz aabb mx my mz maabb))))
+	     (set-fun (newfun)
+	       (setf funs newfun)))
+	  (list 'full #'run
+		'add #'add
+		'set-fun #'set-fun))))))
+
+(defun configure-contact-handler
+    (fun &optional (data (make-contact-suite)))
+  (let ((full (getf data 'full))
+	(set-fun (getf data 'set-fun))
+	(add (getf data 'add)))
+    (funcall
+     set-fun
+     (mapcar (lambda (func) (funcall func add)) fun))
+    full))
 
 ;;;;;
 (defun unit-pitch-yaw (result pitch yaw)
@@ -931,8 +937,7 @@ edge, or no case"
    fun))
 
 (defun standard-fist (fist px py pz vx vy vz)
-  (multiple-value-bind (frac xyzclamp)
-      (funcall (fister-fun fist) px py pz vx vy vz)
+  (with-clamp-and-ratio (xyzclamp frac) ((fister-fun fist) px py pz vx vy vz)
     (if (= #b000 xyzclamp)
 	(setf (fister-exists fist) nil)
 	(progn
