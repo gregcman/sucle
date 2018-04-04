@@ -250,7 +250,7 @@
 		 (toggle *swinging*))
 	       (when *swinging*
 		 (let ((u 32))
-		   (sandbox-sub::aabb-collect-blocks
+		   (aabbcc::aabb-collect-blocks
 		       (px py pz (* u vx) (* u vy) (* u vz)
 			   (load-time-value
 			    (aabbcc:make-aabb
