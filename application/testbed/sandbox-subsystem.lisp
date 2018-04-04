@@ -286,41 +286,37 @@ edge, or no case"
   (:use :cl :utility :application :struct-to-clos))
 (in-package #:sandbox-sub)
 
-
-;;;;TODO: remove duplicated tests
-(defun get-blocks-around (aabb-posx aabb-posy aabb-posz aabb func)
-  (flet ((emit (x y z)
-	   (funcall func x y z)))
-    (let ((aminx (aabbcc:aabb-minx aabb))
-	  (aminy (aabbcc:aabb-miny aabb))
-	  (aminz (aabbcc:aabb-minz aabb))
-	  (amaxx (aabbcc:aabb-maxx aabb))
-	  (amaxy (aabbcc:aabb-maxy aabb))
-	  (amaxz (aabbcc:aabb-maxz aabb)))
-      (let ((minx (+ aminx aabb-posx))
-	    (maxx (+ amaxx aabb-posx))
-	    (miny (+ aminy aabb-posy))
-	    (maxy (+ amaxy aabb-posy))
-	    (minz (+ aminz aabb-posz))
-	    (maxz (+ amaxz aabb-posz)))
-	(let ((i0 (floor minx))
-	      (i1 (ceiling maxx))
-	      (j0 (floor miny))
-	      (j1 (ceiling maxy))
-	      (k0 (floor minz))
-	      (k1 (ceiling maxz)))
-	  (dobox ((i i0 i1)
-		  (j j0 j1))
-		 (emit i j (1- (ceiling minz)))
-		 (emit i j (floor maxz)))
-	  (dobox ((i i0 i1)
-		  (k k0 k1))
-		 (emit i (1- (ceiling miny)) k)
-		 (emit i (floor maxy) k))
-	  (dobox ((j j0 j1)
-		  (k k0 k1))
-		 (emit (1- (ceiling minx)) j k)
-		 (emit (floor maxx) j k)))))))
+(defmacro get-blocks-around ((x y z aabb)
+			  (x-var y-var z-var contact-var)
+			  &body body)
+  (with-gensyms (emit minx maxx miny maxy minz maxz i0 i1 j0 j1 k0 k1 i j k)
+    (once-only (x y z aabb)
+      `(flet ((,emit (,x-var ,y-var ,z-var ,contact-var)
+		,@body))
+	 (let ((,minx (+ (aabbcc:aabb-minx ,aabb) ,x))
+	       (,maxx (+ (aabbcc:aabb-maxx ,aabb) ,x))
+	       (,miny (+ (aabbcc:aabb-miny ,aabb) ,y))
+	       (,maxy (+ (aabbcc:aabb-maxy ,aabb) ,y))
+	       (,minz (+ (aabbcc:aabb-minz ,aabb) ,z))
+	       (,maxz (+ (aabbcc:aabb-maxz ,aabb) ,z)))
+	   (let ((,i0 (floor ,minx))
+		 (,i1 (ceiling ,maxx))
+		 (,j0 (floor ,miny))
+		 (,j1 (ceiling ,maxy))
+		 (,k0 (floor ,minz))
+		 (,k1 (ceiling ,maxz)))
+	     (dobox ((,j ,j0 ,j1)
+		     (,k ,k0 ,k1))
+		    (,emit (1- (ceiling ,minx)) ,j ,k #b100000)
+		    (,emit (floor ,maxx) ,j ,k #b010000))
+	     (dobox ((,i ,i0 ,i1)
+		     (,k ,k0 ,k1))
+		    (,emit ,i (1- (ceiling ,miny)) ,k #b001000)
+		    (,emit ,i (floor ,maxy) ,k #b000100))
+	     (dobox ((,i ,i0 ,i1)
+		     (,j ,j0 ,j1))
+		    (,emit ,i ,j (1- (ceiling ,minz)) #b000010)
+		    (,emit ,i ,j (floor ,maxz) #b000001))))))))
 (defmacro do-shell ((x0 x1 y0 y1 z0 z1 xflip yflip zflip contact-state)
 		    (x-var y-var z-var contact-var)
 		    &body body)
@@ -637,42 +633,6 @@ edge, or no case"
 	   px py pz vx vy vz aabb
 	   #'add-x-y-z)))))
 
-(defun make-contact-suite ()
-  (let ((px 0.0)
-	(py 0.0)
-	(pz 0.0)
-	(aabb nil))
-    (let ((fun nil))
-      (let ((acc 0))
-	(labels
-	    ((run (npx npy npz naabb)
-	       (setf px npx
-		     py npy
-		     pz npz
-		     aabb naabb)
-	       (setf acc 0)
-	       (funcall fun #'add npx npy npz naabb)
-	       acc)
-	     (add (mx my mz maabb)
-	       (setf
-		acc
-		(logior acc
-			(aabbcc:aabb-contact px py pz aabb mx my mz maabb))))
-	     (set-fun (newfun)
-	       (setf fun newfun)))
-	  (list 'full #'run
-		'add #'add
-		'set-fun #'set-fun))))))
-
-(defun configure-contact-handler
-    (fun &optional (data (make-contact-suite)))
-  (let ((full (getf data 'full))
-	(set-fun (getf data 'set-fun)))
-    (funcall
-     set-fun
-     fun)
-    full))
-
 ;;;;;
 (defun unit-pitch-yaw (result pitch yaw)
   (let ((cos-pitch (cos pitch)))
@@ -833,16 +793,15 @@ edge, or no case"
    :maxz 5.0))
 
 (defparameter *dirtying* nil)
-(defun a-contact-fun ()
-  (with-fun-to-vec (add-x-y-z with-buffered-add)
-      ((x y z)
-       (when (aref mc-blocks:*iscollidable* (world:getblock x y z))
-	 (when *dirtying*
-	   (sandbox::plain-setblock x y z (1+ (random 5)) 0))
-	 (funcall collect x y z *block-aabb*)))
-    (lambda (collect px py pz aabb)
-      (with-buffered-add
-	  (get-blocks-around px py pz aabb #'add-x-y-z)))))
+(defun a-contact-fun (px py pz aabb)
+  (let ((acc #b000000))
+    (get-blocks-around (px py pz aabb) (mx my mz contact-var)
+      (declare (ignorable contact-var))
+      (when (aref mc-blocks:*iscollidable* (world:getblock mx my mz))
+	(when *dirtying*
+	  (sandbox::plain-setblock mx my mz (1+ (random 5)) 0))
+	(logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz *block-aabb*))))
+    acc))
 
 (struct->class
  (defstruct entity
@@ -864,7 +823,7 @@ edge, or no case"
   (multiple-value-bind (collisionfun config-fun) (collide-fucks (ahook))
     (make-entity :configure-collision-fun config-fun
 		 :collision-fun collisionfun
-		 :contact-fun (configure-contact-handler (a-contact-fun))
+		 :contact-fun (function a-contact-fun)
 		 :particle (make-farticle)
 		 :neck (make-necking)
 		 :aabb *player-aabb*
