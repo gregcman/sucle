@@ -369,110 +369,115 @@ edge, or no case"
 		    (,emit ,x ,y ,major-z #b001))))))))
 
 (define-modify-macro logiorf (&rest args) logior)
-(defun aabb-collect-blocks (px py pz dx dy dz aabb func)
-  (let ((xnotp (zerop dx))
-	(ynotp (zerop dy))
-	(znotp (zerop dz)))
-    (when (and xnotp
-	       ynotp
-	       znotp)
-      (return-from aabb-collect-blocks))
-    (let* ((minx (aabbcc:aabb-minx aabb))
-	   (miny (aabbcc:aabb-miny aabb))
-	   (minz (aabbcc:aabb-minz aabb))
-	   (maxx (aabbcc:aabb-maxx aabb))
-	   (maxy (aabbcc:aabb-maxy aabb))
-	   (maxz (aabbcc:aabb-maxz aabb))
-	   (xflip (minusp dx))
-	   (yflip (minusp dy))
-	   (zflip (minusp dz))
-	   (xoffset (if xnotp 0.0 (if xflip minx maxx)))
-	   (yoffset (if ynotp 0.0 (if yflip miny maxy)))
-	   (zoffset (if znotp 0.0 (if zflip minz maxz)))
-	   (x (+ px xoffset))
-	   (y (+ py yoffset))
-	   (z (+ pz zoffset))
-	   (total 1))
-      (when xflip
-	(setf dx (- dx)
-	      x (- 0 x)))
-      (when yflip
-	(setf dy (- dy)
-	      y (- 0 y)))
-      (when zflip
-	(setf dz (- dz)
-	      z (- 0 z)))
-      (labels
-	  ((emit (x y z)
-	     (funcall func x y z)))
-	(let ((i-next (ceiling x))
-	      (j-next (ceiling y))
-	      (k-next (ceiling z)))
-	  (loop
-	     ;;find the shortest distance to the next axis-aligned surface
-	     (let ((ratio most-positive-single-float)
-		   (min? #b000))
-	       (unless xnotp
-		 (let ((fooi (/ (- i-next x) dx)))
-		   (if (> ratio fooi)
-		       (setf ratio fooi
-			     min? #b100)
-		       (when (= ratio fooi)
-			 (logiorf min? #b100)))))
-	       (unless ynotp
-		 (let ((fooj (/ (- j-next y) dy)))
-		   (if (> ratio fooj)
-		       (setf ratio fooj
-			     min? #b010)
-		       (when (= ratio fooj)
-			 (logiorf min? #b010)))))
-	       (unless znotp
-		 (let ((fook (/ (- k-next z) dz)))
-		   (if (> ratio fook)
-		       (setf ratio fook
-			     min? #b001)
-		       (when (= ratio fook)
-			 (logiorf min? #b001)))))
+(defmacro aabb-collect-blocks ((px py pz dx dy dz aabb)
+			       (x-var y-var z-var contact-var)
+			       &body body)
+  (with-gensyms
+      (emit xnotp ynotp znotp minx miny minz maxx maxy maxz
+	    xflip yflip zflip xoffset yoffset zoffset x y z total
+	    i-next j-next k-next ratio min? fooi fooj fook i? j? k?
+	    x0 y0 z0 aabb-posx aabb-posy aabb-posz
+	    bmini bmaxi bminj bmaxj bmink bmaxk i j k contact)
+    (once-only (px py pz dx dy dz aabb)
+      `(let ((,xnotp (zerop ,dx))
+	     (,ynotp (zerop ,dy))
+	     (,znotp (zerop ,dz)))
+	 (unless (and ,xnotp ,ynotp ,znotp)	   
+	   (let* ((,minx (aabbcc:aabb-minx ,aabb))
+		  (,miny (aabbcc:aabb-miny ,aabb))
+		  (,minz (aabbcc:aabb-minz ,aabb))
+		  (,maxx (aabbcc:aabb-maxx ,aabb))
+		  (,maxy (aabbcc:aabb-maxy ,aabb))
+		  (,maxz (aabbcc:aabb-maxz ,aabb))
+		  (,xflip (minusp ,dx))
+		  (,yflip (minusp ,dy))
+		  (,zflip (minusp ,dz))
+		  (,xoffset (if ,xnotp 0.0 (if ,xflip ,minx ,maxx)))
+		  (,yoffset (if ,ynotp 0.0 (if ,yflip ,miny ,maxy)))
+		  (,zoffset (if ,znotp 0.0 (if ,zflip ,minz ,maxz)))
+		  (,x (+ ,px ,xoffset))
+		  (,y (+ ,py ,yoffset))
+		  (,z (+ ,pz ,zoffset))
+		  (,total 1))
+	     (when ,xflip
+	       (setf ,dx (- ,dx)
+		     ,x (- 0 ,x)))
+	     (when ,yflip
+	       (setf ,dy (- ,dy)
+		     ,y (- 0 ,y)))
+	     (when ,zflip
+	       (setf ,dz (- ,dz)
+		     ,z (- 0 ,z)))
+	     (labels
+		 ((,emit (,x-var ,y-var ,z-var ,contact-var)
+		    ,@body))
+	       (let ((,i-next (ceiling ,x))
+		     (,j-next (ceiling ,y))
+		     (,k-next (ceiling ,z)))
+		 (loop
+		    ;;find the shortest distance to the next axis-aligned surface
+		    (let ((,ratio most-positive-single-float)
+			  (,min? #b000))
+		      (unless ,xnotp
+			(let ((,fooi (/ (- ,i-next ,x) ,dx)))
+			  (if (> ,ratio ,fooi)
+			      (setf ,ratio ,fooi
+				    ,min? #b100)
+			      (when (= ,ratio ,fooi)
+				(logiorf ,min? #b100)))))
+		      (unless ,ynotp
+			(let ((,fooj (/ (- ,j-next ,y) ,dy)))
+			  (if (> ,ratio ,fooj)
+			      (setf ,ratio ,fooj
+				    ,min? #b010)
+			      (when (= ,ratio ,fooj)
+				(logiorf ,min? #b010)))))
+		      (unless ,znotp
+			(let ((,fook (/ (- ,k-next ,z) ,dz)))
+			  (if (> ,ratio ,fook)
+			      (setf ,ratio ,fook
+				    ,min? #b001)
+			      (when (= ,ratio ,fook)
+				(logiorf ,min? #b001)))))
 
-	       (decf total ratio)
-	       (unless (plusp total)
-		 (return))
-	       (let ((i? (logtest min? #b100))
-		     (j? (logtest min? #b010))
-		     (k? (logtest min? #b001)))
-		 ;;ratchet up the coordinates
-		 (unless xnotp
-		   (setf x (if i? i-next (+ x (* dx ratio))))
-		   (setf i-next (1+ (floor x))))
-		 (unless ynotp
-		   (setf y (if j? j-next (+ y (* dy ratio))))
-		   (setf j-next (1+ (floor y))))
-		 (unless znotp
-		   (setf z (if k? k-next (+ z (* dz ratio))))
-		   (setf k-next (1+ (floor z))))
-		 ;;find the surface cubes
-		 (let ((x0 (if xflip (- x) x))
-		       (y0 (if yflip (- y) y))
-		       (z0 (if zflip (- z) z)))
-		   (let ((aabb-posx (- x0 xoffset))
-			 (aabb-posy (- y0 yoffset))
-			 (aabb-posz (- z0 zoffset)))
-		     (let ((bmini (ceiling (+ aabb-posx minx)))
-			   (bmaxi (floor (+ aabb-posx maxx)))
-			   (bminj (ceiling (+ aabb-posy miny)))
-			   (bmaxj (floor (+ aabb-posy maxy)))
-			   (bmink (ceiling (+ aabb-posz minz)))
-			   (bmaxk (floor (+ aabb-posz maxz))))
-		       (do-shell ((1- bmini) bmaxi
-				  (1- bminj) bmaxj
-				  (1- bmink) bmaxk
-				  xflip
-				  yflip
-				  zflip
-				  min?)
-			   (i j k contact)
-			 (declare (ignorable contact))
-			 (emit i j k)))))))))))))
+		      (decf ,total ,ratio)
+		      (unless (plusp ,total)
+			(return))
+		      (let ((,i? (logtest ,min? #b100))
+			    (,j? (logtest ,min? #b010))
+			    (,k? (logtest ,min? #b001)))
+			;;ratchet up the coordinates
+			(unless ,xnotp
+			  (setf ,x (if ,i? ,i-next (+ ,x (* ,dx ,ratio))))
+			  (setf ,i-next (1+ (floor ,x))))
+			(unless ,ynotp
+			  (setf ,y (if ,j? ,j-next (+ ,y (* ,dy ,ratio))))
+			  (setf ,j-next (1+ (floor ,y))))
+			(unless ,znotp
+			  (setf ,z (if ,k? ,k-next (+ ,z (* ,dz ,ratio))))
+			  (setf ,k-next (1+ (floor ,z))))
+			;;find the surface cubes
+			(let ((,x0 (if ,xflip (- ,x) ,x))
+			      (,y0 (if ,yflip (- ,y) ,y))
+			      (,z0 (if ,zflip (- ,z) ,z)))
+			  (let ((,aabb-posx (- ,x0 ,xoffset))
+				(,aabb-posy (- ,y0 ,yoffset))
+				(,aabb-posz (- ,z0 ,zoffset)))
+			    (let ((,bmini (ceiling (+ ,aabb-posx ,minx)))
+				  (,bmaxi (floor (+ ,aabb-posx ,maxx)))
+				  (,bminj (ceiling (+ ,aabb-posy ,miny)))
+				  (,bmaxj (floor (+ ,aabb-posy ,maxy)))
+				  (,bmink (ceiling (+ ,aabb-posz ,minz)))
+				  (,bmaxk (floor (+ ,aabb-posz ,maxz))))
+			      (do-shell ((1- ,bmini) ,bmaxi
+					 (1- ,bminj) ,bmaxj
+					 (1- ,bmink) ,bmaxk
+					 ,xflip
+					 ,yflip
+					 ,zflip
+					 ,min?)
+				  (,i ,j ,k ,contact)
+				(,emit ,i ,j ,k ,contact))))))))))))))))
 
 ;;;;;;;;;;;;;
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
@@ -597,41 +602,30 @@ edge, or no case"
 			   ,@',flush-body))))
 	   ,@body)))))
 
-(defun collide-fucks (fun)
+(defparameter *dirtying2* nil)
+(defun collide-fucks ()
   (let (aabb
 	(touch-collector (make-touch-collector)))
-    (with-fun-to-vec (bladd-x-y-z with-output-to-bladd)
-	((x y z fooaabb)
-	 (multiple-value-bind (minimum type)
-	     (aabbcc:aabb-collide
-	      aabb
-	      px py pz
-	      fooaabb
-	      x y z
-	      vx vy vz)
-	   (collect-touch minimum type touch-collector)))
-	(values
-	 (lambda (px py pz vx vy vz)
-	   (reset-touch-collector touch-collector)
-	   (with-output-to-bladd
-	     (funcall fun #'bladd-x-y-z px py pz vx vy vz aabb))	     
-	   touch-collector)
-	 (lambda (newaabb) (setf aabb newaabb))))))
-
-(defparameter *dirtying2* nil)
-(defun ahook ()
-  (with-fun-to-vec (add-x-y-z with-buffered-add)
-      ((x y z) 
-       (when (aref mc-blocks:*iscollidable*
-		   (world:getblock x y z))
-	 (when *dirtying2*
-	   (sandbox::plain-setblock x y z (1+ (random 5)) 0))
-	 (funcall bladd x y z *block-aabb*)))   
-    (lambda (bladd px py pz vx vy vz aabb)
-      (with-buffered-add
-	  (aabb-collect-blocks
-	   px py pz vx vy vz aabb
-	   #'add-x-y-z)))))
+    (values
+     (lambda (px py pz vx vy vz)
+       (reset-touch-collector touch-collector)
+       (aabb-collect-blocks (px py pz vx vy vz aabb)
+	   (x y z contact)
+	 (declare (ignorable contact))
+	 (when (aref mc-blocks:*iscollidable*
+		     (world:getblock x y z))
+	   (when *dirtying2*
+	     (sandbox::plain-setblock x y z (1+ (random 5)) 0))
+	   (multiple-value-bind (minimum type)
+	       (aabbcc:aabb-collide
+		aabb
+		px py pz
+		*block-aabb*
+		x y z
+		vx vy vz)
+	     (collect-touch minimum type touch-collector))))	     
+       touch-collector)
+     (lambda (newaabb) (setf aabb newaabb)))))
 
 ;;;;;
 (defun unit-pitch-yaw (result pitch yaw)
@@ -820,7 +814,7 @@ edge, or no case"
    contact-fun))
 
 (defun gentity ()
-  (multiple-value-bind (collisionfun config-fun) (collide-fucks (ahook))
+  (multiple-value-bind (collisionfun config-fun) (collide-fucks)
     (make-entity :configure-collision-fun config-fun
 		 :collision-fun collisionfun
 		 :contact-fun (function a-contact-fun)
@@ -944,10 +938,10 @@ edge, or no case"
 			(floor c))))
 	  (setf (fister-exists fist) t)))))
 
-(defun gen-fister (fist-aabb funs)
+(defun gen-fister (fist-aabb)
   (let ((fist (make-fister)))
     (multiple-value-bind (fun set-aabb)
-	(collide-fucks funs)
+	(collide-fucks)
 	(setf (fister-fun fist)
 	      fun)
 	(funcall set-aabb fist-aabb))

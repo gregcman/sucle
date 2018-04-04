@@ -241,29 +241,28 @@
 	 (with-vec (px py pz) (pos)
 	   (with-vec (vx vy vz) (look-vec)	
 	     (when (window:mice-locked-p)
-;	       #+nil
-	       (when (window::skey-j-p (window::keyval 3))
-		 (toggle *swinging*))
 	       (when (window::skey-j-p (window::keyval 2))
 		 (toggle sandbox-sub::*dirtying2*))
 	       (when (window::skey-j-p (window::keyval 1))
 		 (toggle sandbox-sub::*dirtying*))
-;	       #+nil
+
+	       (when (window::skey-j-p (window::keyval 3))
+		 (toggle *swinging*))
 	       (when *swinging*
 		 (let ((u 32))
 		   (sandbox-sub::aabb-collect-blocks
-		    px py pz (* u vx) (* u vy) (* u vz)
-					;  sandbox-sub::*fist-aabb*
-					;  #+nil
-		    (load-time-value
-		     (aabbcc:make-aabb
-		      :minx -0.5
-		      :miny -0.5
-		      :minz -0.5
-		      :maxx 0.5
-		      :maxy 0.5
-		      :maxz 0.5))   
-		    *big-fist-fun*))))
+		       (px py pz (* u vx) (* u vy) (* u vz)
+			   (load-time-value
+			    (aabbcc:make-aabb
+			     :minx -0.5
+			     :miny -0.5
+			     :minz -0.5
+			     :maxx 0.5
+			     :maxy 0.5
+			     :maxz 0.5)))
+		       (x y z contact)
+		     (declare (ignorable contact))		     
+		     (funcall *big-fist-fun* x y z)))))
 	     (let ((fist *fist*))
 	       (let ((left-p (window::skey-j-p (window::mouseval :left)))
 		     (right-p (window::skey-j-p (window::mouseval :right))))
@@ -414,7 +413,7 @@
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defparameter *swinging* nil)
 (defparameter *fist*
-  (sandbox-sub::gen-fister sandbox-sub::*fist-aabb* (sandbox-sub::ahook)))
+  (sandbox-sub::gen-fister sandbox-sub::*fist-aabb*))
 ;;;;;
 
 (defun wasd-mover (w? a? s? d?)
