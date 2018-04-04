@@ -1,5 +1,5 @@
 (defpackage #:aabbcc
-  (:use #:cl)
+  (:use #:cl #:utility)
   (:export
    #:aabb-minx
    #:aabb-miny
@@ -104,13 +104,12 @@ edge, or no case"
     (otherwise `(%type-translator type dx dy dz))))
 
 (defun %type-translator (type dx dy dz)
-  (utility:etouq
+  (etouq
    `(case type
       ,@(mapcar (lambda (x)
 		  `(,x (type-translator ,x dx dy dz)))
 		'(:xyz :xy :xz :yz :x :y :z nil))
       (otherwise #b000))))
-
 
 ;;rationale: there cannot be an xy collision when there is an x face collision.
 ;;similarly, there cannot be a xyz when there is xy or a subset
@@ -118,41 +117,21 @@ edge, or no case"
   (let ((ddx (abs dx))
 	(ddy (abs dy))
 	(ddz (abs dz)))
-    (macrolet
-	((add (type)
-	   `(type-translator ,type ddx ddy ddz)))
-      (logior
-       (if xyz? (add :xyz) 0)
-       (if xy? (add :xy) 0)
-       (if xz? (add :xz) 0)
-       (if yz? (add :yz) 0)
-       (if x? (add :x) 0)
-       (if y? (add :y) 0)
-       (if z? (add :z) 0)))))
+    (let ((acc 0))
+      (macrolet
+	  ((add (type)
+	     `(setf acc
+		    (logior
+		     (type-translator ,type ddx ddy ddz)))))
+	(if xyz? (add :xyz))
+	(if xy? (add :xy))
+	(if xz? (add :xz))
+	(if yz? (add :yz))
+	(if x? (add :x))
+	(if y? (add :y))
+	(if z? (add :z)))
+      acc)))
 
-
-;;pattern of checking each face
-(defmacro checkface ((op facea faceb) diff (d1 d2) (mx0 my0 mx1 my1 nx0 ny0 nx1 ny1))
-  `(if (,op ,facea ,faceb)
-       (let* ((delta (- ,faceb ,facea))
-	      (ddx (/ (* delta ,d1) ,diff))
-	      (ddy (/ (* delta ,d2) ,diff))
-	      (state (r-intersect (+ ddx ,mx0) (+ ddy ,my0)
-				  (+ ddx ,mx1) (+ ddy ,my1)
-				  ,nx0 ,ny0
-				  ,nx1 ,ny1)))
-	 (if state
-	     (if (case state
-		   ((t) t)
-		   (br (and (minusp ,d2) (plusp ,d1)))
-		   (ur (and (plusp ,d2) (plusp ,d1)))
-		   (ul (and (plusp ,d2) (minusp ,d1)))
-		   (bl (and (minusp ,d2) (minusp ,d1)))
-		   (b (minusp ,d2))
-		   (r (plusp ,d1))
-		   (u (plusp ,d2))
-		   (l (minusp ,d1)))
-		 (/ delta ,diff))))))
 
 ;;;if the velocity is zero, there is no point to test it
 ;;;if it is nonzero, we check the direction
@@ -160,19 +139,40 @@ edge, or no case"
 ;;;negative direction relative to surface 1 we discard
 ;;;spits out three values which indicate movement in the x y z directions.
 (defun %collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
-  (values
-   (unless (zerop dx)
-     (if (plusp dx)
-	 (checkface (<= ax1 bx0) dx (dy dz) (ay0 az0 ay1 az1 by0 bz0 by1 bz1))
-	 (checkface (>= ax0 bx1) dx (dy dz) (ay0 az0 ay1 az1 by0 bz0 by1 bz1))))
-   (unless (zerop dy)
-     (if (plusp dy)
-	 (checkface (<= ay1 by0) dy (dx dz) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1))
-	 (checkface (>= ay0 by1) dy (dx dz) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1))))
-   (unless (zerop dz)
-     (if (plusp dz)
-	 (checkface (<= az1 bz0) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1))
-	 (checkface (>= az0 bz1) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1))))))
+  (macrolet ((checkface ((op facea faceb) diff (d1 d2) (mx0 my0 mx1 my1 nx0 ny0 nx1 ny1))
+	       `(if (,op ,facea ,faceb)
+		    (let* ((delta (- ,faceb ,facea))
+			   (ddx (/ (* delta ,d1) ,diff))
+			   (ddy (/ (* delta ,d2) ,diff))
+			   (state (r-intersect (+ ddx ,mx0) (+ ddy ,my0)
+					       (+ ddx ,mx1) (+ ddy ,my1)
+					       ,nx0 ,ny0
+					       ,nx1 ,ny1)))
+		      (if state
+			  (if (case state
+				((t) t)
+				(br (and (minusp ,d2) (plusp ,d1)))
+				(ur (and (plusp ,d2) (plusp ,d1)))
+				(ul (and (plusp ,d2) (minusp ,d1)))
+				(bl (and (minusp ,d2) (minusp ,d1)))
+				(b (minusp ,d2))
+				(r (plusp ,d1))
+				(u (plusp ,d2))
+				(l (minusp ,d1)))
+			      (/ delta ,diff)))))))
+    (values
+     (unless (zerop dx)
+       (if (plusp dx)
+	   (checkface (<= ax1 bx0) dx (dy dz) (ay0 az0 ay1 az1 by0 bz0 by1 bz1))
+	   (checkface (>= ax0 bx1) dx (dy dz) (ay0 az0 ay1 az1 by0 bz0 by1 bz1))))
+     (unless (zerop dy)
+       (if (plusp dy)
+	   (checkface (<= ay1 by0) dy (dx dz) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1))
+	   (checkface (>= ay0 by1) dy (dx dz) (ax0 az0 ax1 az1 bx0 bz0 bx1 bz1))))
+     (unless (zerop dz)
+       (if (plusp dz)
+	   (checkface (<= az1 bz0) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1))
+	   (checkface (>= az0 bz1) dz (dx dy) (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)))))))
 
 ;;determine how rectangles intersect .0 
 ;;means the edges touch. positive number means there is space between
@@ -480,10 +480,10 @@ edge, or no case"
 				(,emit ,i ,j ,k ,contact))))))))))))))))
 
 ;;;;;;;;;;;;;
-(defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
+(defun collide-world2 (aabb-gen-fnc x y z dx dy dz aabb)
   (multiple-value-bind (new-x new-y new-z xyzclamp)
       (step-motion aabb-gen-fnc
-		   x y z dx dy dz
+		   x y z dx dy dz aabb
 		   (logior (if (zerop dx) #b100 #b000)
 			   (if (zerop dy) #b010 #b000)
 			   (if (zerop dz) #b001 #b000)))
@@ -491,33 +491,33 @@ edge, or no case"
 						 dx dy dz
 						 xyzclamp)
       (values new-x new-y new-z new-dx new-dy new-dz))))
-(defmacro with-clamp-and-ratio ((clamp-var ratio-var) (get-collision-data px py pz vx vy vz)
+(defmacro with-clamp-and-ratio ((clamp-var ratio-var) (get-collision-data px py pz vx vy vz aabb)
 				&body body)
   `(multiple-value-bind (,clamp-var ,ratio-var)
-       (collapse-touch ,vx ,vy ,vz
-		       (funcall ,get-collision-data ,px ,py ,pz ,vx ,vy ,vz))
+       (funcall ,get-collision-data ,px ,py ,pz ,vx ,vy ,vz ,aabb)
      ,@body))
-(defun step-motion (get-collision-data px py pz vx vy vz &optional (xyzclamp 0))
-  (with-clamp-and-ratio (clamp ratio) (get-collision-data px py pz vx vy vz)
-    (multiple-value-bind (newvx newvy newvz) (clamp-vec vx vy vz clamp)
-      (let ((npx (+ px (* ratio vx)))
-	    (npy (+ py (* ratio vy)))
-	    (npz (+ pz (* ratio vz)))
-	    (newclamp (logior clamp xyzclamp)))
-	(if (and (zerop newvx)
-		 (zerop newvy)
-		 (zerop newvz))
-	    (values npx npy npz newclamp)
-	    (let ((whats-left (- 1 ratio)))
-	      (step-motion
-	       get-collision-data
-	       npx
-	       npy
-	       npz
-	       (* newvx whats-left)
-	       (* newvy whats-left)
-	       (* newvz whats-left)
-	       newclamp)))))))
+(define-modify-macro *= (&rest args) *)
+(defun step-motion (get-collision-data px py pz vx vy vz aabb &optional (clamp 0))
+  (loop
+     (if (and (zerop vx)
+	      (zerop vy)
+	      (zerop vz))
+	 (return (values px py pz clamp))
+	 (with-clamp-and-ratio (newclamp ratio) (get-collision-data px py pz vx vy vz aabb)
+	   (logiorf clamp newclamp)
+	   (incf px (* ratio vx))
+	   (incf py (* ratio vy))
+	   (incf pz (* ratio vz))
+	   (if (logtest #b100 clamp)
+	       (setf vx 0.0))
+	   (if (logtest #b010 clamp)
+	       (setf vy 0.0))
+	   (if (logtest #b001 clamp)
+	       (setf vz 0.0))
+	   (let ((whats-left (- 1 ratio)))
+	     (*= vx whats-left)
+	     (*= vy whats-left)
+	     (*= vz whats-left))))))
 
 (defun clamp-vec (vx vy vz xyzclamp)
   (values
@@ -525,59 +525,52 @@ edge, or no case"
    (if (logtest #b010 xyzclamp) 0 vy)
    (if (logtest #b001 xyzclamp) 0 vz)))
 
-(struct->class
- (defstruct touch-collector
-   (acc #b0000000)
-   (invalids #b0000000)
-   (min-ratio 1.0)))
-(defun reset-touch-collector (touch-collector)
-  (setf (touch-collector-acc touch-collector) #b0000000)
-  (setf (touch-collector-invalids touch-collector) #b0000000)
-  (setf (touch-collector-min-ratio touch-collector) 1.0))
-(defun collect-touch (minimum type touch-collector)
-  (let ((tot-min (touch-collector-min-ratio touch-collector)))
-    (if (> minimum tot-min)
-	(values nil nil)
-	(with-let-mapped-places ((acc (touch-collector-acc touch-collector))
-				 (invalids (touch-collector-invalids touch-collector)))
-	  (let ((is-minimum? (< minimum tot-min)))
-	    (when is-minimum?
-	      (setf (touch-collector-min-ratio touch-collector) minimum)
-	      (setf acc #b0000000)
-	      (setf invalids #b0000000))
-	    (flet ((register (type nope)
-		     (setf acc (logior acc type))
-		     (setf invalids (logior invalids nope))))
-	      (case type
-		(#b111 (register #b1000000
-				 #b0000000))
-		(#b110 (register #b0100000
-				 #b1000000))
-		(#b101 (register #b0010000
-				 #b1000000))
-		(#b011 (register #b0001000
-				 #b1000000))
-		(#b100 (register #b0000100
-				 #b1110000)) 
-		(#b010 (register #b0000010
-				 #b1101000))
-		(#b001 (register #b0000001
-				 #b1011000))))
-	    (values is-minimum? t))))))
-(defun collapse-touch (dx dy dz touch-collector)
-  (let ((acc (touch-collector-acc touch-collector)))
-    (setf acc (logandc2 acc (touch-collector-invalids touch-collector)))
-    (values
-     (aabbcc:type-collapser
-      dx dy dz 
-      (logtest acc #b1000000)
-      (logtest acc #b0100000)
-      (logtest acc #b0010000)
-      (logtest acc #b0001000)
-      (logtest acc #b0000100)
-      (logtest acc #b0000010)
-      (logtest acc #b0000001))
-     (touch-collector-min-ratio touch-collector))))
+(defmacro with-touch-collector ((collect-fun collapse-fun min-ratio) &body body)
+  (with-gensyms (acc acc2 invalids potential-minimum type nope register dx dy dz)
+    `(let ((,acc #b0000000)
+	   (,invalids #b0000000)
+	   (,min-ratio 1.0))
+       (flet ((,collect-fun (,potential-minimum ,type)
+		(if (> ,potential-minimum ,min-ratio)
+		    -1
+		    (flet ((,register (,type ,nope)
+			     (if (< ,potential-minimum ,min-ratio) 
+				 (progn
+				   (setf ,min-ratio ,potential-minimum
+					 ,acc ,type
+					 ,invalids ,nope)
+				   0)
+				 (progn
+				   (setf ,acc (logior ,acc ,type)
+					 ,invalids (logior ,invalids ,nope))
+				   1))))
+		      (case ,type
+			(#b111 (,register #b1000000 ;xyz
+					 #b0000000))
+			(#b110 (,register #b0100000 ;xy
+					 #b1000000))
+			(#b101 (,register #b0010000 ;xz
+					 #b1000000))
+			(#b011 (,register #b0001000 ;yz
+					 #b1000000))
+			(#b100 (,register #b0000100 ;x
+					 #b1110000)) 
+			(#b010 (,register #b0000010 ;y
+					 #b1101000))
+			(#b001 (,register #b0000001 ;z
+					 #b1011000))))))
+	      (,collapse-fun (,dx ,dy ,dz)
+		(let ((,acc2 (logandc2 ,acc ,invalids)))
+		  (aabbcc::type-collapser
+		   ,dx ,dy ,dz
+		   (logtest ,acc2 #b1000000)
+		   (logtest ,acc2 #b0100000)
+		   (logtest ,acc2 #b0010000)
+		   (logtest ,acc2 #b0001000)
+		   (logtest ,acc2 #b0000100)
+		   (logtest ,acc2 #b0000010)
+		   (logtest ,acc2 #b0000001)))))
+	 ,@body))))
 
 ;;;;;;;;;
 (defmacro do-vec-params ((&rest vars) (vector &optional (binder 'let)) &body body)
@@ -603,29 +596,26 @@ edge, or no case"
 	   ,@body)))))
 
 (defparameter *dirtying2* nil)
-(defun collide-fucks ()
-  (let (aabb
-	(touch-collector (make-touch-collector)))
+(defun collide-fucks (px py pz vx vy vz aabb)
+  (with-touch-collector (collect-touch collapse-touch min-ratio)
+    (aabb-collect-blocks (px py pz vx vy vz aabb)
+	(x y z contact)
+      (declare (ignorable contact))
+      (when (aref mc-blocks:*iscollidable*
+		  (world:getblock x y z))
+	(when *dirtying2*
+	  (sandbox::plain-setblock x y z (1+ (random 5)) 0))
+	(multiple-value-bind (minimum type)
+	    (aabbcc:aabb-collide
+	     aabb
+	     px py pz
+	     *block-aabb*
+	     x y z
+	     vx vy vz)
+	  (collect-touch minimum type))))
     (values
-     (lambda (px py pz vx vy vz)
-       (reset-touch-collector touch-collector)
-       (aabb-collect-blocks (px py pz vx vy vz aabb)
-	   (x y z contact)
-	 (declare (ignorable contact))
-	 (when (aref mc-blocks:*iscollidable*
-		     (world:getblock x y z))
-	   (when *dirtying2*
-	     (sandbox::plain-setblock x y z (1+ (random 5)) 0))
-	   (multiple-value-bind (minimum type)
-	       (aabbcc:aabb-collide
-		aabb
-		px py pz
-		*block-aabb*
-		x y z
-		vx vy vz)
-	     (collect-touch minimum type touch-collector))))	     
-       touch-collector)
-     (lambda (newaabb) (setf aabb newaabb)))))
+     (collapse-touch vx vy vz)
+     min-ratio)))
 
 ;;;;;
 (defun unit-pitch-yaw (result pitch yaw)
@@ -670,7 +660,6 @@ edge, or no case"
 		is-sneaking
 		contact-handler
 		world-collision-fun
-		configure-aabb-fun
 		aabb)
   (let ((tickscale (/ 1.0 3.0)))
     (step-farticle farticle)
@@ -702,16 +691,15 @@ edge, or no case"
 	  (let ((fun (if noclip
 			 (lambda (&rest args)
 			   (declare (ignore args))
-			   (values (load-time-value (make-touch-collector)) #b000))
+			   (values #b000 1.0))
 			 (progn
-			   (funcall configure-aabb-fun aabb)
 			   world-collision-fun))))
 	    (with-vec (vx vy vz) (vel symbol-macrolet)
 	      (with-vec (px py pz) (pos symbol-macrolet)
 		(setf (values px py pz vx vy vz)
 		      (collide-world2
 		       fun
-		       px py pz vx vy vz)))))
+		       px py pz vx vy vz aabb)))))
 	  (let ((air-friction 0.98)
 		(walking-friction (* 0.6 0.9)))
 	    (with-vec (xvel yvel zvel) (vel symbol-macrolet)
@@ -810,24 +798,21 @@ edge, or no case"
    jump?
    sneak?
    collision-fun
-   configure-collision-fun
    contact-fun))
 
 (defun gentity ()
-  (multiple-value-bind (collisionfun config-fun) (collide-fucks)
-    (make-entity :configure-collision-fun config-fun
-		 :collision-fun collisionfun
-		 :contact-fun (function a-contact-fun)
-		 :particle (make-farticle)
-		 :neck (make-necking)
-		 :aabb *player-aabb*
-		 :hips nil
-		 :contact #b000000
-		 :fly? t
-		 :gravity? nil
-		 :clip? t
-		 :jump? nil
-		 :sneak? nil)))
+  (make-entity :collision-fun (function collide-fucks)
+	       :contact-fun (function a-contact-fun)
+	       :particle (make-farticle)
+	       :neck (make-necking)
+	       :aabb *player-aabb*
+	       :hips nil
+	       :contact #b000000
+	       :fly? t
+	       :gravity? nil
+	       :clip? t
+	       :jump? nil
+	       :sneak? nil))
 
 (defun physentity (entity)
   (physics
@@ -841,7 +826,6 @@ edge, or no case"
    (entity-sneak? entity)
    (entity-contact-fun entity)
    (entity-collision-fun entity)
-   (entity-configure-collision-fun entity)
    (entity-aabb entity)))
 
 (defparameter *fist-aabb*
@@ -905,7 +889,7 @@ edge, or no case"
    fun))
 
 (defun standard-fist (fist px py pz vx vy vz)
-  (with-clamp-and-ratio (xyzclamp frac) ((fister-fun fist) px py pz vx vy vz)
+  (with-clamp-and-ratio (xyzclamp frac) ((fister-fun fist) px py pz vx vy vz *fist-aabb*)
     (if (= #b000 xyzclamp)
 	(setf (fister-exists fist) nil)
 	(progn
@@ -938,13 +922,9 @@ edge, or no case"
 			(floor c))))
 	  (setf (fister-exists fist) t)))))
 
-(defun gen-fister (fist-aabb)
+(defun gen-fister ()
   (let ((fist (make-fister)))
-    (multiple-value-bind (fun set-aabb)
-	(collide-fucks)
-	(setf (fister-fun fist)
-	      fun)
-	(funcall set-aabb fist-aabb))
+    (setf (fister-fun fist) #'collide-fucks)
     fist))
 ;;;;;;;;;;;;;;;;;;;;
 

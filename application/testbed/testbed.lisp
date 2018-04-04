@@ -413,7 +413,7 @@
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defparameter *swinging* nil)
 (defparameter *fist*
-  (sandbox-sub::gen-fister sandbox-sub::*fist-aabb*))
+  (sandbox-sub::gen-fister))
 ;;;;;
 
 (defun wasd-mover (w? a? s? d?)
