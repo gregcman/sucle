@@ -20,8 +20,9 @@
     (defparameter *old-mouse-x* 0.0)
     (defparameter *old-mouse-y* 0.0)))
 
-(defparameter *selection* nil)
-(defparameter *lastpos* nil)
+(progn
+  (defparameter *selection* nil)
+  (defparameter *lastpos* nil))
 
 (defparameter *paused* nil)
 (defparameter *blockid* 1)
@@ -181,25 +182,28 @@
 #+nil
 (map nil
      (lambda (x) (music::free-preloaded x))
-     (application::getfnc 'PRELOADED-SOUNDS)) 
+     (application::getfnc 'PRELOADED-SOUNDS))
+(defparameter *wot-counter* 0)
 (defun wot (value)
+  (incf *wot-counter*)
   (aref 
    (application::getfnc 'preloaded-sounds)
-   (+ (random 4)
+   (+ (mod *wot-counter* 4)
       (* 4 (sound-dispatch value)))))
 
 (defun sound-dispatch (value)
   (case value
-    (0 0)
-    (1 0)
-    (2 3)
-    (3 3)
-    (4 0)
-    (5 1)
+    (0 0) ;air
+    ((1 4 7 14 15 16 21 22 23 24) 0)				;stone,cobble
+    ((2 18) 3)				;grass
+    ((3 13) 2)				;dirt ,gravel
+    ((5 17) 1)				;wood, log
+    (12 4) ;sand
+    ((35 81) 6)
     (otherwise (random 7))))
 
 (defun set-trampoline ()
-  (setf application::*trampoline* '(sandbox-sub::per-frame ;text-sub::per-frame
+  (setf application::*trampoline* '(sandbox-sub::per-frame
 				    per-frame
 				    )))
 (defun start ()
@@ -343,14 +347,10 @@
 
 (defparameter *big-fist-fun*
   (lambda (x y z)
-   ; (atest::dirts x y z)
-  ;  (atest::grassify x y z)
-;    #+nil
-    (unless (zerop (world::getblock x y z))
-    					;(music::play-at (wot) x y z)
-	
-      (sandbox::setblock-with-update x y z 0 0)))
-  )
+    (let ((id (world::getblock x y z)))
+      (unless (zerop id)
+	(music::play-at (wot id) x y z 0.8 1.0)	
+	(sandbox::setblock-with-update x y z 0 0)))))
 
 
 ;;;detect more entities
@@ -369,7 +369,6 @@
      (aref pos 0)
      (aref pos 1)
      (aref pos 2))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
@@ -417,16 +416,33 @@
 ;;;;;
 
 (defun wasd-mover (w? a? s? d?)
-  (let ((x 0)
-	(y 0))
-    (when w? (decf x))
-    (when a? (decf y))
-    (when s? (incf x))
-    (when d? (incf y))
-    (if (and (zerop x)
-	     (zerop y))
-	nil
-	(atan y x))))
+  (let ((acc 0))
+    (flet ((add (var bit)
+	     (when var
+	       (setf acc (logior acc bit)))))
+      (add w? #b0001)
+      (add a? #b0010)
+      (add s? #b0100)
+      (add d? #b1000))   
+    (aref (etouq (let ((array (make-array (expt 2 4))))
+		   (dotimes (index (length array))
+		     (symbol-macrolet ((w? (logbitp 0 index))
+				       (a? (logbitp 1 index))
+				       (s? (logbitp 2 index))
+				       (d? (logbitp 3 index)))
+		       (let ((x 0)
+			     (y 0))
+			 (when w? (decf x))
+			 (when a? (decf y))
+			 (when s? (incf x))
+			 (when d? (incf y))
+			 (if (and (zerop x)
+				  (zerop y))
+			     (setf (aref array index) nil)
+			     (setf (aref array index)
+				   (floatify (atan y x)))))))
+		   array))
+	  acc)))
 
 (defparameter *ent* (sandbox-sub::gentity))
 

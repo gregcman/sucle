@@ -42,6 +42,7 @@
 		 (when (>= 0 whats-left) (exit)))
 	       (logiorf dead-axis newclamp)))))))
 
+;;;;
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
   (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
@@ -233,11 +234,11 @@
 
 (struct->class
  (defstruct entity
-   particle
-   neck
-   hips
-   aabb
-   contact
+   particle ;;center of mass
+   neck ;;
+   hips ;; walking direction
+   aabb 
+   contact ;;touching each side
    fly?
    gravity?
    clip?
@@ -284,45 +285,6 @@
    :maxy 0.005
    :maxz 0.005))
 
-;;;;150 ms delay for sprinting
-;;;;player eye height is 1.5, subtract 1/8 for sneaking
-
-;;gravity is (* -0.08 (expt tickscale 2)) 0 0
-;;falling friction is 0.98
-;;0.6 * 0.91 is walking friction
-
-;;fov::
-;;70 is normal
-;;110 is quake pro
-
-
-
-(defun farticle-to-camera (farticle camera fraction)
-  (let ((curr (farticle-position farticle))
-	(prev (farticle-position-old farticle)))
-    (let ((vec (camera-matrix:camera-vec-position camera))
-	  (cev (camera-matrix:camera-vec-noitisop camera)))
-      (nsb-cga:%vec-lerp vec prev curr fraction)
-      (nsb-cga:%vec* cev vec -1.0))))
-(defun entity-to-camera (entity camera fraction)
-  (necktovec (entity-neck entity)
-		      (camera-matrix:camera-vec-forward camera))	  
-  (farticle-to-camera (entity-particle entity)
-		      camera
-		      fraction))
-
-(defun change-entity-neck (entity yaw pitch)
-  (let ((neck (entity-neck entity)))
-    (lookaround2 neck yaw pitch)))
-
-(defparameter *fov*
-  ((lambda (deg)
-     (* deg (coerce (/ pi 180.0) 'single-float)))
-   (nth 1 '(95 70))))
-
-(defparameter *black* (make-instance 'application::render-area :height 2 :width 2
-				     :x 0
-				     :y 0))
 ;;;;;;;
 (struct->class
  (defstruct fister
@@ -372,15 +334,45 @@
     fist))
 ;;;;;;;;;;;;;;;;;;;;
 
-;;;;
+;;;;150 ms delay for sprinting
+;;;;player eye height is 1.5, subtract 1/8 for sneaking
+
+;;gravity is (* -0.08 (expt tickscale 2)) 0 0
+;;falling friction is 0.98
+;;0.6 * 0.91 is walking friction
+
+;;fov::
+;;70 is normal
+;;110 is quake pro
 
 
-(defparameter *reloadables*
-  '(gl-init
-    ;blockshader-text
-    ;blockshader
-    ;terrain-png
-    ))
+(defun farticle-to-camera (farticle camera fraction)
+  (let ((curr (farticle-position farticle))
+	(prev (farticle-position-old farticle)))
+    (let ((vec (camera-matrix:camera-vec-position camera))
+	  (cev (camera-matrix:camera-vec-noitisop camera)))
+      (nsb-cga:%vec-lerp vec prev curr fraction)
+      (nsb-cga:%vec* cev vec -1.0))))
+(defun entity-to-camera (entity camera fraction)
+  (necktovec (entity-neck entity)
+		      (camera-matrix:camera-vec-forward camera))	  
+  (farticle-to-camera (entity-particle entity)
+		      camera
+		      fraction))
+
+(defun change-entity-neck (entity yaw pitch)
+  (let ((neck (entity-neck entity)))
+    (lookaround2 neck yaw pitch)))
+
+(defparameter *fov*
+  ((lambda (deg)
+     (* deg (coerce (/ pi 180.0) 'single-float)))
+   (nth 1 '(95 70))))
+
+(defparameter *black* (make-instance 'application::render-area :height 2 :width 2
+				     :x 0
+				     :y 0))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (deflazy gl-init (gl-context)
   (declare (ignorable application::gl-context))
@@ -445,35 +437,7 @@
   (vector 0.0 0.0 0.0))
   
 (defparameter *fog-ratio* 0.75)
-#+nil
-(defparameter *depth-buffer?* t)
-;;when set to nil does not clear the depth buffer, but instead flip-flops
-;;the depth function and matrix. has edge artefacts when using glclear for color
 
-#+nil
-(defparameter *mata*
-  (nsb-cga:matrix*
-   (nsb-cga:translate* 0.0 0.0 1.0)
-   (nsb-cga:scale* 1.0 1.0 -1.0)))
-#+nil
-(cond (*depth-buffer?*
-	   )
-	  #+nil
-	  (t
-	   (gl:clear :color-buffer-bit)
-	   (cond ((evenp *render-ticks*)
-		  ;;	   (gl:clear-depth 0.0)
-		  (gl:depth-func :greater)
-		  (gl:depth-range 0.5 1.0)
-		  (nsb-cga:%matrix* matrix
-				      *mata* cam))
-		 (t
-		  ;;	   (gl:clear-depth 1.0)
-		  (gl:depth-func :less)
-		  (gl:depth-range 0.0 0.5)
-		  (setf matrix cam)))))
-
-(defparameter *temp-matrix* (nsb-cga:identity-matrix))
 (defun camera-shader (camera)
   (declare (optimize (safety 3) (debug 3)))
   (glhelp::use-gl-program (getfnc 'blockshader))
@@ -594,16 +558,6 @@
    (filesystem-util:rebase-path #P"grasscolor.png" *ourdir*)))
 (deflazy blockshader (blockshader-text gl-context)
   (glhelp::create-gl-program blockshader-text))
-
-;;;; run use-sandbox before running application::main
-
-;;example::
-#+nil
-(progn
-  (ql:quickload :sandbox-application)
-  (sndbx::use-sandbox)
-  (sandbox::mload "third/")
-  (main))
 
 (deflazy blockshader-text ()
   (glslgen::ashader
