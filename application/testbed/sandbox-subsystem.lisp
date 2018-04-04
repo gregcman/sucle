@@ -564,38 +564,49 @@ edge, or no case"
      (touch-collector-min-ratio touch-collector))))
 
 ;;;;;;;;;
-(defun collide-fucks (some-hooks)
+(defmacro do-vec-params ((&rest vars) (vector &optional (binder 'let)) &body body)
+  (with-gensyms (index)
+    `(dobox
+      ((,index 0 (length ,vector) :inc ,(length vars)))
+      (with-vec ((,index ,@vars)) (,vector ,binder)
+	,@body))))
+
+;;;WARNING: flush-body takes the lexical environment where with-output-to-fun is
+(defmacro with-fun-to-vec ((fun with-output-to-fun)
+			   ((&rest vars) &body flush-body) &body body)
+  (with-gensyms (vec)
+    `(let ((,vec (make-array 0 :adjustable t :fill-pointer 0)))
+       (flet ((,fun ,vars
+		,@ (mapcar (lambda (x) `(vector-push-extend ,x ,vec)) vars)))
+	 (macrolet ((,with-output-to-fun (&body body)
+		      `(progn
+			 (setf (fill-pointer ,',vec) 0)
+			 ,@body
+			 (do-vec-params ,',vars (,',vec)
+			   ,@',flush-body))))
+	   ,@body)))))
+
+(defun collide-fucks (hooks)
   (let (aabb
-	(touch-collector (make-touch-collector))
-	(blockvec (make-array 0 :adjustable t :fill-pointer 0)))
-    (flet ((bladd-x-y-z (x y z aabb)
-	     (vector-push-extend x blockvec)
-	     (vector-push-extend y blockvec)
-	     (vector-push-extend z blockvec)
-	     (vector-push-extend aabb blockvec)))
-      (let ((hooks some-hooks))
+	(touch-collector (make-touch-collector)))
+    (with-fun-to-vec (bladd-x-y-z with-output-to-bladd)
+	((x y z fooaabb)
+	 (multiple-value-bind (minimum type)
+	     (aabbcc:aabb-collide
+	      aabb
+	      px py pz
+	      fooaabb
+	      x y z
+	      vx vy vz)
+	   (collect-touch minimum type touch-collector)))
 	(values
 	 (lambda (px py pz vx vy vz)
 	   (reset-touch-collector touch-collector)
-	   (setf (fill-pointer blockvec) 0)
-	   (dolist (fun hooks)
-	     (funcall fun #'bladd-x-y-z px py pz vx vy vz aabb))
-	   (dobox
-	    ((index 0 (fill-pointer blockvec) :inc 4))
-	    (let ((foox (aref blockvec (+ 0 index)))
-		  (fooy (aref blockvec (+ 1 index)))
-		  (fooz (aref blockvec (+ 2 index)))
-		  (fooaabb (aref blockvec (+ 3 index))))
-	      (multiple-value-bind (minimum type)
-		  (aabbcc:aabb-collide
-		   aabb
-		   px py pz
-		   fooaabb
-		   foox fooy fooz
-		   vx vy vz)
-		(collect-touch minimum type touch-collector))))
+	   (with-output-to-bladd
+	       (dolist (fun hooks)
+		 (funcall fun #'bladd-x-y-z px py pz vx vy vz aabb)))	     
 	   touch-collector)
-	 (lambda (newaabb) (setf aabb newaabb)))))))
+	 (lambda (newaabb) (setf aabb newaabb))))))
 
 (defun make-contact-suite ()
   (let ((px 0.0)
@@ -787,46 +798,25 @@ edge, or no case"
    :maxz 0.3))
 
 (defun ahook ()
-  (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
-    (flet ((add-x-y-z (x y z)
-	     (vector-push-extend x vec)
-	     (vector-push-extend y vec)
-	     (vector-push-extend z vec)))
-      (lambda (bladd px py pz vx vy vz aabb)
-	(setf (fill-pointer vec) 0)
-	(aabb-collect-blocks
-	 px py pz vx vy vz aabb
-	 #'add-x-y-z)
-	(dobox
-	 ((index 0 (fill-pointer vec) :inc 3))
-	 (let ((x (aref vec (+ 0 index)))
-	       (y (aref vec (+ 1 index)))
-	       (z (aref vec (+ 2 index))))
-	   (when (aref mc-blocks:*iscollidable*
-		       (world:getblock x y z))
-	     (let ((foox x)
-		   (fooy y)
-		   (fooz z)
-		   (fooaabb *block-aabb*))
-	       (funcall bladd foox fooy fooz fooaabb)))))))))
+  (with-fun-to-vec (add-x-y-z with-buffered-add)
+      ((x y z) 
+       (when (aref mc-blocks:*iscollidable*
+		   (world:getblock x y z))
+	 (funcall bladd x y z *block-aabb*)))   
+    (lambda (bladd px py pz vx vy vz aabb)
+      (with-buffered-add
+	  (aabb-collect-blocks
+	   px py pz vx vy vz aabb
+	   #'add-x-y-z)))))
 
 (defun a-contact-fun ()
-  (let ((vec (make-array 0 :adjustable t :fill-pointer 0)))
-    (flet ((add-x-y-z (x y z)
-	     (vector-push-extend x vec)
-	     (vector-push-extend y vec)
-	     (vector-push-extend z vec)))
-      (lambda (collect px py pz aabb)
-	(setf (fill-pointer vec) 0)
-	(get-blocks-around px py pz aabb #'add-x-y-z)
-	(dobox
-	 ((index 0 (fill-pointer vec) :inc 3))
-	 (let ((x (aref vec (+ 0 index)))
-	       (y (aref vec (+ 1 index)))
-	       (z (aref vec (+ 2 index))))	     
-	   (when (aref mc-blocks:*iscollidable* (world:getblock x y z))
-;;	     (plain-setblock x y z (+ 2 (random 4)) 0)
-	     (funcall collect x y z *block-aabb*))))))))
+  (with-fun-to-vec (add-x-y-z with-buffered-add)
+      ((x y z)
+       (when (aref mc-blocks:*iscollidable* (world:getblock x y z))
+	 (funcall collect x y z *block-aabb*)))
+    (lambda (collect px py pz aabb)
+      (with-buffered-add
+	  (get-blocks-around px py pz aabb #'add-x-y-z)))))
 
 (struct->class
  (defstruct entity

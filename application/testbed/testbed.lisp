@@ -428,6 +428,7 @@
 (defun physss ()
   (sandbox-sub::physentity *ent*))
 
+#+nil
 (defun num-key-jp (&optional (control-state window::*control-state*))
   (etouq
    (cons
