@@ -289,9 +289,7 @@ edge, or no case"
 
 ;;;;TODO: remove duplicated tests
 (defun get-blocks-around (aabb-posx aabb-posy aabb-posz aabb func)
-  (flet ((floor5 (x)
-	   (1- (ceiling x)))
-	 (emit (x y z)
+  (flet ((emit (x y z)
 	   (funcall func x y z)))
     (let ((aminx (aabbcc:aabb-minx aabb))
 	  (aminy (aabbcc:aabb-miny aabb))
@@ -305,27 +303,76 @@ edge, or no case"
 	    (maxy (+ amaxy aabb-posy))
 	    (minz (+ aminz aabb-posz))
 	    (maxz (+ amaxz aabb-posz)))
-	(dobox ((j (floor miny)
-		   (ceiling maxy))
-		(k (floor minz)
-		   (ceiling maxz)))
-	       (emit (floor5 minx) j k)
-	       (emit (floor maxx) j k))
-	(dobox ((i (floor minx)
-		   (ceiling maxx))
-		(k (floor minz)
-		   (ceiling maxz)))
-	       (emit i (floor5 miny) k)
-	       (emit i (floor maxy) k))
-	(dobox ((j (floor miny)
-		   (ceiling maxy))
-		(i (floor minx)
-		   (ceiling maxx)))
-	       (emit i j (floor5 minz))
-	       (emit i j (floor maxz)))))))
+	(let ((i0 (floor minx))
+	      (i1 (ceiling maxx))
+	      (j0 (floor miny))
+	      (j1 (ceiling maxy))
+	      (k0 (floor minz))
+	      (k1 (ceiling maxz)))
+	  (dobox ((i i0 i1)
+		  (j j0 j1))
+		 (emit i j (1- (ceiling minz)))
+		 (emit i j (floor maxz)))
+	  (dobox ((i i0 i1)
+		  (k k0 k1))
+		 (emit i (1- (ceiling miny)) k)
+		 (emit i (floor maxy) k))
+	  (dobox ((j j0 j1)
+		  (k k0 k1))
+		 (emit (1- (ceiling minx)) j k)
+		 (emit (floor maxx) j k)))))))
+(defmacro do-shell ((x0 x1 y0 y1 z0 z1 xflip yflip zflip contact-state)
+		    (x-var y-var z-var contact-var)
+		    &body body)
+  (with-gensyms (emit
+		 major-x major-y major-z
+		 large-x large-y large-z
+		 small-x small-y small-z
+		 x y z)
+    (alexandria:once-only  (x0 x1 y0 y1 z0 z1 xflip yflip zflip contact-state)
+      `(flet ((,emit (,x-var ,y-var ,z-var ,contact-var)
+		,@body))
+	 (let ((,major-x (if ,xflip ,x0 ,x1))
+	       (,major-y (if ,yflip ,y0 ,y1))
+	       (,major-z (if ,zflip ,z0 ,z1))
+	       (,large-x (if ,xflip (1+ ,x1) ,x1))
+	       (,small-x (if ,xflip (1+ ,x0) ,x0))
+	       (,large-y (if ,yflip (1+ ,y1) ,y1))
+	       (,small-y (if ,yflip (1+ ,y0) ,y0))
+	       (,large-z (if ,zflip (1+ ,z1) ,z1))
+	       (,small-z (if ,zflip (1+ ,z0) ,z0)))
+	   ;;xyz
+	   (when (logtest ,contact-state #b111)
+	     (,emit ,major-x ,major-y ,major-z #b111))
+	   ;;xy
+	   (when (logtest ,contact-state #b110)
+	     (dobox ((,z ,small-z ,large-z))
+		    (,emit ,major-x ,major-y ,z #b110)))
+	   ;;xz
+	   (when (logtest ,contact-state #b101)
+	     (dobox ((,y ,small-y ,large-y))
+		    (,emit ,major-x ,y ,major-z #b101)))
+	   ;;yz
+	   (when (logtest ,contact-state #b011)
+	     (dobox ((,x ,small-x ,large-x))
+		    (,emit ,x ,major-y ,major-z #b011)))
+	   ;;x
+	   (when (logtest ,contact-state #b100)
+	     (dobox ((,y ,small-y ,large-y)
+		     (,z ,small-z ,large-z))
+		    (,emit ,major-x ,y ,z #b100)))
+	   ;;y
+	   (when (logtest ,contact-state #b010)
+	     (dobox ((,x ,small-x ,large-x)
+		     (,z ,small-z ,large-z))
+		    (,emit ,x ,major-y ,z #b010)))
+	   ;;z
+	   (when (logtest ,contact-state #b001)
+	     (dobox ((,x ,small-x ,large-x)
+		     (,y ,small-y ,large-y))
+		    (,emit ,x ,y ,major-z #b001))))))))
 
 (define-modify-macro logiorf (&rest args) logior)
-
 (defun aabb-collect-blocks (px py pz dx dy dz aabb func)
   (let ((xnotp (zerop dx))
 	(ynotp (zerop dy))
@@ -397,6 +444,7 @@ edge, or no case"
 	       (let ((i? (logtest min? #b100))
 		     (j? (logtest min? #b010))
 		     (k? (logtest min? #b001)))
+		 ;;ratchet up the coordinates
 		 (unless xnotp
 		   (setf x (if i? i-next (+ x (* dx ratio))))
 		   (setf i-next (1+ (floor x))))
@@ -406,6 +454,7 @@ edge, or no case"
 		 (unless znotp
 		   (setf z (if k? k-next (+ z (* dz ratio))))
 		   (setf k-next (1+ (floor z))))
+		 ;;find the surface cubes
 		 (let ((x0 (if xflip (- x) x))
 		       (y0 (if yflip (- y) y))
 		       (z0 (if zflip (- z) z)))
@@ -418,21 +467,16 @@ edge, or no case"
 			   (bmaxj (floor (+ aabb-posy maxy)))
 			   (bmink (ceiling (+ aabb-posz minz)))
 			   (bmaxk (floor (+ aabb-posz maxz))))
-		       (when i?
-			 (let ((i (if xflip (1- bmini) bmaxi)))
-			   (dobox ((j (1- bminj) (1+ bmaxj))
-				   (k (1- bmink) (1+ bmaxk)))
-				  (emit i j k))))
-		       (when j?
-			 (let ((j (if yflip (1- bminj) bmaxj)))
-			   (dobox ((i (1- bmini) (1+ bmaxi))
-				   (k (1- bmink) (1+ bmaxk)))
-				  (emit i j k))))
-		       (when k?
-			 (let ((k (if zflip (1- bmink) bmaxk)))
-			   (dobox ((j (1- bminj) (1+ bmaxj))
-				   (i (1- bmini) (1+ bmaxi)))
-				  (emit i j k)))))))))))))))
+		       (do-shell ((1- bmini) bmaxi
+				  (1- bminj) bmaxj
+				  (1- bmink) bmaxk
+				  xflip
+				  yflip
+				  zflip
+				  min?)
+			   (i j k contact)
+			 (declare (ignorable contact))
+			 (emit i j k)))))))))))))
 
 ;;;;;;;;;;;;;
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
