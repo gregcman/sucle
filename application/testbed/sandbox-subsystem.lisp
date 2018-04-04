@@ -49,18 +49,16 @@
 edge, or no case"
   (let ((minimum 1)
 	(values #b000))
-     (flet ((minimize (n value)
-	     (cond ((> minimum n)
-		    (setf minimum n)
-		    (setf values value))
-		   ((= minimum n)
-		    (setf values (logior values value))))))
-      (when x
-	(minimize x #b100))
-      (when y
-	(minimize y #b010))
-      (when z
-	(minimize z #b001)))
+    (flet ((minimize (n value)
+	     (when n
+	       (cond ((> minimum n)
+		      (setf minimum n)
+		      (setf values value))
+		     ((= minimum n)
+		      (setf values (logior values value)))))))
+      (minimize x #b100)
+      (minimize y #b010)
+      (minimize z #b001))
     ;;set the values to magic numnbers to be compared
     (values minimum
 	    values)))
@@ -289,179 +287,147 @@ edge, or no case"
 (in-package #:sandbox-sub)
 
 
-(defun floor5 (x)
-  (1- (ceiling x)))
+;;;;TODO: remove duplicated tests
 (defun get-blocks-around (aabb-posx aabb-posy aabb-posz aabb func)
-  (let ((aminx (aabbcc:aabb-minx aabb))
-	(aminy (aabbcc:aabb-miny aabb))
-	(aminz (aabbcc:aabb-minz aabb))
-	(amaxx (aabbcc:aabb-maxx aabb))
-	(amaxy (aabbcc:aabb-maxy aabb))
-	(amaxz (aabbcc:aabb-maxz aabb)))
-    (let ((minx (+ aminx aabb-posx))
-	  (maxx (+ amaxx aabb-posx))
-	  (miny (+ aminy aabb-posy))
-	  (maxy (+ amaxy aabb-posy))
-	  (minz (+ aminz aabb-posz))
-	  (maxz (+ amaxz aabb-posz)))
-      (dobox ((j (floor miny)
-		 (ceiling maxy))
-	      (k (floor minz)
-		 (ceiling maxz)))
-	     (funcall func (floor5 minx) j k)
-	     (funcall func (floor maxx) j k))
-      (dobox ((i (floor minx)
-		 (ceiling maxx))
-	      (k (floor minz)
-		 (ceiling maxz)))
-	     (funcall func i (floor5 miny) k)
-	     (funcall func i (floor maxy) k))
-      (dobox ((j (floor miny)
-		 (ceiling maxy))
-	      (i (floor minx)
-		 (ceiling maxx)))
-	     (funcall func i j (floor5 minz))
-	     (funcall func i j (floor maxz))))))
+  (flet ((floor5 (x)
+	   (1- (ceiling x)))
+	 (emit (x y z)
+	   (funcall func x y z)))
+    (let ((aminx (aabbcc:aabb-minx aabb))
+	  (aminy (aabbcc:aabb-miny aabb))
+	  (aminz (aabbcc:aabb-minz aabb))
+	  (amaxx (aabbcc:aabb-maxx aabb))
+	  (amaxy (aabbcc:aabb-maxy aabb))
+	  (amaxz (aabbcc:aabb-maxz aabb)))
+      (let ((minx (+ aminx aabb-posx))
+	    (maxx (+ amaxx aabb-posx))
+	    (miny (+ aminy aabb-posy))
+	    (maxy (+ amaxy aabb-posy))
+	    (minz (+ aminz aabb-posz))
+	    (maxz (+ amaxz aabb-posz)))
+	(dobox ((j (floor miny)
+		   (ceiling maxy))
+		(k (floor minz)
+		   (ceiling maxz)))
+	       (emit (floor5 minx) j k)
+	       (emit (floor maxx) j k))
+	(dobox ((i (floor minx)
+		   (ceiling maxx))
+		(k (floor minz)
+		   (ceiling maxz)))
+	       (emit i (floor5 miny) k)
+	       (emit i (floor maxy) k))
+	(dobox ((j (floor miny)
+		   (ceiling maxy))
+		(i (floor minx)
+		   (ceiling maxx)))
+	       (emit i j (floor5 minz))
+	       (emit i j (floor maxz)))))))
 
-(progn
- (defun aux-func (x dx)
-   (if (zerop dx)
-       nil
-       (if (plusp dx)
-	   (floor (1+ x))
-	   (ceiling (1- x)))))
- (defun aux-func2 (x dx)
-   (if (zerop dx)
-       nil
-       (if (plusp dx)
-	   (ceiling x)
-	   (floor x))))
- (defun floor2 (x)
-   (1- (ceiling x)))
- (defun ceiling2 (x)
-   (1+ (floor x)))
- (defun aabb-collect-blocks (px py pz dx dy dz aabb func)
-   (let ((minx (aabbcc:aabb-minx aabb))
+(define-modify-macro logiorf (&rest args) logior)
+(defun aabb-collect-blocks (px py pz dx dy dz aabb func)
+  (when (and (zerop dx)
+	     (zerop dy)
+	     (zerop dz))
+    (return-from aabb-collect-blocks))
+  (let* ((minx (aabbcc:aabb-minx aabb))
 	 (miny (aabbcc:aabb-miny aabb))
 	 (minz (aabbcc:aabb-minz aabb))
 	 (maxx (aabbcc:aabb-maxx aabb))
 	 (maxy (aabbcc:aabb-maxy aabb))
-	 (maxz (aabbcc:aabb-maxz aabb)))
-     (block cya
-       (let ((total 1))
-	 (let ((pluspdx (plusp dx))
-	       (pluspdy (plusp dy))
-	       (pluspdz (plusp dz))
-	       (zeropdx (zerop dx))
-	       (zeropdy (zerop dy))
-	       (zeropdz (zerop dz)))
-	   (when (and zeropdx zeropdy zeropdz)
-	     (return-from cya))
-	   (let ((xoffset (if zeropdx 0.0 (if pluspdx maxx minx)))
-		 (yoffset (if zeropdy 0.0 (if pluspdy maxy miny)))
-		 (zoffset (if zeropdz 0.0 (if pluspdz maxz minz))))
-	     (let ((x (+ px xoffset))
-		   (y (+ py yoffset))
-		   (z (+ pz zoffset)))
-	       (flet ((collide-surface (newx newy newz i? j? k?)
-			(let ((aabb-posx (- newx xoffset))
-			      (aabb-posy (- newy yoffset))
-			      (aabb-posz (- newz zoffset)))
-					;	 (print "a")
-			  (when i?
-			    (dobox ((j (floor2 (+ aabb-posy miny))
-				       (ceiling2 (+ aabb-posy maxy)))
-				    (k (floor2 (+ aabb-posz minz))
-				       (ceiling2 (+ aabb-posz maxz))))
-				   (funcall func (if pluspdx newx (1- newx)) j k)))
-					;	 (print "b")
-			  (when j?
-			    (dobox ((i (floor2 (+ aabb-posx minx))
-				       (ceiling2 (+ aabb-posx maxx)))
-				    (k (floor2 (+ aabb-posz minz))
-				       (ceiling2 (+ aabb-posz maxz))))
-				   (funcall func i (if pluspdy newy (1- newy)) k)))
-					;(print "c")
-			  (when k?
-			    (dobox ((j (floor2 (+ aabb-posy miny))
-				       (ceiling2 (+ aabb-posy maxy)))
-				    (i (floor2 (+ aabb-posx minx))
-				       (ceiling2 (+ aabb-posx maxx))))
-				   (funcall func i j (if pluspdz newz (1- newz))))))))
-		 (let ((i-next (aux-func2 x dx))
-		       (j-next (aux-func2 y dy))
-		       (k-next (aux-func2 z dz)))
-		   (tagbody
-		    rep
-					;     		   (print (list i-next j-next k-next))		     
-		      (let ((i? nil)
-			    (j? nil)
-			    (k? nil)
-			    (ratio nil))
-		       ;;;;find the shortest distance to the next axis-aligned surface,
-		       ;;;;setting the ? vars to true if they are the closest
-			(let ((fooi (if i-next
-					(/ (- i-next x) dx)
-					nil))
-			      (fooj (if j-next
-					(/ (- j-next y) dy)
-					nil))
-			      (fook (if k-next
-					(/ (- k-next z) dz)
-					nil)))
-			  ;;		 (print (list fooi fooj fook))
-			  (progn
-			    (when fooi
-			      (setf ratio (if ratio					    
-					      (min ratio fooi)
-					      fooi)))
-			    (when fooj
-			      (setf ratio (if ratio					    
-					      (min ratio fooj)
-					      fooj)))
-			    (when fook
-			      (setf ratio (if ratio					    
-					      (min ratio fook)
-					      fook))))
-			  (progn
-			    (when fooi
-			      (when (= ratio fooi)
-				(setf i? t)))
-			    (when fooj
-			      (when (= ratio fooj)
-				(setf j? t)))
-			    (when fook
-			      (when (= ratio fook)
-				(setf k? t)))))
+	 (maxz (aabbcc:aabb-maxz aabb))
+	 (xoffset (if (zerop dx) 0.0 (if (plusp dx) maxx minx)))
+	 (yoffset (if (zerop dy) 0.0 (if (plusp dy) maxy miny)))
+	 (zoffset (if (zerop dz) 0.0 (if (plusp dz) maxz minz)))
+	 (x (+ px xoffset))
+	 (y (+ py yoffset))
+	 (z (+ pz zoffset))
+	 (total 1))
+    (labels
+	((floor2 (x)
+	   (1- (ceiling x)))
+	 (ceiling2 (x)
+	   (1+ (floor x)))
+	 (aux-func (x dx) ;;notching to next integer
+	   (if (zerop dx)
+	       nil
+	       (if (plusp dx)
+		   (ceiling2 x)
+		   (floor2 x))))
+	 (aux-func2 (x dx) ;;initial notching
+	   (if (zerop dx)
+	       nil
+	       (if (plusp dx)
+		   (ceiling x)
+		   (floor x))))
+	 (emit (x y z)
+	   (funcall func x y z))
+	 (collide-surface (newx newy newz i? j? k?)
+	   (let ((aabb-posx (- newx xoffset))
+		 (aabb-posy (- newy yoffset))
+		 (aabb-posz (- newz zoffset)))
+	     (when i?
+	       (dobox ((j (floor2 (+ aabb-posy miny))
+			  (ceiling2 (+ aabb-posy maxy)))
+		       (k (floor2 (+ aabb-posz minz))
+			  (ceiling2 (+ aabb-posz maxz))))
+		      (emit (if (plusp dx) newx (1- newx)) j k)))
+	     (when j?
+	       (dobox ((i (floor2 (+ aabb-posx minx))
+			  (ceiling2 (+ aabb-posx maxx)))
+		       (k (floor2 (+ aabb-posz minz))
+			  (ceiling2 (+ aabb-posz maxz))))
+		      (emit i (if (plusp dy) newy (1- newy)) k)))
+	     (when k?
+	       (dobox ((j (floor2 (+ aabb-posy miny))
+			  (ceiling2 (+ aabb-posy maxy)))
+		       (i (floor2 (+ aabb-posx minx))
+			  (ceiling2 (+ aabb-posx maxx))))
+		      (emit i j (if (plusp dz) newz (1- newz))))))))
+      (let ((i-next (aux-func2 x dx))
+	    (j-next (aux-func2 y dy))
+	    (k-next (aux-func2 z dz)))
+	(loop
+	   ;;find the shortest distance to the next axis-aligned surface
+	   (let ((ratio most-positive-single-float)
+		 (min? #b000))
+	     (when i-next
+	       (let ((fooi (/ (- i-next x) dx)))
+		 (when (> ratio fooi)
+		   (setf ratio fooi
+			 min? #b000))
+		 (when (= ratio fooi)
+		   (logiorf min? #b100))))
+	     (when j-next
+	       (let ((fooj (/ (- j-next y) dy)))
+		 (when (> ratio fooj)
+		   (setf ratio fooj
+			 min? #b000))
+		 (when (= ratio fooj)
+		   (logiorf min? #b010))))
+	     (when k-next
+	       (let ((fook (/ (- k-next z) dz)))
+		 (when (> ratio fook)
+		   (setf ratio fook
+			 min? #b000))
+		 (when (= ratio fook)
+		   (logiorf min? #b001))))
 
-			(decf total ratio)
-			(when (minusp total) (return-from cya))
-			(when (zerop (/ most-positive-single-float ratio))
-			  (return-from cya))
-			(let ((newx (if i? i-next (+ x (* dx ratio))))
-			      (newy (if j? j-next (+ y (* dy ratio))))
-			      (newz (if k? k-next (+ z (* dz ratio)))))
-			  
-			  (collide-surface newx newy newz i? j? k?)
+	     (decf total ratio)
+	     (when (minusp total) (return))
+	     (when (zerop (/ most-positive-single-float ratio))
+	       (return))
+	     (symbol-macrolet ((i? (logtest min? #b100))
+			       (j? (logtest min? #b010))
+			       (k? (logtest min? #b001)))
+	       (setf x (if i? i-next (+ x (* dx ratio)))
+		     y (if j? j-next (+ y (* dy ratio)))
+		     z (if k? k-next (+ z (* dz ratio))))
+	       (collide-surface x y z i? j? k?))
 
-			  #+nil
-			  (progn
-			    (when i? (if (plusp dx)
-					 (incf newx)
-					 (decf newx)))
-			    (when j? (if (plusp dy)
-					 (incf newy)
-					 (decf newy)))
-			    (when k? (if (plusp dz)
-					 (incf newz)
-					 (decf newz))))
-
-			  (setf x newx y newy z newz))
-
-			(setf i-next (aux-func x dx)
-			      j-next (aux-func y dy)
-			      k-next (aux-func z dz)))
-		      (go rep))))))))))))
+	     (setf i-next (aux-func x dx)
+		   j-next (aux-func y dy)
+		   k-next (aux-func z dz))))))))
 
 ;;;;;;;;;;;;;
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
@@ -586,7 +552,7 @@ edge, or no case"
 			   ,@',flush-body))))
 	   ,@body)))))
 
-(defun collide-fucks (hooks)
+(defun collide-fucks (fun)
   (let (aabb
 	(touch-collector (make-touch-collector)))
     (with-fun-to-vec (bladd-x-y-z with-output-to-bladd)
@@ -603,17 +569,31 @@ edge, or no case"
 	 (lambda (px py pz vx vy vz)
 	   (reset-touch-collector touch-collector)
 	   (with-output-to-bladd
-	       (dolist (fun hooks)
-		 (funcall fun #'bladd-x-y-z px py pz vx vy vz aabb)))	     
+	     (funcall fun #'bladd-x-y-z px py pz vx vy vz aabb))	     
 	   touch-collector)
 	 (lambda (newaabb) (setf aabb newaabb))))))
+
+(defparameter *dirtying2* nil)
+(defun ahook ()
+  (with-fun-to-vec (add-x-y-z with-buffered-add)
+      ((x y z) 
+       (when (aref mc-blocks:*iscollidable*
+		   (world:getblock x y z))
+	 (when *dirtying2*
+	   (sandbox::plain-setblock x y z (1+ (random 5)) 0))
+	 (funcall bladd x y z *block-aabb*)))   
+    (lambda (bladd px py pz vx vy vz aabb)
+      (with-buffered-add
+	  (aabb-collect-blocks
+	   px py pz vx vy vz aabb
+	   #'add-x-y-z)))))
 
 (defun make-contact-suite ()
   (let ((px 0.0)
 	(py 0.0)
 	(pz 0.0)
 	(aabb nil))
-    (let ((funs nil))
+    (let ((fun nil))
       (let ((acc 0))
 	(labels
 	    ((run (npx npy npz naabb)
@@ -622,8 +602,7 @@ edge, or no case"
 		     pz npz
 		     aabb naabb)
 	       (setf acc 0)
-	       (dolist (fun funs)
-		 (funcall fun #'add npx npy npz naabb))
+	       (funcall fun #'add npx npy npz naabb)
 	       acc)
 	     (add (mx my mz maabb)
 	       (setf
@@ -631,7 +610,7 @@ edge, or no case"
 		(logior acc
 			(aabbcc:aabb-contact px py pz aabb mx my mz maabb))))
 	     (set-fun (newfun)
-	       (setf funs newfun)))
+	       (setf fun newfun)))
 	  (list 'full #'run
 		'add #'add
 		'set-fun #'set-fun))))))
@@ -639,13 +618,10 @@ edge, or no case"
 (defun configure-contact-handler
     (fun &optional (data (make-contact-suite)))
   (let ((full (getf data 'full))
-	(set-fun (getf data 'set-fun))
-	(add (getf data 'add)))
+	(set-fun (getf data 'set-fun)))
     (funcall
      set-fun
-     fun
-    ;(mapcar (lambda (func) (funcall func add)) fun)
-     )
+     fun)
     full))
 
 ;;;;;
@@ -687,7 +663,8 @@ edge, or no case"
 
 (defun physics (yaw dir farticle
 		noclip gravity fly
-		is-jumping is-sneaking
+		is-jumping
+		is-sneaking
 		contact-handler
 		world-collision-fun
 		configure-aabb-fun
@@ -696,7 +673,7 @@ edge, or no case"
     (step-farticle farticle)
     (let ((vel (farticle-velocity farticle))
 	  (pos (farticle-position farticle)))
-      (let ((contact-state (if noclip
+      (let ((contact-state (if (and noclip (not sandbox-sub::*dirtying*))
 			       #b000000
 			       (with-vec (px py pz) (pos)
 				 (funcall contact-handler px py pz aabb)))))
@@ -722,7 +699,7 @@ edge, or no case"
 	  (let ((fun (if noclip
 			 (lambda (&rest args)
 			   (declare (ignore args))
-			   (values 1 #b000))
+			   (values (load-time-value (make-touch-collector)) #b000))
 			 (progn
 			   (funcall configure-aabb-fun aabb)
 			   world-collision-fun))))
@@ -789,30 +766,30 @@ edge, or no case"
    :maxz 1.0))
 
 (defparameter *player-aabb*
+ ; #+nil
   (aabbcc:make-aabb
    :minx -0.3
    :miny -1.5
    :minz -0.3
    :maxx 0.3
    :maxy 0.12
-   :maxz 0.3))
+   :maxz 0.3)
+  #+nil
+  (aabbcc:make-aabb
+   :minx -5.0
+   :miny -5.0
+   :minz -5.0
+   :maxx 5.0
+   :maxy 5.0
+   :maxz 5.0))
 
-(defun ahook ()
-  (with-fun-to-vec (add-x-y-z with-buffered-add)
-      ((x y z) 
-       (when (aref mc-blocks:*iscollidable*
-		   (world:getblock x y z))
-	 (funcall bladd x y z *block-aabb*)))   
-    (lambda (bladd px py pz vx vy vz aabb)
-      (with-buffered-add
-	  (aabb-collect-blocks
-	   px py pz vx vy vz aabb
-	   #'add-x-y-z)))))
-
+(defparameter *dirtying* nil)
 (defun a-contact-fun ()
   (with-fun-to-vec (add-x-y-z with-buffered-add)
       ((x y z)
        (when (aref mc-blocks:*iscollidable* (world:getblock x y z))
+	 (when *dirtying*
+	   (sandbox::plain-setblock x y z (1+ (random 5)) 0))
 	 (funcall collect x y z *block-aabb*)))
     (lambda (collect px py pz aabb)
       (with-buffered-add
@@ -835,10 +812,10 @@ edge, or no case"
    contact-fun))
 
 (defun gentity ()
-  (multiple-value-bind (collisionfun config-fun) (collide-fucks (list (ahook)))
+  (multiple-value-bind (collisionfun config-fun) (collide-fucks (ahook))
     (make-entity :configure-collision-fun config-fun
 		 :collision-fun collisionfun
-		 :contact-fun (configure-contact-handler (list (a-contact-fun)))
+		 :contact-fun (configure-contact-handler (a-contact-fun))
 		 :particle (make-farticle)
 		 :neck (make-necking)
 		 :aabb *player-aabb*

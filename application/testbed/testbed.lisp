@@ -206,7 +206,7 @@
   (set-trampoline)
   (application::main))
 
-(defparameter *reach* 128.0)
+(defparameter *reach* 64.0)
 (defun stuff ()
   (let* ((player-farticle (sandbox-sub::entity-particle *ent*))
 	 (pos (sandbox-sub::farticle-position player-farticle))
@@ -241,8 +241,14 @@
 	 (with-vec (px py pz) (pos)
 	   (with-vec (vx vy vz) (look-vec)	
 	     (when (window:mice-locked-p)
+;	       #+nil
 	       (when (window::skey-j-p (window::keyval 3))
 		 (toggle *swinging*))
+	       (when (window::skey-j-p (window::keyval 2))
+		 (toggle sandbox-sub::*dirtying2*))
+	       (when (window::skey-j-p (window::keyval 1))
+		 (toggle sandbox-sub::*dirtying*))
+;	       #+nil
 	       (when *swinging*
 		 (let ((u 32))
 		   (sandbox-sub::aabb-collect-blocks
@@ -408,7 +414,7 @@
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defparameter *swinging* nil)
 (defparameter *fist*
-  (sandbox-sub::gen-fister sandbox-sub::*fist-aabb* (list (sandbox-sub::ahook))))
+  (sandbox-sub::gen-fister sandbox-sub::*fist-aabb* (sandbox-sub::ahook)))
 ;;;;;
 
 (defun wasd-mover (w? a? s? d?)
