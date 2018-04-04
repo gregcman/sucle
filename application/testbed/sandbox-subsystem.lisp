@@ -325,110 +325,114 @@ edge, or no case"
 	       (emit i j (floor maxz)))))))
 
 (define-modify-macro logiorf (&rest args) logior)
+
 (defun aabb-collect-blocks (px py pz dx dy dz aabb func)
-  (when (and (zerop dx)
-	     (zerop dy)
-	     (zerop dz))
-    (return-from aabb-collect-blocks))
-  (let* ((minx (aabbcc:aabb-minx aabb))
-	 (miny (aabbcc:aabb-miny aabb))
-	 (minz (aabbcc:aabb-minz aabb))
-	 (maxx (aabbcc:aabb-maxx aabb))
-	 (maxy (aabbcc:aabb-maxy aabb))
-	 (maxz (aabbcc:aabb-maxz aabb))
-	 (xoffset (if (zerop dx) 0.0 (if (plusp dx) maxx minx)))
-	 (yoffset (if (zerop dy) 0.0 (if (plusp dy) maxy miny)))
-	 (zoffset (if (zerop dz) 0.0 (if (plusp dz) maxz minz)))
-	 (x (+ px xoffset))
-	 (y (+ py yoffset))
-	 (z (+ pz zoffset))
-	 (total 1))
-    (labels
-	((floor2 (x)
-	   (1- (ceiling x)))
-	 (ceiling2 (x)
-	   (1+ (floor x)))
-	 (aux-func (x dx) ;;notching to next integer
-	   (if (zerop dx)
-	       nil
-	       (if (plusp dx)
-		   (ceiling2 x)
-		   (floor2 x))))
-	 (aux-func2 (x dx) ;;initial notching
-	   (if (zerop dx)
-	       nil
-	       (if (plusp dx)
-		   (ceiling x)
-		   (floor x))))
-	 (emit (x y z)
-	   (funcall func x y z)))
-      (let ((i-next (aux-func2 x dx))
-	    (j-next (aux-func2 y dy))
-	    (k-next (aux-func2 z dz)))
-	(loop
-	   ;;find the shortest distance to the next axis-aligned surface
-	   (let ((ratio most-positive-single-float)
-		 (min? #b000))
-	     (when i-next
-	       (let ((fooi (/ (- i-next x) dx)))
-		 (when (> ratio fooi)
-		   (setf ratio fooi
-			 min? #b000))
-		 (when (= ratio fooi)
-		   (logiorf min? #b100))))
-	     (when j-next
-	       (let ((fooj (/ (- j-next y) dy)))
-		 (when (> ratio fooj)
-		   (setf ratio fooj
-			 min? #b000))
-		 (when (= ratio fooj)
-		   (logiorf min? #b010))))
-	     (when k-next
-	       (let ((fook (/ (- k-next z) dz)))
-		 (when (> ratio fook)
-		   (setf ratio fook
-			 min? #b000))
-		 (when (= ratio fook)
-		   (logiorf min? #b001))))
+  (let ((xnotp (zerop dx))
+	(ynotp (zerop dy))
+	(znotp (zerop dz)))
+    (when (and xnotp
+	       ynotp
+	       znotp)
+      (return-from aabb-collect-blocks))
+    (let* ((minx (aabbcc:aabb-minx aabb))
+	   (miny (aabbcc:aabb-miny aabb))
+	   (minz (aabbcc:aabb-minz aabb))
+	   (maxx (aabbcc:aabb-maxx aabb))
+	   (maxy (aabbcc:aabb-maxy aabb))
+	   (maxz (aabbcc:aabb-maxz aabb))
+	   (xflip (minusp dx))
+	   (yflip (minusp dy))
+	   (zflip (minusp dz))
+	   (xoffset (if xnotp 0.0 (if xflip minx maxx)))
+	   (yoffset (if ynotp 0.0 (if yflip miny maxy)))
+	   (zoffset (if znotp 0.0 (if zflip minz maxz)))
+	   (x (+ px xoffset))
+	   (y (+ py yoffset))
+	   (z (+ pz zoffset))
+	   (total 1))
+      (when xflip
+	(setf dx (- dx)
+	      x (- 0 x)))
+      (when yflip
+	(setf dy (- dy)
+	      y (- 0 y)))
+      (when zflip
+	(setf dz (- dz)
+	      z (- 0 z)))
+      (labels
+	  ((emit (x y z)
+	     (funcall func x y z)))
+	(let ((i-next (ceiling x))
+	      (j-next (ceiling y))
+	      (k-next (ceiling z)))
+	  (loop
+	     ;;find the shortest distance to the next axis-aligned surface
+	     (let ((ratio most-positive-single-float)
+		   (min? #b000))
+	       (unless xnotp
+		 (let ((fooi (/ (- i-next x) dx)))
+		   (if (> ratio fooi)
+		       (setf ratio fooi
+			     min? #b100)
+		       (when (= ratio fooi)
+			 (logiorf min? #b100)))))
+	       (unless ynotp
+		 (let ((fooj (/ (- j-next y) dy)))
+		   (if (> ratio fooj)
+		       (setf ratio fooj
+			     min? #b010)
+		       (when (= ratio fooj)
+			 (logiorf min? #b010)))))
+	       (unless znotp
+		 (let ((fook (/ (- k-next z) dz)))
+		   (if (> ratio fook)
+		       (setf ratio fook
+			     min? #b001)
+		       (when (= ratio fook)
+			 (logiorf min? #b001)))))
 
-	     (decf total ratio)
-	     (when (minusp total) (return))
-	     (when (zerop (/ most-positive-single-float ratio))
-	       (return))
-	     (symbol-macrolet ((i? (logtest min? #b100))
-			       (j? (logtest min? #b010))
-			       (k? (logtest min? #b001)))
-	       (setf x (if i? i-next (+ x (* dx ratio)))
-		     y (if j? j-next (+ y (* dy ratio)))
-		     z (if k? k-next (+ z (* dz ratio))))
-	       (let ((aabb-posx (- x xoffset))
-		     (aabb-posy (- y yoffset))
-		     (aabb-posz (- z zoffset)))
-		 (let ((bmini (floor2 (+ aabb-posx minx)))
-		       (bmaxi (ceiling2 (+ aabb-posx maxx)))
-		       (bminj (floor2 (+ aabb-posy miny)))
-		       (bmaxj (ceiling2 (+ aabb-posy maxy)))
-		       (bmink (floor2 (+ aabb-posz minz)))
-		       (bmaxk (ceiling2 (+ aabb-posz maxz))))
-		   (when i?
-		     (let ((i (if (plusp dx) x (1- x))))
-		       (dobox ((j bminj bmaxj)
-			       (k bmink bmaxk))
-			      (emit i j k))))
-		   (when j?
-		     (let ((j (if (plusp dy) y (1- y))))
-		       (dobox ((i bmini bmaxi)
-			       (k bmink bmaxk))
-			      (emit i j k))))
-		   (when k?
-		     (let ((k (if (plusp dz) z (1- z))))
-		       (dobox ((j bminj bmaxj)
-			       (i bmini bmaxi))
-			      (emit i j k)))))))
-
-	     (setf i-next (aux-func x dx)
-		   j-next (aux-func y dy)
-		   k-next (aux-func z dz))))))))
+	       (decf total ratio)
+	       (unless (plusp total)
+		 (return))
+	       (let ((i? (logtest min? #b100))
+		     (j? (logtest min? #b010))
+		     (k? (logtest min? #b001)))
+		 (unless xnotp
+		   (setf x (if i? i-next (+ x (* dx ratio))))
+		   (setf i-next (1+ (floor x))))
+		 (unless ynotp
+		   (setf y (if j? j-next (+ y (* dy ratio))))
+		   (setf j-next (1+ (floor y))))
+		 (unless znotp
+		   (setf z (if k? k-next (+ z (* dz ratio))))
+		   (setf k-next (1+ (floor z))))
+		 (let ((x0 (if xflip (- x) x))
+		       (y0 (if yflip (- y) y))
+		       (z0 (if zflip (- z) z)))
+		   (let ((aabb-posx (- x0 xoffset))
+			 (aabb-posy (- y0 yoffset))
+			 (aabb-posz (- z0 zoffset)))
+		     (let ((bmini (ceiling (+ aabb-posx minx)))
+			   (bmaxi (floor (+ aabb-posx maxx)))
+			   (bminj (ceiling (+ aabb-posy miny)))
+			   (bmaxj (floor (+ aabb-posy maxy)))
+			   (bmink (ceiling (+ aabb-posz minz)))
+			   (bmaxk (floor (+ aabb-posz maxz))))
+		       (when i?
+			 (let ((i (if xflip (1- bmini) bmaxi)))
+			   (dobox ((j (1- bminj) (1+ bmaxj))
+				   (k (1- bmink) (1+ bmaxk)))
+				  (emit i j k))))
+		       (when j?
+			 (let ((j (if yflip (1- bminj) bmaxj)))
+			   (dobox ((i (1- bmini) (1+ bmaxi))
+				   (k (1- bmink) (1+ bmaxk)))
+				  (emit i j k))))
+		       (when k?
+			 (let ((k (if zflip (1- bmink) bmaxk)))
+			   (dobox ((j (1- bminj) (1+ bmaxj))
+				   (i (1- bmini) (1+ bmaxi)))
+				  (emit i j k)))))))))))))))
 
 ;;;;;;;;;;;;;
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz)
