@@ -4,9 +4,9 @@
    #:*scroll-x*
    #:*scroll-y*)
   (:export
-   #:key-p
-   #:key-j-p
-   #:key-j-r)
+   #:skey-p
+   #:skey-j-p
+   #:skey-j-r)
   (:export
    #:get-proc-address
    #:init

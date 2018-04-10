@@ -142,8 +142,9 @@
   (multiple-value-bind (s m) (sb-ext:get-time-of-day)
     (+ (* (expt 10 6) (- s 1506020000)) m))
   #+nil
-  (* (%cl-glfw3::get-timer-value)
-     (etouq (round (/ (expt 10 6) (%cl-glfw3::get-timer-frequency)))))
+  (* (%glfw::get-timer-value)
+     (etouq (round (/ (expt 10 6)
+		      (%glfw::get-timer-frequency)))))
   #-sbcl
   (* (get-internal-real-time)
      (etouq (round (/ (expt 10 6) internal-time-units-per-second)))))

@@ -7,4 +7,6 @@
   :serial t
   :components  
   ((:file "package")
+   (:file "enum")
+   (:file "input-array")
    (:file "window")))

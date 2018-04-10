@@ -8,10 +8,11 @@
 		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		  :test 'equal)))
 
+#+nil
 (progn
   (defparameter *textx* 0.0)
   (defparameter *texty* 0.0))
-
+#+nil
 (progn
   (progn
     (defparameter *mouse-x* 0.0)
@@ -20,6 +21,7 @@
     (defparameter *old-mouse-x* 0.0)
     (defparameter *old-mouse-y* 0.0)))
 
+#+nil
 (progn
   (defparameter *selection* nil)
   (defparameter *lastpos* nil))
@@ -80,38 +82,6 @@
 	(setf (aref curr 4) (aref other2 1))
 	(setf (aref curr 5) (aref other2 2))
 	(al:listener :orientation curr)))))
-
-#+nil
-(defun copy-array-buf ()
-  (let ((width 256)
-	(height 256))
-    (cffi:with-foreign-object (b :uint8 (etouq (* 256 256 4)))
-      (with-unsafe-speed
-	  (dobox ((ypos 0 height)
-		  (xpos 0 width))
-		 (let ((base (the fixnum (+ xpos (the fixnum (* ypos width))))))
-		   (let ((offset (the fixnum (* 4 base))))
-		     (let ((num
-			    #+nil
-			     (logior (char-code (aref *foo* (mod base 1024)))
-				     (ash 0 8)
-				     (ash 255 16))
-					;	#+nil
-
-			     (ash (random (1- (ash 1 32))) -2)
-			     
-			     #+nil
-			     (get-char-num
-			      (get-char (the fixnum (+ xpos xstart))
-					(the fixnum (+ ypos ystart))))))
-		       (setf (cffi:mem-aref b :uint8 (+ offset 0)) (ldb (byte 8 16) num)
-			     (cffi:mem-aref b :uint8 (+ offset 1)) (ldb (byte 8 8) num)
-			     (cffi:mem-aref b :uint8 (+ offset 2)) (logand 255 num) 
-			     (cffi:mem-aref b :uint8 (+ offset 3)) (ldb (byte 8 24) num))
-		       )))))
-      (progn
-	(gl:bind-texture :texture-2d (glhelp::texture (application::getfnc 'text-sub::text-data)))
-	(gl:tex-sub-image-2d :texture-2d 0 0 0 width height :bgra :unsigned-byte b)))))
 
 #+nil
 (defun more-controls ()
@@ -281,6 +251,7 @@
 		     (when fist?
 		       (when left-p
 			 (with-vec (a b c) (selected-block)
+			   #+nil
 			   (cond
 			     #+nil
 			     ((window::skey-p (window::keyval :left-control))
@@ -288,10 +259,11 @@
 			     #+nil
 			     ((window::skey-p (window::keyval :left-alt))
 			      (push (world::getobj a b c) *selection*))
-			     (t
-			      (funcall *left-fist-fnc* a b c)))))
+			     (t))
+			   (funcall *left-fist-fnc* a b c)))
 		       (when right-p
 			 (with-vec (a b c) (normal-block)
+			   #+nil
 			   (cond
 			     #+nil
 			     ((window::skey-p (window::keyval :left-control))
@@ -299,8 +271,8 @@
 			     #+nil
 			     ((window::skey-p (window::keyval :left-alt))
 			      (push (world::getobj a b c) *selection*))
-			     (t
-			      (funcall *right-fist-fnc* a b c)))))))))))))
+			     (t))
+			   (funcall *right-fist-fnc* a b c)))))))))))
        backwardsbug
        pos)))
   (multiple-value-bind (fraction times) (application::tick *ticker* #'physss)
@@ -448,15 +420,3 @@
 
 (defun physss ()
   (sandbox-sub::physentity *ent*))
-
-#+nil
-(defun num-key-jp (&optional (control-state window::*control-state*))
-  (etouq
-   (cons
-    'cond
-    (mapcar
-     (lambda (n)
-       `((window::skey-j-p
-	  (window::keyval ,n)
-	  control-state) ,n))
-     '(0 1 2 3 4 5 6 7 8 9)))))
