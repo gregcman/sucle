@@ -76,42 +76,9 @@
 	(logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz *block-aabb*))))
     acc))
 
-;;;;;
-(defun unit-pitch-yaw (result pitch yaw)
-  (let ((cos-pitch (cos pitch)))
-    (setf (aref result 0) (* cos-pitch (sin yaw))
-	  (aref result 1) (sin pitch)
-	  (aref result 2) (* cos-pitch (cos yaw))))
-  result)
-
-(struct->class
- (defstruct necking
-   (yaw 0.0)
-   (pitch 0.0)))
-
-(defun lookaround2 (neck newyaw newpitch)
-  (setf (necking-yaw neck) newyaw
-	(necking-pitch neck) newpitch))
-(defun necktovec (neck result-vec)
-  (unit-pitch-yaw result-vec
-		  (necking-pitch neck)
-		  (necking-yaw neck)))
-;;;;;;;
-
-(struct->class
- (defstruct farticle
-   (position (nsb-cga:vec 0.0 0.0 0.0))
-   (position-old (nsb-cga:vec 0.0 0.0 0.0))
-   (velocity (vector 0.0 0.0 0.0))))
-
-(defun step-farticle (p)
-  (let ((old (farticle-position-old p))
-	(curr (farticle-position p)))
-    (nsb-cga:%copy-vec old curr)))
-
+;;;
 (define-modify-macro *= (&rest args)
   *)
-
 (defun physics (yaw dir farticle
 		noclip gravity fly
 		is-jumping
@@ -346,6 +313,38 @@
 ;;110 is quake pro
 
 
+;;;;;
+(defun unit-pitch-yaw (result pitch yaw)
+  (let ((cos-pitch (cos pitch)))
+    (setf (aref result 0) (* cos-pitch (sin yaw))
+	  (aref result 1) (sin pitch)
+	  (aref result 2) (* cos-pitch (cos yaw))))
+  result)
+
+(struct->class
+ (defstruct necking
+   (yaw 0.0)
+   (pitch 0.0)))
+
+(defun lookaround2 (neck newyaw newpitch)
+  (setf (necking-yaw neck) newyaw
+	(necking-pitch neck) newpitch))
+(defun necktovec (neck result-vec)
+  (unit-pitch-yaw result-vec
+		  (necking-pitch neck)
+		  (necking-yaw neck)))
+;;;;;;;
+
+(struct->class
+ (defstruct farticle
+   (position (nsb-cga:vec 0.0 0.0 0.0))
+   (position-old (nsb-cga:vec 0.0 0.0 0.0))
+   (velocity (vector 0.0 0.0 0.0))))
+
+(defun step-farticle (p)
+  (let ((old (farticle-position-old p))
+	(curr (farticle-position p)))
+    (nsb-cga:%copy-vec old curr)))
 (defun farticle-to-camera (farticle camera fraction)
   (let ((curr (farticle-position farticle))
 	(prev (farticle-position-old farticle)))
@@ -364,14 +363,6 @@
   (let ((neck (entity-neck entity)))
     (lookaround2 neck yaw pitch)))
 
-(defparameter *fov*
-  ((lambda (deg)
-     (* deg (coerce (/ pi 180.0) 'single-float)))
-   (nth 1 '(95 70))))
-
-(defparameter *black* (make-instance 'application::render-area :height 2 :width 2
-				     :x 0
-				     :y 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (deflazy gl-init (gl-context)
@@ -383,6 +374,14 @@
   (getfnc 'gl-init)
   (render-stuff))
 
+(defparameter *fov*
+  ((lambda (deg)
+     (* deg (coerce (/ pi 180.0) 'single-float)))
+   (nth 1 '(95 70))))
+
+(defparameter *black* (make-instance 'application::render-area :height 2 :width 2
+				     :x 0
+				     :y 0))
 (defparameter *render-ticks* 0)
 (defun render-stuff ()
   ((lambda (width height)
