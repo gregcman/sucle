@@ -42,7 +42,15 @@
 		 (when (>= 0 whats-left) (exit)))
 	       (logiorf dead-axis newclamp)))))))
 
-;;;;
+(defparameter *block-aabb*
+  (aabbcc:make-aabb
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx 1.0
+   :maxy 1.0
+   :maxz 1.0))
+
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
   (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
@@ -76,7 +84,12 @@
 	(logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz *block-aabb*))))
     acc))
 
-;;;
+;;;;150 ms delay for sprinting
+;;;;player eye height is 1.5, subtract 1/8 for sneaking
+
+;;gravity is (* -0.08 (expt tickscale 2)) 0 0
+;;falling friction is 0.98
+;;0.6 * 0.91 is walking friction
 (define-modify-macro *= (&rest args)
   *)
 (defun physics (yaw dir farticle
@@ -172,14 +185,20 @@
 	   (yvel j+ j-)
 	   (zvel k+ k-))))))))
 
-(defparameter *block-aabb*
-  (aabbcc:make-aabb
-   :minx 0.0
-   :miny 0.0
-   :minz 0.0
-   :maxx 1.0
-   :maxy 1.0
-   :maxz 1.0))
+(struct->class
+ (defstruct entity
+   particle ;;center of mass
+   neck ;;
+   hips ;; walking direction
+   aabb 
+   contact ;;touching each side
+   fly?
+   gravity?
+   clip?
+   jump?
+   sneak?
+   collision-fun
+   contact-fun))
 
 (defparameter *player-aabb*
  ; #+nil
@@ -198,21 +217,6 @@
    :maxx 5.0
    :maxy 5.0
    :maxz 5.0))
-
-(struct->class
- (defstruct entity
-   particle ;;center of mass
-   neck ;;
-   hips ;; walking direction
-   aabb 
-   contact ;;touching each side
-   fly?
-   gravity?
-   clip?
-   jump?
-   sneak?
-   collision-fun
-   contact-fun))
 
 (defun gentity ()
   (make-entity :collision-fun (function collide-fucks)
@@ -299,70 +303,23 @@
   (let ((fist (make-fister)))
     (setf (fister-fun fist) #'collide-fucks)
     fist))
-;;;;;;;;;;;;;;;;;;;;
-
-;;;;150 ms delay for sprinting
-;;;;player eye height is 1.5, subtract 1/8 for sneaking
-
-;;gravity is (* -0.08 (expt tickscale 2)) 0 0
-;;falling friction is 0.98
-;;0.6 * 0.91 is walking friction
-
-;;fov::
-;;70 is normal
-;;110 is quake pro
 
 
 ;;;;;
-(defun unit-pitch-yaw (result pitch yaw)
-  (let ((cos-pitch (cos pitch)))
-    (setf (aref result 0) (* cos-pitch (sin yaw))
-	  (aref result 1) (sin pitch)
-	  (aref result 2) (* cos-pitch (cos yaw))))
-  result)
-
 (struct->class
  (defstruct necking
    (yaw 0.0)
    (pitch 0.0)))
-
-(defun lookaround2 (neck newyaw newpitch)
-  (setf (necking-yaw neck) newyaw
-	(necking-pitch neck) newpitch))
-(defun necktovec (neck result-vec)
-  (unit-pitch-yaw result-vec
-		  (necking-pitch neck)
-		  (necking-yaw neck)))
-;;;;;;;
 
 (struct->class
  (defstruct farticle
    (position (nsb-cga:vec 0.0 0.0 0.0))
    (position-old (nsb-cga:vec 0.0 0.0 0.0))
    (velocity (vector 0.0 0.0 0.0))))
-
 (defun step-farticle (p)
   (let ((old (farticle-position-old p))
 	(curr (farticle-position p)))
     (nsb-cga:%copy-vec old curr)))
-(defun farticle-to-camera (farticle camera fraction)
-  (let ((curr (farticle-position farticle))
-	(prev (farticle-position-old farticle)))
-    (let ((vec (camera-matrix:camera-vec-position camera))
-	  (cev (camera-matrix:camera-vec-noitisop camera)))
-      (nsb-cga:%vec-lerp vec prev curr fraction)
-      (nsb-cga:%vec* cev vec -1.0))))
-(defun entity-to-camera (entity camera fraction)
-  (necktovec (entity-neck entity)
-		      (camera-matrix:camera-vec-forward camera))	  
-  (farticle-to-camera (entity-particle entity)
-		      camera
-		      fraction))
-
-(defun change-entity-neck (entity yaw pitch)
-  (let ((neck (entity-neck entity)))
-    (lookaround2 neck yaw pitch)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (deflazy gl-init (gl-context)
@@ -374,6 +331,10 @@
   (getfnc 'gl-init)
   (render-stuff))
 
+
+;;;fov::
+;;;70 is normal
+;;;110 is quake pro
 (defparameter *fov*
   ((lambda (deg)
      (* deg (coerce (/ pi 180.0) 'single-float)))
@@ -382,51 +343,7 @@
 (defparameter *black* (make-instance 'application::render-area :height 2 :width 2
 				     :x 0
 				     :y 0))
-(defparameter *render-ticks* 0)
-(defun render-stuff ()
-  ((lambda (width height)
-     (let ((camera *camera*))
-       (setf (camera-matrix:camera-aspect-ratio camera)
-	     (/ (coerce width 'single-float)
-		(coerce height 'single-float))))
-     (let ((render-area *render-area*))
-       (setf (render-area-width render-area) (* width (/ 1.0 1.0)) 
-	     (render-area-height render-area) (* height (/ 1.0 1.0))
-	     (render-area-x render-area) 0
-	     (render-area-y render-area) 0
-	     )))
-   window::*width* window::*height*)
-  (glhelp::bind-default-framebuffer)
-  (set-render-area *render-area*)
-  (set-sky-color)
-  (setf (camera-matrix:camera-fov *camera*) *fov*)
-  (setf (camera-matrix:camera-frustum-far *camera*) (* 1024.0 256.0))
-  (camera-matrix:update-matrices *camera*)
-  ;;;render chunks
-  (camera-shader *camera*)
-  ;;;render crosshairs
-;  #+nil
-  (progn
-    ((lambda (width height)
-       (let ((render-area *black*))
-	 (setf
-	  (render-area-x render-area) (- (* width (/ 1.0 2.0)) 1.0) 
-	  (render-area-y render-area) (- (* height (/ 1.0 2.0)) 1.0)
-	  )))
-     window::*width* window::*height*)
-    (set-render-area *black*)
-    (gl:clear-color 1.0 1.0 1.0 1.0)
-    (gl:clear
-     :color-buffer-bit
-     ))
-  (incf *render-ticks*))
 
-(defun set-sky-color ()
-  (let ((daytime sandbox::*daytime*))
-    (let ((r (* daytime (aref *sky-color* 0)))
-	  (g (* daytime (aref *sky-color* 1)))
-	  (b (* daytime (aref *sky-color* 2))))
-      (gl:clear-color r g b 1.0))))
 (defparameter *sky-color*
   #+nil
   (vector 0.68 0.8 1.0)
@@ -437,23 +354,55 @@
   
 (defparameter *fog-ratio* 0.75)
 
-(defun camera-shader (camera)
-  (declare (optimize (safety 3) (debug 3)))
-  (glhelp::use-gl-program (getfnc 'blockshader))
+(defun render-stuff ()
+  ;;camera setup
+  (setf (camera-matrix:camera-aspect-ratio *camera*)
+	(/ (floatify window::*width*)
+	   (floatify window::*height*)))
+  (setf (camera-matrix:camera-fov *camera*) *fov*)
+  (setf (camera-matrix:camera-frustum-far *camera*) (* 1024.0 256.0))
+  (camera-matrix:update-matrices *camera*)
 
-  (let ((matrix
-	 (camera-matrix:camera-matrix-projection-view-player camera)))
-    (gl:clear-depth 1.0)
-    (gl:clear
-     :color-buffer-bit
-     :depth-buffer-bit)
-    (gl:depth-func :less)
+  ;;draw to default framebuffer
+  (glhelp::bind-default-framebuffer)
 
-    (glhelp:with-uniforms uniform (getfnc 'blockshader)
+  ;;setup clipping area
+  (let ((render-area *render-area*))
+    (setf (render-area-width render-area) window::*width*
+	  (render-area-height render-area) window::*height*
+	  (render-area-x render-area) 0
+	  (render-area-y render-area) 0))
+  (set-render-area *render-area*)
+
+  ;;change the sky color according to time
+  (let ((daytime sandbox::*daytime*))
+    (let ((r (* daytime (aref *sky-color* 0)))
+	  (g (* daytime (aref *sky-color* 1)))
+	  (b (* daytime (aref *sky-color* 2))))
+      (gl:clear-color r g b 1.0)))
+  
+  (gl:enable :depth-test)
+  (gl:depth-func :less)
+  (gl:clear-depth 1.0)
+  (gl:clear
+   :color-buffer-bit
+   :depth-buffer-bit)
+  (gl:enable :cull-face)
+  (gl:disable :blend)
+
+  ;;set up shader
+  (let ((shader (getfnc 'blockshader)))
+    (glhelp::use-gl-program shader)
+
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms uniform shader
       (gl:uniform-matrix-4fv 
        (uniform :pmv)
-       matrix
-       nil)
+       (camera-matrix:camera-matrix-projection-view-player *camera*)
+       nil))
+
+    ;;other cosmetic uniforms
+    (glhelp:with-uniforms uniform shader
       (flet ((fractionalize (x)
 	       (alexandria:clamp x 0.0 1.0)))
 	(let ((time sandbox::*daytime*))
@@ -474,18 +423,24 @@
 	(glhelp::set-active-texture 0)
 	(gl:bind-texture :texture-2d
 			 (glhelp::handle (getfnc 'terrain))
-			 ))
-      #+nil
-      (gl:uniformf 
-       (uniform :time)
-       (float (/ (get-internal-real-time)
-		 100.0)))))
-  (gl:enable :depth-test)
-  
-  (gl:enable :cull-face)
-  (gl:disable :blend)
+			 ))))
+  ;;render chunks
   (sandbox::draw-world)
-  (sandbox::designatemeshing))
+
+  ;;handle chunk meshing
+  (sandbox::designatemeshing)
+  
+  ;;render crosshairs
+  (progn
+    (setf
+     (render-area-x *black*) (- (/ window::*width* 2.0) 1.0) 
+     (render-area-y *black*) (- (/ window::*height* 2.0) 1.0)
+     )
+    (set-render-area *black*)
+    (gl:clear-color 1.0 1.0 1.0 1.0)
+    (gl:clear
+     :color-buffer-bit
+     )))
 
 ;;seizures are so FUN!
 #+nil
