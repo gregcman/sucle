@@ -261,81 +261,28 @@
      (aref pos 2))))
 
 (defparameter *blockid* 89)
+(defparameter *count* 0)
 (defparameter *right-fist-fnc*
   (lambda (x y z)
-    (let ((value (world::getblock x y z)))
-      (when (and (zerop value)
-		 (not-occupied x y z))
-	(music::play-at (wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
-			      0.8 1.0)
-	(let ((blockval *blockid*))
-	  (sandbox::setblock-with-update
-	   x
-	   y
-	   z
-	   blockval
-	   (aref mc-blocks:*lightvalue* blockval)))))))
+    (when 
+	(not-occupied x y z)
+      
+      (let ((blockval (let ((seq
+			     #(3 13 82 12 24 4 1 7 10 8 78 79 2 18 17 20 45 5 89)))
+			(elt seq (mod (incf *count*) (length seq))))))
+	(sandbox::setblock-with-update
+	 x
+	 y
+	 z
+	 blockval
+	 (aref mc-blocks:*lightvalue* blockval))))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
-    (let ((blockid (world::getblock x y z)))
-      (unless (= blockid 0)
-      (music::play-at (wot blockid) 
-			    (+ x 0.5) (+ y 0.5) (+ 0.5 z)
-			    0.8
-			    1.0)))
     (sandbox::setblock-with-update x y z 0 0)))
 
 (defparameter *big-fist-fun*
   (lambda (x y z)
     (let ((id (world::getblock x y z)))
       (unless (zerop id)
-	(music::play-at (wot id) x y z 0.8 1.0)	
 	(sandbox::setblock-with-update x y z 0 0)))))
-
-
-(defun preload ()
-  (let ((array (make-array (* 4 7))))
-    (dobox ((number 0 4)
-	    (name 0 7))
-	   (setf (aref array (+ number (* name 4)))
-		 (music::load-all
-		(print
-		  (concatenate
-		   'string
-		   "/home/imac/.minecraft/resources/sound3/dig/"
-		   (string-downcase (symbol-name (aref #(stone wood gravel grass sand snow cloth)
-						       name
-						       )))
-		   (aref #("1" "2" "3" "4") number
-			 )
-		   ".ogg"))
-		  :mono8)))
-    array))
-
-(application::deflazy preloaded-sounds (application::al-context)
-  (declare (ignorable application::al-context))
-  (print "loading-sounds")
-  (preload))
-#+nil
-(map nil
-     (lambda (x) (music::free-preloaded x))
-     (application::getfnc 'PRELOADED-SOUNDS))
-(defparameter *wot-counter* 0)
-(defun wot (value)
-  (incf *wot-counter*)
-  (aref 
-   (application::getfnc 'preloaded-sounds)
-   (+ (mod *wot-counter* 4)
-      (* 4 (sound-dispatch value)))))
-
-(defun sound-dispatch (value)
-  (case value
-    (0 0) ;air
-    ((1 4 7 14 15 16 21 22 23 24) 0)				;stone,cobble
-    ((2 18) 3)				;grass
-    ((3 13) 2)				;dirt ,gravel
-    ((5 17) 1)				;wood, log
-    (12 4) ;sand
-    ((35 81) 6)
-    (otherwise (random 7))))
 

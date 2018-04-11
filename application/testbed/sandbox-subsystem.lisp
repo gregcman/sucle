@@ -360,6 +360,7 @@
 
   (let ((seconds (or 60 840)))
     (setf sandbox::*daytime*
+	  ;(or 0.0)
 	  (floatify
 	   (/ (abs (- (mod (/ (get-internal-real-time)
 			      (floatify internal-time-units-per-second))
@@ -549,6 +550,9 @@
 	   (|.| pixdata "rgb"))
 	fogratio
 	))
+      #+nil
+      (if (== (|.| pixdata "a") 0.0)
+	  (/**/ "discard;"))
       (= (|.| :gl-frag-color "rgb") temp)))
    :attributes
    '((position . 2) 
