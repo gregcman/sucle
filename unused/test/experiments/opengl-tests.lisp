@@ -22,3 +22,8 @@
 	  (gl:depth-func :less)
 	  (gl:depth-range 0.0 0.5)
 	  (setf matrix cam))))) 
+
+#+nil
+#(:clear :set :copy :copy-inverted
+  :noop :invert :and :nand :or :nor
+  :xor :equiv :and-reverse :and-inverted :or-reverse :or-inverted) 

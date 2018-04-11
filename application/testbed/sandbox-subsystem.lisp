@@ -84,12 +84,6 @@
 	(logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz *block-aabb*))))
     acc))
 
-;;;;150 ms delay for sprinting
-;;;;player eye height is 1.5, subtract 1/8 for sneaking
-
-;;gravity is (* -0.08 (expt tickscale 2)) 0 0
-;;falling friction is 0.98
-;;0.6 * 0.91 is walking friction
 (define-modify-macro *= (&rest args)
   *)
 (defun physics (yaw dir farticle
@@ -201,22 +195,13 @@
    contact-fun))
 
 (defparameter *player-aabb*
- ; #+nil
   (aabbcc:make-aabb
    :minx -0.3
    :miny -1.5
    :minz -0.3
    :maxx 0.3
    :maxy 0.12
-   :maxz 0.3)
-  #+nil
-  (aabbcc:make-aabb
-   :minx -5.0
-   :miny -5.0
-   :minz -5.0
-   :maxx 5.0
-   :maxy 5.0
-   :maxz 5.0))
+   :maxz 0.3))
 
 (defun gentity ()
   (make-entity :collision-fun (function collide-fucks)
@@ -246,8 +231,8 @@
    (entity-collision-fun entity)
    (entity-aabb entity)))
 
+;;;a very small cubic fist
 (defparameter *fist-aabb*
-     ;;;a very small cubic fist
   (aabbcc:make-aabb
    :minx -0.005
    :miny -0.005
@@ -256,7 +241,6 @@
    :maxy 0.005
    :maxz 0.005))
 
-;;;;;;;
 (struct->class
  (defstruct fister
    (selected-block (vector 0 0 0))
@@ -304,8 +288,6 @@
     (setf (fister-fun fist) #'collide-fucks)
     fist))
 
-
-;;;;;
 (struct->class
  (defstruct necking
    (yaw 0.0)
@@ -338,25 +320,14 @@
   (render-stuff))
 
 
-;;;fov::
-;;;70 is normal
-;;;110 is quake pro
-(defparameter *fov*
-  ((lambda (deg)
-     (* deg (coerce (/ pi 180.0) 'single-float)))
-   (nth 1 '(95 70))))
+(defparameter *fov* (* 70 (floatify (/ pi 180.0))))
 
 (defparameter *black* (make-instance 'application::render-area :height 2 :width 2
 				     :x 0
 				     :y 0))
 
 (defparameter *sky-color*
-  ;#+nil
-  (vector 0.68 0.8 1.0)
-  #+nil
-  (map 'vector (lambda (x) (/ x 255.0)) (vector 97 138 255))
-  #+nil
-  (vector 0.0 0.0 0.0))
+  (vector 0.68 0.8 1.0))
   
 (defparameter *fog-ratio* 0.75)
 
@@ -456,11 +427,6 @@
      :color-buffer-bit
      )))
 
-;;seizures are so FUN!
-#+nil
-#(:clear :set :copy :copy-inverted
-  :noop :invert :and :nand :or :nor
-  :xor :equiv :and-reverse :and-inverted :or-reverse :or-inverted)
 (progn
   (defun color-grasses (terrain color)
     (modify-greens 64 192 :color color :terrain terrain)
@@ -474,10 +440,12 @@
 		  :displaced-to image
 		  :displaced-index-offset (* c (+ w (* h width))))))
 
-  #+nil
-  (#(1742848/8775 2673664/8775 1079296/8775 255)
-    (getapixel 0 0 grass-tint)
-    (getapixel 255 255 grass-tint))
+  ;;;;150 ms delay for sprinting
+;;;;player eye height is 1.5, subtract 1/8 for sneaking
+
+;;gravity is (* -0.08 (expt tickscale 2)) 0 0
+;;falling friction is 0.98
+;;0.6 * 0.91 is walking friction
 ;;minecraft fog color sometimes (0.68 0.8 1.0)
   ;;  (progno #(113 174 70 255)  #(198 304 122 255))
 ;;;grass is 0 240
@@ -502,11 +470,19 @@
   (load-png 
    (filesystem-util:rebase-path #P"terrain.png" *ourdir*)))
 
-(deflazy modified-terrain-png (terrain-png grass-png)
+(deflazy modified-terrain-png (terrain-png)
   (color-grasses
    (alexandria::copy-array terrain-png)
    (let ((value (random 256)))
-     (getapixel value (random (1+ value)) grass-png))))
+     (multiple-value-bind (w1 w2 w3)
+	 (barycentric-interpolation value (random (1+ value)) 0.0 0.0 255.0 0.0 255.0 255.0)
+       (mapcar (lambda (x y z)
+		 (+ (* x w1)
+		    (* y w2)
+		    (* z w3)))
+	       '(71.0 205.0 51.0)
+	       '(191.0 183.0 85.0)
+	       '(128.0 180.0 151.0))))))
 
 (deflazy terrain (modified-terrain-png gl-context)
   (make-instance
@@ -521,9 +497,6 @@
 	      (:texture-mag-filter . :nearest)
 	      (:texture-wrap-s . :repeat)
 	      (:texture-wrap-t . :repeat)))))))
-(deflazy grass-png ()
-  (load-png 
-   (filesystem-util:rebase-path #P"grasscolor.png" *ourdir*)))
 (deflazy blockshader (blockshader-text gl-context)
   (glhelp::create-gl-program blockshader-text))
 
@@ -594,3 +567,34 @@
      (:camera-pos (:vertex-shader camera-pos))
      (:sampler (:fragment-shader sampler))
      (:time (:vertex-shader time)))))
+
+
+(defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
+  (let ((denominator (+ (*
+			 (- vy2 vy3)
+			 (- vx1 vx3))
+			(*
+			 (- vx3 vx2)
+			 (- vy1 vy3))))
+	(py-yv3 (- py vy3))
+	(px-xv3 (- px vx3)))
+    (let* ((w1 (/
+		(+
+		 (*
+		  (- vy2 vy3)
+		  px-xv3)
+		 (*
+		  (- vx3 vx2)
+		  py-yv3))
+		  denominator))
+	   (w2 (/
+		(+
+		 (*
+		  (- vy3 vy1)
+		  px-xv3)
+		 (*
+		  (- vx1 vx3)
+		  py-yv3))
+		denominator))
+	   (w3 (- 1 w1 w2)))
+      (values w1 w2 w3))))

@@ -130,7 +130,7 @@
       (let* ((a (* x 0.6))
 	     (b (+ 0.2 a))
 	     (c (* b b b))
-	     (d (* 8.0 0.15 (/ (coerce pi 'single-float) 180.0)))
+	     (d (* 8.0 0.15 (/ (floatify pi) 180.0)))
 	     (e (* d c)))
 	(declare (type single-float a b c d e))
 	e))))
@@ -260,7 +260,7 @@
      (aref pos 1)
      (aref pos 2))))
 
-(defparameter *blockid* 1)
+(defparameter *blockid* 89)
 (defparameter *right-fist-fnc*
   (lambda (x y z)
     (let ((value (world::getblock x y z)))
