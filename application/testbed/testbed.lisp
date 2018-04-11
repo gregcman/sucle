@@ -260,7 +260,7 @@
      (aref pos 1)
      (aref pos 2))))
 
-(defparameter *blockid* 89)
+(defparameter *blockid* 1)
 (defparameter *right-fist-fnc*
   (lambda (x y z)
     (let ((value (world::getblock x y z)))
