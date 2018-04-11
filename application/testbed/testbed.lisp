@@ -260,7 +260,7 @@
      (aref pos 1)
      (aref pos 2))))
 
-(defparameter *blockid* 1)
+(defparameter *blockid* 89)
 (defparameter *right-fist-fnc*
   (lambda (x y z)
     (let ((value (world::getblock x y z)))
@@ -269,7 +269,7 @@
 	(music::play-at (wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
 			      0.8 1.0)
 	(let ((blockval *blockid*))
-	  (sandbox::plain-setblock
+	  (sandbox::setblock-with-update
 	   x
 	   y
 	   z

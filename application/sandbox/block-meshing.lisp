@@ -1,16 +1,5 @@
 (in-package :sandbox)
 
-(defparameter *daytime* 1.0)
-
-(defun dark-fun (darkness b0 b1 b2 b3 s0 s1 s2 s3)
-  (let ((time *daytime*))
-    (* darkness
-       0.25
-       (+ (max b0 (* time s0))
-	  (max b1 (* time s1))
-	  (max b2 (* time s2))
-	  (max b3 (* time s3))))))
-
 (defparameter *mesh-etex* nil)
 (defparameter *mesh-dark* nil)
 (defparameter *mesh-epos* nil)
@@ -124,7 +113,7 @@
       (dotimes (x 16)
 	(setf (aref foo-array x)
 	      (light-gen? 0.05 x)))
-      #+nil
+  ;    #+nil
       (let ((a (aref foo-array 0)))
 	(map-into foo-array
 		  (lambda (x)
@@ -150,6 +139,17 @@
      clockwise-winding
      (list u0 u1 v0 v1)))))
 
+(defparameter *daytime* 1.0)
+#+nil
+(defun dark-fun (darkness b0 b1 b2 b3 s0 s1 s2 s3)
+  (let ((time *daytime*))
+    (* darkness
+       0.25
+       (+ (max b0 (* time s0))
+	  (max b1 (* time s1))
+	  (max b2 (* time s2))
+	  (max b3 (* time s3))))))
+
 (defmacro squareface (light-edge-fnc
 		      skylight-edge-fnc
 		      color	      
@@ -159,39 +159,36 @@
 		      (i3 j3 k3))
   (let ((light-edge-code (funcall (symbol-function light-edge-fnc) 'xpos 'ypos 'zpos))
 	(sky-edge-code (funcall (symbol-function skylight-edge-fnc) 'xpos 'ypos 'zpos)))
-    `(progn
-      (let ((xpos (+ i ,i0))
-	    (ypos (+ j ,j0))
-	    (zpos (+ k ,k0)))
-	(declare (type fixnum xpos ypos zpos))
-	(dark (dark-fun
-	       ,color
-	       ,@light-edge-code
-	       ,@sky-edge-code)))
-      (let ((xpos (+ i ,i1))
-	    (ypos (+ j ,j1))
-	    (zpos (+ k ,k1)))
-	(declare (type fixnum xpos ypos zpos ))
-	(dark (dark-fun
-	       ,color
-	       ,@light-edge-code
-	       ,@sky-edge-code)))
-      (let ((xpos (+ i ,i2))
-	    (ypos (+ j ,j2))
-	    (zpos (+ k ,k2)))
-	(declare (type fixnum xpos ypos zpos))
-	(dark (dark-fun
-	       ,color
-	       ,@light-edge-code
-	       ,@sky-edge-code)))     
-      (let ((xpos (+ i ,i3))
-	    (ypos (+ j ,j3))
-	    (zpos (+ k ,k3)))
-	(declare (type fixnum xpos ypos zpos ))
-	(dark (dark-fun
-	       ,color
-	       ,@light-edge-code
-	       ,@sky-edge-code))))))
+    (let ((dark
+	   (flet ((darkify (x) `(* ,color ,x)))
+	     `(dark ,@(mapcar #'darkify light-edge-code)
+		    ,@(mapcar #'darkify sky-edge-code)))
+	    #+nil
+	    `(dark (dark-fun
+		    ,color
+		    ,@light-edge-code
+		    ,@sky-edge-code))))
+      `(progn
+	 (let ((xpos (+ i ,i0))
+	       (ypos (+ j ,j0))
+	       (zpos (+ k ,k0)))
+	   (declare (type fixnum xpos ypos zpos))
+	   ,dark)
+	 (let ((xpos (+ i ,i1))
+	       (ypos (+ j ,j1))
+	       (zpos (+ k ,k1)))
+	   (declare (type fixnum xpos ypos zpos ))
+	   ,dark)
+	 (let ((xpos (+ i ,i2))
+	       (ypos (+ j ,j2))
+	       (zpos (+ k ,k2)))
+	   (declare (type fixnum xpos ypos zpos))
+	   ,dark)     
+	 (let ((xpos (+ i ,i3))
+	       (ypos (+ j ,j3))
+	       (zpos (+ k ,k3)))
+	   (declare (type fixnum xpos ypos zpos ))
+	   ,dark)))))
 
 (defmacro posface ((x0 y0 z0) 
 		   (x1 y1 z1)		      
@@ -201,31 +198,31 @@
      (let ((xp (+ i ,x0))
 	   (yp (+ j ,y0))
 	   (zp (+ k ,z0)))
-       (declare (type fixnum xp yp zp))     
-       (epos (coerce xp 'single-float))
-       (epos (coerce yp 'single-float))
-       (epos (coerce zp 'single-float)))
+       (declare (type fixnum xp yp zp))
+       (epos (floatify xp)
+	     (floatify yp)
+	     (floatify zp)))
      (let ((xp (+ i ,x1))
 	   (yp (+ j ,y1))
 	   (zp (+ k ,z1)))
-       (declare (type fixnum  xp yp zp))      
-       (epos (coerce xp 'single-float))
-       (epos (coerce yp 'single-float))
-       (epos (coerce zp 'single-float)))
+       (declare (type fixnum xp yp zp))
+       (epos (floatify xp)
+	     (floatify yp)
+	     (floatify zp)))
      (let ((xp (+ i ,x2))
 	   (yp (+ j ,y2))
 	   (zp (+ k ,z2)))
-       (declare (type fixnum  xp yp zp))
-       (epos (coerce xp 'single-float))
-       (epos (coerce yp 'single-float))
-       (epos (coerce zp 'single-float)) ) 
+       (declare (type fixnum xp yp zp))
+       (epos (floatify xp)
+	     (floatify yp)
+	     (floatify zp))) 
      (let ((xp (+ i ,x3))
 	   (yp (+ j ,y3))
 	   (zp (+ k ,z3)))
-       (declare (type fixnum  xp yp zp))
-       (epos (coerce xp 'single-float))
-       (epos (coerce yp 'single-float))
-       (epos (coerce zp 'single-float)))))
+       (declare (type fixnum xp yp zp))
+       (epos (floatify xp)
+	     (floatify yp)
+	     (floatify zp)))))
 
 (defmacro face-header (name &body body)
   `(defun ,name (i j k u0 v0 u1 v1)

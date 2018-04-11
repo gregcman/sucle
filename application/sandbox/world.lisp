@@ -188,3 +188,40 @@
 
 (defmethod lispobj-dispatch ((obj symbol))
   56)
+
+(in-package :sandbox)
+;;;;keeping track of the changes to the world
+(progn
+  (defparameter dirtychunks (queue:make-uniq-q))
+  (defun clean-dirty ()
+    (setf dirtychunks (queue:make-uniq-q)))
+  (defun dirty-pop ()
+    (queue:uniq-pop dirtychunks))
+  (defun dirty-push (item)
+    (queue:uniq-push item dirtychunks))
+  (defun block-dirtify (i j k)
+    (let ((imask (mod i 16))
+	  (jmask (mod j 16))
+	  (kmask (mod k 16)))
+      (labels ((add (x y z)
+		 (dirty-push (world:chop (world:chunkhashfunc x z y))))
+	       (i-permute ()
+		 (case imask
+		   (0 (j-permute (1- i)))
+		   (15 (j-permute (1+ i))))
+		 (j-permute i))
+	       (j-permute (ix)
+		 (case jmask
+		   (0 (k-permute ix (1- j)))
+		   (15 (k-permute ix (1+ j))))
+		 (k-permute ix j))
+	       (k-permute (ix jx)
+		 (case kmask
+		   (0 (add ix jx (1- k)))
+		   (15 (add ix jx (1+ k))))
+		 (add ix jx k)))
+	(i-permute)))))
+
+(defun block-dirtify-hashed (xzy)
+  (multiple-value-bind (x z y) (world:unhashfunc xzy)
+    (block-dirtify x y z)))

@@ -41,7 +41,9 @@
 			       (declare (type (unsigned-byte 4) val))
 			       (when (< val lower-level)
 				 (unless (isOpaque (world:%getblock displacement))
-				   (setf (world:%getlight displacement) lower-level)
+				   (progn
+				     (setf (world:%getlight displacement) lower-level)
+				     (block-dirtify-hashed displacement))
 				   (queue::uniq-push displacement bfs)))))))
 	       (%0check i-1 world:add)
 	       (%0check i+1 world:add)
@@ -57,7 +59,9 @@
     (queue:clruniq bfs)
     (queue:clruniq lighting-bfs)
     (queue::kv-uniq-push (world:chunkhashfunc x z y) (world:getlight x y z) bfs)
-    (setf (world:getlight x y z) 0)
+    (progn
+      (setf (world:getlight x y z) 0)
+      (block-dirtify x y z))
     (%de-light-node bfs lighting-bfs)
     (%light-node lighting-bfs)))
 
@@ -78,7 +82,9 @@
 			   (unless (zerop adj-light-level)
 			     (if (< adj-light-level light-value)
 				 (progn
-				   (setf (world:%getlight displacement) 0)
+				   (progn
+				     (setf (world:%getlight displacement) 0)
+				     (block-dirtify-hashed displacement))
 				   (queue::kv-uniq-push displacement adj-light-level bfs))
 				 (when (>= adj-light-level light-value)
 				   (queue::uniq-push displacement lighting-bfs))))))))
@@ -115,7 +121,9 @@
 			       (declare (type (unsigned-byte 4) val))
 			       (when (< val lower-level)
 				 (unless (isOpaque (world:%getblock displacement))
-				   (setf (world:%skygetlight displacement) lower-level)
+				   (progn
+				     (setf (world:%skygetlight displacement) lower-level)
+				     (block-dirtify-hashed displacement))
 				   (queue::uniq-push displacement bfs))))))
 			(downcheck (disp)
 			  `(let ((displacement (world:add place ,disp)))
@@ -125,7 +133,9 @@
 			       (when (< val 15)
 				 (unless (or (isOpaque (world:%getblock displacement))
 					     (> 4503599627370496 displacement))
-				   (setf (world:%skygetlight displacement) 15)
+				   (progn
+				     (setf (world:%skygetlight displacement) 15)
+				     (block-dirtify-hashed displacement))
 				   (queue::uniq-push displacement bfs)))))))
 	       (%0check i-1)
 	       (%0check i+1)
@@ -143,7 +153,9 @@
     (queue:clruniq bfs)
     (queue:clruniq lighting-bfs)
     (queue::kv-uniq-push (world:chunkhashfunc x y z) (world:skygetlight x y z) bfs)
-    (setf (world:skygetlight x y z) 0)
+    (progn
+      (setf (world:skygetlight x y z) 0)
+      (block-dirtify x y z))
     (%sky-de-light-node bfs lighting-bfs)
     (%sky-light-node lighting-bfs)))
 
@@ -164,7 +176,9 @@
 			   (unless (zerop adj-light-level)
 			     (if (< adj-light-level light-value)
 				 (progn
-				   (setf (world:%skygetlight displacement) 0)
+				   (progn
+				     (setf (world:%skygetlight displacement) 0)
+				     (block-dirtify-hashed displacement))
 				   (queue::kv-uniq-push displacement adj-light-level bfs))
 				 (queue::uniq-push displacement lighting-bfs)))))))
 	   
@@ -175,7 +189,9 @@
 		 (unless (or (isopaque (world:%getblock displacement))
 			     (> 4503599627370496 displacement))
 		   (let ((adj-light-level (world:%skygetlight displacement)))
-		     (setf (world:%skygetlight displacement) 0)
+		     (progn
+		       (setf (world:%skygetlight displacement) 0)
+		       (block-dirtify-hashed displacement))
 		     (queue::kv-uniq-push displacement adj-light-level bfs))))
 	       (check j-1))
 	   (check j+1)

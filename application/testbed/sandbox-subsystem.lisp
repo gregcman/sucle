@@ -326,8 +326,14 @@
   (declare (ignorable application::gl-context))
   (clrhash sandbox::*g/chunk-call-list*))
 
+(defparameter *last-session* nil)
 (defun per-frame (session)
   (declare (ignorable session))
+  ;;handle chunk meshing
+  (unless (eq session *last-session*)
+    (sandbox::update-world-vao 0 0 0)
+    (setf *last-session* session))
+  (sandbox::designatemeshing)
   (getfnc 'gl-init)
   (render-stuff))
 
@@ -345,11 +351,11 @@
 				     :y 0))
 
 (defparameter *sky-color*
-  #+nil
+  ;#+nil
   (vector 0.68 0.8 1.0)
   #+nil
   (map 'vector (lambda (x) (/ x 255.0)) (vector 97 138 255))
-  ;#+nil
+  #+nil
   (vector 0.0 0.0 0.0))
   
 (defparameter *fog-ratio* 0.75)
@@ -380,6 +386,15 @@
 	  (g (* daytime (aref *sky-color* 1)))
 	  (b (* daytime (aref *sky-color* 2))))
       (gl:clear-color r g b 1.0)))
+
+  (let ((seconds (or 60 840)))
+    (setf sandbox::*daytime*
+	  (floatify
+	   (/ (abs (- (mod (/ (get-internal-real-time)
+			      (floatify internal-time-units-per-second))
+			   (* 2 seconds))
+		      seconds))
+	      seconds))))
   
   (gl:enable :depth-test)
   (gl:depth-func :less)
@@ -417,6 +432,8 @@
 			    (/ -1.0 (or 128 (camera-matrix:camera-frustum-far *camera*)) *fog-ratio*))
 	    (%gl:uniform-1f (uniform :aratio)
 			    (/ 1.0 *fog-ratio*)))))
+      (%gl:uniform-1f (uniform :time)
+		      sandbox::*daytime*)
 
       (progn
 	(gl:uniformi (uniform :sampler) 0)
@@ -427,9 +444,6 @@
   ;;render chunks
   (sandbox::draw-world)
 
-  ;;handle chunk meshing
-  (sandbox::designatemeshing)
-  
   ;;render crosshairs
   (progn
     (setf
@@ -524,16 +538,21 @@
 	   (fogratio-out "float"))
     :in '((position "vec4")
 	  (texcoord "vec2")
-	  (color "float")
+	  (blocklight "vec4")
+	  (skylight "vec4")
 	  (projection-model-view "mat4")
 
+	  (time "float" 0.0)
+	  
 	  (foglet "float")
 	  (aratio "float")
 	  (camera-pos "vec3"))
     :program
     '(defun "main" void ()
       (= "gl_Position" (* projection-model-view position))
-      (= color-out color)
+      (= color-out (dot (max (* skylight time)
+			     blocklight)
+		    (vec4 0.25)))
       (= texcoord-out texcoord)
 
       (= fogratio-out (min 1.0 (+ (* foglet (distance camera-pos (|.| position "xyz"))) aratio)))))
@@ -544,18 +563,11 @@
 	  (sampler "sampler2D")
 
 	  (fogratio "float")
-	  (fogcolor "vec3")
-;;						     (wombo ("float" 4) "{2.0, 10.4, 1.0, 10.0}")
-	  )
+	  (fogcolor "vec3"))
     :program
     '(defun "main" void ()
       (/**/ vec4 pixdata)
       (= pixdata ("texture2D" sampler texcoord))
-      #+nil
-      (if (> (|.| pixdata "g") 0.5)
-	  (progn
-	    "discard"))
-      ;;      (= (|.| pixdata "rgb") (|.| pixdata "ggr"))
       (/**/ vec3 temp)
       (= temp 
        (mix 
@@ -564,12 +576,12 @@
 	   (|.| pixdata "rgb"))
 	fogratio
 	))
-      ;;      	 (*= temp ([] wombo (int (* 4.0 (|.| temp "g")))))
       (= (|.| :gl-frag-color "rgb") temp)))
    :attributes
    '((position . 2) 
      (texcoord . 8)
-     (color . 0))
+     (blocklight . 1)
+     (skylight . 0))
    :varyings
    '((color-out . color)
      (texcoord-out . texcoord)
@@ -580,4 +592,5 @@
      (:foglet (:vertex-shader foglet))
      (:aratio (:vertex-shader aratio))
      (:camera-pos (:vertex-shader camera-pos))
-     (:sampler (:fragment-shader sampler)))))
+     (:sampler (:fragment-shader sampler))
+     (:time (:vertex-shader time)))))
