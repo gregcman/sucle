@@ -84,74 +84,129 @@
 	(logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz *block-aabb*))))
     acc))
 
+  ;;;;150 ms delay for sprinting
+;;;;player eye height is 1.5, subtract 1/8 for sneaking
+
+;;gravity is (* -0.08 (expt tickscale 2)) 0 0
+;;falling friction is 0.98
+;;0.6 * 0.91 is walking friction
 (define-modify-macro *= (&rest args)
   *)
-(defun physics (yaw dir farticle
+
+(defmacro modify (fun a &rest rest)
+  (once-only (a)
+    `(,fun ,a ,a ,@rest)))
+(defmacro load-time-vector (x y z)
+  `(load-time-value (nsb-cga:vec
+		     ,x ,y ,z)))
+(defparameter *ticks-per-second* 60.0)
+(defparameter *temp-vec* (nsb-cga:vec 0.0 0.0 0.0))
+(defun physics (entity yaw dir farticle
 		noclip gravity fly
 		is-jumping
 		is-sneaking
 		contact-handler
 		world-collision-fun
-		aabb)
-  (let ((tickscale (/ 1.0 3.0)))
-    (step-farticle farticle)
+		aabb &optional (temp-vec *temp-vec*))
+  (declare (optimize (debug 3)))
+  (step-farticle farticle)
+  (flet ((vec (x y z)
+	   (with-vec (a b c) (temp-vec symbol-macrolet)
+	     (setf a x
+		   b y
+		   c z))
+	   temp-vec))
     (let ((vel (farticle-velocity farticle))
-	  (pos (farticle-position farticle)))
+	  (pos (farticle-position farticle))
+	  (mass (farticle-mass farticle))
+	  (force (farticle-force farticle)))
+      (fill force 0.0)
       (let ((contact-state (if (and noclip (not sandbox-sub::*dirtying*))
 			       #b000000
 			       (with-vec (px py pz) (pos)
-				 (funcall contact-handler px py pz aabb)))))
+				 (funcall contact-handler px py pz aabb))))
+	    (total-speed (* *ticks-per-second* (nsb-cga:vec-length vel))))			    
+	(let ((drag (* total-speed
+		       total-speed))
+	      (drag-scale (if fly
+			      0.005
+			      0.0003)))
+	  (nsb-cga:%vec* temp-vec			     
+			 vel
+			 (* *ticks-per-second* drag drag-scale))
+	  (modify nsb-cga:%vec-
+		  force
+		  temp-vec))
 	(let ((onground (logtest contact-state #b000100)))
-	  (let ((speed (* 0.4 (expt tickscale 2))))
-	    (with-vec (xvel yvel zvel) (vel symbol-macrolet)
-	      (if fly
-		  (progn
-		    (when is-jumping
-		      (incf yvel speed))
-		    (when is-sneaking
-		      (decf yvel speed)))
-		  
-		  (if onground
-		      (when is-jumping
-			(incf yvel (* 0.49 (expt tickscale 1))))
-		      (setf speed (* speed 0.2))))
-	      (when dir
-		(let ((dir (+ dir yaw)))
-		  (incf xvel (* speed (sin dir)))
-		  (incf zvel (* speed (cos dir)))))))
-	  (contact-handle contact-state vel)
-	  (let ((fun (if noclip
-			 (lambda (&rest args)
-			   (declare (ignore args))
-			   (values #b000 1.0))
-			 (progn
-			   world-collision-fun))))
-	    (with-vec (vx vy vz) (vel symbol-macrolet)
-	      (with-vec (px py pz) (pos symbol-macrolet)
-		(setf (values px py pz vx vy vz)
-		      (collide-world2
-		       fun
-		       px py pz vx vy vz aabb)))))
-	  (let ((air-friction 0.98)
-		(walking-friction (* 0.6 0.9)))
-	    (with-vec (xvel yvel zvel) (vel symbol-macrolet)
-	      (if fly
-		  (progn
-		    (setf air-friction 0.9)
-		    (*= xvel air-friction)
-		    (*= zvel air-friction))
-		  (progn
-		    (setf air-friction 0.98)
-		    (cond (onground
-			   (*= xvel walking-friction)
-			   (*= zvel walking-friction))
-			  (t (*= xvel 0.9)
-			     (*= zvel 0.9)
-			     ))))
-	      (when (and (not onground)
-			 gravity)
-		(decf yvel (* 0.08 (expt tickscale 2))))
-	      (*= yvel air-friction))))))))
+	  (let ((speed 2.0))
+	    (cond
+	      (fly
+	       (let ((flyvec (vec 0.0 speed 0.0)))
+		 (when is-jumping
+		   (modify nsb-cga:%vec+ force
+			   flyvec))
+		 (case is-sneaking
+		   (0 (modify nsb-cga:%vec- force
+			      flyvec)))))		
+	      (t
+	       (cond
+		 (onground
+		  #+nil
+		  (let ((walking-friction (* 0.91 (* 0.6 0.9))))
+		    (*= xvel walking-friction)
+		    (*= zvel walking-friction))
+		  (case is-sneaking 
+		    (0 (*= speed 0.5))
+		    (1 (*= speed 2.0)))
+		  (when is-jumping
+		    (modify nsb-cga:%vec+ force
+			    (load-time-vector
+			     0.0
+			     200.0
+			     0.0))))
+		 (t
+		  (setf speed (* speed 0.2))))))
+	    (when dir
+	      (let ((dir (+ dir yaw)))
+		(let ((walkvec (vec (* speed (sin dir))
+				    0.0
+				    (* speed (cos dir)))))
+		  (modify nsb-cga:%vec+ force walkvec))))))
+	    ;;to allow walking around block corners
+	    ;;we introduce a frame of gravity lag
+	(progn
+	  (let ((old-onground (logtest (entity-contact entity) #b000100)))
+	    (when (and (not old-onground)
+		       gravity)
+	      (modify nsb-cga:%vec+ force
+		      (load-time-vector
+		       0.0
+		       -9.8
+		       0.0))))
+	  (setf (entity-contact entity) contact-state))
+	(modify nsb-cga:%vec/ force (* (* *ticks-per-second*
+					  *ticks-per-second* 0.5) mass))
+	(modify nsb-cga:%vec+ vel force)
+	(contact-handle contact-state vel))
+      (let ((fun (if noclip
+		     (lambda (&rest args)
+		       (declare (ignore args))
+		       (values #b000 1.0))
+		     (progn
+		       world-collision-fun))))
+	(with-vec (vx vy vz) (vel symbol-macrolet)
+	  (with-vec (px py pz) (pos symbol-macrolet)
+	    (multiple-value-bind (a b c d e f)
+		(collide-world2
+		 fun
+		 px py pz vx vy vz aabb)
+	      (setf (values px py pz vx vy vz)
+		    (values (floatify a)
+			    (floatify b)
+			    (floatify c)
+			    (floatify d)
+			    (floatify e)
+			    (floatify f))))))))))
 
 (defun contact-handle (acc vel)
   (multiple-value-bind (i+ i- j+ j- k+ k-)
@@ -219,6 +274,7 @@
 
 (defun physentity (entity)
   (physics
+   entity
    (necking-yaw (entity-neck entity))
    (entity-hips entity)
    (entity-particle entity)
@@ -297,7 +353,9 @@
  (defstruct farticle
    (position (nsb-cga:vec 0.0 0.0 0.0))
    (position-old (nsb-cga:vec 0.0 0.0 0.0))
-   (velocity (vector 0.0 0.0 0.0))))
+   (velocity (nsb-cga:vec 0.0 0.0 0.0))
+   (force (nsb-cga:vec 0.0 0.0 0.0))
+   (mass 1.0)))
 (defun step-farticle (p)
   (let ((old (farticle-position-old p))
 	(curr (farticle-position p)))
@@ -319,14 +377,15 @@
   (getfnc 'gl-init)
   (render-stuff))
 
-
-(defparameter *fov* (* 70 (floatify (/ pi 180.0))))
+(defparameter *fov* (floatify pi))
 
 (defparameter *black* (make-instance 'application::render-area :height 2 :width 2
 				     :x 0
 				     :y 0))
 
 (defparameter *sky-color*
+  (vector 0.68 0.2 0.0)
+  #+nil
   (vector 0.68 0.8 1.0))
   
 (defparameter *fog-ratio* 0.75)
@@ -434,16 +493,6 @@
 		  :displaced-to image
 		  :displaced-index-offset (* c (+ w (* h width))))))
 
-  ;;;;150 ms delay for sprinting
-;;;;player eye height is 1.5, subtract 1/8 for sneaking
-
-;;gravity is (* -0.08 (expt tickscale 2)) 0 0
-;;falling friction is 0.98
-;;0.6 * 0.91 is walking friction
-;;minecraft fog color sometimes (0.68 0.8 1.0)
-  ;;  (progno #(113 174 70 255)  #(198 304 122 255))
-;;;grass is 0 240
-;;;leaves is [64 80] 192
   (defun modify-greens (xpos ypos
 			&key
 			  (color #(0 0 0 0))
@@ -452,8 +501,6 @@
 	   ((lambda (vecinto other)
 	      (map-into vecinto (lambda (a b) (truncate (* a b) 256)) vecinto other))
 	    (getapixel (- 255 y) x terrain) color))))
-
-;;;;load a png image from a path
 
 (defun load-png (filename)
   (opticl:read-png-file filename))
