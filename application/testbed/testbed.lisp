@@ -145,8 +145,19 @@
 (defparameter *ent* (sandbox-sub::gentity))
 (defparameter *fist* (sandbox-sub::gen-fister))
 (defparameter *swinging* nil)
+(defparameter *ticks* 0)
 
 (defun physss ()
+  (incf *ticks*)
+  (let ((seconds (or 60 840)))
+    (setf sandbox::*daytime*
+	  (or 0.0
+	      (floatify
+	       (/ (abs (- (mod (/ *ticks*
+				  60.0)
+			       (* 2 seconds))
+			  seconds))
+		  seconds)))))
   (sandbox-sub::physentity *ent*))
 (defparameter *reach* 64.0)
 (defun stuff ()
@@ -260,7 +271,7 @@
      (aref pos 1)
      (aref pos 2))))
 
-(defparameter *blockid* 89)
+(defparameter *blockid* 3)
 (defparameter *count* 0)
 (defparameter *right-fist-fnc*
   (lambda (x y z)
@@ -269,7 +280,8 @@
       
       (let ((blockval (let ((seq
 			     #(3 13 82 12 24 4 1 7 10 8 78 79 2 18 17 20 45 5 89)))
-			(elt seq (mod (incf *count*) (length seq))))))
+			(elt seq (mod (round window::*scroll-y*)
+				      (length seq))))))
 	(sandbox::setblock-with-update
 	 x
 	 y

@@ -357,16 +357,6 @@
 	  (g (* daytime (aref *sky-color* 1)))
 	  (b (* daytime (aref *sky-color* 2))))
       (gl:clear-color r g b 1.0)))
-
-  (let ((seconds (or 60 840)))
-    (setf sandbox::*daytime*
-	  ;(or 0.0)
-	  (floatify
-	   (/ (abs (- (mod (/ (get-internal-real-time)
-			      (floatify internal-time-units-per-second))
-			   (* 2 seconds))
-		      seconds))
-	      seconds))))
   
   (gl:enable :depth-test)
   (gl:depth-func :less)
@@ -429,10 +419,13 @@
      )))
 
 (progn
-  (defun color-grasses (terrain color)
-    (modify-greens 64 192 :color color :terrain terrain)
-    (modify-greens 80 192 :color color :terrain terrain)
-    (modify-greens 0 240 :color color :terrain terrain)
+  (defun color-grasses (terrain)
+    (flet ((color ()
+	     (let ((value (random 256)))
+	       (foliage-color value (random (1+ value))))))
+      (modify-greens 64 192 :color (color) :terrain terrain)
+      (modify-greens 80 192 :color (color) :terrain terrain)
+      (modify-greens 0 240 :color (color) :terrain terrain))
     terrain)
   (defun getapixel (h w image)
     (destructuring-bind (height width c) (array-dimensions image)
@@ -467,23 +460,24 @@
 
 (defvar *ourdir* (filesystem-util:this-directory))
 
+(defun  foliage-color (a b)
+  (multiple-value-bind (w1 w2 w3)
+      (barycentric-interpolation a b 0.0 0.0 255.0 0.0 255.0 255.0)
+    (mapcar (lambda (x y z)
+	      (+ (* x w1)
+		 (* y w2)
+		 (* z w3)))
+	    '(71.0 205.0 51.0)
+	    '(191.0 183.0 85.0)
+	    '(128.0 180.0 151.0))))
+
 (deflazy terrain-png ()
   (load-png 
    (filesystem-util:rebase-path #P"terrain.png" *ourdir*)))
 
 (deflazy modified-terrain-png (terrain-png)
   (color-grasses
-   (alexandria::copy-array terrain-png)
-   (let ((value (random 256)))
-     (multiple-value-bind (w1 w2 w3)
-	 (barycentric-interpolation value (random (1+ value)) 0.0 0.0 255.0 0.0 255.0 255.0)
-       (mapcar (lambda (x y z)
-		 (+ (* x w1)
-		    (* y w2)
-		    (* z w3)))
-	       '(71.0 205.0 51.0)
-	       '(191.0 183.0 85.0)
-	       '(128.0 180.0 151.0))))))
+   (alexandria::copy-array terrain-png)))
 
 (deflazy terrain (modified-terrain-png gl-context)
   (make-instance
@@ -550,7 +544,7 @@
 	   (|.| pixdata "rgb"))
 	fogratio
 	))
-      #+nil
+    ;  #+nil
       (if (== (|.| pixdata "a") 0.0)
 	  (/**/ "discard;"))
       (= (|.| :gl-frag-color "rgb") temp)))
