@@ -121,11 +121,14 @@
 	  (mass (farticle-mass farticle))
 	  (force (farticle-force farticle)))
       (fill force 0.0)
-      (let ((contact-state (if (and noclip (not sandbox-sub::*dirtying*))
-			       #b000000
-			       (with-vec (px py pz) (pos)
-				 (funcall contact-handler px py pz aabb))))
-	    (total-speed (* *ticks-per-second* (nsb-cga:vec-length vel))))			    
+      (let* ((contact-state (if (and noclip (not sandbox-sub::*dirtying*))
+				#b000000
+				(with-vec (px py pz) (pos)
+				  (funcall contact-handler px py pz aabb))))
+	     (vel-length (nsb-cga:vec-length vel))
+	     (total-speed (* *ticks-per-second* vel-length)))
+
+	;;wind resistance
 	(let ((drag (* total-speed
 		       total-speed))
 	      (drag-scale (if fly
@@ -138,9 +141,10 @@
 		  force
 		  temp-vec))
 	(let ((onground (logtest contact-state #b000100)))
-	  (let ((speed 2.0))
+	  (let ((speed (* 2 1.4)))
 	    (cond
 	      (fly
+	       (*= speed 8.0)
 	       (let ((flyvec (vec 0.0 speed 0.0)))
 		 (when is-jumping
 		   (modify nsb-cga:%vec+ force
@@ -152,28 +156,41 @@
 	       (cond
 		 (onground
 		  #+nil
-		  (let ((walking-friction (* 0.91 (* 0.6 0.9))))
-		    (*= xvel walking-friction)
-		    (*= zvel walking-friction))
+		  (unless (zerop total-speed)
+		    (let ((walking-friction 0.0))
+		      (nsb-cga:%normalize temp-vec vel)
+		      (modify nsb-cga:%vec* temp-vec walking-friction)
+		      (modify nsb-cga:%vec-
+			      force
+			      temp-vec)))
 		  (case is-sneaking 
 		    (0 (*= speed 0.5))
 		    (1 (*= speed 2.0)))
 		  (when is-jumping
 		    (modify nsb-cga:%vec+ force
-			    (load-time-vector
+			    (vec
 			     0.0
-			     200.0
-			     0.0))))
-		 (t
-		  (setf speed (* speed 0.2))))))
+			     (* 3.3 *ticks-per-second*)
+			     0.0)))))))
 	    (when dir
-	      (let ((dir (+ dir yaw)))
-		(let ((walkvec (vec (* speed (sin dir))
-				    0.0
-				    (* speed (cos dir)))))
-		  (modify nsb-cga:%vec+ force walkvec))))))
-	    ;;to allow walking around block corners
-	    ;;we introduce a frame of gravity lag
+	      (let ((target-vec 
+		      (let ((diraux (+ dir yaw)))
+			(vec (sin diraux)
+			     0.0
+			     (cos diraux)))))   
+		(let* ((strength? (* *ticks-per-second*
+				     (nsb-cga:dot-product target-vec vel)))
+		       (difference (- speed strength?)))
+		  (when (> difference 0.0)
+		    (let ((velocity-dependent-force
+			   (min (if onground
+				    speed
+				    (* speed 0.5))
+				difference)))
+		      (modify nsb-cga:%vec* target-vec velocity-dependent-force)
+		      (modify nsb-cga:%vec+ force target-vec))))))))
+	;;to allow walking around block corners
+	;;we introduce a frame of gravity lag
 	(progn
 	  (let ((old-onground (logtest (entity-contact entity) #b000100)))
 	    (when (and (not old-onground)
