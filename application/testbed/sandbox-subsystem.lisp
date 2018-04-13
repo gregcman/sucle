@@ -231,7 +231,6 @@
 		    (let* ((dot (nsb-cga:dot-product difference target-vec)))
 		      (let ((bump-direction			     
 			     (if (and (not onground)
-				      (not fly)
 				      (> 0.0 dot))
 				 ;;in the air?
 				 (let ((vec
