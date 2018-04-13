@@ -101,13 +101,17 @@
 		     ,x ,y ,z)))
 (defparameter *ticks-per-second* 60.0)
 (defparameter *temp-vec* (nsb-cga:vec 0.0 0.0 0.0))
+(defparameter *jump-frame-count* 0)
+(defparameter *jump-rising* nil)
+(defparameter *jump-count* 0.0)
 (defun physics (entity yaw dir farticle
 		noclip gravity fly
 		is-jumping
 		is-sneaking
 		contact-handler
 		world-collision-fun
-		aabb &optional (temp-vec *temp-vec*))
+		aabb &optional
+		       (temp-vec *temp-vec*))
   (declare (optimize (debug 3)))
   (step-farticle farticle)
   (flet ((vec (x y z)
@@ -126,7 +130,12 @@
 				(with-vec (px py pz) (pos)
 				  (funcall contact-handler px py pz aabb))))
 	     (vel-length (nsb-cga:vec-length vel))
-	     (total-speed (* *ticks-per-second* vel-length)))
+	     (total-speed (* *ticks-per-second* vel-length))
+	     (ground-speed
+	      (let ((x (* *ticks-per-second* (aref vel 0)))
+		    (z (* *ticks-per-second* (aref vel 2))))
+		(sqrt (+ (* x x)
+			 (* z z))))))
 
 	;;wind resistance
 	(let ((drag (* total-speed
@@ -141,64 +150,120 @@
 		  force
 		  temp-vec))
 	(let ((onground (logtest contact-state #b000100)))
-	  (let ((speed (* 2 1.4)))
+	  (if onground
+	      (setf *jump-frame-count* 0)
+	      (incf *jump-frame-count*))
+	  (let* ((walkspeed (* 2 1.4 2.1))
+		 (speed walkspeed)
+		 (step-power 4.0))
+	    (case is-sneaking 
+	      (0 (and (not fly)
+		      (*= speed 0.25)))
+	      (1 (*= speed 2.0)))
 	    (cond
 	      (fly
-	       (*= speed 8.0)
-	       (let ((flyvec (vec 0.0 speed 0.0)))
-		 (when is-jumping
-		   (modify nsb-cga:%vec+ force
-			   flyvec))
-		 (case is-sneaking
-		   (0 (modify nsb-cga:%vec- force
-			      flyvec)))))		
+	       (*= speed 4.0))		
 	      (t
+	       (when (> 0.0 (aref vel 1))
+		 (setf *jump-rising* nil))
 	       (cond
 		 (onground
-		  #+nil
-		  (unless (zerop total-speed)
-		    (let ((walking-friction 0.0))
-		      (nsb-cga:%normalize temp-vec vel)
-		      (modify nsb-cga:%vec* temp-vec walking-friction)
-		      (modify nsb-cga:%vec-
-			      force
-			      temp-vec)))
-		  (case is-sneaking 
-		    (0 (*= speed 0.5))
-		    (1 (*= speed 2.0)))
+		  (setf *jump-rising* nil)
+		  (unless dir
+		    (nsb-cga:%vec* temp-vec vel *ticks-per-second*)
+		    (modify nsb-cga:%vec* temp-vec
+			    4.0
+			    )
+		    (modify nsb-cga:%vec-
+			    force
+			    temp-vec))
 		  (when is-jumping
-		    (modify nsb-cga:%vec+ force
-			    (vec
-			     0.0
-			     (* 3.3 *ticks-per-second*)
-			     0.0)))))))
-	    (when dir
-	      (let ((target-vec 
-		      (let ((diraux (+ dir yaw)))
-			(vec (sin diraux)
-			     0.0
-			     (cos diraux)))))   
-		(let* ((strength? (* *ticks-per-second*
-				     (nsb-cga:dot-product target-vec vel)))
-		       (difference (- speed strength?)))
-		  (when (> difference 0.0)
-		    (let ((velocity-dependent-force
-			   (min (if onground
-				    speed
-				    (* speed 0.5))
-				difference)))
-		      (modify nsb-cga:%vec* target-vec velocity-dependent-force)
-		      (modify nsb-cga:%vec+ force target-vec))))))))
+		    (setf *jump-rising* t)
+		    (let ((foo (/ (- (max walkspeed ground-speed)
+				     walkspeed) walkspeed)))
+		      (setf *jump-count* (* *ticks-per-second*
+					    (cond ((eql 0 is-sneaking) 0.0)
+						  (t foo))))
+		      (let ((base 4.0))
+			(incf base (* 2.0 foo))
+			(modify nsb-cga:%vec+ force
+				(vec
+				 0.0
+				 (* base *ticks-per-second*)
+				 0.0))))))
+		 (t (*= step-power 0.6)))
+	       (when *jump-rising*
+		 (when (and is-jumping (< *jump-frame-count*
+					  *jump-count*))
+		   (modify nsb-cga:%vec+ force
+			   (vec
+			    0.0
+			    (* 6.0 (/ (- *jump-count* *jump-frame-count*)
+				      *jump-count*))
+			    0.0))))))
+	    (let* ((yvalue (if fly
+			       (if is-jumping
+				   speed
+				   (case is-sneaking
+				     (0 (- speed))
+				     (otherwise 0.0)))
+			       0.0))
+		   (target-vec
+		    (if dir
+			(let ((diraux (+ dir yaw)))
+			  (nsb-cga:vec
+			   (* speed (sin diraux))
+			   yvalue
+			   (* speed (cos diraux))))
+			(prog1
+			    (nsb-cga:vec 0.0 yvalue 0.0)
+			  (setf step-power 1.0)))))
+	      (let ((velocity (nsb-cga:vec (* (aref vel 0) *ticks-per-second*)
+					   (if fly
+					       (* (aref vel 1) *ticks-per-second*)
+					       0.0)
+					   (* (aref vel 2) *ticks-per-second*))))
+		(let* ((difference (nsb-cga:vec-
+				    target-vec
+				    velocity))
+		       (difference-length (nsb-cga:vec-length difference)))
+		  (unless (zerop difference-length)
+		    (let* ((dot (nsb-cga:dot-product difference target-vec)))
+		      (let ((bump-direction			     
+			     (if (and (not onground)
+				      (not fly)
+				      (> 0.0 dot))
+				 ;;in the air?
+				 (let ((vec
+					(nsb-cga:cross-product
+					 (nsb-cga:cross-product target-vec difference)
+					 target-vec)))
+				   (let ((value (nsb-cga:vec-length vec)))
+				     (if (zerop value)
+					 (progn
+					   (error "wtf")
+				;	   vec
+					   )
+					 (nsb-cga:vec/ vec value))))
+				 (nsb-cga:vec/ 
+				  difference
+				  difference-length))))
+			(let ((step-force (* 2.0 difference-length)))
+			  (modify nsb-cga:%vec+ force
+				  (nsb-cga:vec* bump-direction
+						(* step-power step-force))))))))))))
 	;;to allow walking around block corners
 	;;we introduce a frame of gravity lag
 	(progn
 	  (let ((old-onground (logtest (entity-contact entity) #b000100)))
 	    (when (and (not old-onground)
 		       gravity)
-	      (modify nsb-cga:%vec+ force
+	      (modify nsb-cga:%vec- force
 		      (load-time-vector
 		       0.0
-		       -9.8
+		       (or 13.0
+			   ;9.8
+			   )
 		       0.0))))
 	  (setf (entity-contact entity) contact-state))
 	(modify nsb-cga:%vec/ force (* (* *ticks-per-second*
@@ -217,13 +282,22 @@
 		(collide-world2
 		 fun
 		 px py pz vx vy vz aabb)
-	      (setf (values px py pz vx vy vz)
-		    (values (floatify a)
-			    (floatify b)
-			    (floatify c)
-			    (floatify d)
-			    (floatify e)
-			    (floatify f))))))))))
+	      (let ((a (floatify a))
+		    (b (floatify b))
+		    (c (floatify c))
+		    (d (floatify d))
+		    (e (floatify e))
+		    (f (floatify f)))
+;		(assert (wtf a))
+;		(assert (wtf b))
+;		(assert (wtf c))
+;		(assert (wtf d))
+;		(assert (wtf e))
+;		(assert (wtf f))		
+		(setf (values px py pz vx vy vz)
+		      (values a b c d e f))))))))))
+(defun wtf (x)
+  (= x x))
 
 (defun contact-handle (acc vel)
   (multiple-value-bind (i+ i- j+ j- k+ k-)
@@ -394,15 +468,13 @@
   (getfnc 'gl-init)
   (render-stuff))
 
-(defparameter *fov* (floatify pi))
+(defparameter *fov* (* (floatify pi) (/ 70 180)))
 
 (defparameter *black* (make-instance 'application::render-area :height 2 :width 2
 				     :x 0
 				     :y 0))
 
 (defparameter *sky-color*
-  (vector 0.68 0.2 0.0)
-  #+nil
   (vector 0.68 0.8 1.0))
   
 (defparameter *fog-ratio* 0.75)

@@ -1,6 +1,6 @@
 (defpackage :atest
   (:use :cl
-	:funland))
+	:utility))
 (in-package :atest)
 (defparameter *box* #(0 128 0 128 -128 0))
 
@@ -342,11 +342,12 @@
 	      oldx oldy oldz)))))
 
 (defun line (px py pz vx vy vz)
-  (sandbox::aabb-collect-blocks
-   px py pz (- vx px) (- vy py) (- vz pz)
-   sandbox::*fist-aabb*   
-   (lambda (x y z)
-     (sandbox::plain-setblock x y z 1 0))))
+  (aabbcc::aabb-collect-blocks
+      (px py pz (- vx px) (- vy py) (- vz pz)
+	  sandbox-sub::*fist-aabb*)
+      (x y z contact)
+    (declare (ignorable contact))
+   (sandbox::plain-setblock x y z 1 0)))
 
 (defun pumpkinify (x y z)
   (when (and (= 2 (world::getblock x y z))

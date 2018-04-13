@@ -160,12 +160,16 @@
 		       seconds))
 	       seconds)))))
   (sandbox-sub::physentity *ent*))
-(defparameter *start-fov* (* 95 (floatify (/ pi 180.0))))
-(defparameter *target-fov* (* 110 (floatify (/ pi 180.0))))
+#+nil
+(progn
+  (defparameter *start-fov* (* 95 (floatify (/ pi 180.0))))
+  (defparameter *target-fov* (* 110 (floatify (/ pi 180.0))))
+  (defun ease (a b &optional (modifier 0.5))
+    (alexandria:lerp modifier a b))
+  (define-modify-macro easef (b &optional (modifier 0.5)) ease))
+
 (defparameter *reach* 64.0)
-(defun ease (a b &optional (modifier 0.5))
-  (alexandria:lerp modifier a b))
-(define-modify-macro easef (b &optional (modifier 0.5)) ease)
+
 (defun stuff ()
   (let* ((player-farticle (sandbox-sub::entity-particle *ent*))
 	 (pos (sandbox-sub::farticle-position player-farticle))
@@ -196,6 +200,7 @@
 	     (window::skey-p (window::keyval #\A))
 	     (window::skey-p (window::keyval #\S))
 	     (window::skey-p (window::keyval #\D))))
+      #+nil
       (case is-sneaking
 	(1 (easef sandbox-sub::*fov* *target-fov* 0.1))
 	(otherwise (easef sandbox-sub::*fov* *start-fov* 0.1)))
@@ -218,7 +223,8 @@
 	    (let ((vec (camera-matrix:camera-vec-position camera))
 		  (cev (camera-matrix:camera-vec-noitisop camera)))
 	      (nsb-cga:%vec-lerp vec prev curr fraction)
-	      (when (eql 0 is-sneaking)
+	      (when (and (not fly)
+			 (eql 0 is-sneaking))
 		(nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))
 	      (nsb-cga:%vec* cev vec -1.0))))))))
 
