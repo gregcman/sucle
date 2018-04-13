@@ -20,8 +20,8 @@
     (application::main)))
 (defvar *this-directory* (filesystem-util:this-directory))
 
-(defparameter *window-start-height* 480)
-(defparameter *window-start-width* 780)
+(defparameter *window-start-height* 512)
+(defparameter *window-start-width* 512)
 (defparameter *window-start-title* "basic app")
 (defparameter *ticks* 0)
 (defparameter *ndc-mouse-x* 0.0)
@@ -34,8 +34,10 @@
 (defparameter *drag-offset-y* 0.0)
 
 (defun init ()
+  #+nil
   (setf *sprites* (doubly-linked-list:circular "sentinel"))
   (text-sub::change-color-lookup 'terminal-test::color-fun)
+  #+nil
   (let ((chain *sprites*))
     (dotimes (x 10)
       (doubly-linked-list:insert-next chain
@@ -55,15 +57,14 @@
 				     window:*height*))))
   (when (window::skey-j-p (window::keyval #\esc))
     (application::quit))
-  (when (window::skey-j-p (window::keyval :f2))
-    (terminal-test::reset-term)
-    )
-  (when (window::skey-j-p (window::keyval :f1))
-    (terminal-test::kill)
-    )
   #+nil
-  (when (window::skey-j-p (window::keyval :r))
-    (application::reload 'cons-texture))
+  (progn
+    (when (window::skey-j-p (window::keyval :f2))
+      (terminal-test::reset-term)
+      )
+    (when (window::skey-j-p (window::keyval :f1))
+      (terminal-test::kill)
+      ))
   #+nil
   (when (window::skey-j-p (window::keyval #\A))
     (music::reset-listener)
@@ -73,11 +74,43 @@
   (gl:clear :color-buffer-bit)
   (gl:disable :cull-face)
   (gl:disable :blend)
+  #+nil
   (more-test)
+  #+nil
   (render-stuff)
+  #+nil
   (foo0)
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
+    (let ((program (getfnc 'flat-texture-shader)))
+    (glhelp::use-gl-program program)
+    (glhelp:with-uniforms uniform program
+      (gl:uniformi (uniform 'sampler) 0)
+      (glhelp::set-active-texture 0))
+
+    
+    (when (window::skey-p (window::mouseval :1))
+      (deflazy cons-png ()
+	(flip-image:flip-image
+	 (color-test::test42 (floatify window::*scroll-y*)
+					;	   (+ 0.5 (* 0.1 (sin *ticks*)))
+			     (/ (+ 1 mousex) 2)
+					;	   (+ 0.5 (* 0.1 (cos *ticks*)))
+			     (/ (+ 1 mousey) 2)
+			     )))
+					;(sleep 0.1)
+      )
+    (render-sprite
+     (load-time-value
+      (make-instance
+       'sprite
+       :texture 'cons-texture
+       :position (make-instance 'point :x -1.0 :y -1.0)
+       :bounding-box (make-instance 'rectangle
+				    :x0 0.0 :y0 0.0
+				    :x1 2.0 :y1 2.0)))))
+    
+    #+nil
     (when (window::skey-j-p (window::mouseval :left))
       ;;search for topmost sprite to drag
       (tagbody 
@@ -96,13 +129,16 @@
 		   (doubly-linked-list:insert-next *sprites* sprite-cell)
 		   (go end))))
 	     (setf last sprite-cell)))
-	 end))
+       end))
+    #+nil
     (typecase *selection*
       (sprite (with-slots (x y) (slot-value *selection* 'position)
 		(setf x (+ *drag-offset-x* mousex)
 		      y (+ *drag-offset-y* mousey))))))
+  #+nil
   (when (window::skey-j-r (window::mouseval :left))
     (setf *selection* nil))
+  #+nil
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -365,10 +401,10 @@
    (prog1
        (glhelp:pic-texture
 	cons-png
-	:rgb)
+	:rgba)
      (glhelp:apply-tex-params
-      (quote ((:texture-min-filter . :nearest)
-	      (:texture-mag-filter . :nearest)
+      (quote ((:texture-min-filter . :linear)
+	      (:texture-mag-filter . :linear)
 	      (:texture-wrap-s . :clamp)
 	      (:texture-wrap-t . :clamp)))))))
 

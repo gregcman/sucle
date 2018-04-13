@@ -37,7 +37,8 @@
     (if (and (wtf2 x)
 	     (wtf2 y)
 	     (wtf2 z))
-	(rs-colors::adobe-rgb-from-cie-xyz x y z)
+       
+	(rs-colors::cie-rgb-from-cie-xyz x y z)
 	(values 0.0 0.0 0.0))))
 
 (defparameter *path*
@@ -106,9 +107,10 @@
 
 
 (defun luminance-zenith (turbidity solar-angle)
-  (let ((x (* (- (/ 4 9)
-		 (/ turbidity 120))
-	      (- (floatify pi) (* 2 solar-angle)))))
+  (let ((x (* (- (/ 4.0 9.0)
+		 (/ turbidity 120.0))
+	      (- (floatify pi)
+		 (* 2.0 solar-angle)))))
     (+ (*  (- (* 4.0453 turbidity)
 	      4.9710)
 	   (floatify (tan x)))
@@ -143,19 +145,17 @@
 
 (defun xy-luminance (array turbidity solar-angle)
   (row-major-aref
-   (opticl::post-multiply-by-column-vector 
+   (opticl::matrix-multiply
     (opticl::matrix-multiply
      (row-vector (expt turbidity 2)
 		 turbidity
 		 1.0)
      array)
-    (make-array 4 :element-type 'single-float
-		:initial-contents
-		(list
-		 (expt solar-angle 3)
-		 (expt solar-angle 2)
-		 solar-angle
-		 1.0)))
+    (column-vector
+     (expt solar-angle 3)
+     (expt solar-angle 2)
+     solar-angle
+     1.0))
    0))
 
 (defun luminances (turbidity solar-angle)
@@ -186,8 +186,10 @@
   (multiple-value-bind (xlum ylum lumlum) (luminances turbidity solar-angle)
     (let* ((lumfun (multiple-value-call #'funfun (luminance-distribtion-parameters turbidity)))
 	   (lumscale (/ lumlum (funcall lumfun 0.0 solar-angle)))
+	   
 	   (xfun (multiple-value-call #'funfun (x-distribtion-parameters turbidity)))
 	   (xscale (/ xlum (funcall xfun 0.0 solar-angle)))
+	   
 	   (yfun (multiple-value-call #'funfun (y-distribtion-parameters turbidity)))
 	   (yscale (/ ylum (funcall yfun 0.0 solar-angle))))
       (lambda (theta gamma)
@@ -196,24 +198,44 @@
 	 (* yscale (funcall yfun theta gamma))
 	 (* lumscale (funcall lumfun theta gamma)))))))
 
-(defun test42 (turbidity solar-angle &optional (path *path*))
-  (let* ((width 512)
-	 (fwidth (floatify width)))
+(defun test42 (turbidity a b)
+  (let* ((width 128)
+	 (fwidth (floatify width))
+	 (foo2 (* 0.5 (floatify pi)))
+	 (foo (* 1.0 (floatify pi)))
+	 (sunpos (complex (* foo a)
+			  (* foo b)))
+	 (zenith (complex (* foo 0.5)
+			  (* foo 0.5)))
+	 (solar-angle ;(abs (- sunpos zenith))
+	  ))
     (let ((array (make-array (list width width 4) :element-type '(unsigned-byte 8)))
-	  (fun (luminance-fun turbidity solar-angle)))
+	  (fun (luminance-fun ;turbidity solar-angle
+	;	1.0
+		(+ 1.0 (* 6.0 b))
+		(* foo a)
+		)))
       (with-float-traps-masked
 	(dotimes (x width)
 	  (dotimes (y width)
-	    (unless (= 0 y)
+	    ;(unless (= 0 y))
+	    (let ((spot
+		   ;;distance to zenith can never be greater than pi/2
+		   (complex (* foo2 (/ x fwidth))
+			    
+			    (* foo (/ y fwidth)))))
 	      (multiple-value-bind (xval yval lumval)
 		  (funcall fun
-			   (* (floatify (* pi 2)) (/ x fwidth))
-			   (* (floatify (* pi 2)) (/ y fwidth)))
+			   (realpart spot) ;;distance to zenith is x
+					;(abs (- spot zenith))
+			   (imagpart spot) ;;distance to sun is y
+					;(abs (- spot sunpos))
+			   )
 		(when (and (wtf2 xval)
 			   (wtf2 yval)
 			   (wtf2 lumval))
 		  (multiple-value-bind (r g b)
-		      (test xval yval lumval)
+		      (test xval yval (- 1.0 (exp (* (- 0.1) lumval))))
 		    (flet ((fun (elt value)
 			     (setf (aref array (- (1- width) y) x elt)
 				   (floor (* value 255.0)))))
@@ -221,6 +243,4 @@
 		      (fun 1 g)
 		      (fun 2 b)
 		      (fun 3 1.0)))))))))
-      (opticl:write-png-file
-       path
-       array))))
+      array)))
