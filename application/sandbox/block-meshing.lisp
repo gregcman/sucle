@@ -97,28 +97,19 @@
 		   (1 0 0))))))
 
 (eval-when (:compile-toplevel)
-  ;;0.9 for nether???
-  ;;0.8 for overworld(in-package :sandbox)???
-  (defun light-gen? (f i)
-    (expt (+ 0.7 (* 2 f)) (- 15 i)))
+  (defun light-gen (x)
+    (let ((a (/ x 15)))
+      (expt (* a a) 2.33))
+    #+nil
+    (let ((value
+	   ))
+      (* value value)))
 
-  ;;;overworld f = 0.05
-;;;nether f = 0.1
-  (defun light-gen (f i)
-    (+ f
-       (/ (* i (- 1 f))
-	  (- 60 i i i))))
   (defparameter light-index-table
     (let ((foo-array (make-array 16 :element-type 'single-float)))
       (dotimes (x 16)
 	(setf (aref foo-array x)
-	      (light-gen? 0.05 x)))
-  ;    #+nil
-      (let ((a (aref foo-array 0)))
-	(map-into foo-array
-		  (lambda (x)
-		    (/ (- x a) (- 1 a)))
-		  foo-array))
+	      (floatify (light-gen x))))
       foo-array)))
 
 (declaim (inline lightfunc))

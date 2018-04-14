@@ -35,39 +35,26 @@
     x))
  '(   
    ;;earth
-   (3 "dirt" 2 0 T T)
-   (13 "gravel" 19 0 T T)
-   (82 "clay" 72 0 T T)
+   (3 "soil" 2 0 T T)
 
    (12 "sand" 18 0 T T)
-   (24 "sandstone" 208 0 T T)
-
-   (4 "cobblestone" 16 0 T T) 
-   (1 "stone" 1 0 T T)
-   
-   (7 "bedrock" 17 0 T T)
-
-   (10 "lava" 237 15 NIL NIL)
-
-   ;;water   
-   (8 "water" 205 0 NIL NIL)
-   (78 "snow" 66 0 T NIL) 
-   (79 "ice" 67 0 T NIL)
+   (13 "gravel" 19 0 T T)
+   (24 "cobble" 208 0 T T)  
+   (1 "boulder" 1 0 T T)
 
    ;;air
-   (0 "air" 0 0 NIL NIL)
+   (0 "void" 0 0 NIL NIL)
    ;;wind??
    
    ;;life
    (2 "grass" 0 0 T T)
-   (18 "foliage" 53 0 T nil) 
+   (18 "foliage" 53 0 T t) 
    (17 "log" 20 0 T T) 
    
    ;;artificial
    (20 "glass" 49 0 T NIL)
-   (45 "brick" 7 0 T T)
-   (5 "plank" 4 0 T T) 
+   (5 "lumber" 4 0 T T) 
    
-   (89 "lightbulb" 105 15 T T) 
+   (89 "lamp" 105 15 T T) 
 
    ))

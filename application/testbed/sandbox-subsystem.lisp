@@ -240,8 +240,8 @@
 				   (let ((value (nsb-cga:vec-length vec)))
 				     (if (zerop value)
 					 (progn
-					   (error "wtf")
-				;	   vec
+				;	   (error "wtf")
+					   vec
 					   )
 					 (nsb-cga:vec/ vec value))))
 				 (nsb-cga:vec/ 
@@ -570,7 +570,6 @@
     (flet ((color ()
 	     (let ((value (random 256)))
 	       (foliage-color value (random (1+ value))))))
-      (modify-greens 64 192 :color (color) :terrain terrain)
       (modify-greens 80 192 :color (color) :terrain terrain)
       (modify-greens 0 240 :color (color) :terrain terrain))
     terrain)

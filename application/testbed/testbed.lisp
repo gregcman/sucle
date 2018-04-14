@@ -122,19 +122,7 @@
   (camera-al-listener sandbox-sub::*camera*))
 
 ;;;
-(progn
-  (declaim (ftype (function (single-float) single-float)
-		  translator))
-  (with-unsafe-speed
-    (defun translator (x)
-      (let* ((a (* x 0.6))
-	     (b (+ 0.2 a))
-	     (c (* b b b))
-	     (d (* 8.0 0.15 (/ (floatify pi) 180.0)))
-	     (e (* d c)))
-	(declare (type single-float a b c d e))
-	e))))
-(defparameter *mouse-multiplier* (translator 0.5))
+(defparameter *mouse-multiplier* 0.002617)
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 ;;;
 (defparameter *ticker*
@@ -300,7 +288,7 @@
 	(not-occupied x y z)
       
       (let ((blockval (let ((seq
-			     #(3 13 82 12 24 4 1 7 10 8 78 79 2 18 17 20 45 5 89)))
+			     #(3 13 12 24 1 2 18 17 20 5 89)))
 			(elt seq (mod (round window::*scroll-y*)
 				      (length seq))))))
 	(sandbox::setblock-with-update

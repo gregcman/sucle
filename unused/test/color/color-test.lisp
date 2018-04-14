@@ -207,13 +207,13 @@
 			  (* foo b)))
 	 (zenith (complex (* foo 0.5)
 			  (* foo 0.5)))
-	 (solar-angle ;(abs (- sunpos zenith))
+	 (solar-angle (* foo2 a)
 	  ))
     (let ((array (make-array (list width width 4) :element-type '(unsigned-byte 8)))
 	  (fun (luminance-fun ;turbidity solar-angle
-	;	1.0
-		(+ 1.0 (* 6.0 b))
-		(* foo a)
+		1.0
+	;	(+ 1.0 (* 6.0 b))
+		solar-angle
 		)))
       (with-float-traps-masked
 	(dotimes (x width)
@@ -235,7 +235,10 @@
 			   (wtf2 yval)
 			   (wtf2 lumval))
 		  (multiple-value-bind (r g b)
-		      (test xval yval (- 1.0 (exp (* (- 0.1) lumval))))
+		      (test xval yval
+			   ; lumval
+			    (- 1.0 (exp (* (- 0.5) lumval)))
+			    )
 		    (flet ((fun (elt value)
 			     (setf (aref array (- (1- width) y) x elt)
 				   (floor (* value 255.0)))))
