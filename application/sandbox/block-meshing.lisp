@@ -99,7 +99,8 @@
 (eval-when (:compile-toplevel)
   (defun light-gen (x)
     (let ((a (/ x 15)))
-      (expt (* a a) 2.33))
+      (gamma-correction:gamma-correct
+       (* a a)))
     #+nil
     (let ((value
 	   ))
@@ -317,7 +318,7 @@
 (defun show-sidep (blockid other-blockid)
   (or (zerop other-blockid)
       (and (/= blockid other-blockid)
-	   (not (aref mc-blocks:*opaquecubelooukup* other-blockid)))))
+	   (not (aref block-data:*opaquecubelooukup* other-blockid)))))
 
 (defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
   (let ((id (gensym)))
@@ -329,7 +330,7 @@
   (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
 
 (defun renderstandardblock (id i j k)
-  (let ((texid (aref mc-blocks:*blockIndexInTexture* id)))
+  (let ((texid (aref block-data:*blockIndexInTexture* id)))
     (with-texture-translator2 (u0 u1 v0 v1) texid
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)

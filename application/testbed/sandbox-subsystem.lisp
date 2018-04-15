@@ -55,7 +55,7 @@
     (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
       (declare (ignorable contact))
-      (when (aref mc-blocks:*iscollidable*
+      (when (aref block-data:*iscollidable*
 		  (world:getblock x y z))
 	(when *dirtying2*
 	  (sandbox::plain-setblock x y z (1+ (random 5)) 0))
@@ -76,7 +76,7 @@
   (let ((acc #b000000))
     (aabbcc::get-blocks-around (px py pz aabb) (mx my mz contact-var)
       (declare (ignorable contact-var))
-      (when (aref mc-blocks:*iscollidable* (world:getblock mx my mz))
+      (when (aref block-data:*iscollidable* (world:getblock mx my mz))
 	(when *dirtying*
 	  (sandbox::plain-setblock mx my mz (1+ (random 5)) 0))
 	(logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz *block-aabb*))))

@@ -296,7 +296,7 @@
 	 y
 	 z
 	 blockval
-	 (aref mc-blocks:*lightvalue* blockval))))))
+	 (aref block-data:*lightvalue* blockval))))))
 (defparameter *left-fist-fnc*
   (lambda (x y z)
     (sandbox::setblock-with-update x y z 0 0)))

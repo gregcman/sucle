@@ -1,8 +1,8 @@
-(defpackage #:mc-blocks
+(defpackage #:block-data
   (:use #:cl
 	#:utility))
 
-(in-package :mc-blocks)
+(in-package :block-data)
 
 (macrolet
     ((defblockprop (name type)

@@ -57,7 +57,7 @@
   (map-box (lambda (x y z)
 	     (let ((blockid (world:getblock x y z)))
 					;(unless (zerop blockid))
-	       (let ((light (aref mc-blocks:*lightvalue* blockid)))
+	       (let ((light (aref block-data:*lightvalue* blockid)))
 		 (if (zerop light)
 		     (sandbox::plain-setblock x y z blockid 0 0)
 		     (sandbox::plain-setblock x y z blockid light)))))

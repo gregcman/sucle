@@ -47,7 +47,7 @@
   (maphash (lambda (k v)
 	     (map-into v (lambda (x)
 			   (let ((ans (mod (* x 2) 95)))
-			     (if (aref mc-blocks::renderasnormalblock ans)
+			     (if (aref block-data::renderasnormalblock ans)
 				 ans
 				 1))) v))
 	   world:chunkhash))
@@ -88,7 +88,7 @@
 	  (z -128 0))
 	 (let ((blockid (world:getblock x y z)))
 					;(unless (zerop blockid))
-	   (let ((light (aref mc-blocks::lightvalue blockid)))
+	   (let ((light (aref block-data::lightvalue blockid)))
 	     (if (zerop light)
 		 (plain-setblock x y z blockid light 0)
 		 (setblock-with-update x y z blockid light)))))
