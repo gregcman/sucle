@@ -1,5 +1,5 @@
 (defpackage #:doubly-linked-list
-  (:use #:cl)
+  (:use #:cl #:utility)
   (:export
    #:insert-next
    #:insert-prev
@@ -7,7 +7,8 @@
    #:link
    #:attach-next
    #:attach-prev
-   #:circular)
+   #:circular
+   #:do-circular-doubly-linked-list)
   (:export
    #:node-prev
    #:node-next
@@ -54,3 +55,27 @@
     (setf (node-next cell) cell
 	  (node-prev cell) cell)
     cell))
+
+(defmacro do-circular-doubly-linked-list ((object &optional (forward-p t))
+						    start &body body)
+  (let ((next-fun (if forward-p
+		      'node-next
+		      'node-prev)))
+    (with-gensyms (node-var)
+      (once-only (start)
+	`(do ((,node-var (,next-fun ,start)
+			 (,next-fun ,node-var)))
+	     ((or
+	       (not (node-p ,start))
+	       (eq ,node-var ,start)))
+	   (let ((,object (node-payload ,node-var)))
+	     ,@body))))))
+
+
+
+(set-pprint-dispatch
+ 'node
+ (lambda (stream object)
+   (do-circular-doubly-linked-list (obj) object
+     (write obj :stream stream)
+     (terpri stream))))

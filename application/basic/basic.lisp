@@ -78,21 +78,56 @@
        :initarg :y)))
 (defparameter *ndc-mouse-x* 0.0)
 (defparameter *ndc-mouse-y* 0.0)
-(defparameter *sprites*
-  (let ((chain (doubly-linked-list:circular "sentinel")))
-    (dotimes (x 10)
-      (doubly-linked-list:insert-next
-       chain
-       (doubly-linked-list:make-node
-	:payload
-	(make-instance
-	 'sprite
-	 :texture 'cons-texture
-	 :position (make-instance 'point :x (1- (random 2.0)) :y (1- (random 2.0)))
-	 :bounding-box (make-instance 'rectangle
-				      :x0 0.0 :y0 0.0
-				      :x1 (+ 0.1 (random 0.5)) :y1 (+ 0.1 (random 0.5)))))))
-    chain))
+
+(struct-to-clos:struct->class
+ (defstruct sprite-chain
+   (chain (doubly-linked-list:circular "sentinel"))
+   (hash (make-hash-table :test 'eq))))
+(defparameter *sprites* (make-sprite-chain))
+
+(defun add-sprite (sprite &optional (sprite-chain *sprites*))
+  (let ((hash (sprite-chain-hash sprite-chain)))
+    (multiple-value-bind (old-cell exists-p)
+	(gethash sprite hash)
+      (declare (ignorable old-cell))
+      (unless exists-p
+	(let ((new-node (doubly-linked-list:make-node
+			 :payload
+			 sprite)))
+	  (setf (gethash sprite hash)
+		new-node)
+	  (doubly-linked-list:insert-next
+	   (sprite-chain-chain sprite-chain)
+	   new-node)))
+      (not exists-p))))
+
+(defun remove-sprite (sprite &optional (sprite-chain *sprites*))
+  (let ((hash (sprite-chain-hash sprite-chain)))
+    (multiple-value-bind (old-cell exists-p) (gethash sprite hash)
+      (when exists-p
+	(doubly-linked-list:detach old-cell)
+	(remhash sprite hash))
+      exists-p)))
+
+(defun topify-sprite (sprite &optional (sprite-chain *sprites*))
+  (let ((hash (sprite-chain-hash sprite-chain)))
+    (multiple-value-bind (old-cell exists-p) (gethash sprite hash)
+      (when exists-p
+	(doubly-linked-list:detach old-cell)
+	(doubly-linked-list:insert-next
+	 (sprite-chain-chain sprite-chain)
+	 old-cell))
+      exists-p)))
+
+(dotimes (x 10)
+  (add-sprite
+   (make-instance
+    'sprite
+    :texture 'cons-texture
+    :position (make-instance 'point :x (1- (random 2.0)) :y (1- (random 2.0)))
+    :bounding-box (make-instance 'rectangle
+				 :x0 0.0 :y0 0.0
+				 :x1 (+ 0.1 (random 0.5)) :y1 (+ 0.1 (random 0.5))))))
 
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
@@ -166,23 +201,17 @@
 ;    #+nil
     (when (window::skey-j-p (window::mouseval :left))
       ;;search for topmost sprite to drag
-      (tagbody 
-	 (let ((last *sprites*))
-	   (do ((sprite-cell (doubly-linked-list:node-next last)
-			     (doubly-linked-list:node-next sprite-cell)))
-	       ((eq sprite-cell *sprites*))
-	     (let ((sprite (doubly-linked-list:node-payload sprite-cell)))
-	       (with-slots (absolute-rectangle position) sprite
-		 (when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
-		   (with-slots (x y) position
-		     (setf *drag-offset-x* (- x mousex)
-			   *drag-offset-y* (- y mousey)))
-		   (setf *selection* sprite)
-		   (doubly-linked-list:detach sprite-cell)
-		   (doubly-linked-list:insert-next *sprites* sprite-cell)
-		   (go end))))
-	     (setf last sprite-cell)))
-       end))
+      (block cya
+	(doubly-linked-list:do-circular-doubly-linked-list (sprite)
+	    (sprite-chain-chain *sprites*)
+	  (with-slots (absolute-rectangle position) sprite
+	    (when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
+	      (with-slots (x y) position
+		(setf *drag-offset-x* (- x mousex)
+		      *drag-offset-y* (- y mousey)))
+	      (setf *selection* sprite)
+	      (topify-sprite sprite)
+	      (return-from cya))))))
 ;    #+nil
     (typecase *selection*
       (sprite (with-slots (x y) (slot-value *selection* 'position)
@@ -197,11 +226,9 @@
     (glhelp:with-uniforms uniform program
       (gl:uniformi (uniform 'sampler) 0)
       (glhelp::set-active-texture 0))
-    (do ((sprite-cell (doubly-linked-list:node-prev *sprites*)
-		      (doubly-linked-list:node-prev sprite-cell)))
-	((eq sprite-cell *sprites*))
-      (let ((sprite (doubly-linked-list:node-payload sprite-cell)))
-	(render-sprite sprite)))))
+    (doubly-linked-list:do-circular-doubly-linked-list (sprite nil)
+	(sprite-chain-chain *sprites*)
+      (render-sprite sprite))))
 
 (defun render-tile (char-code x y background-color foreground-color)
   (color (byte/255 char-code)
