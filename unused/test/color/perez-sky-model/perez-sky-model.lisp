@@ -1,66 +1,7 @@
-(defpackage :color-test
-  (:use :cl :utility))
-(in-package :color-test)
+(defpackage :perez-sky-model
+  (:use :cl :utility :bad-floats :matrix :cie-color-space))
+(in-package :perez-sky-model)
 
-(defmacro wtf (x)
-  (once-only (x)
-    `(= ,x ,x)))
-
-(defmacro wtf2 (x)
-  (once-only (x)
-    `(wtf (* 0.0 ,x))))
-
-(declaim (inline cie-xyz-cie-xyl))
-(defun cie-xyz-cie-xyl (x y z)
-  (let ((a (+ x y z)))
-    (values (/ x a)
-	    (/ y a)
-	    y)))
-
-(declaim (inline cie-xyl-cie-xyz))
-(defun cie-xyl-cie-xyz (x y luminance)
-  (values (/ (* luminance x)
-	     y)
-	  luminance
-	  (/ (* luminance (- 1 x y))
-	     y)))
-
-(defun test-same (x0 y0 z0)
-  (multiple-value-bind (x y z) (cie-xyl-cie-xyz x0 y0 z0)
-    (multiple-value-bind (x y z) (cie-xyz-cie-xyl x y z)
-      (assert (= x x0))
-      (assert (= y y0))
-      (assert (= z z0)))))
-
-(defun test (x y luminance)
-  (multiple-value-bind (x y z) (cie-xyl-cie-xyz x y luminance)
-    (if (and (wtf2 x)
-	     (wtf2 y)
-	     (wtf2 z))
-       
-	(rs-colors::cie-rgb-from-cie-xyz x y z)
-	(values 0.0 0.0 0.0))))
-
-(defparameter *path*
-  "/home/imac/quicklisp/local-projects/symmetrical-umbrella/unused/test/color/color-test.png")
-(defun test69 (&optional (path *path*))
-  (let ((array (make-array '(256 256 4) :element-type '(unsigned-byte 8))))
-    (dotimes (x 256)
-      (dotimes (y 256)
-	(unless (= 0 y)
-	  (multiple-value-bind (r g b) (test (/ x 255.0)
-					     (/ y 255.0)
-					     1.0)
-	    (flet ((fun (elt value)
-		     (setf (aref array (- 255 y) x elt)
-			   (floor (* value 255.0)))))
-	      (fun 0 r)
-	      (fun 1 g)
-	      (fun 2 b)
-	      (fun 3 1.0))))))
-    (opticl:write-png-file
-     path
-     array)))
 ;;;;A B C D E
 
 ;;luminance
@@ -133,20 +74,10 @@
      (-0.04214  0.08970 -0.04153  0.00516)
      ( 0.15346 -0.26756  0.06670  0.26688))))
 
-(defmacro row-vector (&rest args)
-  `(make-array
-    '(1 ,(length args)) :element-type 'single-float :initial-contents
-    (list (list ,@args))))
-
-(defmacro column-vector (&rest args)
-  `(make-array
-    '(,(length args) 1) :element-type 'single-float :initial-contents
-    (list ,@ (mapcar (lambda (x) (list (quote list) x)) args))))
-
 (defun xy-luminance (array turbidity solar-angle)
   (row-major-aref
-   (opticl::matrix-multiply
-    (opticl::matrix-multiply
+   (matrix-multiply
+    (matrix-multiply
      (row-vector (expt turbidity 2)
 		 turbidity
 		 1.0)
@@ -163,11 +94,6 @@
 	  (xy-luminance *zenith-y* turbidity solar-angle)
 	  (luminance-zenith turbidity solar-angle)))
 
-
-(defmacro with-float-traps-masked (&body body)
-  `(progn
-     (sb-int:with-float-traps-masked (:invalid :overflow :inexact :underflow :divide-by-zero)
-      ,@body)))
 (defconstant +e+ (floatify (exp 1.0)))
 (defun funfun (a b c d e)
   (lambda (theta gamma)
@@ -178,7 +104,7 @@
 		(+ 1
 		   (* c (exp (* d gamma)))
 		   (* e (expt (cos gamma) 2))))))
-	(if (wtf value)
+	(if (float-not-nan-p value)
 	    value
 	    most-positive-single-float)))))
 
@@ -198,7 +124,7 @@
 	 (* yscale (funcall yfun theta gamma))
 	 (* lumscale (funcall lumfun theta gamma)))))))
 
-(defun test42 (turbidity a b)
+(defun test-array (turbidity a b)
   (let* ((width 128)
 	 (fwidth (floatify width))
 	 (foo2 (* 0.5 (floatify pi)))
@@ -231,14 +157,15 @@
 			   (imagpart spot) ;;distance to sun is y
 					;(abs (- spot sunpos))
 			   )
-		(when (and (wtf2 xval)
-			   (wtf2 yval)
-			   (wtf2 lumval))
+		(when (and (float-good-p xval)
+			   (float-good-p yval)
+			   (float-good-p lumval))
 		  (multiple-value-bind (r g b)
-		      (test xval yval
-			   ; lumval
-			    (- 1.0 (exp (* (- 0.5) lumval)))
-			    )
+		      (cie-xyl-cie-rgb
+		       xval yval
+					; lumval
+		       (- 1.0 (exp (* (- 0.5) lumval)))
+		       )
 		    (flet ((fun (elt value)
 			     (setf (aref array (- (1- width) y) x elt)
 				   (floor (* value 255.0)))))

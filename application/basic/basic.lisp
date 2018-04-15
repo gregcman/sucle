@@ -2,13 +2,19 @@
   (:use #:cl #:utility #:application #:opengl-immediate))
 (in-package :basic)
 
+(defparameter *ticks* 0)
 (defparameter *saved-session* nil)
 (defun per-frame (&optional session)
   (declare (ignorable session))
   (unless (eq *saved-session* session)
     (setf *saved-session* session)
     (init))
+  (incf *ticks*)
   (app))
+
+(defparameter *window-start-height* 512)
+(defparameter *window-start-width* 512)
+(defparameter *window-start-title* "basic app")
 (defun start ()
   (let ((application::*argument-values*
 	 (list nil
@@ -20,13 +26,73 @@
     (application::main)))
 (defvar *this-directory* (filesystem-util:this-directory))
 
-(defparameter *window-start-height* 512)
-(defparameter *window-start-width* 512)
-(defparameter *window-start-title* "basic app")
-(defparameter *ticks* 0)
+(defclass rectangle ()
+  ((x0 :accessor rectangle.x0
+       :initform 0.0
+       :initarg :x0)
+   (y0 :accessor rectangle.y0
+       :initform 0.0
+       :initarg :y0)
+   (x1 :accessor rectangle.x1
+       :initform 0.0
+       :initarg :x1)
+   (y1 :accessor rectangle.y1
+       :initform 0.0
+       :initarg :y1)))
+
+(defun coordinate-inside-rectangle-p (x y rectangle)
+  (with-slots (x0 y0 x1 y1) rectangle
+    (and (< x0 x x1)
+	 (< y0 y y1))))
+
+(defclass sprite ()
+  ((bounding-box :accessor sprite.bounding-box
+		 :initform (make-instance 'rectangle
+					  :x0 -0.25 :y0 -0.25
+					  :x1 0.25 :y1 0.25)
+		 :initarg :bounding-box)
+   (texture-section :accessor sprite.texture-section
+		    :initform (make-instance 'rectangle
+					     :x0 0.0 :y0 0.0
+					     :x1 1.0 :y1 1.0)
+		    :initarg :texture-section)
+   (absolute-rectangle :accessor sprite.absolute-rectangle
+		       :initform (make-instance 'rectangle)
+		       :initarg :absolute-rectangle)
+   (texture :accessor sprite.texture
+	    :initform nil
+	    :initarg :texture)
+   (color :accessor sprite.color
+	  :initform '(1.0 1.0 1.0 1.0)
+	  :initarg :color)
+   (position :accessor sprite.position
+	     :initform (make-instance 'point)
+	     :initarg :position)))
+
+(defclass point ()
+  ((x :accessor point.x
+       :initform 0.0
+       :initarg :x)
+   (y :accessor point.y
+       :initform 0.0
+       :initarg :y)))
 (defparameter *ndc-mouse-x* 0.0)
 (defparameter *ndc-mouse-y* 0.0)
-(defparameter *sprites* nil)
+(defparameter *sprites*
+  (let ((chain (doubly-linked-list:circular "sentinel")))
+    (dotimes (x 10)
+      (doubly-linked-list:insert-next
+       chain
+       (doubly-linked-list:make-node
+	:payload
+	(make-instance
+	 'sprite
+	 :texture 'cons-texture
+	 :position (make-instance 'point :x (1- (random 2.0)) :y (1- (random 2.0)))
+	 :bounding-box (make-instance 'rectangle
+				      :x0 0.0 :y0 0.0
+				      :x1 (+ 0.1 (random 0.5)) :y1 (+ 0.1 (random 0.5)))))))
+    chain))
 
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
@@ -34,30 +100,15 @@
 (defparameter *drag-offset-y* 0.0)
 
 (defun init ()
-  #+nil
-  (setf *sprites* (doubly-linked-list:circular "sentinel"))
-  (text-sub::change-color-lookup 'terminal-test::color-fun)
-  #+nil
-  (let ((chain *sprites*))
-    (dotimes (x 10)
-      (doubly-linked-list:insert-next chain
-	    (doubly-linked-list:make-node :payload
-	     (make-instance
-	      'sprite
-	      :texture 'cons-texture
-	      :position (make-instance 'point :x (1- (random 2.0)) :y (1- (random 2.0)))
-	      :bounding-box (make-instance 'rectangle
-					   :x0 0.0 :y0 0.0
-					   :x1 (+ 0.1 (random 0.5)) :y1 (+ 0.1 (random 0.5)))))))))
+  (text-sub::change-color-lookup 'terminal-test::color-fun))
 (defun app ()
-  (incf *ticks*)
   (setf *ndc-mouse-x* (+ -1 (* 2.0 (/ (floatify window::*mouse-x*)
 				      window:*width*)))
 	*ndc-mouse-y* (- 1 (* 2.0 (/ (floatify window::*mouse-y*)
 				     window:*height*))))
   (when (window::skey-j-p (window::keyval #\esc))
     (application::quit))
-  #+nil
+;  #+nil
   (progn
     (when (window::skey-j-p (window::keyval :f2))
       (terminal-test::reset-term)
@@ -65,7 +116,9 @@
     (when (window::skey-j-p (window::keyval :f1))
       (terminal-test::kill)
       ))
-  #+nil
+  ;  #+nil
+  (more-test)
+;  #+nil
   (when (window::skey-j-p (window::keyval #\A))
     (music::reset-listener)
     (music::play-at (merge-pathnames "wilhelm_scream.wav" *this-directory*) 0.0 0.0 0.0 1.0 1.0))
@@ -74,12 +127,11 @@
   (gl:clear :color-buffer-bit)
   (gl:disable :cull-face)
   (gl:disable :blend)
-  #+nil
-  (more-test)
-  #+nil
+;  #+nil
   (render-stuff)
-  #+nil
+;  #+nil
   (foo0)
+;  #+nil
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
     (let ((program (getfnc 'flat-texture-shader)))
@@ -88,7 +140,7 @@
       (gl:uniformi (uniform 'sampler) 0)
       (glhelp::set-active-texture 0))
 
-    
+    #+nil
     (when (window::skey-p (window::mouseval :1))
       (deflazy cons-png ()
 	(flip-image:flip-image
@@ -100,6 +152,7 @@
 			     )))
 					;(sleep 0.1)
       )
+    #+nil
     (render-sprite
      (load-time-value
       (make-instance
@@ -110,7 +163,7 @@
 				    :x0 0.0 :y0 0.0
 				    :x1 2.0 :y1 2.0)))))
     
-    #+nil
+;    #+nil
     (when (window::skey-j-p (window::mouseval :left))
       ;;search for topmost sprite to drag
       (tagbody 
@@ -130,15 +183,15 @@
 		   (go end))))
 	     (setf last sprite-cell)))
        end))
-    #+nil
+;    #+nil
     (typecase *selection*
       (sprite (with-slots (x y) (slot-value *selection* 'position)
 		(setf x (+ *drag-offset-x* mousex)
 		      y (+ *drag-offset-y* mousey))))))
-  #+nil
+;  #+nil
   (when (window::skey-j-r (window::mouseval :left))
     (setf *selection* nil))
-  #+nil
+;  #+nil
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -150,28 +203,29 @@
       (let ((sprite (doubly-linked-list:node-payload sprite-cell)))
 	(render-sprite sprite)))))
 
-(defun render-terminal (x y &optional (term terminal-test::*term*))
-  (flet ((value (r g b x y)
-	   (color (byte/255 r)
-		  (byte/255 g)
-		  (byte/255 b))
-	   (vertex
-	    (floatify x)
-	    (floatify y))))
-    (with-slots ((cx 3bst::x) (cy 3bst::y)) (with-slots (3bst::cursor) term 3bst::cursor)
-      (terminal-test::do-term-values (glyph col row)
-	(let ((char (3bst:c glyph))
-	      (bg (3bst:bg glyph))
-	      (fg (3bst:fg glyph)))
-	  (when (and (= cx col)
-		     (= cy row))
-	    (rotatef bg fg))
-	  (value (char-code char)
-		 bg
-		 fg
-		 (+ x col)
-		 (- y row)))))))
+(defun render-tile (char-code x y background-color foreground-color)
+  (color (byte/255 char-code)
+	 (byte/255 background-color)
+	 (byte/255 foreground-color))
+  (vertex
+   (floatify x)
+   (floatify y)))
 
+(defun render-terminal (x y &optional (term terminal-test::*term*))
+  (with-slots ((cx 3bst::x) (cy 3bst::y)) (with-slots (3bst::cursor) term 3bst::cursor)
+    (terminal-test::do-term-values (glyph col row)
+      (let ((char (3bst:c glyph))
+	    (bg (3bst:bg glyph))
+	    (fg (3bst:fg glyph)))
+	(when (and (= cx col)
+		   (= cy row))
+	  (rotatef bg fg))
+	(render-tile
+	 (char-code char)
+	 (+ x col)
+	 (- y row)
+	 bg
+	 fg)))))
 (defmacro get-control-sequence ((control-state char-var shift control alt super) &body body)
   (once-only (control-state shift control alt super)
     `(let ((something-flag nil))
@@ -217,8 +271,7 @@
 			       window::*control*
 			       window::*alt*
 			       window::*super*)
-	  (vector-push-extend char *command-buffer*))
-    
+	  (vector-push-extend char *command-buffer*))   
     (terminal-test::enter *command-buffer*)
     (setf (fill-pointer *command-buffer*) 0))
   (terminal-test::update-terminal-stuff))
@@ -399,65 +452,12 @@
    'glhelp::gl-texture
    :handle
    (prog1
-       (glhelp:pic-texture
-	cons-png
-	:rgba)
+       (glhelp:pic-texture cons-png)
      (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :linear)
 	      (:texture-mag-filter . :linear)
 	      (:texture-wrap-s . :clamp)
 	      (:texture-wrap-t . :clamp)))))))
-
-(defclass rectangle ()
-  ((x0 :accessor rectangle.x0
-       :initform 0.0
-       :initarg :x0)
-   (y0 :accessor rectangle.y0
-       :initform 0.0
-       :initarg :y0)
-   (x1 :accessor rectangle.x1
-       :initform 0.0
-       :initarg :x1)
-   (y1 :accessor rectangle.y1
-       :initform 0.0
-       :initarg :y1)))
-
-(defclass point ()
-  ((x :accessor point.x
-       :initform 0.0
-       :initarg :x)
-   (y :accessor point.y
-       :initform 0.0
-       :initarg :y)))
-
-(defun coordinate-inside-rectangle-p (x y rectangle)
-  (with-slots (x0 y0 x1 y1) rectangle
-    (and (< x0 x x1)
-	 (< y0 y y1))))
-
-(defclass sprite ()
-  ((bounding-box :accessor sprite.bounding-box
-		 :initform (make-instance 'rectangle
-					  :x0 -0.25 :y0 -0.25
-					  :x1 0.25 :y1 0.25)
-		 :initarg :bounding-box)
-   (texture-section :accessor sprite.texture-section
-		    :initform (make-instance 'rectangle
-					     :x0 0.0 :y0 0.0
-					     :x1 1.0 :y1 1.0)
-		    :initarg :texture-section)
-   (absolute-rectangle :accessor sprite.absolute-rectangle
-		       :initform (make-instance 'rectangle)
-		       :initarg :absolute-rectangle)
-   (texture :accessor sprite.texture
-	    :initform nil
-	    :initarg :texture)
-   (color :accessor sprite.color
-	  :initform '(1.0 1.0 1.0 1.0)
-	  :initarg :color)
-   (position :accessor sprite.position
-	     :initform (make-instance 'point)
-	     :initarg :position)))
 
 (defun render-sprite (sprite)
   (with-slots (texture-section bounding-box position color texture absolute-rectangle)
@@ -502,15 +502,8 @@
       (let ((count 0))
 	(dotimes (x 16)
 	  (dotimes (y 16)
-	    (let ((val (byte/255 count)))
-	      (color val
-		     val
-		     val))
-	    (vertex (floatify x)
-		    (floatify y)
-		    0.0)
+	    (render-tile count x y count (- 255 count))
 	    (incf count))))
-					;   (basic::render-terminal 0 24)
       (let ((bgcol (byte/255 (text-sub::color-rgba 3 3 3 3)))
 	    (fgcol (byte/255 (text-sub::color-rgba 0 0 0 3))))
 	((lambda (x y string)

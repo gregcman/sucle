@@ -1,6 +1,3 @@
-utility:
-	common lisp utilities
-
 application:
 	a basic application with input, sound, lazy loading, opengl,
 	openal, ffmpeg, among other things

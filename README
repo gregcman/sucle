@@ -7,6 +7,9 @@ component:
 data-structures:
 	things which are simple enough that they would commonly be called "data structures"
 
+common-lisp:
+	language extension
+
 ffi:
 	foreign library bindings
 

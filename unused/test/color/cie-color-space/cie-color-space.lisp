@@ -1,0 +1,53 @@
+(defpackage :cie-color-space
+  (:use #:cl #:bad-floats)
+  (:export
+   #:cie-xyl-cie-rgb))
+(in-package :cie-color-space)
+
+(declaim (inline cie-xyz-cie-xyl))
+(defun cie-xyz-cie-xyl (x y z)
+  (let ((a (+ x y z)))
+    (values (/ x a)
+	    (/ y a)
+	    y)))
+
+(declaim (inline cie-xyl-cie-xyz))
+(defun cie-xyl-cie-xyz (x y luminance)
+  (values (/ (* luminance x)
+	     y)
+	  luminance
+	  (/ (* luminance (- 1 x y))
+	     y)))
+
+(defun test-same (x0 y0 z0)
+  (multiple-value-bind (x y z) (cie-xyl-cie-xyz x0 y0 z0)
+    (multiple-value-bind (x y z) (cie-xyz-cie-xyl x y z)
+      (assert (= x x0))
+      (assert (= y y0))
+      (assert (= z z0)))))
+
+(defun cie-xyl-cie-rgb (x y luminance)
+  (multiple-value-bind (x y z) (cie-xyl-cie-xyz x y luminance)
+    (if (and (float-good-p x)
+	     (float-good-p y)
+	     (float-good-p z))      
+	(rs-colors::cie-rgb-from-cie-xyz x y z)
+	(values 0.0 0.0 0.0))))
+
+(defun test-array ()
+  (let ((array (make-array '(256 256 4) :element-type '(unsigned-byte 8))))
+    (dotimes (x 256)
+      (dotimes (y 256)
+	(unless (= 0 y)
+	  (multiple-value-bind (r g b) (cie-xyl-cie-rgb
+					(/ x 255.0)
+					(/ y 255.0)
+					1.0)
+	    (flet ((fun (elt value)
+		     (setf (aref array (- 255 y) x elt)
+			   (floor (* value 255.0)))))
+	      (fun 0 r)
+	      (fun 1 g)
+	      (fun 2 b)
+	      (fun 3 1.0))))))
+    array)) 

@@ -3,10 +3,10 @@
 	       #:sandbox
 	       #:opticl
 	       #:reverse-array-iterator
-	       #:singleton-lparallel)
+	       #:singleton-lparallel
+	       #:uncommon-lisp)
   :serial t
   :components 
-  ((:file "struct-to-clos")
-   (:file "aabbcc")
+  ((:file "aabbcc")
    (:file "sandbox-subsystem")
    (:file "testbed")))

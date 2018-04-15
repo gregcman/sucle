@@ -21,13 +21,22 @@
 ;					   (:texture-wrap-s . :repeat)
 ;					   (:texture-wrap-t . :repeat)
 					   )))
+
 ;;;;tex-parameters is an alist of pairs (a . b) with
 ;;;;(lambda (a b) (gl:tex-parameter :texture-2d a b))
-(defun pic-texture (thepic type)
+(defun pic-texture (thepic &optional type)
   (let ((dims (array-dimensions thepic)))
     (let ((h (pop dims))
 	  (w (pop dims))
 	  (channels (pop dims)))
+      (unless type
+	(setf
+	 type
+	 (case channels
+	   ((nil) :red)
+	   (2 (error "2 components?"))
+	   (3 :rgb)
+	   (4 :rgba))))
       (when (eq nil channels)
 	(setf channels 1))
       (let* ((byte-width (* channels w))
@@ -38,7 +47,7 @@
 	      (incf foured 4)
 	      (let ((array (make-array (* foured h)
 				       :element-type (array-element-type thepic))))
-		(declare (dynamic-extent array))
+;		(declare (dynamic-extent array))
 		(dotimes (hi h)
 		  (let ((base1 (* hi byte-width))
 			(base2 (* hi foured)))
