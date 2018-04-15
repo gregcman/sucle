@@ -4,20 +4,23 @@ application:
 component:
 	macros, utility libraries, combinations of libraries...
 
-data-structures:
-	things which are simple enough that they would commonly be called "data structures"
-
 common-lisp:
 	language extension
 
-ffi:
-	foreign library bindings
+sense-perception:
+	color generation. audio and haptic generation in the future maybe
 
 forks:
 	remixes/downloads of other people's libraries
 
+data-structures:
+	things which are simple enough that they would commonly be called "data structures"
+
 unused:
 	random code which is not necessarily maintained or functional
+
+ffi:
+	foreign library bindings
 
 other:
 	binaries, notes, c code

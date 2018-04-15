@@ -4,7 +4,8 @@
 	       #:opticl
 	       #:reverse-array-iterator
 	       #:singleton-lparallel
-	       #:uncommon-lisp)
+	       #:uncommon-lisp
+	       #:math-modify-macros)
   :serial t
   :components 
   ((:file "aabbcc")

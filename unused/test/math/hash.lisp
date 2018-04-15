@@ -1,6 +1,3 @@
-(in-package :sandbox)
-
-;;;;various hash functions for built-in data types
 
 (defparameter fnv-1a-hash-nums
   (list 16777619 

@@ -1,7 +1,6 @@
 (defpackage #:sandbox-sub
-  (:use :cl :utility :application :struct-to-clos))
+  (:use :cl :utility :application :struct-to-clos :math-modify-macros))
 (in-package #:sandbox-sub)
-(define-modify-macro logiorf (&rest args) logior)
 
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz aabb)
   (multiple-value-bind (new-x new-y new-z xyzclamp)
@@ -11,7 +10,6 @@
 	    (if (logtest #b100 xyzclamp) 0 dx)
 	    (if (logtest #b010 xyzclamp) 0 dy)
 	    (if (logtest #b001 xyzclamp) 0 dz))))
-(define-modify-macro *= (&rest args) *)
 (defun step-motion (get-collision-data px py pz vx vy vz aabb)
   (let ((dead-axis #b000) ;;axis which are zeroed
 	(clamp #b000)) ;;the final clamping value for each axis
@@ -90,15 +88,10 @@
 ;;gravity is (* -0.08 (expt tickscale 2)) 0 0
 ;;falling friction is 0.98
 ;;0.6 * 0.91 is walking friction
-(define-modify-macro *= (&rest args)
-  *)
 
 (defmacro modify (fun a &rest rest)
   (once-only (a)
     `(,fun ,a ,a ,@rest)))
-(defmacro load-time-vector (x y z)
-  `(load-time-value (nsb-cga:vec
-		     ,x ,y ,z)))
 (defparameter *ticks-per-second* 60.0)
 (defparameter *temp-vec* (nsb-cga:vec 0.0 0.0 0.0))
 (defparameter *jump-frame-count* 0)
@@ -258,12 +251,13 @@
 	    (when (and (not old-onground)
 		       gravity)
 	      (modify nsb-cga:%vec- force
-		      (load-time-vector
-		       0.0
-		       (or 13.0
-			   ;9.8
-			   )
-		       0.0))))
+		      (load-time-value
+		       (nsb-cga:vec
+			0.0
+			(or 13.0
+					;9.8
+			    )
+			0.0)))))
 	  (setf (entity-contact entity) contact-state))
 	(modify nsb-cga:%vec/ force (* (* *ticks-per-second*
 					  *ticks-per-second* 0.5) mass))
