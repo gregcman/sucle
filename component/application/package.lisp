@@ -3,7 +3,8 @@
   (:export
    #:main)
   (:export
-   #:*trampoline*)
+   #:poll-app
+   #:*quit-token*)
   (:export
    #:getfnc
    #:deflazy)

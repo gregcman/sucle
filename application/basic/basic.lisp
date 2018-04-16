@@ -5,7 +5,8 @@
 
 (defparameter *ticks* 0)
 (defparameter *saved-session* nil)
-(defun per-frame (&optional session)
+(defun per-frame (&optional (session application:*quit-token*))
+  (application:poll-app)
   (unless (eq *saved-session* session)
     (setf *saved-session* session)
     (init))
@@ -13,9 +14,9 @@
   (app))
 
 (defun start ()
-  (setf application::*trampoline*
-	'(per-frame))
   (application::main
+   (lambda ()
+     (loop (per-frame)))
    :width 512
    :height 512
    :title "a basic app"))

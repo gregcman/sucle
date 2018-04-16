@@ -96,18 +96,18 @@
 		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		  :test 'equal)))
 
-(defun set-trampoline ()
-  (setf application::*trampoline* '(sandbox-sub::per-frame
-				    per-frame
-				    )))
 (defun start ()
-  (set-trampoline)
-  (application::main))
+  (application::main
+   (lambda ()
+     (loop (per-frame)))
+   :width 720
+   :height 480
+   :title "conceptually simple block game"))
 
 (defparameter *paused* nil)
-(defun per-frame (&optional session)
-  (declare (ignorable session))
-
+(defun per-frame ()
+  (application:poll-app)
+  (sandbox-sub::per-frame)
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))

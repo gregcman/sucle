@@ -1,13 +1,13 @@
 (in-package :application)
 
 (defparameter *thread* nil)
-(defun main (&rest rest)
+(defun main (fun &rest rest)
   (when (or (eq nil *thread*)
 	    (not (bordeaux-threads:thread-alive-p *thread*)))
     (setf
      *thread*
      (bordeaux-threads:make-thread
-      (apply #'just-main rest)))))
+      (apply #'just-main fun rest)))))
 
 (eval-always
   (defparameter *parameters*
@@ -20,7 +20,7 @@
  (flet ((supplyify (sym)
 	  (symbolicate2 (list sym "-SUPPLIED-P"))))
    (let ((keys *parameters*))
-     `(defun just-main (&rest rest
+     `(defun just-main (fun &rest rest
 			&key
 			  ,@(mapcar
 			     (lambda (x)
@@ -35,10 +35,11 @@
 			 (push ,(keywordify sym)
 			       rest))))
 		  keys)
-	(let ((stdo *standard-output*))
+	(let ((stdo *standard-output*)
+	      (initfun (init fun)))
 	  (lambda ()
 	    (let ((*standard-output* stdo))
-	      (window::wrapper #'init
+	      (window::wrapper initfun
 			       rest))))))))
 
 (deflazy w ()
@@ -53,38 +54,34 @@
 (deflazy gl-context ()
   (unless glhelp::*gl-context*
     (error "no opengl context you idiot!")))
-(defun init ()
-  (glhelp:with-gl-context
-    (setf %gl:*gl-get-proc-address* (window:get-proc-address))
-    (setf window::*resize-hook* 'root-window-change)
-    (dolist (item '(h w gl-context))
-      (refresh item t))
-    (window:set-vsync t)
-    (gl:enable :scissor-test)
-    (call-trampoline)))
 
-(defparameter *trampoline* nil)
-(defun call-trampoline ()
-  (let ((value (cons "trampoline" "token")))
-    (catch value
-      (loop
-	 (trampoline-bounce value *trampoline*)))))
+(defparameter *quit-token* nil)
+(defun init (fun)
+  (lambda ()
+    (glhelp:with-gl-context
+      (setf %gl:*gl-get-proc-address* (window:get-proc-address))
+      (setf window::*resize-hook* 'root-window-change)
+      (dolist (item '(h w gl-context))
+	(refresh item t))
+      (window:set-vsync t)
+      (gl:enable :scissor-test)
+      (let ((*quit-token* (cons "trampoline" "token")))
+	(catch *quit-token*
+	  (funcall fun))))))
 
-(defparameter *control-state*
-  window::*control-state*)
-(defun trampoline-bounce (exit-token funs)
+(defmacro quit (&optional form)
+  `(progn
+     (setf window::*status* t)
+     (throw *quit-token* ,form)))
+
+(defun poll-app ()
   (when window:*status*
-    (throw exit-token (values)))
-  (window:poll)
-  (window::update-control-state *control-state*)
+    (quit))
+  (window::update-control-state2)
+  (window:update-display)
   (flush-refreshes)
-  (dolist (fun funs)
-    (funcall fun exit-token))
-  (window::update-control-state2 *control-state*)
-  (window:update-display))
-
-(defun quit ()
-  (setf window:*status* t))
+  (window:poll)
+  (window::update-control-state))
 
 (deflazy al-context ()
   (music::really-start)

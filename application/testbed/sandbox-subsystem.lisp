@@ -449,7 +449,7 @@
   (clrhash sandbox::*g/chunk-call-list*))
 
 (defparameter *last-session* nil)
-(defun per-frame (session)
+(defun per-frame (&optional (session application::*quit-token*))
   (declare (ignorable session))
   ;;handle chunk meshing
   (unless (eq session *last-session*)
