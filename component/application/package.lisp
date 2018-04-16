@@ -5,7 +5,7 @@
   (:export
    #:poll-app
    #:*quit-token*
-   #:init-session)
+   #:on-session-change)
   (:export
    #:getfnc
    #:deflazy)

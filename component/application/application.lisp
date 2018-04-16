@@ -69,7 +69,7 @@
 	(catch *quit-token*
 	  (funcall fun))))))
 
-(defmacro init-session (session-place &body body &environment env)
+(defmacro on-session-change (session-place &body body &environment env)
   (multiple-value-bind (vars vals stores setter getter)
       (get-setf-expansion session-place env)
     (with-gensyms (token)

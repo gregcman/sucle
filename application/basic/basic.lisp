@@ -6,7 +6,7 @@
 (defparameter *ticks* 0)
 (defparameter *saved-session* nil)
 (defun per-frame ()
-  (init-session *saved-session*
+  (on-session-change *saved-session*
     (init))
   (incf *ticks*)
   (app))
