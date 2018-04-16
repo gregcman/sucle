@@ -69,6 +69,17 @@
 	(catch *quit-token*
 	  (funcall fun))))))
 
+(defmacro init-session (session-place &body body &environment env)
+  (multiple-value-bind (vars vals stores setter getter)
+      (get-setf-expansion session-place env)
+    (with-gensyms (token)
+      `(let* (,@ (mapcar #'list vars vals))
+	 (let ((,token *quit-token*))
+	   (unless (eq ,getter ,token)
+	     ,@body
+	     (multiple-value-bind ,stores ,token
+	       ,setter)))))))
+
 (defmacro quit (&optional form)
   `(progn
      (setf window::*status* t)

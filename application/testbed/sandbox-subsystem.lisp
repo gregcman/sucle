@@ -451,8 +451,7 @@
 (defparameter *last-session* nil)
 (defun per-frame ()
   ;;handle chunk meshing
-  (unless (eq *last-session* *quit-token*)
-    (setf *last-session* *quit-token*)
+  (init-session *last-session*
     (sandbox::update-world-vao 0 0 0))
   (sandbox::designatemeshing)
   (getfnc 'gl-init)
