@@ -449,12 +449,11 @@
   (clrhash sandbox::*g/chunk-call-list*))
 
 (defparameter *last-session* nil)
-(defun per-frame (&optional (session application::*quit-token*))
-  (declare (ignorable session))
+(defun per-frame ()
   ;;handle chunk meshing
-  (unless (eq session *last-session*)
-    (sandbox::update-world-vao 0 0 0)
-    (setf *last-session* session))
+  (unless (eq *last-session* *quit-token*)
+    (setf *last-session* *quit-token*)
+    (sandbox::update-world-vao 0 0 0))
   (sandbox::designatemeshing)
   (getfnc 'gl-init)
   (render-stuff))

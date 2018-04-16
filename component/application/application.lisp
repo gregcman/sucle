@@ -1,13 +1,13 @@
 (in-package :application)
 
 (defparameter *thread* nil)
-(defun main (fun &rest rest)
+(defun main (start-fun &rest rest)
   (when (or (eq nil *thread*)
 	    (not (bordeaux-threads:thread-alive-p *thread*)))
     (setf
      *thread*
      (bordeaux-threads:make-thread
-      (apply #'just-main fun rest)))))
+      (apply #'just-main start-fun rest)))))
 
 (eval-always
   (defparameter *parameters*
@@ -20,7 +20,7 @@
  (flet ((supplyify (sym)
 	  (symbolicate2 (list sym "-SUPPLIED-P"))))
    (let ((keys *parameters*))
-     `(defun just-main (fun &rest rest
+     `(defun just-main (start-fun &rest rest
 			&key
 			  ,@(mapcar
 			     (lambda (x)
@@ -36,7 +36,7 @@
 			       rest))))
 		  keys)
 	(let ((stdo *standard-output*)
-	      (initfun (init fun)))
+	      (initfun (init start-fun)))
 	  (lambda ()
 	    (let ((*standard-output* stdo))
 	      (window::wrapper initfun

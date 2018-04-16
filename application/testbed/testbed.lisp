@@ -99,14 +99,15 @@
 (defun start ()
   (application::main
    (lambda ()
-     (loop (per-frame)))
+     (loop
+	(application:poll-app)
+	(per-frame)))
    :width 720
    :height 480
    :title "conceptually simple block game"))
 
 (defparameter *paused* nil)
 (defun per-frame ()
-  (application:poll-app)
   (sandbox-sub::per-frame)
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
