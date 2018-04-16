@@ -219,3 +219,8 @@
 		   ,@decl
 		   (unless ,more? (return))
 		   ,@forms)))))))
+
+
+(defun keywordify (sym)
+  (intern (string sym)
+	  (load-time-value (find-package "KEYWORD"))))

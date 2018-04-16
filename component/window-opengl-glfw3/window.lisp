@@ -97,19 +97,23 @@
 (defun get-proc-address ()
   (function glfw:get-proc-address))
 
-(defparameter *iresizable* nil)
-(defparameter *iwidth* 1)
-(defparameter *iheight* 1)
-(defparameter *ititle* "window")
+
+(defmacro with-window (window-keys &body body)
+  `(unwind-protect
+	(progn
+	  (apply #'glfw:create-window ,window-keys)
+	  ,@body)
+     (glfw:destroy-window)))
 
 ;;Graphics calls on OS X must occur in the main thread
-(defun wrapper (func)
+(defun wrapper (func &optional (params
+				'(:title "window"
+				  :width 1
+				  :height 1
+				  :resizable nil)))
   (glfw:with-init
     (window:init)
-    (glfw:with-window (:title *ititle*
-			      :width *iwidth*
-			      :height *iheight*
-			      :resizable *iresizable*)
+    (with-window params
       (glfw:set-mouse-button-callback 'mouse-callback)
       (glfw:set-key-callback 'key-callback)
       (glfw:set-scroll-callback 'scroll-callback)
@@ -117,8 +121,10 @@
       (glfw:set-char-callback 'char-callback)
       
       (glfw:set-cursor-position-callback 'cursor-callback)
-      (setf *width* *iwidth*
-	    *height* *iheight*)
+      
+      (setf (values *width*
+		    *height*)
+	    (get-window-size))
       (funcall func))))
 
 (defun get-mouse-out ()
@@ -150,6 +156,16 @@
   (if bool
       (glfw:swap-interval 1) ;;1 is on
       (glfw:swap-interval 0))) ;;0 is off
+
+(defun get-window-size (&optional (window glfw:*window*))
+  (cffi:with-foreign-objects ((w :int)
+			      (h :int))
+    (cffi:foreign-funcall "glfwGetWindowSize"
+			  %glfw::window window
+			  :pointer w
+			  :pointer h :void)
+    (values (cffi:mem-ref w :int)
+	    (cffi:mem-ref h :int))))
 
 (defun get-mouse-position (&optional (window glfw:*window*)) 
   (cffi:with-foreign-objects ((x :double) (y :double))

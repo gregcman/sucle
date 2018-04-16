@@ -6,27 +6,22 @@
 (defparameter *ticks* 0)
 (defparameter *saved-session* nil)
 (defun per-frame (&optional session)
-  (declare (ignorable session))
   (unless (eq *saved-session* session)
     (setf *saved-session* session)
     (init))
   (incf *ticks*)
   (app))
 
-(defparameter *window-start-height* 512)
-(defparameter *window-start-width* 512)
-(defparameter *window-start-title* "basic app")
 (defun start ()
-  (let ((application::*argument-values*
-	 (list nil
-	       *window-start-width*
-	       *window-start-height*
-	       *window-start-title*)))
-    (setf application::*trampoline*
-	  '(per-frame))
-    (application::main)))
+  (setf application::*trampoline*
+	'(per-frame))
+  (application::main
+   :width 512
+   :height 512
+   :title "a basic app"))
 (defvar *this-directory* (filesystem-util:this-directory))
 
+;;;geometry
 (defclass rectangle ()
   ((x0 :accessor rectangle.x0
        :initform 0.0
@@ -53,6 +48,7 @@
    (y :accessor point.y
        :initform 0.0
        :initarg :y)))
+;;;
 
 (defclass sprite ()
   ((bounding-box :accessor sprite.bounding-box
@@ -239,6 +235,7 @@
 	    'mesh-vertex-tex-coord-color
 	  (draw-textured-quad 0.5 0.5 0.9 0.9 0.0 0.0 1.0 1.0))))))
 
+;;;more geometry
 (defun draw-textured-quad (x0 y0 x1 y1 s0 t0 s1 t1)
   (destructuring-bind (r g b a) *pen-color*
     (color r g b a)
@@ -256,8 +253,7 @@
     (color r g b a)
     (tex-coord s1 t0)
     (vertex x1 y0)
-    ))
-
+   ))
 (defun draw-quad (x0 y0 x1 y1)
   (destructuring-bind (r g b a) *pen-color*
     (color r g b a)
@@ -268,7 +264,6 @@
     (vertex x1 y1)
     (color r g b a)
     (vertex x1 y0)))
-
 (defmacro complex-cis ((place placei theta) &body body)
   `(let ((,place (cos ,theta))
 	 (,placei (sin ,theta)))
@@ -295,6 +290,8 @@
 	    (color r g b a)
 	    (vertex point-x point-y))
 	  (complex-multiply offset offseti d di offset offseti))))))
+;;;
+
 (progn
   (deflazy flat-shader-source ()
     (glslgen:ashader

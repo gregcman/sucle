@@ -1,27 +1,45 @@
 (in-package :application)
 
 (defparameter *thread* nil)
-(defun main ()
+(defun main (&rest rest)
   (when (or (eq nil *thread*)
 	    (not (bordeaux-threads:thread-alive-p *thread*)))
-    (setf *thread*
-	  (bordeaux-threads:make-thread
-	   (just-main)))))
+    (setf
+     *thread*
+     (bordeaux-threads:make-thread
+      (apply #'just-main rest)))))
 
+(eval-always
+  (defparameter *parameters*
+    '((title "app")
+      (width 720)
+      (height 480)
+      (resizable nil))))
 
-(defparameter *arguments* '(window::*iresizable*
-			    window::*iwidth*
-			    window::*iheight*
-			    window::*ititle*))
-(defparameter *argument-values* (list nil 720 480
-				      "app"))
-(defun just-main ()
-  (let ((stdo *standard-output*)
-	(args *argument-values*))
-    (lambda ()
-      (progv (cons '*standard-output* *arguments*)
-	  (cons stdo args)
-	(window::wrapper #'init)))))
+(etouq
+ (flet ((supplyify (sym)
+	  (symbolicate2 (list sym "-SUPPLIED-P"))))
+   (let ((keys *parameters*))
+     `(defun just-main (&rest rest
+			&key
+			  ,@(mapcar
+			     (lambda (x)
+			       (destructuring-bind (name default) x
+				 (list name default (supplyify name))))
+			     keys)
+			  &allow-other-keys)
+	,@(mapcar (lambda (pair)
+		    (let ((sym (first pair)))
+		      `(unless ,(supplyify sym)
+			 (push ,sym rest)
+			 (push ,(keywordify sym)
+			       rest))))
+		  keys)
+	(let ((stdo *standard-output*))
+	  (lambda ()
+	    (let ((*standard-output* stdo))
+	      (window::wrapper #'init
+			       rest))))))))
 
 (deflazy w ()
   window::*width*)

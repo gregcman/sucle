@@ -31,4 +31,7 @@
    #:nest
    #:%nest
    #:once-only
-   #:parse-body))
+   #:parse-body)
+
+  (:export
+   #:keywordify))

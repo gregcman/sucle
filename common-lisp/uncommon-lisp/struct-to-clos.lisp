@@ -6,9 +6,6 @@
 
 (defun conc-name (title)
   (concatenate 'string (string title) "-"))
-(defun keywordify (string-designator)
-  (intern (string string-designator)
-	  (load-time-value (find-package "KEYWORD"))))
 
 (defmacro struct->class (form)
   (%struct->class form))
