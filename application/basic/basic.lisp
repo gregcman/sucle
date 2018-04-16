@@ -1,5 +1,6 @@
 (defpackage #:basic
-  (:use #:cl #:utility #:application #:opengl-immediate))
+  (:use #:cl #:utility #:application #:opengl-immediate
+	#:sprite-chain))
 (in-package :basic)
 
 (defparameter *ticks* 0)
@@ -78,46 +79,6 @@
        :initarg :y)))
 (defparameter *ndc-mouse-x* 0.0)
 (defparameter *ndc-mouse-y* 0.0)
-
-(struct-to-clos:struct->class
- (defstruct sprite-chain
-   (chain (doubly-linked-list:circular "sentinel"))
-   (hash (make-hash-table :test 'eq))))
-(defparameter *sprites* (make-sprite-chain))
-
-(defun add-sprite (sprite &optional (sprite-chain *sprites*))
-  (let ((hash (sprite-chain-hash sprite-chain)))
-    (multiple-value-bind (old-cell exists-p)
-	(gethash sprite hash)
-      (declare (ignorable old-cell))
-      (unless exists-p
-	(let ((new-node (doubly-linked-list:make-node
-			 :payload
-			 sprite)))
-	  (setf (gethash sprite hash)
-		new-node)
-	  (doubly-linked-list:insert-next
-	   (sprite-chain-chain sprite-chain)
-	   new-node)))
-      (not exists-p))))
-
-(defun remove-sprite (sprite &optional (sprite-chain *sprites*))
-  (let ((hash (sprite-chain-hash sprite-chain)))
-    (multiple-value-bind (old-cell exists-p) (gethash sprite hash)
-      (when exists-p
-	(doubly-linked-list:detach old-cell)
-	(remhash sprite hash))
-      exists-p)))
-
-(defun topify-sprite (sprite &optional (sprite-chain *sprites*))
-  (let ((hash (sprite-chain-hash sprite-chain)))
-    (multiple-value-bind (old-cell exists-p) (gethash sprite hash)
-      (when exists-p
-	(doubly-linked-list:detach old-cell)
-	(doubly-linked-list:insert-next
-	 (sprite-chain-chain sprite-chain)
-	 old-cell))
-      exists-p)))
 
 (dotimes (x 10)
   (add-sprite
@@ -202,8 +163,7 @@
     (when (window::skey-j-p (window::mouseval :left))
       ;;search for topmost sprite to drag
       (block cya
-	(doubly-linked-list:do-circular-doubly-linked-list (sprite)
-	    (sprite-chain-chain *sprites*)
+	(do-sprite-chain (sprite) ()
 	  (with-slots (absolute-rectangle position) sprite
 	    (when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
 	      (with-slots (x y) position
@@ -226,8 +186,7 @@
     (glhelp:with-uniforms uniform program
       (gl:uniformi (uniform 'sampler) 0)
       (glhelp::set-active-texture 0))
-    (doubly-linked-list:do-circular-doubly-linked-list (sprite nil)
-	(sprite-chain-chain *sprites*)
+    (do-sprite-chain (sprite t) ()
       (render-sprite sprite))))
 
 (defun render-tile (char-code x y background-color foreground-color)

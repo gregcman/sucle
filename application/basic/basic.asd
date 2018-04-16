@@ -6,7 +6,9 @@
 	       #:opengl-immediate
 	       #:opticl
 	       #:character-modifier-bits
-	       #:terminal-3bst-sbcl)
+	       #:terminal-3bst-sbcl
+	       #:uncommon-lisp)
   :serial t
   :components 
-  ((:file "basic")))
+  ((:file "sprite-chain")
+   (:file "basic")))
