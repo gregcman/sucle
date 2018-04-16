@@ -11,12 +11,17 @@
   (incf *ticks*)
   (app))
 
+(defparameter *app* nil)
 (defun start ()
   (application:main
    (lambda ()
      (loop
 	(application:poll-app)
-	(per-frame)))
+	(if *app*
+	    (testbed::per-frame)
+	    (per-frame))
+	(when (window:skey-j-p (window::keyval #\h))
+	  (toggle *app*))))
    :width 512
    :height 512
    :title "a basic app"))
@@ -419,6 +424,7 @@
       (setf (fill-pointer *numbuf*) 0)
       (with-output-to-string (stream *numbuf* :element-type 'character)
 	(princ (get-internal-real-time) stream)
+	(print "Hello World" stream)
 	*numbuf*)
       (rebase -128.0 -128.0)
       (gl:point-size 1.0)
@@ -427,8 +433,14 @@
 	  (dotimes (y 16)
 	    (render-tile count x y count (- 255 count))
 	    (incf count))))
-      (let ((bgcol (byte/255 (text-sub::color-rgba 3 3 3 3)))
-	    (fgcol (byte/255 (text-sub::color-rgba 0 0 0 3))))
+      (let ((bgcol (byte/255
+		    15
+		    ;(text-sub::color-rgba 3 3 3 3)
+		    ))
+	    (fgcol (byte/255
+		    0
+		    ;(text-sub::color-rgba 0 0 0 3)
+		    )))
 	((lambda (x y string)
 	   (let ((start x))
 	     (let ((len (length string)))

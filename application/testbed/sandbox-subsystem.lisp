@@ -444,17 +444,14 @@
     (nsb-cga:%copy-vec old curr)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(deflazy gl-init (gl-context)
-  (declare (ignorable application::gl-context))
-  (clrhash sandbox::*g/chunk-call-list*))
 
 (defparameter *last-session* nil)
 (defun per-frame ()
   ;;handle chunk meshing
   (on-session-change *last-session*
+    (clrhash sandbox::*g/chunk-call-list*)
     (sandbox::update-world-vao 0 0 0))
   (sandbox::designatemeshing)
-  (getfnc 'gl-init)
   (render-stuff))
 
 (defparameter *fov* (* (floatify pi) (/ 70 180)))
