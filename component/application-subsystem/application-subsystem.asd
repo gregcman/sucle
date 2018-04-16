@@ -9,5 +9,4 @@
      (:file "axis-aligned-quads")
      (:file "flip-image")
      (:file "filesystem-util")
-     (:file "fps-independent-timestep")
      (:file "scratch-buffer")))

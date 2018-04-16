@@ -4,6 +4,8 @@
    #:character-modifier-bits))
 (in-package #:character-modifier-bits)
 
+;;;nonportably assume that the lisp implementation uses ascii
+
 (defun ascii-control (char)
   (logxor (ash 1 6) char))
 

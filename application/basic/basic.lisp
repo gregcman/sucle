@@ -46,6 +46,14 @@
     (and (< x0 x x1)
 	 (< y0 y y1))))
 
+(defclass point ()
+  ((x :accessor point.x
+       :initform 0.0
+       :initarg :x)
+   (y :accessor point.y
+       :initform 0.0
+       :initarg :y)))
+
 (defclass sprite ()
   ((bounding-box :accessor sprite.bounding-box
 		 :initform (make-instance 'rectangle
@@ -70,13 +78,6 @@
 	     :initform (make-instance 'point)
 	     :initarg :position)))
 
-(defclass point ()
-  ((x :accessor point.x
-       :initform 0.0
-       :initarg :x)
-   (y :accessor point.y
-       :initform 0.0
-       :initarg :y)))
 (defparameter *ndc-mouse-x* 0.0)
 (defparameter *ndc-mouse-y* 0.0)
 
@@ -159,20 +160,24 @@
 				    :x0 0.0 :y0 0.0
 				    :x1 2.0 :y1 2.0)))))
     
-;    #+nil
+					;    #+nil
     (when (window::skey-j-p (window::mouseval :left))
       ;;search for topmost sprite to drag
-      (block cya
-	(do-sprite-chain (sprite) ()
-	  (with-slots (absolute-rectangle position) sprite
-	    (when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
-	      (with-slots (x y) position
-		(setf *drag-offset-x* (- x mousex)
-		      *drag-offset-y* (- y mousey)))
-	      (setf *selection* sprite)
-	      (topify-sprite sprite)
-	      (return-from cya))))))
-;    #+nil
+      (let
+	  ((sprite
+	    (block cya
+	      (do-sprite-chain (sprite) ()
+		(with-slots (absolute-rectangle) sprite
+		  (when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
+		    (return-from cya sprite)))))))
+	(when sprite
+	  (with-slots (position) sprite
+	    (with-slots (x y) position
+	      (setf *drag-offset-x* (- x mousex)
+		    *drag-offset-y* (- y mousey))))
+	  (setf *selection* sprite)
+	  (topify-sprite sprite))))
+					;    #+nil
     (typecase *selection*
       (sprite (with-slots (x y) (slot-value *selection* 'position)
 		(setf x (+ *drag-offset-x* mousex)
@@ -196,72 +201,6 @@
   (vertex
    (floatify x)
    (floatify y)))
-
-(defun render-terminal (x y &optional (term terminal-test::*term*))
-  (with-slots ((cx 3bst::x) (cy 3bst::y)) (with-slots (3bst::cursor) term 3bst::cursor)
-    (terminal-test::do-term-values (glyph col row)
-      (let ((char (3bst:c glyph))
-	    (bg (3bst:bg glyph))
-	    (fg (3bst:fg glyph)))
-	(when (and (= cx col)
-		   (= cy row))
-	  (rotatef bg fg))
-	(render-tile
-	 (char-code char)
-	 (+ x col)
-	 (- y row)
-	 bg
-	 fg)))))
-(defmacro get-control-sequence ((control-state char-var shift control alt super) &body body)
-  (once-only (control-state shift control alt super)
-    `(let ((something-flag nil))
-       (labels ((enter-string (string)
-		  (let ((len (length string)))
-		    (unless (zerop len)
-		      (setf something-flag t)
-		      (dotimes (index len)
-			(enter-char (aref string index))))))
-		(enter-char (,char-var)
-		  ,@body)
-		(enter (x)
-		  (setf something-flag t)
-		  (enter-char x)))
-	 (macrolet ((foo (x a b)
-		      `(when (window::skey-j-p-or-repeat (window::keyval ,a))
-			 ,(list (ecase x
-				  (0 'enter)
-				  (1 'enter-string)) b))))
-	   (foo 0 :enter #\return)
-	   (foo 0 :backspace #\del)
-	   (foo 0 :tab #\Tab)
-	   (foo 1 :up "[A")
-	   (foo 1 :down "[B")
-	   (foo 1 :left "[D")
-	   (foo 1 :right "[C"))      
-
-	 (window::do-character-keys ((window::control-state-jp-or-repeat ,control-state) true? code)
-	   (when true?
-	     (multiple-value-bind (char esc)
-		 (character-modifier-bits:character-modifier-bits
-		  (char-code (char-downcase (code-char code)))
-		  ,shift ,control ,alt ,super)
-	       (when esc
-		 (enter #\esc))
-	       (enter (code-char char))))))
-       something-flag)))
-(defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
-(defun more-test ()
-  (when (get-control-sequence (window::*control-state*
-			       char
-			       window::*shift*
-			       window::*control*
-			       window::*alt*
-			       window::*super*)
-	  (vector-push-extend char *command-buffer*))   
-    (terminal-test::enter *command-buffer*)
-    (setf (fill-pointer *command-buffer*) 0))
-  (terminal-test::update-terminal-stuff))
-
 
 
 (defun foo0 ()
@@ -511,9 +450,9 @@
 			  (setf x (1+ x))))))
 	       len)))
 	 10.0 10.0 *numbuf*)))
-					; #+nil
     (gl:with-primitives :points
       (opengl-immediate::mesh-vertex-color))
+    
     (when terminal-test::*term*
       (render-terminal 0 24)
       (gl:with-primitives :points
@@ -528,3 +467,70 @@
       (gl:enable :blend)
       (gl:blend-func :src-alpha :one-minus-src-alpha)
       (gl:call-list (glhelp::handle (getfnc 'text-sub::fullscreen-quad))))))
+
+
+;;;terminal emulation
+(defun render-terminal (x y &optional (term terminal-test::*term*))
+  (with-slots ((cx 3bst::x) (cy 3bst::y)) (with-slots (3bst::cursor) term 3bst::cursor)
+    (terminal-test::do-term-values (glyph col row)
+      (let ((char (3bst:c glyph))
+	    (bg (3bst:bg glyph))
+	    (fg (3bst:fg glyph)))
+	(when (and (= cx col)
+		   (= cy row))
+	  (rotatef bg fg))
+	(render-tile
+	 (char-code char)
+	 (+ x col)
+	 (- y row)
+	 bg
+	 fg)))))
+(defmacro get-control-sequence ((control-state char-var shift control alt super) &body body)
+  (once-only (control-state shift control alt super)
+    `(let ((something-flag nil))
+       (labels ((enter-string (string)
+		  (let ((len (length string)))
+		    (unless (zerop len)
+		      (setf something-flag t)
+		      (dotimes (index len)
+			(enter-char (aref string index))))))
+		(enter-char (,char-var)
+		  ,@body)
+		(enter (x)
+		  (setf something-flag t)
+		  (enter-char x)))
+	 (macrolet ((foo (x a b)
+		      `(when (window::skey-j-p-or-repeat (window::keyval ,a))
+			 ,(list (ecase x
+				  (0 'enter)
+				  (1 'enter-string)) b))))
+	   (foo 0 :enter #\return)
+	   (foo 0 :backspace #\del)
+	   (foo 0 :tab #\Tab)
+	   (foo 1 :up "[A")
+	   (foo 1 :down "[B")
+	   (foo 1 :left "[D")
+	   (foo 1 :right "[C"))      
+
+	 (window::do-character-keys ((window::control-state-jp-or-repeat ,control-state) true? code)
+	   (when true?
+	     (multiple-value-bind (char esc)
+		 (character-modifier-bits:character-modifier-bits
+		  (char-code (char-downcase (code-char code)))
+		  ,shift ,control ,alt ,super)
+	       (when esc
+		 (enter #\esc))
+	       (enter (code-char char))))))
+       something-flag)))
+(defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
+(defun more-test ()
+  (when (get-control-sequence (window::*control-state*
+			       char
+			       window::*shift*
+			       window::*control*
+			       window::*alt*
+			       window::*super*)
+	  (vector-push-extend char *command-buffer*))   
+    (terminal-test::enter *command-buffer*)
+    (setf (fill-pointer *command-buffer*) 0))
+  (terminal-test::update-terminal-stuff))

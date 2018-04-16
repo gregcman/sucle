@@ -115,7 +115,7 @@
       (moused))
   (setf *paused* (window::mice-free-p))
   (if *paused*
-	(application::tick *ticker* (lambda ()))
+	(fps-independent-timestep::tick *ticker* ())
 	(stuff))
   
   (particle-al-listener (sandbox-sub::entity-particle *ent*))
@@ -135,19 +135,6 @@
 (defparameter *swinging* nil)
 (defparameter *ticks* 0)
 
-(defun physss ()
-  (incf *ticks*)
-  (let ((seconds (or 60 840)))
-    (setf sandbox::*daytime*
-	  (or
-	   1.0
-	   (floatify
-	    (/ (abs (- (mod (/ *ticks*
-			       60.0)
-			    (* 2 seconds))
-		       seconds))
-	       seconds)))))
-  (sandbox-sub::physentity *ent*))
 #+nil
 (progn
   (defparameter *start-fov* (* 95 (floatify (/ pi 180.0))))
@@ -193,7 +180,20 @@
 	(1 (easef sandbox-sub::*fov* *target-fov* 0.1))
 	(otherwise (easef sandbox-sub::*fov* *start-fov* 0.1)))
       (fist-stuff pos)
-      (multiple-value-bind (fraction times) (application::tick *ticker* #'physss)
+      (multiple-value-bind (fraction times)
+	  (fps-independent-timestep::tick *ticker* ()
+	    (incf *ticks*)
+	    (let ((seconds (or 60 840)))
+	      (setf sandbox::*daytime*
+		    (or
+		     1.0
+		     (floatify
+		      (/ (abs (- (mod (/ *ticks*
+					 60.0)
+				      (* 2 seconds))
+				 seconds))
+			 seconds)))))
+	    (sandbox-sub::physentity *ent*))
 	(declare (ignorable times))
 	(let ((neck (sandbox-sub::entity-neck *ent*)))
 	  (when (window:mice-locked-p)

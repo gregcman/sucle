@@ -9,5 +9,7 @@
 	       #:glhelp
 	       #:dependency-graph)
   :components
-  ((:file "application")))
+  ((:file "package")
+   (:file "lazy-loading")
+   (:file "application")))
 
