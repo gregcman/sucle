@@ -5,3 +5,7 @@ testbed:
 
 application-example-hello-world:
 	a blank screen
+
+app-subsystem:
+	- components necessary for basic application with input, sound, lazy loading, opengl,
+	openal, ffmpeg, among other things

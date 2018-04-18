@@ -1,12 +1,10 @@
-application:
-	a basic application with input, sound, lazy loading, opengl,
-	openal, ffmpeg, among other things
+spacetime:
+	- time facilities
+	- geometry in 2d and 3d
 
-application-subsystem:
-	game/app utilities
-
-utility:
-	common lisp utilities
+general:
+	- convenience macros
+	- utility libraries
 
 data-structures:
-	things which are simple enough that they would commonly be called "data structures"
+	- ???
