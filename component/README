@@ -5,26 +5,8 @@ application:
 application-subsystem:
 	game/app utilities
 
-music-openal-ffmpeg:
-	stream and play audio with openal and ffmpeg 
+utility:
+	common lisp utilities
 
-opengl:
-	opengl utilities
-
-terminal625-glfw3:
-	basic window setting and opengl starting
-
-camat:
-	camera matrix
-
-nsb-cga:
-	add destructive matrix functions to sb-cga
-
-singleton-lparallel:
-	start an lparallel kernel
-
-queue:
-	a fifo queue and a unique element queue
-
-zeorp:
-	an array iterator and reader/writer
+data-structures:
+	things which are simple enough that they would commonly be called "data structures"

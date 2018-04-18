@@ -1,26 +1,20 @@
 application:
-	"standalone" programs, what a person would interact with
+	- what a person would interact with
 		
 component:
-	macros, utility libraries, combinations of libraries...
+	- convenience macros
+	- utility libraries
+	- application subsystems
+	- math
+	- data structures
 
-common-lisp:
-	language extension
-
-sense-perception:
-	color generation. audio and haptic generation in the future maybe
-
-forks:
-	remixes/downloads of other people's libraries
-
-data-structures:
-	things which are simple enough that they would commonly be called "data structures"
+foreign:
+	- foreign library bindings
+	- binaries
+	- unmodified forks
+	- convenience wrappers around standardized things,
+	  like ascii, ieee-754 floats, qwerty keyboards, opengl, common lisp
+	- convenience wrappers around other libraries
 
 unused:
-	random code which is not necessarily maintained or functional
-
-ffi:
-	foreign library bindings
-
-other:
-	binaries, notes, c code
+	- random code which is not necessarily maintained or functional

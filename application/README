@@ -1,4 +1,7 @@
-sandbox:
-	a voxel game
+basic:
+	a terminal emulator
 testbed:
-	????
+	a voxel game
+
+application-example-hello-world:
+	a blank screen
