@@ -1,10 +1,10 @@
 application:
 	- what a person would interact with
+	- also application subsystems	
 		
 component:
 	- convenience macros
 	- utility libraries
-	- application subsystems
 	- math
 	- data structures
 
