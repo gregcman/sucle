@@ -1,7 +1,8 @@
+this folder contains code for dealing with widely accepted standards and well as random libraries
+
 uncommon-lisp:
 	- common lisp
-	- convert structs to classes
- 	
+	- convert structs to classes	
 
 music-openal-ffmpeg:
 	- openal and ffmpeg
