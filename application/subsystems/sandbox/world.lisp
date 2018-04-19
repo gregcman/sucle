@@ -36,7 +36,7 @@
 
 
 (defpackage #:world
-  (:use :cl)	
+  (:use :cl #:utility)	
   (:export 
 
 ;;;block accessors
@@ -96,12 +96,7 @@
 (defun clearworld ()
   (send-to-free-mem *lispobj* *freechunkmempoolobj*))
 
-(utility:etouq
- (let ((value (logior (ash 15 12))))	  
-   (vox::field `(simple-array t (4096))
-	       '*lispobj*
-	       value
-	       `(recycler:get-from *freechunkmempoolobj* ,value)))
+(etouq
  (let* ((bits (logcount most-positive-fixnum))
 	(y 10)
 	(remaining-bits (- bits y))
@@ -109,21 +104,43 @@
 	(z (ceiling remaining-bits 2)))
    (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z)))
  (vox::truncation 4 4 4)
- (vox::derived-parts)
  (vox::offset 0 0 0)
  (vox::names
   'unhashfunc 'chunkhashfunc
   'chop 'anti-chop 'rem-flow '%%ref 'add)
- `(progn
-    ,(vox::define-fixnum-ops)
-    (progn
-      ,(vox::prep-hash
-	'%getobj '%setobj)
-      (progn	     
+ ;;;5. type of data to be stored, names of the functions, the hash table,
+;;;default "vacuum" state, space generators
+ (let* ((value (logior (ash 15 12)))
+	(data-type `(simple-array t (4096)))
+	(chunk-container '*lispobj*)
+	(vacuum-state value)
+	(space-provider `(recycler:get-from *freechunkmempoolobj* ,value)))
+   `(progn
+      ,(vox::define-fixnum-ops)
+      (with-unsafe-speed      
 	(defun getobj (i j k)
-	  (%getobj (chunkhashfunc i j k)))
-	(defun (setf getobj) (new i j k)
-	  (%setobj (chunkhashfunc i j k) new))))))
+	  (let ((block-code (chunkhashfunc i j k)))
+	    (declare (type fixnum block-code))
+	    (let ((chunk-code (,vox::*chop* block-code)))
+	      (let ((chunk (gethash chunk-code ,chunk-container)))
+		(declare (type (or ,data-type null) chunk))
+		(if chunk
+		    (values (aref chunk (%%ref block-code)) t)
+		    (values ,vacuum-state nil))))))
+	(defun setobj (i j k new)
+	  (let ((block-code (chunkhashfunc i j k)))	  
+	    (declare (type fixnum block-code))
+	    (let ((chunk-code (,vox::*chop* block-code)))
+	      (let ((chunk (or (gethash chunk-code
+					,chunk-container)
+			       (setf
+				(gethash chunk-code
+					 ,chunk-container)
+				,space-provider))))
+		(declare (type ,data-type chunk))
+		(setf (aref chunk (%%ref block-code)) new))))))
+      (defun (setf getobj) (new i j k)
+	(setobj new i j k)))))
 
 (defgeneric lispobj-dispatch (obj))
 
@@ -133,7 +150,7 @@
     (otherwise (lispobj-dispatch value))))
 
 (defun (setf num-getobj) (new i j k)
-  (setf (getobj i j k) new) )
+  (setobj i j k new))
 (defun num-getobj (i j k)
   (let ((value (getobj i j k)))
     (value-dispatch value)))

@@ -5,9 +5,35 @@
 ;;;;or some sort of three dimensional data
 ;;;;Currently implemented by a hash table filled with arrays.
 
+;;the type of hash table that lets fixnums be equated [default is eql]
+;;combine the number of bits per individual item, the get/set names,
+;;the hash which hashes the fixnums, the default value, and the method
+;;to create new chunks
 
-
-
+;;instead of using a struct or a vector to represent a point,
+;;a single fixnum can be used.
+;;a fixnum is 62 bits on a 64 bit machine [lets not worry about the 32 bit]
+;;a minecraft world is 256 blocks high and 60 mil block wide and long
+;;1 bit to pad, 9 bits z, 1 bit pad, 25 bits y, 1 bit pad, 25 bit x
+;;== 512 high, 33554432 long, 33554432 wide. not exactly minecraft specs,
+;;but close enough
+;;chunks are aligned to 16 16 16 which means that by chopping off
+;;the last 4 bits of each constituent number in the fixnum
+;;we get the code for the chunk! and this is done in one mask!
+;;the padding is added so we can use another number as a type of
+;;vector to add to the fixnum position. If after addition the number
+;;overflows, we chop off the most significant bit with a single mask
+;;because the y axis is the most significant, the codes can be sorted
+;;in order of height!
+;;bit 1 - 25 is x = (byte 25 0)
+;;bit 26 is overflow padding for x
+;;bit 27 - 51 is y (byte 25 26)
+;;bit 52 is overflow padding for z
+;;bit 53 - 61 is z (byte 9 52)
+;;bit 62 is overflow padding for y
+;;20 bits go to x, 20 bits go to y, 20 bits go to z, 2 bits are left over = 62 bits
+;;(defparameter spec `((20 ,(ash 1 19)) (20 ,(ash 1 19)) (20 ,(ash 1 19))))
+;;(eval (CREATE-PACKED-NUM 'chunkhashfunc 'unhashfunc spec))
 
 (macrolet ((defspec (name lambda-list)
 	     (let ((dynamic-var-names (mapcar (lambda (sym)
@@ -36,46 +62,28 @@
 ;;;4. names of the different generated functions so they can refer to each other
 ;;;by name
   (defspec names
-      (unhashfunc chunkhashfunc chop anti-chop rem-flow %%ref add))
-;;;5. type of data to be stored, names of the functions, the hash table,
-;;;default "vacuum" state, space generators
-  (defspec field
-      (data-type chunk-container vacuum-state space-provider)))
+      (unhashfunc chunkhashfunc chop anti-chop rem-flow %%ref add)))
 
-;;instead of using a struct or a vector to represent a point,
-;;a single fixnum can be used.
-;;a fixnum is 62 bits on a 64 bit machine [lets not worry about the 32 bit]
-;;a minecraft world is 256 blocks high and 60 mil block wide and long
-;;1 bit to pad, 9 bits z, 1 bit pad, 25 bits y, 1 bit pad, 25 bit x
-;;== 512 high, 33554432 long, 33554432 wide. not exactly minecraft specs,
-;;but close enough
-;;chunks are aligned to 16 16 16 which means that by chopping off
-;;the last 4 bits of each constituent number in the fixnum
-;;we get the code for the chunk! and this is done in one mask!
-;;the padding is added so we can use another number as a type of
-;;vector to add to the fixnum position. If after addition the number
-;;overflows, we chop off the most significant bit with a single mask
-;;because the y axis is the most significant, the codes can be sorted
-;;in order of height!
-;;bit 1 - 25 is x = (byte 25 0)
-;;bit 26 is overflow padding for x
-;;bit 27 - 51 is y (byte 25 26)
-;;bit 52 is overflow padding for z
-;;bit 53 - 61 is z (byte 9 52)
-;;bit 62 is overflow padding for y
-;;20 bits go to x, 20 bits go to y, 20 bits go to z, 2 bits are left over = 62 bits
-;;(defparameter spec `((20 ,(ash 1 19)) (20 ,(ash 1 19)) (20 ,(ash 1 19))))
-;;(eval (CREATE-PACKED-NUM 'chunkhashfunc 'unhashfunc spec))
-
-(defmacro fastnum (name args &body body)
-  `(progn
-     (declaim (inline ,name))
-     (defun ,name ,args
-       (declare (optimize (speed 3) (safety 0)))
-       (declare (type fixnum ,@args))
-       ,@body)))
+(defparameter *uoffset0* nil)
+(defparameter *uoffset1* nil)
+(defparameter *uoffset2* nil)
+(defparameter *overflow-mask* nil)
+(defparameter *truncate-mask* nil)
+(defparameter *anti-truncate-mask* nil)
 
 (defun define-fixnum-ops ()
+  (setf *uoffset0* (ash 1 *num0-size*)
+	*uoffset1* (ash 1 *num1-size*)
+	*uoffset2* (ash 1 *num2-size*)
+	*overflow-mask* (lognot (logior (ash 1 (+ *num0-start* *num0-size*))
+					(ash 1 (+ *num1-start* *num1-size*))
+					(ash 1 (+ *num2-start* *num2-size*))))
+	*truncate-mask* (lognot (+ (ash (1- (ash 1 *chopy*)) *num0-start*)
+				   (ash (1- (ash 1 *chopx*)) *num1-start*)
+				   (ash (1- (ash 1 *chopz*)) *num2-start*)))
+	*anti-truncate-mask* (+ (ash (1- (ash 1 *chopy*)) *num0-start*)
+				(ash (1- (ash 1 *chopx*)) *num1-start*)
+				(ash (1- (ash 1 *chopz*)) *num2-start*)))
   `(progn
      (fastnum
 	 ,*unhashfunc*
@@ -145,6 +153,14 @@
 	 (a b)
        (,*rem-flow* (+ a b)))))
 
+(defmacro fastnum (name args &body body)
+  `(progn
+     (declaim (inline ,name))
+     (defun ,name ,args
+       (declare (optimize (speed 3) (safety 0)))
+       (declare (type fixnum ,@args))
+       ,@body)))
+
 ;;;;which one is faster???
 
 #+nil
@@ -156,53 +172,3 @@
     `(if (> ,(/ n 2) ,x) 
 	 ,x
 	 (- ,x ,n))))
-
-(defparameter *uoffset0* nil)
-(defparameter *uoffset1* nil)
-(defparameter *uoffset2* nil)
-(defparameter *overflow-mask* nil)
-(defparameter *truncate-mask* nil)
-(defparameter *anti-truncate-mask* nil)
-(defun derived-parts ()
-  (setf *uoffset0* (ash 1 *num0-size*)
-	*uoffset1* (ash 1 *num1-size*)
-	*uoffset2* (ash 1 *num2-size*)
-	*overflow-mask* (lognot (logior (ash 1 (+ *num0-start* *num0-size*))
-					(ash 1 (+ *num1-start* *num1-size*))
-					(ash 1 (+ *num2-start* *num2-size*))))
-	*truncate-mask* (lognot (+ (ash (1- (ash 1 *chopy*)) *num0-start*)
-				   (ash (1- (ash 1 *chopx*)) *num1-start*)
-				   (ash (1- (ash 1 *chopz*)) *num2-start*)))
-	*anti-truncate-mask* (+ (ash (1- (ash 1 *chopy*)) *num0-start*)
-				(ash (1- (ash 1 *chopx*)) *num1-start*)
-				(ash (1- (ash 1 *chopz*)) *num2-start*))))
-
-;;the type of hash table that lets fixnums be equated [default is eql]
-;;combine the number of bits per individual item, the get/set names,
-;;the hash which hashes the fixnums, the default value, and the method
-;;to create new chunks
-
-(defun prep-hash (getter setter)
-  `(progn
-     (utility:with-unsafe-speed
-       (defun ,getter (block-code)
-	 (declare (type fixnum block-code))
-	 (let ((chunk-code (,*chop* block-code)))
-	   (let ((chunk (gethash chunk-code ,*chunk-container*)))
-	     (declare (type (or ,*data-type* null) chunk))
-	     (if chunk
-		 (values (aref chunk (,*%%ref* block-code)) t)
-		 (values ,*vacuum-state* nil)))))
-       (defun ,setter (block-code blockid)
-	 (declare (type fixnum block-code))
-	 (let ((chunk-code (,*chop* block-code)))
-	   (let ((chunk (or (gethash chunk-code
-				     ,*chunk-container*)
-			    (setf
-			     (gethash chunk-code
-				      ,*chunk-container*)
-			     ,*space-provider*))))
-	     (declare (type ,*data-type* chunk))
-	     (setf (aref chunk (,*%%ref* block-code)) blockid))))
-       (defun (setf ,getter) (new location)
-	 (,setter location new)))))
