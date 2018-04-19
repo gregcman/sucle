@@ -132,6 +132,8 @@
 			       (declare (type (unsigned-byte 4) val))
 			       (when (< val 15)
 				 (unless (or (isOpaque (world:%getblock displacement))
+					     ;;this depends on the fact that
+					     ;;the height coordinate is the highest bits
 					     (> j+1 displacement))
 				   (progn
 				     (setf (world:%skygetlight displacement) 15)
@@ -187,6 +189,8 @@
 	   (if (= 15 light-value)
 	       (let ((displacement (world:add j-1 place)))
 		 (unless (or (isopaque (world:%getblock displacement))
+			     ;;this depends on the fact that
+			     ;;the height coordinate is the highest bits
 			     (> j+1 displacement))
 		   (let ((adj-light-level (world:%skygetlight displacement)))
 		     (progn
