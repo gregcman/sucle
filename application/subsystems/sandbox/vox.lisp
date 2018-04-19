@@ -1,50 +1,46 @@
 (defpackage #:vox
   (:use #:cl))
-
+(in-package :vox)
 ;;;;create a data structure to store chunks which in turn store voxels
 ;;;;or some sort of three dimensional data
 ;;;;Currently implemented by a hash table filled with arrays.
-(in-package :vox)
 
-;;;;different types of specification
-;;;;1: layout of 3 numbers in the fixnum
-;;;;2: size of trucator for each of the 3 numbers -- how large the individual
-;;;;chunks are in that dimension
-;;;;3. signed/unsigned/offset of 3 numbers
-;;;;4. names of the different generated functions so they can refer to each other
-;;;;by name
-;;;;5. type of data to be stored, names of the functions, the hash table,
-;;;;default "vacuum" state, space generators
 
-(defmacro defspec (name lambda-list)
-  (let ((dynamic-var-names (mapcar (lambda (sym)
-				     (utility:symbolicate2
-				      (list "*" sym "*")))
-				   lambda-list)))
-    `(progn
-       ,@(mapcar (lambda (name) `(defparameter ,name nil))
-		 dynamic-var-names)
-       (defun ,name ,lambda-list
-	 (progn
-	   ,@(mapcar (lambda (var dyn-var)
-		       `(setf ,dyn-var ,var))
-		     lambda-list
-		     dynamic-var-names))))))
 
-(defspec layout
-    (num0-size num0-start num1-size num1-start num2-size num2-start))
-(defspec truncation
-    (chopx chopy chopz))
-(defspec names
-    (unhashfunc chunkhashfunc chop anti-chop rem-flow %%ref add))
-(defspec offset
-    (offset0 offset1 offset2))
-(defspec field
-    (data-type chunk-container vacuum-state space-provider))
-(defspec access
-    (getter setter))
 
-;;inline the headless lambda, give it a name, give it speed and recklessness
+
+(macrolet ((defspec (name lambda-list)
+	     (let ((dynamic-var-names (mapcar (lambda (sym)
+						(utility:symbolicate2
+						 (list "*" sym "*")))
+					      lambda-list)))
+	       `(progn
+		  ,@(mapcar (lambda (name) `(defparameter ,name nil))
+			    dynamic-var-names)
+		  (defun ,name ,lambda-list
+		    (progn
+		      ,@(mapcar (lambda (var dyn-var)
+				  `(setf ,dyn-var ,var))
+				lambda-list
+				dynamic-var-names)))))))
+;;;1: layout of 3 numbers in the fixnum
+  (defspec layout
+      (num0-size num0-start num1-size num1-start num2-size num2-start))
+;;;2: size of trucator for each of the 3 numbers -- how large the individual
+;;;chunks are in that dimension
+  (defspec truncation
+      (chopx chopy chopz))
+;;;3. signed/unsigned/offset of 3 numbers
+  (defspec offset
+      (offset0 offset1 offset2))
+;;;4. names of the different generated functions so they can refer to each other
+;;;by name
+  (defspec names
+      (unhashfunc chunkhashfunc chop anti-chop rem-flow %%ref add))
+;;;5. type of data to be stored, names of the functions, the hash table,
+;;;default "vacuum" state, space generators
+  (defspec field
+      (data-type chunk-container vacuum-state space-provider)))
 
 ;;instead of using a struct or a vector to represent a point,
 ;;a single fixnum can be used.
@@ -186,10 +182,10 @@
 ;;the hash which hashes the fixnums, the default value, and the method
 ;;to create new chunks
 
-(defun prep-hash ()
+(defun prep-hash (getter setter)
   `(progn
      (utility:with-unsafe-speed
-       (defun ,*getter* (block-code)
+       (defun ,getter (block-code)
 	 (declare (type fixnum block-code))
 	 (let ((chunk-code (,*chop* block-code)))
 	   (let ((chunk (gethash chunk-code ,*chunk-container*)))
@@ -197,7 +193,7 @@
 	     (if chunk
 		 (values (aref chunk (,*%%ref* block-code)) t)
 		 (values ,*vacuum-state* nil)))))
-       (defun ,*setter* (block-code blockid)
+       (defun ,setter (block-code blockid)
 	 (declare (type fixnum block-code blockid))
 	 (let ((chunk-code (,*chop* block-code)))
 	   (let ((chunk (or (gethash chunk-code
@@ -208,5 +204,5 @@
 			     ,*space-provider*))))
 	     (declare (type ,*data-type* chunk))
 	     (setf (aref chunk (,*%%ref* block-code)) blockid))))
-       (defun (setf ,*getter*) (new location)
-	 (,*setter* location new)))))
+       (defun (setf ,getter) (new location)
+	 (,setter location new)))))

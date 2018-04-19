@@ -109,29 +109,23 @@
    (let ((value (logior (ash 15 12))))
      ((lambda (setter getter %setter %getter hash default creator)	  
 	(vox::field `(simple-array t (4096)) hash default creator)
-	(vox::access %getter %setter)
-	(let ((bits (logcount most-positive-fixnum)))
-	  (let ((y 10)
-		(x nil; 26
-		  )
-		(z nil;26
-		  ))
-	    (decf bits y)
-	    (setf x (floor bits 2))
-	    (setf z (ceiling bits 2))
-	    (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z))))
+	(let* ((bits (logcount most-positive-fixnum))
+	       (y 10)
+	       (remaining-bits (- bits y))
+	       (x (floor remaining-bits 2))
+	       (z (ceiling remaining-bits 2)))
+	  (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z)))
 	(vox::truncation 4 4 4)
 	(vox::derived-parts)
 	(vox::offset 0 0 0)
 	(vox::names
 	 'unhashfunc 'chunkhashfunc
 	 'chop 'anti-chop 'rem-flow '%%ref 'add)
-	(list 'progn
-	      (vox::define-fixnum-ops)
-	      (list 'progn
-		    (vox::prep-hash)
-		    (define-accessors getter setter %getter %setter)
-		    `(defsetf %getter %setter))))
+	`(progn
+	   ,(vox::define-fixnum-ops)
+	   (progn
+	     ,(vox::prep-hash %getter %setter)
+	     ,(define-accessors getter setter %getter %setter))))
       'setobj 'getobj
       '%setobj '%getobj
       '*lispobj* value
