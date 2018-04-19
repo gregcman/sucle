@@ -132,7 +132,7 @@
 			       (declare (type (unsigned-byte 4) val))
 			       (when (< val 15)
 				 (unless (or (isOpaque (world:%getblock displacement))
-					     (> 4503599627370496 displacement))
+					     (> j+1 displacement))
 				   (progn
 				     (setf (world:%skygetlight displacement) 15)
 				     (block-dirtify-hashed displacement))
@@ -187,7 +187,7 @@
 	   (if (= 15 light-value)
 	       (let ((displacement (world:add j-1 place)))
 		 (unless (or (isopaque (world:%getblock displacement))
-			     (> 4503599627370496 displacement))
+			     (> j+1 displacement))
 		   (let ((adj-light-level (world:%skygetlight displacement)))
 		     (progn
 		       (setf (world:%skygetlight displacement) 0)
