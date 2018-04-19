@@ -2,9 +2,9 @@
 #+nil
 (defmacro etouq (form)
   (eval form))
-(defmacro etouq (form)
+(defmacro etouq (&body body)
   (let ((var (gensym)))
-    `(macrolet ((,var () ,form))
+    `(macrolet ((,var () ,@body))
        (,var))))
 
 (defmacro toggle (var) `(setf ,var (not ,var)))

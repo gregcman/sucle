@@ -97,38 +97,33 @@
   (send-to-free-mem *lispobj* *freechunkmempoolobj*))
 
 (utility:etouq
- (flet ((define-accessors (getter-name 
-				       %getter-name %setter-name)
-	  `(progn	     
-	     (defun ,getter-name (i j k)
-	       (,%getter-name (chunkhashfunc i j k)))
-	     (defun (setf ,getter-name) (new i j k)
-	       (,%setter-name (chunkhashfunc i j k) new)))))
-   (let ((value (logior (ash 15 12))))	  
-     (vox::field `(simple-array t (4096))
-		 '*lispobj*
-		 value
-		 `(recycler:get-from *freechunkmempoolobj* ,value)))
-   (let* ((bits (logcount most-positive-fixnum))
-	  (y 10)
-	  (remaining-bits (- bits y))
-	  (x (floor remaining-bits 2))
-	  (z (ceiling remaining-bits 2)))
-     (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z)))
-   (vox::truncation 4 4 4)
-   (vox::derived-parts)
-   (vox::offset 0 0 0)
-   (vox::names
-    'unhashfunc 'chunkhashfunc
-    'chop 'anti-chop 'rem-flow '%%ref 'add)
-   `(progn
-      ,(vox::define-fixnum-ops)
-      (progn
-	,(vox::prep-hash
-	  '%getobj '%setobj)
-	,(define-accessors
-	  'getobj 
-	  '%getobj '%setobj)))))
+ (let ((value (logior (ash 15 12))))	  
+   (vox::field `(simple-array t (4096))
+	       '*lispobj*
+	       value
+	       `(recycler:get-from *freechunkmempoolobj* ,value)))
+ (let* ((bits (logcount most-positive-fixnum))
+	(y 10)
+	(remaining-bits (- bits y))
+	(x (floor remaining-bits 2))
+	(z (ceiling remaining-bits 2)))
+   (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z)))
+ (vox::truncation 4 4 4)
+ (vox::derived-parts)
+ (vox::offset 0 0 0)
+ (vox::names
+  'unhashfunc 'chunkhashfunc
+  'chop 'anti-chop 'rem-flow '%%ref 'add)
+ `(progn
+    ,(vox::define-fixnum-ops)
+    (progn
+      ,(vox::prep-hash
+	'%getobj '%setobj)
+      (progn	     
+	(defun getobj (i j k)
+	  (%getobj (chunkhashfunc i j k)))
+	(defun (setf getobj) (new i j k)
+	  (%setobj (chunkhashfunc i j k) new))))))
 
 (defgeneric lispobj-dispatch (obj))
 
