@@ -46,7 +46,6 @@
    #:%getlight #:%setlight
    #:skygetlight #:skysetlight
    #:%skygetlight #:%skysetlight
-   #:setmeta #:getmeta
 
 ;;;pointer manipulation
    #:%%ref 

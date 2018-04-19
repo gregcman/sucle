@@ -224,3 +224,14 @@
 (defun keywordify (sym)
   (intern (string sym)
 	  (load-time-value (find-package "KEYWORD"))))
+
+(defconstant +fixnum-bits+ (logcount most-positive-fixnum))
+(defun print-bits (n &optional (stream *standard-output*))
+  (format stream
+	  (etouq (concatenate 'string
+			      "~"
+			      (write-to-string
+			      +fixnum-bits+ )
+			      ",'0b"))
+	  (logand n most-positive-fixnum))
+  n)

@@ -34,4 +34,8 @@
    #:parse-body)
 
   (:export
-   #:keywordify))
+   #:keywordify)
+
+  (:export
+   #:fixnum-bits
+   #:print-bits))
