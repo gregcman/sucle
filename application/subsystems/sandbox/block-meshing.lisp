@@ -4,19 +4,16 @@
 (defparameter *mesh-dark* nil)
 (defparameter *mesh-epos* nil)
 
-(defun chunk-shape (chunk-position iter)
-  (declare (optimize (debug 3)))
+(defun chunk-shape (iter io jo ko)
   (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
-    (multiple-value-bind (io ko jo) (world:unhashfunc chunk-position)
-      (dobox ((i io (+ 16 io))
-	      (j jo (+ 16 jo))
-	      (k ko (+ 16 ko)))
-	     (let ((blockid (world:getblock i j k)))
-	       (unless (zerop blockid)
-		 (blockshape
-		  i j k
-		  blockid)))))
-    (values chunk-position iter)))
+    (dobox ((i io (+ 16 io))
+	    (j jo (+ 16 jo))
+	    (k ko (+ 16 ko)))
+	   (let ((blockid (world:getblock i j k)))
+	     (unless (zerop blockid)
+	       (blockshape
+		i j k
+		blockid))))))
 
 
 (defmacro %edge-aux ((i j k)

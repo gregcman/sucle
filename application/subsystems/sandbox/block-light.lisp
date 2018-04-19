@@ -6,7 +6,7 @@
 (defparameter *scratch-bfs* (queue::make-uniq-q))
 (defparameter *scratch-bfs2* (queue::make-uniq-q))
 
-(defun light-node (x z y &optional (bfs *scratch-bfs*))
+(defun light-node (x y z &optional (bfs *scratch-bfs*))
   (queue::clruniq bfs)
   (queue::uniq-push (world:chunkhashfunc x y z) bfs)  
   (%light-node bfs))
@@ -17,12 +17,12 @@
 	 (z (+ k ,mz)))
      ,@body))
 
-(defconstant i+1 (world:chunkhashfunc 1 0 0))
-(defconstant i-1 (world:chunkhashfunc -1 0 0))
-(defconstant j+1 (world:chunkhashfunc 0 0 1))
-(defconstant j-1 (world:chunkhashfunc 0 0 -1))
-(defconstant k+1 (world:chunkhashfunc 0 1 0))
-(defconstant k-1 (world:chunkhashfunc 0 -1 0))
+(defconstant i+1 (world:chunkhashfunc  1  0  0))
+(defconstant i-1 (world:chunkhashfunc -1  0  0))
+(defconstant j+1 (world:chunkhashfunc  0  1  0))
+(defconstant j-1 (world:chunkhashfunc  0 -1  0))
+(defconstant k+1 (world:chunkhashfunc  0  0  1))
+(defconstant k-1 (world:chunkhashfunc  0  0 -1))
 
 ;;flood fill propagation
 (defun %light-node (bfs)
@@ -58,7 +58,7 @@
 	(lighting-bfs *scratch-bfs2*))
     (queue:clruniq bfs)
     (queue:clruniq lighting-bfs)
-    (queue::kv-uniq-push (world:chunkhashfunc x z y) (world:getlight x y z) bfs)
+    (queue::kv-uniq-push (world:chunkhashfunc x y z) (world:getlight x y z) bfs)
     (progn
       (setf (world:getlight x y z) 0)
       (block-dirtify x y z))
@@ -100,7 +100,7 @@
 
 (defun sky-light-node (x y z &optional (bfs *scratch-bfs*))
   (queue::clruniq bfs)
-  (queue::uniq-push (world:chunkhashfunc x z y) bfs)  
+  (queue::uniq-push (world:chunkhashfunc x y z) bfs)  
   (%sky-light-node bfs))
 
 ;;flood fill propagation with moving downwards

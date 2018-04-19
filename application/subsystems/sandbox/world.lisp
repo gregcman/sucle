@@ -100,9 +100,9 @@
  (flet ((define-accessors (getter-name setter-name %getter-name %setter-name)
 	  `(progn
 	     (defun ,getter-name (i j k)
-	       (,%getter-name (chunkhashfunc i k j)))
+	       (,%getter-name (chunkhashfunc i j k)))
 	     (defun ,setter-name (i j k new)
-	       (,%setter-name (chunkhashfunc i k j) new))
+	       (,%setter-name (chunkhashfunc i j k) new))
 	     (defun (setf ,getter-name) (new i j k)
 	       (,setter-name i j k new)))))
    (let ((value (logior (ash 15 12))))
@@ -193,7 +193,7 @@
 	  (jmask (mod j 16))
 	  (kmask (mod k 16)))
       (labels ((add (x y z)
-		 (dirty-push (world:chop (world:chunkhashfunc x z y))))
+		 (dirty-push (world:chop (world:chunkhashfunc x y z))))
 	       (i-permute ()
 		 (case imask
 		   (0 (j-permute (1- i)))
@@ -211,6 +211,6 @@
 		 (add ix jx k)))
 	(i-permute)))))
 
-(defun block-dirtify-hashed (xzy)
-  (multiple-value-bind (x z y) (world:unhashfunc xzy)
+(defun block-dirtify-hashed (xyz)
+  (multiple-value-bind (x y z) (world:unhashfunc xyz)
     (block-dirtify x y z)))

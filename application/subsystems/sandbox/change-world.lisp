@@ -37,8 +37,8 @@
 		      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 		  x y z
 		  (- i 8)
-		  (- k 8)
-		  (- j 8)))))))
+		  (- j 8)
+		  (- k 8)))))))
 
 (defun update-chunk-mesh (coords iter)
   (when coords
@@ -89,12 +89,14 @@
 	   (let ((lparallel:*task-category* 'mesh-chunk))
 	     (lparallel:submit-task
 	      *achannel*
-	      (lambda (iter space)
+	      (lambda (iter space chunk-pos)
 		(map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
-		(multiple-value-bind (a b) (chunk-shape thechunk iter)
-		  (%list space #'update-chunk-mesh a b)))
+		(multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
+		  (chunk-shape iter io jo ko)
+		  (%list space #'update-chunk-mesh chunk-pos iter)))
 	      (attrib-buffer-iterators)
-	      (make-list 3)))
+	      (make-list 3)
+	      thechunk))
 	   (return)))))
 
 
