@@ -86,17 +86,17 @@
 		     `(ldb (byte ,*num0-size* ,*num0-start*) fixnum))
 		 *uoffset0*)
 	       ,(signed-unsigned
-		 `(LDB (byte ,*num1-size* ,*num1-start*) fixnum)
-		 *uoffset1*)
-	       ,(signed-unsigned
 		 `(ash fixnum ,(- *num2-start*))
-		 *uoffset2*)))
+		 *uoffset2*)
+	       ,(signed-unsigned
+		 `(LDB (byte ,*num1-size* ,*num1-start*) fixnum)
+		 *uoffset1*)))
      (fastnum
 	 ,*chunkhashfunc*
 	 (x y z)
        (THE FIXNUM
-	    (logior (the fixnum (ash (mod z ,*uoffset2*) ,*num2-start*))
-		    (the fixnum (ash (mod y ,*uoffset1*) ,*num1-start*))
+	    (logior (the fixnum (ash (mod y ,*uoffset2*) ,*num2-start*))
+		    (the fixnum (ash (mod z ,*uoffset1*) ,*num1-start*))
 		    (the fixnum (ash (mod x ,*uoffset0*) ,*num0-start*)))))
      (fastnum
 	 ,*chop*

@@ -11,13 +11,17 @@
 
 (defun savechunk (path position)
   (let ((position-list (multiple-value-list (world:unhashfunc position))))
+    (rotatef (second position-list)
+	     (third position-list))
     (filesystem-util:save2
      path
      position-list
      (gethash position world::*lispobj*))))
 
 (defun loadchunk (path position-list)
-  (let ((position (apply #'world:chunkhashfunc position-list)))
+  (let ((position
+	 (destructuring-bind (x y z) position-list
+	     (world:chunkhashfunc x z y))))
     (let ((data (filesystem-util:myload2 path position-list)))
       (case (length data)
 	(3
