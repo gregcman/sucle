@@ -97,38 +97,38 @@
   (send-to-free-mem *lispobj* *freechunkmempoolobj*))
 
 (utility:etouq
- (flet ((define-accessors (getter-name setter-name %getter-name %setter-name)
-	  `(progn
+ (flet ((define-accessors (getter-name 
+				       %getter-name %setter-name)
+	  `(progn	     
 	     (defun ,getter-name (i j k)
 	       (,%getter-name (chunkhashfunc i j k)))
-	     (defun ,setter-name (i j k new)
-	       (,%setter-name (chunkhashfunc i j k) new))
 	     (defun (setf ,getter-name) (new i j k)
-	       (,setter-name i j k new)))))
-   (let ((value (logior (ash 15 12))))
-     ((lambda (setter getter %setter %getter hash default creator)	  
-	(vox::field `(simple-array t (4096)) hash default creator)
-	(let* ((bits (logcount most-positive-fixnum))
-	       (y 10)
-	       (remaining-bits (- bits y))
-	       (x (floor remaining-bits 2))
-	       (z (ceiling remaining-bits 2)))
-	  (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z)))
-	(vox::truncation 4 4 4)
-	(vox::derived-parts)
-	(vox::offset 0 0 0)
-	(vox::names
-	 'unhashfunc 'chunkhashfunc
-	 'chop 'anti-chop 'rem-flow '%%ref 'add)
-	`(progn
-	   ,(vox::define-fixnum-ops)
-	   (progn
-	     ,(vox::prep-hash %getter %setter)
-	     ,(define-accessors getter setter %getter %setter))))
-      'setobj 'getobj
-      '%setobj '%getobj
-      '*lispobj* value
-      `(recycler:get-from *freechunkmempoolobj* ,value)))))
+	       (,%setter-name (chunkhashfunc i j k) new)))))
+   (let ((value (logior (ash 15 12))))	  
+     (vox::field `(simple-array t (4096))
+		 '*lispobj*
+		 value
+		 `(recycler:get-from *freechunkmempoolobj* ,value)))
+   (let* ((bits (logcount most-positive-fixnum))
+	  (y 10)
+	  (remaining-bits (- bits y))
+	  (x (floor remaining-bits 2))
+	  (z (ceiling remaining-bits 2)))
+     (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z)))
+   (vox::truncation 4 4 4)
+   (vox::derived-parts)
+   (vox::offset 0 0 0)
+   (vox::names
+    'unhashfunc 'chunkhashfunc
+    'chop 'anti-chop 'rem-flow '%%ref 'add)
+   `(progn
+      ,(vox::define-fixnum-ops)
+      (progn
+	,(vox::prep-hash
+	  '%getobj '%setobj)
+	,(define-accessors
+	  'getobj 
+	  '%getobj '%setobj)))))
 
 (defgeneric lispobj-dispatch (obj))
 
@@ -137,43 +137,41 @@
     (fixnum value)
     (otherwise (lispobj-dispatch value))))
 
-(defsetf num-getobj setobj)
+(defun (setf num-getobj) (new i j k)
+  (setf (getobj i j k) new) )
 (defun num-getobj (i j k)
   (let ((value (getobj i j k)))
     (value-dispatch value)))
-(defsetf %num-getobj %setobj)
-(defun %num-getobj (place)
-  (let ((value (%getobj place)))
-    (value-dispatch value)))
 
-(defmacro suite (bits position set get %set %get)
+(defmacro suite (bits position get %get)
   (let* ((bytespec `(byte ,bits ,position))
 	 (access `(ldb ,bytespec
-		       (num-getobj i j k)))
-	 (%access `(ldb ,bytespec
-			(%num-getobj place))))
+		       (num-getobj i j k))))
     `(progn
-       (defun ,set (i j k new) (setf ,access new))
-       (defun ,get (i j k) ,access)
-       (defsetf ,get ,set)
-       (defun ,%set (place new) (setf ,%access new))
-       (defun ,%get (place) ,%access)
-       (defsetf ,%get ,%set))))
+       (defun (setf ,get) (new i j k)
+	 (setf ,access new))
+       (defun ,get (i j k)
+	 ,access)
+       (defun (setf ,%get) (new place)
+	 (multiple-value-bind (i j k) (unhashfunc place)
+	   (setf ,access new)))
+       (defun ,%get (place)
+	 (multiple-value-bind (i j k) (unhashfunc place)
+	   ,access)))))
 (progn
-  (suite 8 0 setblock getblock %setblock %getblock)
-  (suite 4 8 setlight getlight %setlight %getlight)
-  (suite 4 12 skysetlight skygetlight %skysetlight %skygetlight))
+  (suite 8 0 getblock %getblock)
+  (suite 4 8 getlight %getlight)
+  (suite 4 12 skygetlight %skygetlight))
 
-(defun blockify (blockid light sky meta)
-  (dpb meta (byte 16 4)
-	(dpb sky (byte 4 12)
-	     (dpb light (byte 4 8) blockid))))
+(defun blockify (blockid light sky)
+  (dpb sky (byte 4 12)
+       (dpb light (byte 4 8) blockid)))
 
 (defmethod lispobj-dispatch ((obj character))
-  (blockify (char-code obj) 0 0 0))
+  (blockify (char-code obj) 0 0))
 
 (defmethod lispobj-dispatch ((obj t))
-  (blockify (logcount (sxhash obj)) 0 0 0))
+  (blockify (logcount (sxhash obj)) 0 0))
 
 (defmethod lispobj-dispatch ((obj symbol))
   56)

@@ -194,7 +194,7 @@
 		 (values (aref chunk (,*%%ref* block-code)) t)
 		 (values ,*vacuum-state* nil)))))
        (defun ,setter (block-code blockid)
-	 (declare (type fixnum block-code blockid))
+	 (declare (type fixnum block-code))
 	 (let ((chunk-code (,*chop* block-code)))
 	   (let ((chunk (or (gethash chunk-code
 				     ,*chunk-container*)
