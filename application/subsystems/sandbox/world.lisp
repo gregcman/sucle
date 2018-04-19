@@ -107,34 +107,31 @@
 	     (defun (setf ,getter-name) (new i j k)
 	       (,setter-name i j k new)))))
    (let ((value (logior (ash 15 12))))
-     ((lambda (setter getter %setter %getter hash default creator)
-	(let ((uniform-spec (coge:gen-spec)))
-	  
-	  (vox::field uniform-spec `(simple-array t (4096)) hash default creator)
-	  (vox::access uniform-spec %getter %setter)
-	  (let ((bits (logcount most-positive-fixnum)))
-	    (let ((y 10)
-		  (x nil; 26
-		    )
-		  (z nil;26
-		    ))
-	      (decf bits y)
-	      (setf x (floor bits 2))
-	      (setf z (ceiling bits 2))
-	      (vox::layout uniform-spec (1- x) 0 (1- z) x (1- y) (+ x z))))
-	  (vox::truncation uniform-spec 4 4 4)
-	  (vox::derived-parts uniform-spec)
-	  (vox::offset uniform-spec 0 0 0)
-	  (vox::names uniform-spec
-		      'unhashfunc 'chunkhashfunc
-		      'chop 'anti-chop 'rem-flow '%%ref 'add)
-	  (list 'progn
-		(vox::define-fixnum-ops
-		    uniform-spec)
-		(list 'progn
-		      (vox::prep-hash uniform-spec)
-		      (define-accessors getter setter %getter %setter)
-		      `(defsetf %getter %setter)))))
+     ((lambda (setter getter %setter %getter hash default creator)	  
+	(vox::field `(simple-array t (4096)) hash default creator)
+	(vox::access %getter %setter)
+	(let ((bits (logcount most-positive-fixnum)))
+	  (let ((y 10)
+		(x nil; 26
+		  )
+		(z nil;26
+		  ))
+	    (decf bits y)
+	    (setf x (floor bits 2))
+	    (setf z (ceiling bits 2))
+	    (vox::layout (1- x) 0 (1- z) x (1- y) (+ x z))))
+	(vox::truncation 4 4 4)
+	(vox::derived-parts)
+	(vox::offset 0 0 0)
+	(vox::names
+	 'unhashfunc 'chunkhashfunc
+	 'chop 'anti-chop 'rem-flow '%%ref 'add)
+	(list 'progn
+	      (vox::define-fixnum-ops)
+	      (list 'progn
+		    (vox::prep-hash)
+		    (define-accessors getter setter %getter %setter)
+		    `(defsetf %getter %setter))))
       'setobj 'getobj
       '%setobj '%getobj
       '*lispobj* value
@@ -172,8 +169,7 @@
 (progn
   (suite 8 0 setblock getblock %setblock %getblock)
   (suite 4 8 setlight getlight %setlight %getlight)
-  (suite 4 12 skysetlight skygetlight %skysetlight %skygetlight)
-  (suite 4 16 setmeta getmeta %setmeta %getmeta))
+  (suite 4 12 skysetlight skygetlight %skysetlight %skygetlight))
 
 (defun blockify (blockid light sky meta)
   (dpb meta (byte 16 4)

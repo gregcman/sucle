@@ -68,11 +68,6 @@
 		(push arg actual-args))
 	    (push (car arg) actual-args))))))
 
-(defmacro defspec (name lambda-list)
-  (let ((actual-args (get-actual-args lambda-list)))
-    `(defun ,name ,(cons 'spec lambda-list)
-       (add-spec spec ,(cons 'list (mapcar (lambda (x) (list 'cons (list 'quote x) x)) actual-args))))))
-
 (defpackage #:vox
   (:use #:cl))
 
@@ -91,34 +86,35 @@
 ;;;;5. type of data to be stored, names of the functions, the hash table,
 ;;;;default "vacuum" state, space generators
 
-(coge:defspec layout (num0-size num0-start num1-size num1-start num2-size num2-start))
-(coge:defspec truncation (chopx chopy chopz))
-(coge:defspec names (unhashfunc chunkhashfunc chop anti-chop rem-flow %%ref add))
-(coge:defspec offset (offset0 offset1 offset2))
-(coge:defspec field (data-type chunk-container vacuum-state space-provider))
-(coge:defspec access (getter setter))
+(defmacro defspec (name lambda-list)
+  (let ((dynamic-var-names (mapcar (lambda (sym)
+				     (utility:symbolicate2
+				      (list "*" sym "*")))
+				   lambda-list)))
+    `(progn
+       ,@(mapcar (lambda (name) `(defparameter ,name nil))
+		 dynamic-var-names)
+       (defun ,name ,lambda-list
+	 (progn
+	   ,@(mapcar (lambda (var dyn-var)
+		       `(setf ,dyn-var ,var))
+		     lambda-list
+		     dynamic-var-names))))))
+
+(defspec layout
+    (num0-size num0-start num1-size num1-start num2-size num2-start))
+(defspec truncation
+    (chopx chopy chopz))
+(defspec names
+    (unhashfunc chunkhashfunc chop anti-chop rem-flow %%ref add))
+(defspec offset
+    (offset0 offset1 offset2))
+(defspec field
+    (data-type chunk-container vacuum-state space-provider))
+(defspec access
+    (getter setter))
 
 ;;inline the headless lambda, give it a name, give it speed and recklessness
-(defun make-fast (nombre headless-lambda)
-  `(progn
-     (declaim (inline ,nombre))
-     (defun ,nombre ,(car headless-lambda)
-       (declare (optimize (speed 3) (safety 0)))
-       ,@(cdr headless-lambda))))
-
-(defun not-too-fast (nombre headless-lambda)
-  `(progn
-     (defun ,nombre ,(car headless-lambda)
-       (declare (optimize (speed 3) (safety 0)))
-       ,@(cdr headless-lambda))))
-
-(defun fixnums! (headless-lambda)
-  `(,(car headless-lambda)
-     (declare (type fixnum ,@(coge:get-actual-args (car headless-lambda))))
-     ,@(cdr headless-lambda)))
-
-(defun fastnum (name headless-lambda)
-  (make-fast name (fixnums! headless-lambda)))
 
 ;;instead of using a struct or a vector to represent a point,
 ;;a single fixnum can be used.
@@ -145,148 +141,142 @@
 ;;(defparameter spec `((20 ,(ash 1 19)) (20 ,(ash 1 19)) (20 ,(ash 1 19))))
 ;;(eval (CREATE-PACKED-NUM 'chunkhashfunc 'unhashfunc spec))
 
-(defun gen-remove-overflow ()
-  `((pos) (the fixnum (logand pos p!overflow-mask))))
+(defmacro fastnum (name args &body body)
+  `(progn
+     (declaim (inline ,name))
+     (defun ,name ,args
+       (declare (optimize (speed 3) (safety 0)))
+       (declare (type fixnum ,@args))
+       ,@body)))
 
-(defun gen-chopper ()
-  `((pos) (the fixnum (logand p!truncate-mask pos))))
-
-(defun gen-anti-chopper ()
-  `((pos) (the fixnum (logand p!anti-truncate-mask pos))))
-
-(defun gen-packer ()
-  `((x y z)
-    (THE FIXNUM
-	 (logior (the fixnum (ash (mod z p!uoffset2) p!num2-start))
-		 (the fixnum (ash (mod y p!uoffset1) p!num1-start))
-		 (the fixnum (ash (mod x p!uoffset0) p!num0-start))))))
+(defun define-fixnum-ops ()
+  `(progn
+     (fastnum
+	 ,*unhashfunc*
+	 (fixnum)
+       (values ,(signed-unsigned
+		 (if (zerop *num0-start*)
+		     `(logand fixnum ,(1- (ash 1 *num0-size*)))  
+		     `(ldb (byte ,*num0-size* ,*num0-start*) fixnum))
+		 *uoffset0*)
+	       ,(signed-unsigned
+		 `(LDB (byte ,*num1-size* ,*num1-start*) fixnum)
+		 *uoffset1*)
+	       ,(signed-unsigned
+		 `(ash fixnum ,(- *num2-start*))
+		 *uoffset2*)))
+     (fastnum
+	 ,*chunkhashfunc*
+	 (x y z)
+       (THE FIXNUM
+	    (logior (the fixnum (ash (mod z ,*uoffset2*) ,*num2-start*))
+		    (the fixnum (ash (mod y ,*uoffset1*) ,*num1-start*))
+		    (the fixnum (ash (mod x ,*uoffset0*) ,*num0-start*)))))
+     (fastnum
+	 ,*chop*
+	 (pos)
+       (the fixnum (logand ,*truncate-mask* pos)))
+     (fastnum
+	 ,*anti-chop*
+	 (pos)
+       (the fixnum (logand ,*anti-truncate-mask* pos)))
+     (fastnum
+	 ,*rem-flow*
+	 (pos)
+       (the fixnum (logand ,*overflow-mask* pos)))
+     (fastnum
+	 ,*%%ref*
+	 (code)
+       ,(let ((size-0 *chopx*)
+	      (size-1 *chopy*)
+	      (size-2 *chopz*)
+	      (start-1 *num1-start*)
+	      (start-2 *num2-start*))
+	     (let ((first-shift (- start-2 size-0 size-1))
+		   (second-shift (- start-2 start-1 size-1))
+		   (end-size (+ size-0 size-1 size-2)))
+	       `(let ((c (,*anti-chop* code)))	  
+		  (the (unsigned-byte ,end-size)
+		       ,(if (and (= size-0 size-1 size-2)
+				 (= start-1 26)
+				 (= start-2 52))
+			    `(ash (logior (the fixnum (ash c ,first-shift))
+					  (the fixnum (ash c ,second-shift))
+					  c)
+				  ,(- first-shift))
+			    `(ash (logior (the fixnum
+					       (ash (logand c ,(1- (ash 1 size-0)))
+						    ,first-shift))
+					  (the fixnum
+					       (ash
+						(logand c ,(ash (1- (ash 1 size-1))
+								start-1))
+						,second-shift))
+					  c)
+				  ,(- first-shift))))))))
+     (fastnum
+	 ,*add*
+	 (a b)
+       (,*rem-flow* (+ a b)))))
 
 ;;;;which one is faster???
 
-(if nil
-    (defmacro signed-unsigned (x n)
-      (let ((n (eval n)))
-	`(- (mod (the fixnum (+ ,x ,(/ n 2))) ,n) ,(/ n 2))))
+#+nil
+(defun signed-unsigned (x n)
+  `(- (mod (the fixnum (+ ,x ,(/ n 2))) ,n) ,(/ n 2)))
 
-    (defmacro signed-unsigned (x n)
-      (let ((n (eval n)))
-	`(let ((a ,x))
-	   (if (> ,(/ n 2) a) 
-	       a
-	       (- a ,n))))))
+(defun signed-unsigned (x n)
+  (utility:once-only (x)
+    `(if (> ,(/ n 2) ,x) 
+	 ,x
+	 (- ,x ,n))))
 
-(defun gen-unpacker(spec)
-  `((fixnum)
-    (values (signed-unsigned
-	     ,(if (zerop (coge:rp spec 'p!num0-start))
-		  `(logand fixnum (1- (ash 1 p!num0-size)))  
-		  `(ldb (byte p!num0-size p!num0-start) fixnum)) p!uoffset0)
-	    (signed-unsigned
-	     (LDB (byte p!num1-size p!num1-start) fixnum) p!uoffset1)
-	    (signed-unsigned
-	     (ash fixnum (- p!num2-start)) p!uoffset2))))
-
-(defun gen-mask-overflow ()
-  `(lognot (logior (ash 1 (+ p!num0-start p!num0-size))
-		   (ash 1 (+ p!num1-start p!num1-size))
-		   (ash 1 (+ p!num2-start p!num2-size)))))
-
-(defun gen-mask-truncate ()
-  `(lognot (+ (ash (1- (ash 1 p!chopy)) p!num0-start)
-	      (ash (1- (ash 1 p!chopx)) p!num1-start)
-	      (ash (1- (ash 1 p!chopz)) p!num2-start))))
-
-(defun gen-mask-anti-truncate ()
-  `(+ (ash (1- (ash 1 p!chopy)) p!num0-start)
-      (ash (1- (ash 1 p!chopx)) p!num1-start)
-      (ash (1- (ash 1 p!chopz)) p!num2-start)))
-
-(defun gen-%%ref (spec)
-  (let ((size-0 (coge:rp spec 'p!chopx))
-	(size-1 (coge:rp spec 'p!chopy))
-	(size-2 (coge:rp spec 'p!chopz))
-	(start-1 (coge:rp spec 'p!num1-start))
-	(start-2 (coge:rp spec 'p!num2-start)))
-    (let ((first-shift (- start-2 size-0 size-1))
-	  (second-shift (- start-2 start-1 size-1))
-	  (end-size (+ size-0 size-1 size-2)))
-      `((code)
-	(let ((c (p!anti-chop code)))	  
-	  (the (unsigned-byte ,end-size)
-	       ,(if (and (= size-0 size-1 size-2)
-			 (= start-1 26)
-			 (= start-2 52))
-		    `(ash (logior (the fixnum (ash c ,first-shift))
-				  (the fixnum (ash c ,second-shift))
-				  c)
-			  ,(- first-shift))
-		    `(ash (logior (the fixnum
-				       (ash (logand c ,(1- (ash 1 size-0)))
-						   ,first-shift))
-				  (the fixnum
-				       (ash
-					(logand c ,(ash (1- (ash 1 size-1))
-							start-1))
-					,second-shift))
-				  c)
-			  ,(- first-shift)))))))))
-
-(defun gen-add ()
-  `((a b) (p!rem-flow (+ a b))))
-
-(defun gen-getter ()
-  `((block-code)   
-    (let ((chunk-code (p!chop block-code)))
-      (let ((chunk (gethash chunk-code p!chunk-container)))
-	(declare (type (or p!data-type null) chunk))
-	(if chunk
-	    (values (aref chunk (p!%%ref block-code)) t)
-	    (values p!vacuum-state nil))))))
-
-(defun gen-setter ()
-  `((block-code blockid)
-    (let ((chunk-code (p!chop block-code)))
-      (let ((chunk (or (gethash chunk-code p!chunk-container)
-		       (setf
-			(gethash chunk-code p!chunk-container)
-			p!space-provider))))
-	(declare (type p!data-type chunk))
-	(setf (aref chunk (p!%%ref block-code)) blockid)))))
-
-(defun derived-parts (spec)
-  (coge:add-spec
-   spec
-   `((uoffset0 . ,(eval (coge:rp spec '(ash 1 p!num0-size))))
-     (uoffset1 . ,(eval (coge:rp spec '(ash 1 p!num1-size))))
-     (uoffset2 . ,(eval (coge:rp spec '(ash 1 p!num2-size))))))
-  (coge:add-spec
-   spec
-   `((overflow-mask . ,(coge:rp spec (gen-mask-overflow)))
-     (truncate-mask . ,(coge:rp spec (gen-mask-truncate)))
-     (anti-truncate-mask . ,(coge:rp spec (gen-mask-anti-truncate))))))
-
-(defun define-fixnum-ops (spec)
-  (coge:rp spec
-	   `(progn
-	      ,(fastnum (coge:rp spec 'p!unhashfunc) (gen-unpacker spec))
-	      ,(fastnum (coge:rp spec 'p!chunkhashfunc) (gen-packer))
-	      ,(fastnum (coge:rp spec 'p!chop) (gen-chopper))
-	      ,(fastnum (coge:rp spec 'p!anti-chop) (gen-anti-chopper))
-	      ,(fastnum (coge:rp spec 'p!rem-flow) (gen-remove-overflow))
-	      ,(fastnum (coge:rp spec 'p!%%ref) (gen-%%ref spec))
-	      ,(fastnum (coge:rp spec 'p!add) (gen-add)))))
+(defparameter *uoffset0* nil)
+(defparameter *uoffset1* nil)
+(defparameter *uoffset2* nil)
+(defparameter *overflow-mask* nil)
+(defparameter *truncate-mask* nil)
+(defparameter *anti-truncate-mask* nil)
+(defun derived-parts ()
+  (setf *uoffset0* (ash 1 *num0-size*)
+	*uoffset1* (ash 1 *num1-size*)
+	*uoffset2* (ash 1 *num2-size*)
+	*overflow-mask* (lognot (logior (ash 1 (+ *num0-start* *num0-size*))
+					(ash 1 (+ *num1-start* *num1-size*))
+					(ash 1 (+ *num2-start* *num2-size*))))
+	*truncate-mask* (lognot (+ (ash (1- (ash 1 *chopy*)) *num0-start*)
+				   (ash (1- (ash 1 *chopx*)) *num1-start*)
+				   (ash (1- (ash 1 *chopz*)) *num2-start*)))
+	*anti-truncate-mask* (+ (ash (1- (ash 1 *chopy*)) *num0-start*)
+				(ash (1- (ash 1 *chopx*)) *num1-start*)
+				(ash (1- (ash 1 *chopz*)) *num2-start*))))
 
 ;;the type of hash table that lets fixnums be equated [default is eql]
 ;;combine the number of bits per individual item, the get/set names,
 ;;the hash which hashes the fixnums, the default value, and the method
 ;;to create new chunks
-(defun genhash ()
-  (make-hash-table :test 'eq))
 
-(defun prep-hash (spec)
-  (coge:rp spec
-	   `(progn
-	      ,(not-too-fast (coge:rp spec 'p!getter) (fixnums! (gen-getter)))
-	      ,(not-too-fast (coge:rp spec 'p!setter) (fixnums! (gen-setter)))
-	      (defun (setf p!getter) (new location)
-		(,(coge:rp spec 'p!setter) location new)))))
+(defun prep-hash ()
+  `(progn
+     (utility:with-unsafe-speed
+       (defun ,*getter* (block-code)
+	 (declare (type fixnum block-code))
+	 (let ((chunk-code (,*chop* block-code)))
+	   (let ((chunk (gethash chunk-code ,*chunk-container*)))
+	     (declare (type (or ,*data-type* null) chunk))
+	     (if chunk
+		 (values (aref chunk (,*%%ref* block-code)) t)
+		 (values ,*vacuum-state* nil)))))
+       (defun ,*setter* (block-code blockid)
+	 (declare (type fixnum block-code blockid))
+	 (let ((chunk-code (,*chop* block-code)))
+	   (let ((chunk (or (gethash chunk-code
+				     ,*chunk-container*)
+			    (setf
+			     (gethash chunk-code
+				      ,*chunk-container*)
+			     ,*space-provider*))))
+	     (declare (type ,*data-type* chunk))
+	     (setf (aref chunk (,*%%ref* block-code)) blockid))))
+       (defun (setf ,*getter*) (new location)
+	 (,*setter* location new)))))
