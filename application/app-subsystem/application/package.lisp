@@ -1,7 +1,9 @@
 (defpackage #:application
   (:use #:cl #:utility)
   (:export
-   #:main)
+   #:main
+   #:*thread*
+   #:*main-subthread-p*)
   (:export
    #:poll-app
    #:*quit-token*

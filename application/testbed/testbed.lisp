@@ -187,7 +187,7 @@
 	    (let ((seconds (or 60 840)))
 	      (setf sandbox::*daytime*
 		    (or
-		     0.0
+		     ;0.0
 		     1.0
 		     (floatify
 		      (/ (abs (- (mod (/ *ticks*

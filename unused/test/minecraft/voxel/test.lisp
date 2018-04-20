@@ -70,7 +70,7 @@
 	       (unless height
 		 (setf height 0))
 	       (dobox ((upup (1+ height) y))
-		      (world:skysetlight x upup z 15))))
+		      (setf (world:skygetlight x upup z) 15))))
 	   #(0 128 128 129 -128 0))
   (map-box (lambda (x y z)
 	     (when (= 15 (world:skygetlight x y z))

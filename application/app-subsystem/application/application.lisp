@@ -1,13 +1,17 @@
 (in-package :application)
 
+(defparameter *main-subthread-p* t)
 (defparameter *thread* nil)
 (defun main (start-fun &rest rest)
-  (when (or (eq nil *thread*)
-	    (not (bordeaux-threads:thread-alive-p *thread*)))
-    (setf
-     *thread*
-     (bordeaux-threads:make-thread
-      (apply #'just-main start-fun rest)))))
+  (let ((fun (apply #'just-main start-fun rest)))
+    (if *main-subthread-p*
+	(when (or (eq nil *thread*)
+		  (not (bordeaux-threads:thread-alive-p *thread*)))
+	  (setf
+	   *thread*
+	   (bordeaux-threads:make-thread
+	    fun)))
+	(funcall fun))))
 
 (eval-always
   (defparameter *parameters*
