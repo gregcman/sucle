@@ -4,9 +4,8 @@
 	       #:bordeaux-threads
 	       #:nsb-cga
 	       #:filesystem-util
-	       #:image-utility)
+	       #:image-utility
+	       #:quads)
     :components
     ((:file "camera-matrix")
-     (:file "rectangular-tilemap")
-     (:file "axis-aligned-quads")
      (:file "scratch-buffer")))

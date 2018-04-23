@@ -456,30 +456,6 @@
 
 (defparameter *fov* (* (floatify pi) (/ 70 180)))
 
-(progn
-  (defclass render-area ()
-    ((x :accessor render-area-x
-	:initform 0
-	:initarg :x)
-     (y :accessor render-area-y
-	:initform 0
-	:initarg :y)
-     (width :accessor render-area-width
-	    :initform 0
-	    :initarg :width)
-     (height :accessor render-area-height
-	     :initform 0
-	     :initarg :height)))
-  (defun set-render-area (render-area)
-    (with-slots (x y width height) render-area
-      (glhelp:set-render-area x y width height))))
-(defparameter *render-area* (make-instance 'render-area))
-
-
-(defparameter *black* (make-instance 'render-area :height 2 :width 2
-				     :x 0
-				     :y 0))
-
 (defparameter *camera* (camera-matrix:make-camera
 			:frustum-far (* 256.0)
 			:frustum-near (/ 1.0 8.0)))
@@ -502,12 +478,7 @@
   (glhelp::bind-default-framebuffer)
 
   ;;setup clipping area
-  (let ((render-area *render-area*))
-    (setf (render-area-width render-area) window::*width*
-	  (render-area-height render-area) window::*height*
-	  (render-area-x render-area) 0
-	  (render-area-y render-area) 0))
-  (set-render-area *render-area*)
+  (glhelp::set-render-area 0 0 window::*width* window::*height*)
 
   ;;change the sky color according to time
   (let ((daytime sandbox::*daytime*))
@@ -566,11 +537,11 @@
 
   ;;render crosshairs
   (progn
-    (setf
-     (render-area-x *black*) (- (/ window::*width* 2.0) 1.0) 
-     (render-area-y *black*) (- (/ window::*height* 2.0) 1.0)
-     )
-    (set-render-area *black*)
+    (glhelp:set-render-area
+     (- (/ window::*width* 2.0) 1.0)
+     (- (/ window::*height* 2.0) 1.0)
+     2
+     2)
     (gl:clear-color 1.0 1.0 1.0 1.0)
     (gl:clear
      :color-buffer-bit
