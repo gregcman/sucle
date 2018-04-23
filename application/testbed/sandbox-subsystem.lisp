@@ -456,9 +456,33 @@
 
 (defparameter *fov* (* (floatify pi) (/ 70 180)))
 
-(defparameter *black* (make-instance 'application::render-area :height 2 :width 2
+(progn
+  (defclass render-area ()
+    ((x :accessor render-area-x
+	:initform 0
+	:initarg :x)
+     (y :accessor render-area-y
+	:initform 0
+	:initarg :y)
+     (width :accessor render-area-width
+	    :initform 0
+	    :initarg :width)
+     (height :accessor render-area-height
+	     :initform 0
+	     :initarg :height)))
+  (defun set-render-area (render-area)
+    (with-slots (x y width height) render-area
+      (glhelp:set-render-area x y width height))))
+(defparameter *render-area* (make-instance 'render-area))
+
+
+(defparameter *black* (make-instance 'render-area :height 2 :width 2
 				     :x 0
 				     :y 0))
+
+(defparameter *camera* (camera-matrix:make-camera
+			:frustum-far (* 256.0)
+			:frustum-near (/ 1.0 8.0)))
 
 (defparameter *sky-color*
   (vector 0.68 0.8 1.0))

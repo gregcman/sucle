@@ -105,29 +105,3 @@
 (defun restart-sound-system ()
   (music::restart-al)
   (refresh 'al-context t))
-;;;;;;;;;;;;;;;;;;;;;
-(progn
-  (defclass render-area ()
-    ((x :accessor render-area-x
-	:initform 0
-	:initarg :x)
-     (y :accessor render-area-y
-	:initform 0
-	:initarg :y)
-     (width :accessor render-area-width
-	    :initform 0
-	    :initarg :width)
-     (height :accessor render-area-height
-	     :initform 0
-	     :initarg :height)))
-  (defun set-render-area (render-area)
-    (with-slots (x y width height) render-area
-      (%set-render-area x y width height)))
-  (defun %set-render-area (x y width height)
-    (gl:viewport x y width height)
-    (gl:scissor x y width height)))
-(defparameter *render-area* (make-instance 'render-area))
-
-(defparameter *camera* (camera-matrix:make-camera
-			:frustum-far (* 256.0)
-			:frustum-near (/ 1.0 8.0)))

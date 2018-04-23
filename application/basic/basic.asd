@@ -7,7 +7,8 @@
 	       #:opticl
 	       #:character-modifier-bits
 	       #:terminal-3bst-sbcl
-	       #:uncommon-lisp)
+	       #:uncommon-lisp
+	       #:testbed)
   :serial t
   :components 
   ((:file "sprite-chain")

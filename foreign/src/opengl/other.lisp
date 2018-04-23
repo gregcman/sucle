@@ -31,3 +31,8 @@
    :quads
    :quad-strip
    :polygon))
+
+(export '(set-render-area))
+(defun set-render-area (x y width height)
+  (gl:viewport x y width height)
+  (gl:scissor x y width height))

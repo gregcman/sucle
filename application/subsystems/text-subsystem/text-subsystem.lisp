@@ -130,7 +130,7 @@
     `(let ((,program (getfnc 'flat-shader)))
        (glhelp::use-gl-program ,program)
        (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-       (application::%set-render-area 0 0 256 256)
+       (glhelp:set-render-area 0 0 256 256)
        (glhelp:with-uniforms ,uniform-fun ,program
 	 (flet ((,rebase-fun (x y)
 		  (gl:uniform-matrix-4fv
@@ -356,7 +356,7 @@
     (gl:disable :cull-face)
     (gl:disable :depth-test)
     (gl:disable :blend)
-    (application::%set-render-area 0 0 upw uph)
+    (glhelp:set-render-area 0 0 upw uph)
     (when (not (and (= *indirection-width* upw)
 		    (= *indirection-height* uph)))
       (setf *indirection-width* upw
