@@ -1,6 +1,6 @@
 (asdf:defsystem #:application
   :depends-on (#:utility
-	       #:opengl-glfw3
+	       #:window
 	       #:application-subsystem
 	       #:nsb-cga
 	       #:bordeaux-threads

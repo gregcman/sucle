@@ -7,7 +7,8 @@
 	       #:uncommon-lisp
 	       #:math-modify-macros
 	       #:fps-independent-timestep
-	       #:aabbcc)
+	       #:aabbcc
+	       #:control)
   :serial t
   :components 
   ((:file "sandbox-subsystem")
