@@ -92,7 +92,7 @@
 (defvar *this-directory* (filesystem-util:this-directory))
 (deflazy font-png ()
   (let ((array
-	 (opticl:read-png-file
+	 (image-utility:read-png-file
 	  (filesystem-util:rebase-path #P"font.png"
 				       *this-directory*))))
     (destructuring-bind (w h) (array-dimensions array)

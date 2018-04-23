@@ -4,7 +4,7 @@
 	       #:doubly-linked-list
 	       #:text-subsystem
 	       #:opengl-immediate
-	       #:opticl
+	       #:image-utility
 	       #:character-modifier-bits
 	       #:terminal-3bst-sbcl
 	       #:uncommon-lisp

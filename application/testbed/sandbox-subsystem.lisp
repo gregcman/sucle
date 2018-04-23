@@ -601,7 +601,7 @@
 	    (getapixel (- 255 y) x terrain) color))))
 
 (defun load-png (filename)
-  (opticl:read-png-file filename))
+  (image-utility:read-png-file filename))
 
 (defvar *ourdir* (filesystem-util:this-directory))
 

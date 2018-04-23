@@ -372,9 +372,9 @@
     (glhelp::create-gl-program flat-texture-shader-source)))
 
 (deflazy cons-png ()
-  (flip-image:flip-image
-   (opticl:read-png-file
-    (filesystem-util:rebase-path #P"cons-cell.png" *this-directory*))))
+  (image-utility:read-png-file
+   (filesystem-util:rebase-path #P"cons-cell.png" *this-directory*)
+   t))
 (deflazy cons-texture (cons-png gl-context)
   (make-instance
    'glhelp::gl-texture

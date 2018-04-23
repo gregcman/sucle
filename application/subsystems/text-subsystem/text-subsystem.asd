@@ -1,7 +1,7 @@
 (asdf:defsystem #:text-subsystem
   :depends-on (#:application
 	       #:utility
-	       #:opticl)
+	       #:image-utility)
   :serial t
   :components 
   ((:file "text-subsystem"))) 

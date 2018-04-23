@@ -1,7 +1,13 @@
-(defpackage #:flip-image
-  (:use #:cl))
+(defpackage #:image-utility
+  (:use #:cl)
+  (:export
+   #:flip-image)
+  (:export
+   #:*flip-image-p*
+   #:read-png-file
+   #:write-png-file))
 
-(in-package #:flip-image)
+(in-package #:image-utility)
 
 ;;;;destructive flip
 (defun flip-image (image)
@@ -16,4 +22,12 @@
 			   (row-major-aref image (+ h w))))))))
   image)
 
-(export '(flip-image))
+(defparameter *flip-image-p* nil)
+(defun read-png-file (pathname &optional (flip-p *flip-image-p*))
+  (let ((array
+	 (opticl:read-png-file pathname)))
+    (if flip-p
+	(flip-image array)
+	array)))
+(defun write-png-file (pathname image)
+  (opticl:write-png-file pathname image))

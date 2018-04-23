@@ -3,10 +3,10 @@
 	       #:reverse-array-iterator
 	       #:bordeaux-threads
 	       #:nsb-cga
-	       #:filesystem-util)
+	       #:filesystem-util
+	       #:image-utility)
     :components
     ((:file "camera-matrix")
      (:file "rectangular-tilemap")
      (:file "axis-aligned-quads")
-     (:file "flip-image")
      (:file "scratch-buffer")))

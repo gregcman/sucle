@@ -1,7 +1,7 @@
 (asdf:defsystem #:testbed
   :depends-on (#:application
 	       #:sandbox
-	       #:opticl
+	       #:image-utility
 	       #:reverse-array-iterator
 	       #:singleton-lparallel
 	       #:uncommon-lisp
