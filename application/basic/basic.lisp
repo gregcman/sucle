@@ -86,8 +86,12 @@
     (when (window::skey-j-p (window::keyval :f1))
       (terminal-test::kill)
       ))
-  ;  #+nil
-  (more-test)
+					;  #+nil
+  (progn
+    (multiple-value-bind (buf existsp) (control:get-input-characters)
+      (when existsp
+	(terminal-test::enter buf)))
+    (terminal-test::update-terminal-stuff))
 ;  #+nil
   (when (window::skey-j-p (window::keyval #\A))
     (music::reset-listener)
@@ -466,52 +470,3 @@
 	 (- y row)
 	 bg
 	 fg)))))
-(defmacro get-control-sequence ((control-state char-var shift control alt super) &body body)
-  (once-only (control-state shift control alt super)
-    `(let ((something-flag nil))
-       (labels ((enter-string (string)
-		  (let ((len (length string)))
-		    (unless (zerop len)
-		      (setf something-flag t)
-		      (dotimes (index len)
-			(enter-char (aref string index))))))
-		(enter-char (,char-var)
-		  ,@body)
-		(enter (x)
-		  (setf something-flag t)
-		  (enter-char x)))
-	 (macrolet ((foo (x a b)
-		      `(when (window::skey-j-p-or-repeat (window::keyval ,a))
-			 ,(list (ecase x
-				  (0 'enter)
-				  (1 'enter-string)) b))))
-	   (foo 0 :enter #\return)
-	   (foo 0 :backspace #\del)
-	   (foo 0 :tab #\Tab)
-	   (foo 1 :up "[A")
-	   (foo 1 :down "[B")
-	   (foo 1 :left "[D")
-	   (foo 1 :right "[C"))      
-
-	 (window::do-character-keys ((window::control-state-jp-or-repeat ,control-state) true? code)
-	   (when true?
-	     (multiple-value-bind (char esc)
-		 (character-modifier-bits:character-modifier-bits
-		  (char-code (char-downcase (code-char code)))
-		  ,shift ,control ,alt ,super)
-	       (when esc
-		 (enter #\esc))
-	       (enter (code-char char))))))
-       something-flag)))
-(defparameter *command-buffer* (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
-(defun more-test ()
-  (when (get-control-sequence (window::*control-state*
-			       char
-			       window::*shift*
-			       window::*control*
-			       window::*alt*
-			       window::*super*)
-	  (vector-push-extend char *command-buffer*))   
-    (terminal-test::enter *command-buffer*)
-    (setf (fill-pointer *command-buffer*) 0))
-  (terminal-test::update-terminal-stuff))

@@ -8,7 +8,8 @@
 	       #:math-modify-macros
 	       #:fps-independent-timestep
 	       #:aabbcc
-	       #:control)
+	       #:control
+	       #:triangles)
   :serial t
   :components 
   ((:file "sandbox-subsystem")
