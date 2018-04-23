@@ -2,4 +2,5 @@
   :depends-on (#:utility)
     :components
     ((:file "rectangular-tilemap")
-     (:file "axis-aligned-quads")))
+     (:file "axis-aligned-quads")
+     (:file "rectangle")))

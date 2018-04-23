@@ -97,7 +97,7 @@
 (defparameter *jump-frame-count* 0)
 (defparameter *jump-rising* nil)
 (defparameter *jump-count* 0.0)
-(defun physics (entity yaw dir farticle
+(defun physics (entity yaw dir pointmass
 		noclip gravity fly
 		is-jumping
 		is-sneaking
@@ -106,17 +106,17 @@
 		aabb &optional
 		       (temp-vec *temp-vec*))
   (declare (optimize (debug 3)))
-  (step-farticle farticle)
+  (step-pointmass pointmass)
   (flet ((vec (x y z)
 	   (with-vec (a b c) (temp-vec symbol-macrolet)
 	     (setf a x
 		   b y
 		   c z))
 	   temp-vec))
-    (let ((vel (farticle-velocity farticle))
-	  (pos (farticle-position farticle))
-	  (mass (farticle-mass farticle))
-	  (force (farticle-force farticle)))
+    (let ((vel (pointmass-velocity pointmass))
+	  (pos (pointmass-position pointmass))
+	  (mass (pointmass-mass pointmass))
+	  (force (pointmass-force pointmass)))
       (fill force 0.0)
       (let* ((contact-state (if (and noclip (not sandbox-sub::*dirtying*))
 				#b000000
@@ -343,7 +343,7 @@
 (defun gentity ()
   (make-entity :collision-fun (function collide-fucks)
 	       :contact-fun (function a-contact-fun)
-	       :particle (make-farticle)
+	       :particle (make-pointmass)
 	       :neck (make-necking)
 	       :aabb *player-aabb*
 	       :hips nil
@@ -432,15 +432,15 @@
    (pitch 0.0)))
 
 (struct->class
- (defstruct farticle
+ (defstruct pointmass
    (position (nsb-cga:vec 0.0 0.0 0.0))
    (position-old (nsb-cga:vec 0.0 0.0 0.0))
    (velocity (nsb-cga:vec 0.0 0.0 0.0))
    (force (nsb-cga:vec 0.0 0.0 0.0))
    (mass 1.0)))
-(defun step-farticle (p)
-  (let ((old (farticle-position-old p))
-	(curr (farticle-position p)))
+(defun step-pointmass (p)
+  (let ((old (pointmass-position-old p))
+	(curr (pointmass-position p)))
     (nsb-cga:%copy-vec old curr)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

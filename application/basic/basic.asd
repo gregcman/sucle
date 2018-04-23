@@ -8,7 +8,9 @@
 	       #:character-modifier-bits
 	       #:terminal-3bst-sbcl
 	       #:uncommon-lisp
-	       #:testbed)
+	       #:testbed
+	       #:quads
+	       #:point)
   :serial t
   :components 
   ((:file "sprite-chain")

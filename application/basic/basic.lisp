@@ -1,6 +1,6 @@
 (defpackage #:basic
   (:use #:cl #:utility #:application #:opengl-immediate
-	#:sprite-chain))
+	#:sprite-chain #:point #:rectangle))
 (in-package :basic)
 
 (defparameter *ticks* 0)
@@ -26,35 +26,6 @@
    :height 512
    :title "a basic app"))
 (defvar *this-directory* (filesystem-util:this-directory))
-
-;;;geometry
-(defclass rectangle ()
-  ((x0 :accessor rectangle.x0
-       :initform 0.0
-       :initarg :x0)
-   (y0 :accessor rectangle.y0
-       :initform 0.0
-       :initarg :y0)
-   (x1 :accessor rectangle.x1
-       :initform 0.0
-       :initarg :x1)
-   (y1 :accessor rectangle.y1
-       :initform 0.0
-       :initarg :y1)))
-
-(defun coordinate-inside-rectangle-p (x y rectangle)
-  (with-slots (x0 y0 x1 y1) rectangle
-    (and (< x0 x x1)
-	 (< y0 y y1))))
-
-(defclass point ()
-  ((x :accessor point.x
-       :initform 0.0
-       :initarg :x)
-   (y :accessor point.y
-       :initform 0.0
-       :initarg :y)))
-;;;
 
 (defclass sprite ()
   ((bounding-box :accessor sprite.bounding-box

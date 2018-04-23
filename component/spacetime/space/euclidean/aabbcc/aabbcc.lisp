@@ -1,5 +1,5 @@
 (defpackage #:aabbcc
-  (:use #:cl #:utility)
+  (:use #:cl #:utility #:rectangle)
   (:export
    #:aabb-minx
    #:aabb-miny
@@ -146,35 +146,6 @@
 		   (logtest ,acc2 #b0000010)
 		   (logtest ,acc2 #b0000001)))))
 	 ,@body))))
-
-
-;;determine how rectangles intersect .0 
-;;means the edges touch. positive number means there is space between
-;;negative means it is past. the symbols u r l and b represent the top,
-;;right, left, and bottom of the first rectangle. nil means none at all
-;;t means an area intersection
-(defun r-intersect (ax0 ay0 ax1 ay1 bx0 by0 bx1 by1)
-  (let ((dbottom (- ay0 by1))
-	(dright (- bx0 ax1))
-	(dup (- by0 ay1))
-	(dleft (- ax0 bx1)))
-    (let ((db (zerop dbottom))
-	  (dr (zerop dright))
-	  (du (zerop dup))
-	  (dl (zerop dleft)))
-      (if (or db dr du dl)
-	  (cond ((and du dr) 'ur)
-		((and du dl) 'ul)
-		((and db dl) 'bl)
-		((and db dr) 'br)
-		(db 'b)
-		(dr 'r)
-		(du 'u)
-		(dl 'l))
-	  (not (or (plusp dbottom)
-		   (plusp dright)
-		   (plusp dup)
-		   (plusp dleft)))))))
 
 ;;;spits out three values which indicate movement in the x y z directions.
 (defun %%collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)

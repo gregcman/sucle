@@ -3,8 +3,8 @@
 (in-package :testbed)
 
 (defun particle-al-listener (particle)
-  (let ((pos (sandbox-sub::farticle-position particle))
-	(vel (sandbox-sub::farticle-velocity particle)))
+  (let ((pos (sandbox-sub::pointmass-position particle))
+	(vel (sandbox-sub::pointmass-velocity particle)))
     (al:listener :position pos)
     (al:listener :velocity vel)))
 (defun camera-al-listener (camera)
@@ -147,8 +147,8 @@
 (defparameter *reach* 64.0)
 
 (defun stuff ()
-  (let* ((player-farticle (sandbox-sub::entity-particle *ent*))
-	 (pos (sandbox-sub::farticle-position player-farticle))
+  (let* ((player-pointmass (sandbox-sub::entity-particle *ent*))
+	 (pos (sandbox-sub::pointmass-position player-pointmass))
 	 (entity *ent*))
     (symbol-macrolet ((is-jumping (sandbox-sub::entity-jump? entity))
 		      (is-sneaking (sandbox-sub::entity-sneak? entity))
@@ -207,8 +207,8 @@
 	  (unit-pitch-yaw (camera-matrix:camera-vec-forward sandbox-sub::*camera*)
 			  (sandbox-sub::necking-pitch neck)
 			  (sandbox-sub::necking-yaw neck))
-	  (let ((curr (sandbox-sub::farticle-position player-farticle))
-		(prev (sandbox-sub::farticle-position-old player-farticle))
+	  (let ((curr (sandbox-sub::pointmass-position player-pointmass))
+		(prev (sandbox-sub::pointmass-position-old player-pointmass))
 		(camera sandbox-sub::*camera*))
 	    (let ((vec (camera-matrix:camera-vec-position camera))
 		  (cev (camera-matrix:camera-vec-noitisop camera)))
@@ -270,7 +270,7 @@
 ;;;detect block types?
 (defun not-occupied (x y z &optional (ent *ent*))
   (let ((aabb (sandbox-sub::entity-aabb ent))
-	(pos (sandbox-sub::farticle-position
+	(pos (sandbox-sub::pointmass-position
 	      (sandbox-sub::entity-particle ent))))
     (aabbcc::aabb-not-overlap
      sandbox-sub::*block-aabb*
