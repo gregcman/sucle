@@ -6,9 +6,9 @@
 	       #:singleton-lparallel
 	       #:uncommon-lisp
 	       #:math-modify-macros
-	       #:fps-independent-timestep)
+	       #:fps-independent-timestep
+	       #:aabbcc)
   :serial t
   :components 
-  ((:file "aabbcc")
-   (:file "sandbox-subsystem")
+  ((:file "sandbox-subsystem")
    (:file "testbed")))
