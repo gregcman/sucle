@@ -361,7 +361,7 @@
 		    (= *indirection-height* uph)))
       (setf *indirection-width* upw
 	    *indirection-height* uph)
-      (application::%refresh 'indirection))
+      (application::refresh 'indirection t))
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
     (gl:clear :color-buffer-bit)
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))

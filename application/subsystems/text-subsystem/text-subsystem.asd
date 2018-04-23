@@ -1,7 +1,9 @@
 (asdf:defsystem #:text-subsystem
-  :depends-on (#:application
+  :depends-on (#:deflazy
 	       #:utility
-	       #:image-utility)
+	       #:image-utility
+	       #:filesystem-util
+	       #:quads)
   :serial t
   :components 
   ((:file "text-subsystem"))) 

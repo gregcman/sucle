@@ -9,7 +9,8 @@
 	       #:fps-independent-timestep
 	       #:aabbcc
 	       #:control
-	       #:triangles)
+	       #:triangles
+	       #:camera-matrix)
   :serial t
   :components 
   ((:file "sandbox-subsystem")

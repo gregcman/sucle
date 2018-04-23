@@ -1,11 +1,15 @@
 (asdf:defsystem #:sandbox
   :depends-on (#:cl-opengl
-	       #:application-subsystem
 	       #:utility
 	       #:reverse-array-iterator
 	       #:singleton-lparallel
 	       #:glhelp
-	       #:gamma-correction)
+	       #:gamma-correction
+
+	       #:bordeaux-threads
+	       #:nsb-cga
+	       #:filesystem-util
+	       #:quads)
   :serial t
   :components
   ((:file "queue")

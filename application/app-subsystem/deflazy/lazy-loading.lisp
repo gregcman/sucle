@@ -1,4 +1,12 @@
-(in-package :application)
+(defpackage #:deflazy
+  (:use #:cl #:utility)
+  (:export
+   #:getfnc
+   #:deflazy
+   #:refresh
+   #:flush-refreshes))
+
+(in-package :deflazy)
 
 ;;;;;TODO: clean this area up with dependency graph 
 (defvar *stuff* (make-hash-table :test 'eq))

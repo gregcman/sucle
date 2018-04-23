@@ -1,15 +1,13 @@
 (asdf:defsystem #:application
   :depends-on (#:utility
 	       #:window
-	       #:application-subsystem
+	       #:scratch-buffer
 	       #:nsb-cga
 	       #:bordeaux-threads
 	       #:cl-opengl
 	       #:music
 	       #:glhelp
-	       #:dependency-graph)
+	       #:deflazy)
   :components
-  ((:file "package")
-   (:file "lazy-loading")
-   (:file "application")))
+  ((:file "application")))
 

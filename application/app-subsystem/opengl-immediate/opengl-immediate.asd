@@ -2,6 +2,6 @@
   :depends-on (#:utility
 	       #:cl-opengl
 	       #:reverse-array-iterator
-	       #:application-subsystem)
+	       #:scratch-buffer)
   :components 
   ((:file "opengl-immediate"))) 
