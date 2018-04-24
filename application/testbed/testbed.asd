@@ -10,7 +10,8 @@
 	       #:aabbcc
 	       #:control
 	       #:triangles
-	       #:camera-matrix)
+	       #:camera-matrix
+	       #:alexandria)
   :serial t
   :components 
   ((:file "sandbox-subsystem")
