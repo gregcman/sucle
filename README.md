@@ -1,3 +1,8 @@
+# symmetrical-umbrella
+symmetrical-umbrella contains whatever I need it to because there was no reason to have multiple repositories
+
+## Folders
+
 application:
 	- what a person would interact with
 	- also application subsystems	
@@ -18,3 +23,15 @@ foreign:
 
 unused:
 	- random code which is not necessarily maintained or functional
+	
+## Platforms
+Tested on:
+- Ubuntu 16.04 sbcl x86_64
+
+## Requirements
+- glfw3
+- ffmpeg
+- openal
+- opengl
+- a common lisp implementation
+ 
