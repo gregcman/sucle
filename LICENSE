@@ -1,0 +1,29 @@
+---- BEGINNING OF COPYRIGHT FOR THE SYMMETRICAL UMBRELLA ENVIRONMENT ------------
+
+  Copyright (c) 2018, Gregorio C Manabat  
+	      All Rights Reserved
+
+  SYMMETRICAL-UMBRELLA is free software; you can redistribute it and/or modify it
+  under the terms of the GNU Library General Public License as published
+  by the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version; see file 'COPYING'.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU Library General Public License for more details.
+
+  You should have received a copy of the GNU Library General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+  PLEASE NOTE THAT:
+
+  This license covers all of the Symmetrical-Umbrella program except for:
+  - everything in /foreign/forks/
+  - everything in /foreign/binaries/ 
+  - everything in /foreign/src/3bst/ ;;3b's terminal emulator
+  - the function "matrix-multiply" in /component/data-structures/matrix/matrix.lisp ;;from opticl
+  Look the precise copyright of these extensions in the corresponding directories.
+
+---- END OF COPYRIGHT FOR THE SYMMETRICAL UMBRELLA ENVIRONMENT ------------------
