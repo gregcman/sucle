@@ -1,24 +1,23 @@
 # symmetrical-umbrella
 A collection of systems which do stuff.
 
-## Folders
+## Folders and what they contain
 
 - application/
-    - what a person would interact with
-    - also application subsystems	
+    - Interactive applications
+    - Subsystems	
 		
 - component/
-    - convenience macros
-    - utility libraries
-    - math
-    - data structures
+    - Convenience macros
+    - Utility libraries
+    - Math
+    - Data structures
 
 - foreign/
-    - foreign library bindings
-    - binaries
-    - unmodified forks
-    - convenience wrappers around standardized things, like ascii, ieee-754 floats, qwerty keyboards, opengl, common lisp
-    - convenience wrappers around other libraries
+    - Foreign library bindings
+    - Binaries
+    - Unmodified forks
+    - Convenience wrappers around standard APIs and libraries
 
 - unused/
     - random code which is not necessarily maintained or functional
