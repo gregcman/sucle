@@ -22,18 +22,18 @@
 - unused/
     - random code which is not necessarily maintained or functional
 
-# Requirements
+## Requirements
 
-## Non-quicklisp libraries
+### Non-quicklisp libraries
 - glfw3
 - ffmpeg
 - openal
 - opengl
 - a common lisp implementation
 
-## Platforms
+### Platforms
 Tested on:
 - Ubuntu 16.04 sbcl x86_64
  
-# Contact
+## Contact
  - Any feedback would be greatly appreciated. My email is gregoriomanabat@gmail.com.
