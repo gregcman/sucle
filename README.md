@@ -24,12 +24,7 @@ A collection of systems which do stuff.
     - random code which is not necessarily maintained or functional
 
 ## Use Cases
-I've played this a lot.
-
 ![voxel game](https://user-images.githubusercontent.com/14166099/39225064-57b43bfa-4818-11e8-9f33-4737ae6f18b7.png) 
-
-Emacs demonstration.
-
 ![terminal emulator](https://user-images.githubusercontent.com/14166099/39225409-3571051c-481a-11e8-8160-422a7052e605.png)
 
 ## Platforms
