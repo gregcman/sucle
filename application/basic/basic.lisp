@@ -22,8 +22,8 @@
 	    (per-frame))
 	(when (window:skey-j-p (window::keyval #\h))
 	  (toggle *app*))))
-   :width 512
-   :height 512
+   :width (* 80 8)
+   :height (* 25 16)
    :title "a basic app"))
 (defvar *this-directory* (filesystem-util:this-directory))
 
@@ -103,7 +103,7 @@
   (gl:disable :blend)
 ;  #+nil
   (render-stuff)
-;  #+nil
+  #+nil
   (foo0)
 ;  #+nil
   (let ((mousex *ndc-mouse-x*)
@@ -159,10 +159,10 @@
       (sprite (with-slots (x y) (slot-value *selection* 'position)
 		(setf x (+ *drag-offset-x* mousex)
 		      y (+ *drag-offset-y* mousey))))))
-;  #+nil
+  #+nil
   (when (window::skey-j-r (window::mouseval :left))
     (setf *selection* nil))
-;  #+nil
+  #+nil
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
