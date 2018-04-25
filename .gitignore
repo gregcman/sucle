@@ -40,3 +40,6 @@ flycheck_*.el
 
 # projectiles files
 .projectile
+
+# quicklisp libraries
+/foreign/quicklisp/bundle/
