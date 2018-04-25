@@ -1,5 +1,5 @@
 # symmetrical-umbrella
-This repository is a starting point for stuff that I need. It is one big repository because I currently see no reason to have multiple repositories.
+A collection of systems which do stuff.
 
 ## Folders
 
