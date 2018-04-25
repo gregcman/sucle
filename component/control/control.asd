@@ -1,6 +1,7 @@
 (asdf:defsystem #:control
   :depends-on (#:window
-	       #:utility)
+	       #:utility
+	       #:character-modifier-bits)
   :components 
   ((:file "control"))) 
 

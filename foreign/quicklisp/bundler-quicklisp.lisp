@@ -7,6 +7,11 @@
    "bundle/"
    (filesystem-util:this-directory)))
 
+(defparameter *bundle-file*
+  (merge-pathnames
+   "bundle.lisp"
+   *bundles-dir*))
+
 (defun bundle-systems ()
   (ql:bundle-systems *systems* :to *bundles-dir*))
 
@@ -25,3 +30,6 @@
     "cl-opengl"
     "sb-cga"
     ))
+
+(defun load-bundle ()
+  (load *bundle-file*))
