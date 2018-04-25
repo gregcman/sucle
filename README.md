@@ -3,26 +3,25 @@ symmetrical-umbrella contains whatever I need it to because there was no reason 
 
 ## Folders
 
-application:
-	- what a person would interact with
-	- also application subsystems	
+- application/
+ - what a person would interact with
+ - also application subsystems	
 		
-component:
-	- convenience macros
-	- utility libraries
-	- math
-	- data structures
+- component/
+ - convenience macros
+ - utility libraries
+ - math
+ - data structures
 
-foreign:
-	- foreign library bindings
-	- binaries
-	- unmodified forks
-	- convenience wrappers around standardized things,
-	  like ascii, ieee-754 floats, qwerty keyboards, opengl, common lisp
-	- convenience wrappers around other libraries
+- foreign/
+ - foreign library bindings
+ - binaries
+ - unmodified forks
+ - convenience wrappers around standardized things, like ascii, ieee-754 floats, qwerty keyboards, opengl, common lisp
+ - convenience wrappers around other libraries
 
-unused:
-	- random code which is not necessarily maintained or functional
+- unused/
+ - random code which is not necessarily maintained or functional
 	
 ## Platforms
 Tested on:
