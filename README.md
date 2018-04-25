@@ -1,5 +1,5 @@
 # symmetrical-umbrella
-symmetrical-umbrella contains whatever I need it to because there is currently no reason to have multiple repositories
+This repository is a starting point for stuff that I need. It is one big repository because I currently see no reason to have multiple repositories.
 
 ## Folders
 
