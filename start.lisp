@@ -45,3 +45,9 @@
 
 (load (merge-pathnames "foreign/quicklisp/bundle/bundle.lisp"
 		       start::*this-directory*))
+
+(asdf:load-system "trivial-features")
+(asdf:load-system "cffi")
+
+(load (merge-pathnames "foreign/binaries/binaries.lisp"
+		       start::*this-directory*))

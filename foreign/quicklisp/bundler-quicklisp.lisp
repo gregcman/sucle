@@ -30,6 +30,7 @@
     "cl-opengl"
     "sb-cga"
     "defpackage-plus"
+    "trivial-features"
     ))
 
 (defun load-bundle ()
