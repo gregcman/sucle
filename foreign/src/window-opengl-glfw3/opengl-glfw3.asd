@@ -1,7 +1,7 @@
 (asdf:defsystem #:opengl-glfw3
   :description "glfw3 opengl context creation, windowing and input"
 
-  :depends-on (#:cl-glfw3
+  :depends-on (#:glfw-3-2
 	       #:utility)
 
   :serial t

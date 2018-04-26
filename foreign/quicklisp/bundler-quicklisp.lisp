@@ -29,6 +29,7 @@
     "lparallel"
     "cl-opengl"
     "sb-cga"
+    "defpackage-plus"
     ))
 
 (defun load-bundle ()
