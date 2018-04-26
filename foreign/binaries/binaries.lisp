@@ -7,7 +7,7 @@
     "darwin/"
     #+(and windows x86)
     "win32/"
-    #+(and windows x86_64)
+    #+(and windows x86-64)
     "win64/"))
 (when *folder*
   (pushnew
