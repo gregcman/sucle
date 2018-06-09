@@ -12,11 +12,6 @@
 	  (swap (random tot) (random tot) keys))))
     (dotimes (x (length keys))
       (setf (gethash (vector-pop keys) hash) (vector-pop values)))))
-(defun remove-empty-chunks ()
-  (maphash (lambda (k v)
-	     (when (all-zeroes-p v)
-	       (remhash k world:chunkhash)))
-	   world:chunkhash))
 
 (defun wtf-increment ()
   (maphash (lambda (k v)
@@ -77,11 +72,6 @@
 	   (return-from find-height i))))
   0)
 
-(defun all-zeroes-p (sequence)
-  (dotimes (x (length sequence))
-    (unless (zerop (aref sequence x))
-      (return-from all-zeroes-p nil)))
-  t)
 (defun simple-relight ()
   (dobox ((x 0 128)
 	  (y 0 128)
@@ -165,6 +155,7 @@
 	   (unless (zerop blockid)
 	     (when (> 3 (neighbors x y z))
 	       (plain-setblock x y z 0 0 0))))))
+#+nil
 (defun bonder ()
   (dobox ((x 0 128)
 	  (y 0 128)

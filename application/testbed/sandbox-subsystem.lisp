@@ -423,9 +423,29 @@
 			(floor c))))
 	  (setf (fister-exists fist) t)))))
 
+(defun collide-fucks2 (px py pz vx vy vz aabb)
+  (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
+    (block first-block
+      (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
+	  (x y z contact)
+	(declare (ignorable contact))
+	(when (aref block-data:*iscollidable*
+		    (world:getblock x y z))
+	  (multiple-value-bind (minimum type)
+	      (aabbcc:aabb-collide
+	       aabb
+	       px py pz
+	       *block-aabb*
+	       x y z
+	       vx vy vz)
+	    (collect-touch minimum type))
+	  (return-from first-block))))
+    (values
+     (collapse-touch vx vy vz)
+     min-ratio)))
 (defun gen-fister ()
   (let ((fist (make-fister)))
-    (setf (fister-fun fist) #'collide-fucks)
+    (setf (fister-fun fist) #'collide-fucks2)
     fist))
 
 (struct->class
@@ -539,48 +559,7 @@
 			 ))))
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
-  (sandbox::draw-world)
-
-  (let ((shader (getfnc 'solidshader)))
-    (glhelp::use-gl-program shader)
-
-    ;;uniform crucial for first person 3d
-    (glhelp:with-uniforms uniform shader
-      (gl:uniform-matrix-4fv 
-       (uniform :pmv)
-       (camera-matrix:camera-matrix-projection-view-player *camera*)
-       nil)))
-
-  (gl:disable :cull-face)
-  (gl:polygon-mode :front-and-back :line)
-  (gl:line-width 4)
-  (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
-    (with-vec (a b c) (selected-block)
-      (draw-aabb a b c *block-aabb2*)))
-
-  ;;render crosshairs
-  (progn
-    (glhelp:set-render-area
-     (- (/ window::*width* 2.0) 1.0)
-     (- (/ window::*height* 2.0) 1.0)
-     2
-     2)
-    (gl:clear-color 1.0 1.0 1.0 1.0)
-    (gl:clear
-     :color-buffer-bit
-     )))
-
-(defparameter *block-aabb2*
-  (let* ((offset 0.01)
-	 (small (- 0.0 offset))
-	 (large (+ 1.0 offset)))
-    (aabbcc:make-aabb
-     :minx small
-     :miny small
-     :minz small
-     :maxx large
-     :maxy large
-     :maxz large)))
+  (sandbox::draw-world))
 
 (progn
   (defun color-grasses (terrain)
@@ -719,35 +698,6 @@
      (:camera-pos (:vertex-shader camera-pos))
      (:sampler (:fragment-shader sampler))
      (:time (:vertex-shader time)))))
-
-(deflazy solidshader (solidshader-text gl-context)
-  (glhelp::create-gl-program solidshader-text))
-(deflazy solidshader-text ()
-  (glslgen::ashader
-   :version 120
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((color-out "vec3"))
-    :in '((position "vec4")
-	  (color "vec3")
-	  (projection-model-view "mat4"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= color-out color)))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((color "vec3"))
-    :program
-    '(defun "main" void ()
-      (= (|.| :gl-frag-color "rgb") color)))
-   :attributes
-   '((position . 0) 
-     (color . 3))
-   :varyings
-   '((color-out . color))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view)))))
 
 (defun draw-aabb (x y z &optional (aabb *fist-aabb*))
   ;;;;draw the fist hitbox

@@ -4,20 +4,6 @@
 (in-package :atest)
 (defparameter *box* #(0 128 0 128 -128 0))
 
-(defun grassify (x y z)
-  (let ((blockid (world:getblock x y z)))
-    (when (= blockid 3)
-      (let ((idabove (world:getblock x (1+ y) z)))
-	(when (zerop idabove)
-	  (sandbox::plain-setblock x y z 2 0))))))
-
-(defun dirts (x y z)
-  (let ((blockid (world:getblock x y z)))
-    (when (= blockid 1)
-      (when (or (zerop (world:getblock x (+ 2 y) z))
-		(zerop (world:getblock x (+ 3 y) z)))
-	(sandbox::plain-setblock x y z 3 0)))))
-
 (defun find-top (x z min max test)
   (let ((delta (- max min)))
     (dotimes (i delta)

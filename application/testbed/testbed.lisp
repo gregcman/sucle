@@ -78,9 +78,79 @@
    :height 480
    :title "conceptually simple block game"))
 
+
+(application:deflazy solidshader (solidshader-text application::gl-context)
+  (glhelp::create-gl-program solidshader-text))
+(application:deflazy solidshader-text ()
+  (glslgen::ashader
+   :version 120
+   :vs
+   (glslgen2::make-shader-stage
+    :out '((color-out "vec3"))
+    :in '((position "vec4")
+	  (color "vec3")
+	  (projection-model-view "mat4"))
+    :program
+    '(defun "main" void ()
+      (= "gl_Position" (* projection-model-view position))
+      (= color-out color)))
+   :frag
+   (glslgen2::make-shader-stage
+    :in '((color "vec3"))
+    :program
+    '(defun "main" void ()
+      (= (|.| :gl-frag-color "rgb") color)))
+   :attributes
+   '((position . 0) 
+     (color . 3))
+   :varyings
+   '((color-out . color))
+   :uniforms
+   '((:pmv (:vertex-shader projection-model-view)))))
+(defparameter *block-aabb2*
+  (let* ((offset 0.001)
+	 (small (- 0.0 offset))
+	 (large (+ 1.0 offset)))
+    (aabbcc:make-aabb
+     :minx small
+     :miny small
+     :minz small
+     :maxx large
+     :maxy large
+     :maxz large)))
+(defun render? ()
+  (when (sandbox-sub::fister-exists *fist*)
+    (let ((shader (application:getfnc 'solidshader)))
+      (glhelp::use-gl-program shader)
+      ;;uniform crucial for first person 3d
+      (glhelp:with-uniforms uniform shader
+	(gl:uniform-matrix-4fv 
+	 (uniform :pmv)
+	 (camera-matrix:camera-matrix-projection-view-player sandbox-sub::*camera*)
+	 nil)))
+
+    (gl:disable :cull-face)
+    (gl:polygon-mode :front-and-back :line)
+    (gl:line-width 2)
+    (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
+      (with-vec (a b c) (selected-block)
+	(sandbox-sub::draw-aabb a b c *block-aabb2*))))
+  ;;render crosshairs
+  (progn
+    (glhelp:set-render-area
+     (- (/ window::*width* 2.0) 1.0)
+     (- (/ window::*height* 2.0) 1.0)
+     2
+     2)
+    (gl:clear-color 1.0 1.0 1.0 1.0)
+    (gl:clear
+     :color-buffer-bit
+     )))
+
 (defparameter *paused* nil)
 (defun per-frame ()
   (sandbox-sub::per-frame)
+  (render?)
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
@@ -159,6 +229,8 @@
 	    (let ((seconds (or 60 840)))
 	      (setf sandbox::*daytime*
 		    (floatify
+		     1.0
+		     #+nil
 		     (sin
 		      (/ *ticks*
 			 60
@@ -205,12 +277,12 @@
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      (load-time-value
 		       (aabbcc:make-aabb
-			:minx -0.5
-			:miny -0.5
-			:minz -0.5
-			:maxx 0.5
-			:maxy 0.5
-			:maxz 0.5)))
+			:minx -4.5
+			:miny -4.5
+			:minz -4.5
+			:maxx  4.5
+			:maxy  4.5
+			:maxz  4.5)))
 		  (x y z contact)
 		(declare (ignorable contact))		     
 		(funcall *big-fist-fun* x y z)))))
@@ -234,7 +306,6 @@
 		  (with-vec (a b c) (normal-block)
 		    (funcall *right-fist-fnc* a b c)))))))))))
 
-
 ;;;detect more entities
 ;;;detect block types?
 (defun not-occupied (x y z &optional (ent *ent*))
@@ -251,7 +322,7 @@
      (aref pos 1)
      (aref pos 2))))
 
-(defparameter *blockid* 3)
+(defparameter *blockid* 1)
 (defparameter *count* 0)
 (defparameter *right-fist-fnc*
   (lambda (x y z)
@@ -269,12 +340,146 @@
 	 blockval
 	 (aref block-data:*lightvalue* blockval))))))
 (defparameter *left-fist-fnc*
-  (lambda (x y z)
-    (sandbox::setblock-with-update x y z 0 0)))
+  (nth 1
+       (list
+	(lambda (x y z)
+	  (let ((*box* (translate-box x y z *box*)))
+	    (map-box
+	     (sphere
+	      (nth 2
+		   (list
+		    (lambda (x y z)
+		      (dotimes (i 5)
+			(bonder x y z)))
+		    (lambda (x y z)
+		      (dotimes (i 5)
+			(bonder2 x y z)))
+		    (lambda (x y z)
+		      (dotimes (i 5)
+			(bonder3 x y z)))
+		    (lambda (x y z)
+		      (dirts x y z)
+		      (grassify x y z))
+		    (lambda (x y z)
+		      (sandbox::setblock-with-update
+		       x y z
+		       *blockid*))
+		    (lambda (x y z)
+		      (unless (zerop (world:getblock x y z))
+			(sandbox::setblock-with-update x y z 1)))))))))
+	(lambda (x y z)
+	  (sandbox::setblock-with-update x y z 0 0)))))
+
+(defun dirtngrass (x y z)
+  (dirts x y z)
+  (grassify x y z))
+
+(defun dirts (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (when (= blockid 1)
+      (when (or (zerop (world:getblock x (+ 2 y) z))
+		(zerop (world:getblock x (+ 3 y) z)))
+	(sandbox::plain-setblock x y z 3 0)))))
+
+(defun grassify (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (when (= blockid 3)
+      (let ((idabove (world:getblock x (1+ y) z)))
+	(when (zerop idabove)
+	  (sandbox::plain-setblock x y z 2 0))))))
+
+(let* ((b 10)
+       (a (- b)))
+  (defparameter *box* (vector
+		       a b
+		       a b
+		       a b)))
+
+(defun map-box (func &optional (box *box*))
+  (declare (type (function (fixnum fixnum fixnum)) func)
+	   (type simple-vector box))
+  (with-vec (x0 x1 y0 y1 z0 z1) (box)
+    (dobox ((x x0 x1)
+	    (y y0 y1)
+	    (z z0 z1))
+	   (funcall func x y z))))
+(defun translate-box (x y z box)
+  (with-vec (a b c d e f) (box)
+    (vector (+ a x) (+ b x)
+	    (+ c y) (+ d y)
+	    (+ e z) (+ f z))))
+(defun sphere (fun &optional (box *box*))
+    (with-vec (x0 x1 y0 y1 z0 z1) (box)
+      (let* ((x2 (ash (+ x0 x1) -1))
+	     (y2 (ash (+ y0 y1) -1))
+	     (z2 (ash (+ z0 z1) -1))
+	     (x4 (ash (- x1 x0) -1))
+	     (y4 (ash (- y1 y0) -1))
+	     (z4 (ash (- z1 z0) -1))
+	     (x5 (* y4 z4 y4 z4))
+	     (y5 (* x4 z4 x4 z4))
+	     (z5 (* y4 x4 y4 x4))
+	     (tot (* x4 y4 z4 x4 y4 z4)))
+	(lambda (x y z)
+	  (let ((x3 (- x2 x))
+		(y3 (- y2 y))
+		(z3 (- z2 z)))
+	    (when (> tot (+ (* x3 x3 x5)
+			    (* y3 y3 y5)
+			    (* z3 z3 z5)))
+	      (funcall fun x y z)))))))
 
 (defparameter *big-fist-fun*
-  (lambda (x y z)
-    (let ((id (world::getblock x y z)))
-      (unless (zerop id)
-	(sandbox::setblock-with-update x y z 0 0)))))
+  (nth 0
+       (list 
+	#'dirtngrass
+	(lambda (x y z)
+	  (let ((id (world::getblock x y z)))
+	    (unless (zerop id)
+	      (sandbox::setblock-with-update x y z 0 0)))))))
 
+(defun neighbors (x y z)
+  (let ((tot 0))
+    (macrolet ((aux (i j k)
+		 `(unless (zerop (world:getblock (+ x ,i) (+ y ,j) (+ z ,k)))
+		   (incf tot))))
+      (aux 1 0 0)
+      (aux -1 0 0)
+      (aux 0 1 0)
+      (aux 0 -1 0)
+      (aux 0 0 1)
+      (aux 0 0 -1))
+    tot))
+
+(defun bonder (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (unless (zerop blockid)
+      (let ((naybs (neighbors x y z)))
+	(when (> 3 naybs)	  
+	  (sandbox::setblock-with-update x y z 0))))))
+(defun bonder2 (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (when (zerop blockid)
+      (let ((naybs (neighbors x y z)))
+	(when (< 1 naybs)	  
+	  (sandbox::setblock-with-update x y z 1))))))
+(defun bonder3 (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (when (zerop blockid)
+      (let ((naybs (neighbors x y z)))
+	(when (< 2 naybs)	  
+	  (sandbox::setblock-with-update x y z 1))))))
+
+(defun remove-empty-chunks ()
+  (let ((times 0))
+    (maphash (lambda (k v)
+	       (when (all-zeroes-p v)
+		 (remhash k world::*lispobj*)
+		 (incf times)))
+	     world::*lispobj*)
+    (format t "removed ~s chunks" times)))
+(defun all-zeroes-p (sequence)
+  (dotimes (x (length sequence))
+    (unless (zerop (mod (aref sequence x) 256))
+      (return-from all-zeroes-p nil)))
+  t)
