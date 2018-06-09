@@ -158,14 +158,10 @@
 	    (incf *ticks*)
 	    (let ((seconds (or 60 840)))
 	      (setf sandbox::*daytime*
-		    (or
-		  ;   0.0
-		     1.0
-		     (floatify
-		      (/ (abs (- (mod (/ *ticks*
-					 60.0)
-				      (* 2 seconds))
-				 seconds))
+		    (floatify
+		     (sin
+		      (/ *ticks*
+			 60
 			 seconds)))))
 	    (sandbox-sub::physentity *ent*))
 	(declare (ignorable times))
@@ -221,21 +217,22 @@
 	(let ((fist *fist*))
 	  (let ((left-p (window::skey-j-p (window::mouseval :left)))
 		(right-p (window::skey-j-p (window::mouseval :right))))
-	    (when (or left-p right-p)
-	      (sandbox-sub::standard-fist
-	       fist
-	       px py pz
-	       (* *reach* vx) (* *reach* vy) (* *reach* vz))
-	      (let ((fist? (sandbox-sub::fister-exists fist))
-		    (selected-block (sandbox-sub::fister-selected-block fist))
-		    (normal-block (sandbox-sub::fister-normal-block fist)))
-		(when fist?
-		  (when left-p
-		    (with-vec (a b c) (selected-block)
-		      (funcall *left-fist-fnc* a b c)))
-		  (when right-p
-		    (with-vec (a b c) (normal-block)
-		      (funcall *right-fist-fnc* a b c))))))))))))
+	    #+nil
+	    (when (or left-p right-p))
+	    (sandbox-sub::standard-fist
+	     fist
+	     px py pz
+	     (* *reach* vx) (* *reach* vy) (* *reach* vz))
+	    (let ((fist? (sandbox-sub::fister-exists fist))
+		  (selected-block (sandbox-sub::fister-selected-block fist))
+		  (normal-block (sandbox-sub::fister-normal-block fist)))
+	      (when fist?
+		(when left-p
+		  (with-vec (a b c) (selected-block)
+		    (funcall *left-fist-fnc* a b c)))
+		(when right-p
+		  (with-vec (a b c) (normal-block)
+		    (funcall *right-fist-fnc* a b c)))))))))))
 
 
 ;;;detect more entities

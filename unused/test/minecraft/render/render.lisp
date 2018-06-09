@@ -1,12 +1,3 @@
- 
-(defun draw-fistbox ()
-  ;;;;draw the fist hitbox
-  (progn
-    (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
-		      (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
-	     fist-aabb
-	   (draw-box (+ minx fistx -0) (+  miny fisty -0) (+  minz fistz -0)
-		     (+ maxx fistx -0) (+  maxy fisty -0) (+  maxz fistz -0)))))
 
 (defun draw-sky ()
   (progn

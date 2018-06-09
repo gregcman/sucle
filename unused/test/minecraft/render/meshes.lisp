@@ -78,52 +78,6 @@
       (vvv 1.0 0.0 0.0 1.0  -1.0 distance)
       (vvv 1.0 0.0 1.0  1.0  1.0 distance))))
 
-(defun draw-box (minx miny minz maxx maxy maxz)
-  (let ((h0 0.0)
-	(h1 (/ 1.0 3.0))
-	(h2 (/ 2.0 3.0))
-	(h3 (/ 3.0 3.0))
-	(w0 0.0)
-	(w1 (/ 1.0 4.0))
-	(w2 (/ 2.0 4.0))
-	(w3 (/ 3.0 4.0))
-	(w4 (/ 4.0 4.0)))
-    (gl:with-primitives :quads
-      (vvv 0.0 w2 h3 minx maxy minz)
-      (vvv 0.0 w2 h2 maxx maxy minz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      (vvv 0.0 w1 h3 minx maxy maxz)
-
-      ;;j-
-      (vvv 0.0 w2 h0 minx miny minz)
-      (vvv 0.0 w1 h0 minx miny maxz)
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w2 h1 maxx miny minz)
-
-      ;;k-
-      (vvv 0.0 w3 h2 minx maxy minz)
-      (vvv 0.0 w3 h1 minx miny minz)
-      (vvv 0.0 w2 h1 maxx miny minz)
-      (vvv 0.0 w2 h2 maxx maxy minz)
-
-      ;;k+
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w0 h1 minx miny maxz)
-      (vvv 0.0 w0 h2 minx maxy maxz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      
-      ;;i-
-      (vvv 0.0 w3 h1 minx miny minz)
-      (vvv 0.0 w3 h2 minx maxy minz)
-      (vvv 0.0 w4 h2 minx maxy maxz)
-      (vvv 0.0 w4 h1 minx miny maxz)
-
-      ;;i+
-      (vvv 0.0 w2 h1 maxx miny minz)
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      (vvv 0.0 w2 h2 maxx maxy minz))))
-
 
 (defun draw-hotbar ()
   (let ((distance 0.0))
