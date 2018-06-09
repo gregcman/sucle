@@ -178,6 +178,7 @@
 					    (cond ((eql 0 is-sneaking) 0.0)
 						  (t foo))))
 		      (let ((base 4.0))
+			#+nil
 			(incf base (* 2.0 foo))
 			(modify nsb-cga:%vec+ force
 				(vec
@@ -185,6 +186,7 @@
 				 (* base *ticks-per-second*)
 				 0.0))))))
 		 (t (*= step-power 0.6)))
+	       #+nil
 	       (when *jump-rising*
 		 (when (and is-jumping (< *jump-frame-count*
 					  *jump-count*))
@@ -454,15 +456,16 @@
   (sandbox::designatemeshing)
   (render-stuff))
 
-(defparameter *fov* (* (floatify pi) (/ 70 180)))
+(defparameter *fov* (* (floatify pi) (/ 95 180)))
 
 (defparameter *camera* (camera-matrix:make-camera
 			:frustum-far (* 256.0)
 			:frustum-near (/ 1.0 8.0)))
 
 (defparameter *sky-color*
-  (vector 0.0 0.0 0.0)
   #+nil
+  (vector 0.0 0.0 0.0)
+;  #+nil
   (vector 0.68 0.8 1.0))
   
 (defparameter *fog-ratio* 0.75)
@@ -554,8 +557,8 @@
     (flet ((color ()
 	     (let ((value (random 256)))
 	       (foliage-color value (random (1+ value))))))
-      (modify-greens 80 192 :color (color) :terrain terrain)
-      (modify-greens 0 240 :color (color) :terrain terrain))
+      (modify-greens 80 192 :color (foliage-color 0 0) :terrain terrain)
+      (modify-greens 0 240 :color (foliage-color 255 255) :terrain terrain))
     terrain)
   (defun getapixel (h w image)
     (destructuring-bind (height width c) (array-dimensions image)
@@ -567,11 +570,14 @@
   (defun modify-greens (xpos ypos
 			&key
 			  (color #(0 0 0 0))
-			  (terrain (error "no image")))
-    (dobox ((x xpos (+ 16 xpos)) (y ypos (+ 16 ypos)))
+			  (terrain (error "no image"))
+			  (height 256)
+			  (texheight 16))
+    (dobox ((x xpos (+ texheight xpos))
+	    (y ypos (+ texheight ypos)))
 	   ((lambda (vecinto other)
-	      (map-into vecinto (lambda (a b) (truncate (* a b) 256)) vecinto other))
-	    (getapixel (- 255 y) x terrain) color))))
+	      (map-into vecinto (lambda (a b) (truncate (* a b) height)) vecinto other))
+	    (getapixel (- (- height 1) y) x terrain) color))))
 
 (defun load-png (filename)
   (image-utility:read-png-file filename))

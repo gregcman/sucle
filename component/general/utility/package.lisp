@@ -28,6 +28,7 @@
   (:export
    #:symbolicate2
    #:with-gensyms
+   #:make-gensym-list
    #:nest
    #:%nest
    #:once-only
