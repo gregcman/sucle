@@ -339,35 +339,6 @@
 	 z
 	 blockval
 	 (aref block-data:*lightvalue* blockval))))))
-(defparameter *left-fist-fnc*
-  (nth 2
-       (list
-	(lambda (x y z)
-	  (let ((*box* (translate-box x y z *box*)))
-	    (map-box
-	     (sphere
-	      (nth 0
-		   (list
-		    (lambda (x y z)
-		      (dotimes (i 5)
-			(bonder x y z)))
-		    (lambda (x y z)
-		      (dotimes (i 5)
-			(bonder2 x y z)))
-		    (lambda (x y z)
-		      (dotimes (i 5)
-			(bonder3 x y z)))
-		    #'dirtngrass
-		    (lambda (x y z)
-		      (sandbox::setblock-with-update
-		       x y z
-		       *blockid*))
-		    (lambda (x y z)
-		      (unless (zerop (world:getblock x y z))
-			(sandbox::setblock-with-update x y z 1)))))))))
-	#'tree
-	(lambda (x y z)
-	  (sandbox::setblock-with-update x y z 0 0)))))
 
 (defun dirtngrass (x y z)
   (dirts x y z)
@@ -512,3 +483,33 @@
 	       (sandbox::setblock-with-update (+ x x0) (+ yup y0) (+ z z0) 18))))
     (dobox ((y0 y (+ y (+ 3 trunk-height))))
 	   (sandbox::setblock-with-update x y0 z 17))))
+
+(defparameter *left-fist-fnc*
+  (nth 2
+       (list
+	(lambda (x y z)
+	  (let ((*box* (translate-box x y z *box*)))
+	    (map-box
+	     (sphere
+	      (nth 0
+		   (list
+		    (lambda (x y z)
+		      (dotimes (i 5)
+			(bonder x y z)))
+		    (lambda (x y z)
+		      (dotimes (i 5)
+			(bonder2 x y z)))
+		    (lambda (x y z)
+		      (dotimes (i 5)
+			(bonder3 x y z)))
+		    #'dirtngrass
+		    (lambda (x y z)
+		      (sandbox::setblock-with-update
+		       x y z
+		       *blockid*))
+		    (lambda (x y z)
+		      (unless (zerop (world:getblock x y z))
+			(sandbox::setblock-with-update x y z 1)))))))))
+	#'tree
+	(lambda (x y z)
+	  (sandbox::setblock-with-update x y z 0 0)))))
