@@ -99,6 +99,7 @@
   (glhelp:set-render-area 0 0 window:*width* window:*height*)
   (gl:clear-color 0.5 0.5 0.5 0.0)
   (gl:clear :color-buffer-bit)
+  (gl:polygon-mode :front-and-back :fill)
   (gl:disable :cull-face)
   (gl:disable :blend)
 ;  #+nil
