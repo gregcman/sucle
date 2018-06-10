@@ -390,59 +390,61 @@
    fun))
 
 (defun standard-fist (fist px py pz vx vy vz)
-  (multiple-value-bind (xyzclamp frac) (funcall (fister-fun fist) px py pz vx vy vz *fist-aabb*)
-    (if (= #b000 xyzclamp)
-	(setf (fister-exists fist) nil)
-	(progn
-	  (macrolet ((setvec3d (vec x y z)
-	     (let ((a (gensym)))
-	       `(let ((,a ,vec))
-		  (setf (aref ,a 0) ,x
-			(aref ,a 1) ,y
-			(aref ,a 2) ,z)))))
-	    (let ((a (+ px (* frac vx)))
-		  (b (+ py (* frac vy)))
-		  (c (+ pz (* frac vz))))
-	      (let ((dx (if (logtest xyzclamp #b100)
-			    (if (plusp vx) 1 -1) 0))
-		    (dy (if (logtest xyzclamp #b010)
-			    (if (plusp vy) 1 -1) 0))
-		    (dz (if (logtest xyzclamp #b001)
-			    (if (plusp vz) 1 -1) 0)))
-		(setvec3d (fister-selected-block fist)
-			  (floor (+ dx a))
-			  (floor (+ dy b))
-			  (floor (+ dz c))))
-	      (setvec3d (fister-position fist)
-			a 
-			b
-			c)
-	      (setvec3d (fister-normal-block fist)
-			(floor a) 
-			(floor b)
-			(floor c))))
-	  (setf (fister-exists fist) t)))))
+  (multiple-value-bind (xyzclamp frac x y z) (funcall (fister-fun fist) px py pz vx vy vz *fist-aabb*)
+    (cond ((= #b000 xyzclamp)
+	   (setf (fister-exists fist) nil))
+	  (t
+	   (macrolet ((setvec3d (vec x y z)
+			(let ((a (gensym)))
+			  `(let ((,a ,vec))
+			     (setf (aref ,a 0) ,x
+				   (aref ,a 1) ,y
+				   (aref ,a 2) ,z)))))
+	     (let ((a (+ px (* frac vx)))
+		   (b (+ py (* frac vy)))
+		   (c (+ pz (* frac vz))))
+	       
+	       (setvec3d (fister-selected-block fist)
+			 x
+			 y
+			 z)
+	       (setvec3d (fister-position fist)
+			 a 
+			 b
+			 c)
+	       (let ((dx 0)
+		     (dy 0)
+		     (dz 0))
+		 (cond ((logtest xyzclamp #b100)
+			(setf dx (if (plusp vx) 1 -1)) 0)
+		       ((logtest xyzclamp #b010)
+			(setf dy (if (plusp vy) 1 -1)) 0)
+		       ((logtest xyzclamp #b001)
+			(setf dz (if (plusp vz) 1 -1)) 0))
+		 (setvec3d (fister-normal-block fist)
+			   (- x dx)
+			   (- y dy)
+			   (- z dz)))))
+	   (setf (fister-exists fist) t)))))
 
 (defun collide-fucks2 (px py pz vx vy vz aabb)
-  (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
-    (block first-block
-      (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
-	  (x y z contact)
-	(declare (ignorable contact))
-	(when (aref block-data:*iscollidable*
-		    (world:getblock x y z))
-	  (multiple-value-bind (minimum type)
-	      (aabbcc:aabb-collide
-	       aabb
-	       px py pz
-	       *block-aabb*
-	       x y z
-	       vx vy vz)
-	    (collect-touch minimum type))
-	  (return-from first-block))))
-    (values
-     (collapse-touch vx vy vz)
-     min-ratio)))
+  (block first-block
+    (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
+	(x y z contact)
+      (declare (ignorable contact))
+      (when (aref block-data:*iscollidable*
+		  (world:getblock x y z))
+	(multiple-value-bind (minimum type)
+	    (aabbcc:aabb-collide
+	     aabb
+	     px py pz
+	     *block-aabb*
+	     x y z
+	     vx vy vz)
+	  (declare (ignorable minimum))
+	  (unless (zerop type)
+	    (return-from first-block (values type minimum x y z))))))
+    #b000))
 (defun gen-fister ()
   (let ((fist (make-fister)))
     (setf (fister-fun fist) #'collide-fucks2)

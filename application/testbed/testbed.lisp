@@ -277,12 +277,12 @@
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      (load-time-value
 		       (aabbcc:make-aabb
-			:minx -4.5
-			:miny -4.5
-			:minz -4.5
-			:maxx  4.5
-			:maxy  4.5
-			:maxz  4.5)))
+			:minx -1.5
+			:miny -1.5
+			:minz -1.5
+			:maxx  1.5
+			:maxy  1.5
+			:maxz  1.5)))
 		  (x y z contact)
 		(declare (ignorable contact))		     
 		(funcall *big-fist-fun* x y z)))))
@@ -340,13 +340,13 @@
 	 blockval
 	 (aref block-data:*lightvalue* blockval))))))
 (defparameter *left-fist-fnc*
-  (nth 1
+  (nth 2
        (list
 	(lambda (x y z)
 	  (let ((*box* (translate-box x y z *box*)))
 	    (map-box
 	     (sphere
-	      (nth 2
+	      (nth 0
 		   (list
 		    (lambda (x y z)
 		      (dotimes (i 5)
@@ -357,9 +357,7 @@
 		    (lambda (x y z)
 		      (dotimes (i 5)
 			(bonder3 x y z)))
-		    (lambda (x y z)
-		      (dirts x y z)
-		      (grassify x y z))
+		    #'dirtngrass
 		    (lambda (x y z)
 		      (sandbox::setblock-with-update
 		       x y z
@@ -367,6 +365,7 @@
 		    (lambda (x y z)
 		      (unless (zerop (world:getblock x y z))
 			(sandbox::setblock-with-update x y z 1)))))))))
+	#'tree
 	(lambda (x y z)
 	  (sandbox::setblock-with-update x y z 0 0)))))
 
@@ -483,3 +482,33 @@
     (unless (zerop (mod (aref sequence x) 256))
       (return-from all-zeroes-p nil)))
   t)
+
+(defun tree (x y z)
+  (incf y)
+  (let ((trunk-height (+ 1 (random 3))))
+    (let ((yup (+ y trunk-height)))
+      (dobox ((z0 -2 3)
+	      (x0 -2 3)
+	      (y0 0 2))
+	     (unless (and (or (= z0 -2)
+			      (= z0 2))
+			  (or (= x0 -2)
+			      (= x0 2))
+			  (= y0 1)
+			  (zerop (random 2)))
+	       (sandbox::setblock-with-update (+ x x0) (+ yup y0) (+ z z0) 18))))
+    (let ((yup (+ y trunk-height 2)))
+      (dobox ((x0 -1 2)
+	      (z0 -1 2)
+	      (y0 0 2))
+	     (unless (and
+		      (= y0 1)
+		      (or (= z0 -1)
+			  (= z0 1))
+		      (or (= x0 -1)
+			  (= x0 1))
+		      #+nil
+		      (zerop (random 2)))
+	       (sandbox::setblock-with-update (+ x x0) (+ yup y0) (+ z z0) 18))))
+    (dobox ((y0 y (+ y (+ 3 trunk-height))))
+	   (sandbox::setblock-with-update x y0 z 17))))
