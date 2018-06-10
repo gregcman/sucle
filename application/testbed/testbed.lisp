@@ -149,18 +149,18 @@
 
 (defparameter *paused* nil)
 (defun per-frame ()
-  (sandbox-sub::per-frame)
-  (render?)
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
       (window::toggle-mouse-capture)
       (moused))
   (setf *paused* (window::mice-free-p))
-  (if *paused*
-	(fps-independent-timestep::tick *ticker* ())
-	(stuff))
-  
+  (cond (*paused*
+	 (fps-independent-timestep::tick *ticker* ()))
+	(t
+	 (sandbox-sub::per-frame)
+	 (render?)
+	 (stuff))) 
   (particle-al-listener (sandbox-sub::entity-particle *ent*))
   (camera-al-listener sandbox-sub::*camera*))
 
