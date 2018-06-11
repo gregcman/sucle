@@ -104,7 +104,7 @@
   (gl:disable :blend)
 ;  #+nil
   (render-stuff)
-  #+nil
+;  #+nil
   (foo0)
 ;  #+nil
   (let ((mousex *ndc-mouse-x*)
@@ -118,7 +118,7 @@
     #+nil
     (when (window::skey-p (window::mouseval :1))
       (deflazy cons-png ()
-	(flip-image:flip-image
+	(image-utility:flip-image
 	 (color-test::test42 (floatify window::*scroll-y*)
 					;	   (+ 0.5 (* 0.1 (sin *ticks*)))
 			     (/ (+ 1 mousex) 2)
@@ -160,10 +160,10 @@
       (sprite (with-slots (x y) (slot-value *selection* 'position)
 		(setf x (+ *drag-offset-x* mousex)
 		      y (+ *drag-offset-y* mousey))))))
-  #+nil
+;  #+nil
   (when (window::skey-j-r (window::mouseval :left))
     (setf *selection* nil))
-  #+nil
+;  #+nil
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program

@@ -1,7 +1,7 @@
 (asdf:defsystem #:basic
   :depends-on (#:application
 	       #:utility
-	       #:doubly-linked-list
+	       #:sprite-chain
 	       #:text-subsystem
 	       #:opengl-immediate
 	       #:image-utility
@@ -13,5 +13,4 @@
 	       #:point)
   :serial t
   :components 
-  ((:file "sprite-chain")
-   (:file "basic")))
+  ((:file "basic")))
