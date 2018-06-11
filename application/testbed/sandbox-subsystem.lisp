@@ -485,9 +485,9 @@
 			:frustum-near (/ 1.0 8.0)))
 
 (defparameter *sky-color*
-  #+nil
-  (vector 0.0 0.0 0.0)
 ;  #+nil
+  (vector 0.0 0.0 0.0)
+  #+nil
   (vector 0.68 0.8 1.0))
   
 (defparameter *fog-ratio* 0.75)
