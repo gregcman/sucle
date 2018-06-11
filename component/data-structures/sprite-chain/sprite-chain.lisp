@@ -4,7 +4,8 @@
    #:remove-sprite
    #:add-sprite
    #:topify-sprite
-   #:do-sprite-chain))
+   #:do-sprite-chain
+   #:make-sprite-chain))
 (in-package :sprite-chain)
 
 (struct-to-clos:struct->class

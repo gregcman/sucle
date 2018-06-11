@@ -54,15 +54,17 @@
 (defparameter *ndc-mouse-x* 0.0)
 (defparameter *ndc-mouse-y* 0.0)
 
-(dotimes (x 10)
-  (add-sprite
-   (make-instance
-    'sprite
-    :texture 'cons-texture
-    :position (make-instance 'point :x (random 200) :y (random 200))
-    :bounding-box (make-instance 'rectangle
-				 :x0 0.0 :y0 0.0
-				 :x1 50.0 :y1 50.0))))
+(progn
+  (setf sprite-chain::*sprites* (sprite-chain:make-sprite-chain))
+  (dotimes (x 10)
+    (add-sprite
+     (make-instance
+      'sprite
+      :texture 'cons-texture
+      :position (make-instance 'point :x (random 200) :y (random 200))
+      :bounding-box (make-instance 'rectangle
+				   :x0 0.0 :y0 0.0
+				   :x1 (* 8.0 10) :y1 (* 16.0 10))))))
 
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
