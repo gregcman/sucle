@@ -151,10 +151,11 @@
      (glslgen2::make-shader-stage
       :out '((value-out "vec4"))
       :in '((position "vec4")
-	    (value "vec4"))
+	    (value "vec4")
+	    (pmv "mat4"))
       :program
       '(defun "main" void ()
-	(= "gl_Position" position)
+	(= "gl_Position" (* pmv position))
 	(= value-out value)))
      :frag
      (glslgen2::make-shader-stage
