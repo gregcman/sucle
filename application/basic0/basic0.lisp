@@ -56,39 +56,46 @@
 (defparameter *ndc-mouse-y* 0.0)
 
 (defparameter *numbuf* (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character))
+(defun random-point ()
+  (make-instance 'point
+		 :x (* *glyph-width* (random 80))
+		 :y (* *glyph-height* (random 25))))
 (progn
-  ;(setf sprite-chain::*sprites* (sprite-chain:make-sprite-chain))
+  (setf sprite-chain::*sprites* (sprite-chain:make-sprite-chain))
   (dotimes (x 10)
+    (let ((rect (make-instance 'rectangle))
+	  (string "hello world"))
+      (string-bounding-box string rect)
+      (add-sprite
+       (make-instance
+	'sprite
+	:position (random-point) 
+	:bounding-box rect
+	:string string))))
+  (let ((rect (make-instance 'rectangle)))
     (add-sprite
      (make-instance
       'sprite
-      :position (make-instance 'point
-			       :x (* *glyph-width* (random 20))
-			       :y (* *glyph-height* (random 20)))
-      :bounding-box (make-instance 'rectangle
-				   :x0 0.0 :y0 0.0
-				   :x1 (* *glyph-width* 1)
-				   :y1 (* *glyph-height* 1)))))
-  (add-sprite
-     (make-instance
-      'sprite
-      :position (make-instance 'point
-			       :x (* *glyph-width* (random 20))
-			       :y (* *glyph-height* (random 20)))
-      :bounding-box (make-instance 'rectangle
-				   :x0 0.0 :y0 0.0
-				   :x1 (* *glyph-width* 1)
-				   :y1 (* *glyph-height* 1))
+      :position (random-point)
+      :bounding-box rect
       :tickfun
       (lambda ()
 	;;mouse coordinates
 	(setf (fill-pointer *numbuf*) 0)
 	(with-output-to-string (stream *numbuf* :element-type 'character)
 	  (princ (list (floor *ndc-mouse-x*)
-		       (floor *ndc-mouse-y*)) stream)
-	  *numbuf*))
+		       (floor *ndc-mouse-y*)) stream))
+	(string-bounding-box *numbuf* rect))
       :string *numbuf*
-      )))
+      ))))
+
+(defun string-bounding-box (string &optional (rectangle (make-instance 'rectangle)))
+  (multiple-value-bind (x y) (string-bounds string)
+    (with-slots (x0 y0 x1 y1) rectangle
+      (setf x0 0.0
+	    y0 (- (* *glyph-height* y))
+	    x1 (* *glyph-width* x)
+	    y1 *glyph-height*))))
 
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
@@ -275,22 +282,37 @@
 		  (bgcol		   
 		   (bytecolor 3 3 3 3)
 		    ))
-  (let ((start x))
-    (let ((len (length string)))
-      (dotimes (index len)
-	(let ((char (aref string index)))
-	  (cond ((char= char #\Newline)
-		 (setf x start)
-		 (decf y))
-		(t
-		 (color (byte/255 (char-code char))
-			bgcol
-			fgcol)
-		 (vertex (floatify x)
-			 (floatify y)
-			 0.0)			  
-		 (setf x (1+ x))))))
-      len)))
+  (let ((start x)
+	(len (length string)))
+    (dotimes (index len)
+      (let ((char (aref string index)))
+	(cond ((char= char #\Newline)
+	       (setf x start)
+	       (decf y))
+	      (t
+	       (color (byte/255 (char-code char))
+		      bgcol
+		      fgcol)
+	       (vertex (floatify x)
+		       (floatify y)
+		       0.0)			  
+	       (incf x)))))))
+
+(defun string-bounds (string)
+  (let ((len (length string))
+	(maxx 0)
+	(x 0)
+	(y 0))
+    (dotimes (index len)
+      (let ((char (aref string index)))
+	(cond ((char= char #\Newline)
+	       (when (> x maxx)
+		 (setf maxx x))
+	       (setf x 0)
+	       (decf y))
+	      (t
+	       (setf x (1+ x))))))
+    (values (max x maxx) y)))
 
 (defun render-stuff ()
   (text-sub::with-data-shader (uniform rebase)
@@ -315,7 +337,7 @@
 		   (values
 		    (bytecolor 3 3 3)
 		    (bytecolor 0 0 0))))
-	    (draw-string (+ 1 (/ xpos *glyph-width*))
+	    (draw-string (/ xpos *glyph-width*)
 			 (/ ypos *glyph-height*)
 			 string
 			 fgcolor
