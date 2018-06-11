@@ -45,6 +45,9 @@
    (tickfun :accessor sprite.tickfun
 	    :initform nil
 	    :initarg :tickfun)
+   (onclick :accessor sprite.onclick
+	    :initform nil
+	    :initarg :onclick)
    (position :accessor sprite.position
 	     :initform (make-instance 'point)
 	     :initarg :position)))
@@ -82,18 +85,28 @@
 	      (t
 	       (setf x (1+ x))))))
     (values (max x maxx) y)))
+
+(defun plain-button (fun str &optional
+				  (sprite (make-instance 'sprite))
+				  (pos (random-point)))
+  "a statically named button"
+  (let ((rect (make-instance 'rectangle)))
+    (string-bounding-box str rect)
+    (with-slots (position bounding-box string onclick) sprite
+      (setf position pos
+	    bounding-box rect
+	    string str
+	    onclick fun)))
+  sprite)
 (progn
   (setf sprite-chain::*sprites* (sprite-chain:make-sprite-chain))
   (dotimes (x 10)
-    (let ((rect (make-instance 'rectangle))
-	  (string "hello world"))
-      (string-bounding-box string rect)
+    (let ((sprite (make-instance 'sprite)))
       (add-sprite
-       (make-instance
-	'sprite
-	:position (random-point) 
-	:bounding-box rect
-	:string string))))
+       (plain-button
+	(lambda () (remove-sprite sprite))
+	"hello world"
+	sprite))))
   (let ((rect (make-instance 'rectangle))
 	(numbuf (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character)))
     (add-sprite
@@ -129,7 +142,7 @@
       (when fun
 	(funcall fun))))
   (when (or (window::skey-j-p (window::keyval #\q))
-	    (window::skey-j-p (window::mouseval :5)))
+	    (window::skey-j-p (window::mouseval 4)))
     (typecase *hovering*
       (sprite
        (sprite-chain:remove-sprite *hovering*)
@@ -170,8 +183,12 @@
 		(when (coordinate-inside-rectangle-p mousex mousey absolute-rectangle)
 		  (return-from cya sprite)))))))
       (setf *hovering* sprite)
-      (when sprite
-	(when (window::skey-j-p (window::mouseval :right))
+      (when sprite	
+	(when (window::skey-j-p (window::mouseval :left))
+	  (let ((onclick (sprite.onclick sprite)))
+	    (when onclick
+	      (funcall onclick))))
+	(when (window::skey-j-p (window::mouseval 5))
 	  (with-slots (position) sprite
 	    (with-slots (x y) position
 	      (setf *drag-offset-x* (- x mousex)
@@ -181,10 +198,17 @@
 					;    #+nil
     (typecase *selection*
       (sprite (with-slots (x y) (slot-value *selection* 'position)
-		(setf x (closest-multiple (+ *drag-offset-x* mousex) 8.0)
-		      y (closest-multiple (+ *drag-offset-y* mousey) 16.0))))))
+		(let ((xnew (closest-multiple (+ *drag-offset-x* mousex) *glyph-width*))
+		      (ynew (closest-multiple (+ *drag-offset-y* mousey) *glyph-height*)))
+		  (unless (eq x xnew)
+;		    (setf *button-dragged* t)
+		    (setf x xnew))
+		  (unless (eq y ynew)
+;		    (setf *button-dragged* t)
+		    (setf y ynew)))))))
 ;  #+nil
-  (when (window::skey-j-r (window::mouseval :right))
+  (when (window::skey-j-r (window::mouseval 5))
+    (setf *button-dragged* nil)
     (setf *selection* nil))
 					;					  #+nil
   (do-sprite-chain (sprite t) ()
@@ -208,6 +232,7 @@
 	  (with-slots (x0 y0 x1 y1) absolute-rectangle
 	    (setf x0 px0 y0 py0 x1 px1 y1 py1)))))))
 
+#+nil
 (defun render-sprite (sprite)
   (with-slots (absolute-rectangle)
       sprite
@@ -239,6 +264,7 @@
       (incf count))))
 
 ;;;more geometry
+#+nil
 (defun draw-quad (x0 y0 x1 y1)
   (destructuring-bind (r g b a) *pen-color*
     (color r g b a)
