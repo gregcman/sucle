@@ -11,6 +11,9 @@
   (incf *ticks*)
   (app))
 
+(defparameter *glyph-height* 16.0)
+(defparameter *glyph-width* 8.0)
+
 (defparameter *app* nil)
 (defun start ()
   (application:main
@@ -22,8 +25,8 @@
 	    (per-frame))
 	(when (window:skey-j-p (window::keyval #\h))
 	  (toggle *app*))))
-   :width (* 80 8)
-   :height (* 25 16)
+   :width (floor (* 80 *glyph-width*))
+   :height (floor (* 25 *glyph-height*))
    :title ""))
 (defvar *this-directory* (filesystem-util:this-directory))
 
@@ -33,23 +36,21 @@
 					  :x0 -0.25 :y0 -0.25
 					  :x1 0.25 :y1 0.25)
 		 :initarg :bounding-box)
-   (texture-section :accessor sprite.texture-section
-		    :initform (make-instance 'rectangle
-					     :x0 0.0 :y0 0.0
-					     :x1 1.0 :y1 1.0)
-		    :initarg :texture-section)
    (absolute-rectangle :accessor sprite.absolute-rectangle
 		       :initform (make-instance 'rectangle)
 		       :initarg :absolute-rectangle)
-   (texture :accessor sprite.texture
-	    :initform nil
-	    :initarg :texture)
    (color :accessor sprite.color
 	  :initform '(1.0 1.0 1.0 1.0)
 	  :initarg :color)
+   (string :accessor sprite.string
+	   :initform "mehzer"
+	   :initarg :string)
    (position :accessor sprite.position
 	     :initform (make-instance 'point)
 	     :initarg :position)))
+
+(defun closest-multiple (x n)
+  (* n (round x n)))
 
 (defparameter *ndc-mouse-x* 0.0)
 (defparameter *ndc-mouse-y* 0.0)
@@ -60,11 +61,13 @@
     (add-sprite
      (make-instance
       'sprite
-      :texture 'cons-texture
-      :position (make-instance 'point :x (random 200) :y (random 200))
+      :position (make-instance 'point
+			       :x (* *glyph-width* (random 20))
+			       :y (* *glyph-height* (random 20)))
       :bounding-box (make-instance 'rectangle
 				   :x0 0.0 :y0 0.0
-				   :x1 (* 8.0 10) :y1 (* 16.0 10))))))
+				   :x1 (* *glyph-width* 1)
+				   :y1 (* *glyph-height* 1))))))
 
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
@@ -123,8 +126,8 @@
 					;    #+nil
     (typecase *selection*
       (sprite (with-slots (x y) (slot-value *selection* 'position)
-		(setf x (+ *drag-offset-x* mousex)
-		      y (+ *drag-offset-y* mousey))))))
+		(setf x (closest-multiple (+ *drag-offset-x* mousex) 8.0)
+		      y (closest-multiple (+ *drag-offset-y* mousey) 16.0))))))
 ;  #+nil
   (when (window::skey-j-r (window::mouseval :left))
     (setf *selection* nil))
@@ -185,23 +188,19 @@
     (glhelp::create-gl-program flat-shader-source)))
 
 (defun render-sprite (sprite)
-  (with-slots (texture-section bounding-box position color texture absolute-rectangle)
+  (with-slots (bounding-box position color absolute-rectangle)
       sprite
       (flet ((render-stuff ()
-	       (with-slots ((s0 x0) (t0 y0) (s1 x1) (t1 y1)) texture-section
-		 (with-slots (x0 y0 x1 y1) bounding-box
-		   (with-slots ((xpos x) (ypos y)) position
-		     (let ((px0 (+ x0 xpos))
-			   (py0 (+ y0 ypos))
-			   (px1 (+ x1 xpos))
-			   (py1 (+ y1 ypos)))
-		       (with-slots (x0 y0 x1 y1) absolute-rectangle
-			 (setf x0 px0 y0 py0 x1 px1 y1 py1))
-		       (draw-quad px0 py0 
-				  px1 py1
-				  ;s0 t0
-				  ;s1 t1
-				  )))))))
+	       (with-slots (x0 y0 x1 y1) bounding-box
+		 (with-slots ((xpos x) (ypos y)) position
+		   (let ((px0 (+ x0 xpos))
+			 (py0 (+ y0 ypos))
+			 (px1 (+ x1 xpos))
+			 (py1 (+ y1 ypos)))
+		     (with-slots (x0 y0 x1 y1) absolute-rectangle
+		       (setf x0 px0 y0 py0 x1 px1 y1 py1))
+		     (draw-quad px0 py0 
+				px1 py1))))))
 	(if color
 	    (let ((*pen-color* color))
 	      (render-stuff))
@@ -229,30 +228,39 @@
 	  (dotimes (y 16)
 	    (render-tile count x y count (- 255 count))
 	    (incf count))))
-      (let ((bgcol (byte/255
-		    (text-sub::color-rgba 3 3 3 3)
-		    ))
-	    (fgcol (byte/255		    
-		    (text-sub::color-rgba 0 0 0 3)
-		    )))
-	((lambda (x y string)
-	   (let ((start x))
-	     (let ((len (length string)))
-	       (dotimes (index len)
-		 (let ((char (aref string index)))
-		   (cond ((char= char #\Newline)
-			  (setf x start)
-			  (decf y))
-			 (t
-			  (color (byte/255 (char-code char))
-				 bgcol
-				 fgcol)
-			  (vertex (floatify x)
-				  (floatify y)
-				  0.0)			  
-			  (setf x (1+ x))))))
-	       len)))
-	 10.0 10.0 *numbuf*)))
+      (flet ((draw-string (x y string &optional
+			     (fgcol
+			      (byte/255		    
+			       (text-sub::color-rgba 0 0 0 3)
+			       ))
+			     (bgcol
+			      (byte/255
+			       (text-sub::color-rgba 3 3 3 3)
+			       )))
+	       (let ((start x))
+		 (let ((len (length string)))
+		   (dotimes (index len)
+		     (let ((char (aref string index)))
+		       (cond ((char= char #\Newline)
+			      (setf x start)
+			      (decf y))
+			     (t
+			      (color (byte/255 (char-code char))
+				     bgcol
+				     fgcol)
+			      (vertex (floatify x)
+				      (floatify y)
+				      0.0)			  
+			      (setf x (1+ x))))))
+		   len))))
+	(draw-string 10.0 10.0 *numbuf*)
+	(do-sprite-chain (sprite t) ()
+	  (with-slots (position string)
+	      sprite
+	    (with-slots ((xpos x) (ypos y)) position
+	      (draw-string (+ 1.0 (/ xpos *glyph-width*))
+			   (/ ypos *glyph-height*)
+			   string))))))
     (gl:with-primitives :points
       (opengl-immediate::mesh-vertex-color))
     (text-sub::with-text-shader (uniform)
