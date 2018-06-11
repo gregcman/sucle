@@ -55,8 +55,8 @@
 (defun closest-multiple (x n)
   (* n (round x n)))
 
-(defparameter *ndc-mouse-x* 0.0)
-(defparameter *ndc-mouse-y* 0.0)
+(defparameter *mouse-x* 0.0)
+(defparameter *mouse-y* 0.0)
 
 (defun random-point ()
   (make-instance 'point
@@ -119,8 +119,8 @@
 	;;mouse coordinates
 	(setf (fill-pointer numbuf) 0)
 	(with-output-to-string (stream numbuf :element-type 'character)
-	  (princ (list (floor *ndc-mouse-x*)
-		       (floor *ndc-mouse-y*)) stream))
+	  (princ (list (floor *mouse-x*)
+		       (floor *mouse-y*)) stream))
 	(string-bounding-box numbuf rect))
       :string numbuf
       ))))
@@ -133,47 +133,23 @@
 
 (defun init ())
 (defun app ()
-  (setf *ndc-mouse-x* (floatify window::*mouse-x*)
-	*ndc-mouse-y* (- window::*height* (floatify window::*mouse-y*)))
+  (setf *mouse-x* (floatify window::*mouse-x*)
+	*mouse-y* (- window::*height* (floatify window::*mouse-y*)))
   (when (window::skey-j-p (window::keyval #\esc))
     (application::quit))
   (do-sprite-chain (sprite t) ()
     (let ((fun (sprite.tickfun sprite)))
       (when fun
 	(funcall fun))))
-  (when (or (window::skey-j-p (window::keyval #\q))
-	    (window::skey-j-p (window::mouseval 4)))
+  (when 
+    (window::skey-j-p (window::mouseval 4))
     (typecase *hovering*
       (sprite
        (sprite-chain:remove-sprite *hovering*)
        (setf *hovering* nil))))
 
-  (glhelp:set-render-area 0 0 window:*width* window:*height*)
-  (gl:clear-color 0.5 0.25 0.25 0.0)
-  (gl:clear :color-buffer-bit)
-  (gl:polygon-mode :front-and-back :fill)
-  (gl:disable :cull-face)
-  (gl:disable :blend)
-;  #+nil
-  (render-stuff)
-  (let ((mousex *ndc-mouse-x*)
-	(mousey *ndc-mouse-y*))
-    (let ((program (getfnc 'flat-shader)))
-      (glhelp::use-gl-program program)
-      (glhelp:with-uniforms uniform program
-	(gl:uniform-matrix-4fv (uniform :pmv)
-			       (nsb-cga:matrix*
-				(nsb-cga:scale*
-				 (/ 2.0 (floatify window::*width*))
-				 (/ 2.0 (floatify window::*height*))
-				 1.0)
-				(nsb-cga:translate* 
-				 (/ (floatify window::*width*)
-				    -2.0)				 
-				 (/ (floatify window::*height*)
-				    -2.0)
-				 0.0))
-			       nil)))
+  (let ((mousex *mouse-x*)
+	(mousey *mouse-y*))
       ;;search for topmost sprite to drag
     (let
 	((sprite
@@ -195,24 +171,46 @@
 		    *drag-offset-y* (- y mousey))))
 	  (setf *selection* sprite)
 	  (topify-sprite sprite))))
-					;    #+nil
     (typecase *selection*
       (sprite (with-slots (x y) (slot-value *selection* 'position)
 		(let ((xnew (closest-multiple (+ *drag-offset-x* mousex) *glyph-width*))
 		      (ynew (closest-multiple (+ *drag-offset-y* mousey) *glyph-height*)))
 		  (unless (eq x xnew)
-;		    (setf *button-dragged* t)
 		    (setf x xnew))
 		  (unless (eq y ynew)
-;		    (setf *button-dragged* t)
 		    (setf y ynew)))))))
-;  #+nil
   (when (window::skey-j-r (window::mouseval 5))
-    (setf *button-dragged* nil)
     (setf *selection* nil))
-					;					  #+nil
+  
   (do-sprite-chain (sprite t) ()
     (update-bounds sprite))
+  
+
+  (glhelp:set-render-area 0 0 window:*width* window:*height*)
+  (gl:clear-color 0.5 0.25 0.25 0.0)
+  (gl:clear :color-buffer-bit)
+  (gl:polygon-mode :front-and-back :fill)
+  (gl:disable :cull-face)
+  (gl:disable :blend)
+  (render-stuff)
+  
+  #+nil
+  (let ((program (getfnc 'flat-shader)))
+    (glhelp::use-gl-program program)
+    (glhelp:with-uniforms uniform program
+      (gl:uniform-matrix-4fv (uniform :pmv)
+			     (nsb-cga:matrix*
+			      (nsb-cga:scale*
+			       (/ 2.0 (floatify window::*width*))
+			       (/ 2.0 (floatify window::*height*))
+			       1.0)
+			      (nsb-cga:translate* 
+			       (/ (floatify window::*width*)
+				  -2.0)				 
+			       (/ (floatify window::*height*)
+				  -2.0)
+			       0.0))
+			     nil)))
   #+nil
   (progn
     (do-sprite-chain (sprite t) ()
