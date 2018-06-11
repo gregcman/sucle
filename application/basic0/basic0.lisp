@@ -24,7 +24,7 @@
 	  (toggle *app*))))
    :width (* 80 8)
    :height (* 25 16)
-   :title "a basic app"))
+   :title ""))
 (defvar *this-directory* (filesystem-util:this-directory))
 
 (defclass sprite ()
@@ -59,10 +59,10 @@
    (make-instance
     'sprite
     :texture 'cons-texture
-    :position (make-instance 'point :x (1- (random 2.0)) :y (1- (random 2.0)))
+    :position (make-instance 'point :x (random 200) :y (random 200))
     :bounding-box (make-instance 'rectangle
 				 :x0 0.0 :y0 0.0
-				 :x1 (+ 0.1 (random 0.5)) :y1 (+ 0.1 (random 0.5))))))
+				 :x1 50.0 :y1 50.0))))
 
 (defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
@@ -71,10 +71,8 @@
 
 (defun init ())
 (defun app ()
-  (setf *ndc-mouse-x* (+ -1 (* 2.0 (/ (floatify window::*mouse-x*)
-				      window:*width*)))
-	*ndc-mouse-y* (- 1 (* 2.0 (/ (floatify window::*mouse-y*)
-				     window:*height*))))
+  (setf *ndc-mouse-x* (floatify window::*mouse-x*)
+	*ndc-mouse-y* (- window::*height* (floatify window::*mouse-y*)))
   (when (window::skey-j-p (window::keyval #\esc))
     (application::quit))
 
@@ -86,13 +84,24 @@
   (gl:disable :blend)
 ;  #+nil
   (render-stuff)
-;  #+nil
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
     (let ((program (getfnc 'flat-shader)))
-    (glhelp::use-gl-program program))
-    
-					;    #+nil
+      (glhelp::use-gl-program program)
+      (glhelp:with-uniforms uniform program
+	(gl:uniform-matrix-4fv (uniform :pmv)
+			       (nsb-cga:matrix*
+				(nsb-cga:scale*
+				 (/ 2.0 (floatify window::*width*))
+				 (/ 2.0 (floatify window::*height*))
+				 1.0)
+				(nsb-cga:translate* 
+				 (/ (floatify window::*width*)
+				    -2.0)				 
+				 (/ (floatify window::*height*)
+				    -2.0)
+				 0.0))
+			       nil)))
     (when (window::skey-j-p (window::mouseval :left))
       ;;search for topmost sprite to drag
       (let
@@ -117,11 +126,8 @@
 ;  #+nil
   (when (window::skey-j-r (window::mouseval :left))
     (setf *selection* nil))
-;  #+nil
-  (let ((program (getfnc 'flat-shader)))
-    (glhelp::use-gl-program program)
-    (do-sprite-chain (sprite t) ()
-      (render-sprite sprite))))
+  (do-sprite-chain (sprite t) ()
+    (render-sprite sprite)))
 
 (defun render-tile (char-code x y background-color foreground-color)
   (color (byte/255 char-code)
@@ -172,7 +178,7 @@
      :varyings
      '((value-out . value))
      :uniforms
-     '()))
+     '((:pmv (:vertex-shader pmv)))))
   (deflazy flat-shader (flat-shader-source gl-context)
     (glhelp::create-gl-program flat-shader-source)))
 
@@ -210,7 +216,8 @@
       (gl:disable :depth-test)
       (setf (fill-pointer *numbuf*) 0)
       (with-output-to-string (stream *numbuf* :element-type 'character)
-	(princ (get-internal-real-time) stream)
+	(princ (list (floor *ndc-mouse-x*)
+		     (floor *ndc-mouse-y*)) stream)
 	(print "Hello World" stream)
 	*numbuf*)
       (rebase -128.0 -128.0)
