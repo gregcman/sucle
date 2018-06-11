@@ -298,7 +298,10 @@
     (let ((top (pop *sprite-chain-stack*)))
       (when top
 	(decf *sprite-chain-stack-depth*)
-	(setf sprite-chain::*sprites* top)))))
+	(setf sprite-chain::*sprites* top))))
+  (defun replace-sprite-chain-stack ()
+    (pop-sprite-chain-stack)
+    (push-sprite-chain-stack)))
 
 (defun bottom-layer ()
   (add-sprite
@@ -337,7 +340,7 @@
 
 (defun new-layer ()
   (push-sprite-chain-stack)
-  (add-sprite
+  (add-sprite 
    (plain-button
     (lambda (this)
       (declare (ignorable this))
