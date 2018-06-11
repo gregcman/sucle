@@ -86,46 +86,6 @@
 	       (setf x (1+ x))))))
     (values (max x maxx) y)))
 
-(defun plain-button (fun str &optional
-				  (sprite (make-instance 'sprite))
-				  (pos (random-point)))
-  "a statically named button"
-  (let ((rect (make-instance 'rectangle)))
-    (string-bounding-box str rect)
-    (with-slots (position bounding-box string onclick) sprite
-      (setf position pos
-	    bounding-box rect
-	    string str
-	    onclick fun)))
-  sprite)
-(progn
-  (setf sprite-chain::*sprites* (sprite-chain:make-sprite-chain))
-  (dotimes (x 10)
-    (let ((sprite (make-instance 'sprite)))
-      (add-sprite
-       (plain-button
-	(lambda () (remove-sprite sprite))
-	"hello world"
-	sprite))))
-  (let ((rect (make-instance 'rectangle))
-	(numbuf (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character)))
-    (add-sprite
-     (make-instance
-      'sprite
-      :position (random-point)
-      :bounding-box rect
-      :tickfun
-      (lambda ()
-	;;mouse coordinates
-	(setf (fill-pointer numbuf) 0)
-	(with-output-to-string (stream numbuf :element-type 'character)
-	  (princ (list (floor *mouse-x*)
-		       (floor *mouse-y*)) stream))
-	(string-bounding-box numbuf rect))
-      :string numbuf
-      ))))
-
-(defparameter *pen-color* (list 1.0 0.0 0.0 1.0))
 (defparameter *selection* nil)
 (defparameter *hovering* nil)
 (defparameter *drag-offset-x* 0.0)
@@ -136,7 +96,7 @@
   (setf *mouse-x* (floatify window::*mouse-x*)
 	*mouse-y* (- window::*height* (floatify window::*mouse-y*)))
   (when (window::skey-j-p (window::keyval #\esc))
-    (application::quit))
+    (pop-sprite-chain-stack))
   (do-sprite-chain (sprite t) ()
     (let ((fun (sprite.tickfun sprite)))
       (when fun
@@ -163,7 +123,7 @@
 	(when (window::skey-j-p (window::mouseval :left))
 	  (let ((onclick (sprite.onclick sprite)))
 	    (when onclick
-	      (funcall onclick))))
+	      (funcall onclick sprite))))
 	(when (window::skey-j-p (window::mouseval 5))
 	  (with-slots (position) sprite
 	    (with-slots (x y) position
@@ -192,31 +152,7 @@
   (gl:polygon-mode :front-and-back :fill)
   (gl:disable :cull-face)
   (gl:disable :blend)
-  (render-stuff)
-  
-  #+nil
-  (let ((program (getfnc 'flat-shader)))
-    (glhelp::use-gl-program program)
-    (glhelp:with-uniforms uniform program
-      (gl:uniform-matrix-4fv (uniform :pmv)
-			     (nsb-cga:matrix*
-			      (nsb-cga:scale*
-			       (/ 2.0 (floatify window::*width*))
-			       (/ 2.0 (floatify window::*height*))
-			       1.0)
-			      (nsb-cga:translate* 
-			       (/ (floatify window::*width*)
-				  -2.0)				 
-			       (/ (floatify window::*height*)
-				  -2.0)
-			       0.0))
-			     nil)))
-  #+nil
-  (progn
-    (do-sprite-chain (sprite t) ()
-      (render-sprite sprite))
-    (gl:with-primitive :quads
-      (mesh-vertex-tex-coord-color))))
+  (render-stuff))
 
 (defun update-bounds (sprite)
   (with-slots (bounding-box position absolute-rectangle)
@@ -229,50 +165,6 @@
 	      (py1 (+ y1 ypos)))
 	  (with-slots (x0 y0 x1 y1) absolute-rectangle
 	    (setf x0 px0 y0 py0 x1 px1 y1 py1)))))))
-
-#+nil
-(defun render-sprite (sprite)
-  (with-slots (absolute-rectangle)
-      sprite
-    (let ((*pen-color*
-	   (cond ((eq sprite *selection*)
-		  '(1.0 0.0 0.0 1.0))
-		 ((eq sprite *hovering*)
-		  '(0.0 0.0 0.0 1.0))
-		 (t
-		  '(1.0 1.0 1.0 1.0)))))
-      (with-slots (x0 y0 x1 y1) absolute-rectangle
-	(draw-quad x0 y0 
-		   x1 y1)))))
-
-#+nil
-(defun render-tile (char-code x y background-color foreground-color)
-  (color (byte/255 char-code)
-	 (byte/255 background-color)
-	 (byte/255 foreground-color))
-  (vertex
-   (floatify x)
-   (floatify y)))
-#+nil
-;;a rainbow
-(let ((count 0))
-  (dotimes (x 16)
-    (dotimes (y 16)
-      (render-tile count x y count (- 255 count))
-      (incf count))))
-
-;;;more geometry
-#+nil
-(defun draw-quad (x0 y0 x1 y1)
-  (destructuring-bind (r g b a) *pen-color*
-    (color r g b a)
-    (vertex x0 y0)
-    (color r g b a)
-    (vertex x0 y1)
-    (color r g b a)
-    (vertex x1 y1)
-    (color r g b a)
-    (vertex x1 y0)))
 
 (progn
   (deflazy flat-shader-source ()
@@ -380,3 +272,88 @@
     (gl:enable :blend)
     (gl:blend-func :src-alpha :one-minus-src-alpha)
     (gl:call-list (glhelp::handle (getfnc 'text-sub::fullscreen-quad)))))
+
+(defun plain-button (fun &optional
+			   (str (string (gensym "nameless-button-")))
+			   (sprite (make-instance 'sprite))
+			   (pos (random-point)))
+  "a statically named button"
+  (let ((rect (make-instance 'rectangle)))
+    (string-bounding-box str rect)
+    (with-slots (position bounding-box string onclick) sprite
+      (setf position pos
+	    bounding-box rect
+	    string str
+	    onclick fun)))
+  sprite)
+
+(progn
+  (defparameter *sprite-chain-stack* nil)
+  (defparameter *sprite-chain-stack-depth* 0)
+  (defun push-sprite-chain-stack (&optional (new-top (sprite-chain:make-sprite-chain)))
+    (push sprite-chain::*sprites* *sprite-chain-stack*)
+    (setf sprite-chain::*sprites* new-top)
+    (incf *sprite-chain-stack-depth*))
+  (defun pop-sprite-chain-stack ()
+    (let ((top (pop *sprite-chain-stack*)))
+      (when top
+	(decf *sprite-chain-stack-depth*)
+	(setf sprite-chain::*sprites* top)))))
+
+(defun bottom-layer ()
+  (add-sprite
+   (plain-button
+    (lambda (this) (remove-sprite this))
+    "hello world"))
+  (add-sprite
+   (plain-button
+    (lambda (this)
+      (declare (ignorable this))
+      (application::quit))
+    "quit"))
+  (add-sprite
+   (plain-button
+    (lambda (this)
+      (declare (ignorable this))
+      (new-layer))
+    "new"))
+  (let ((rect (make-instance 'rectangle))
+	(numbuf (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character)))
+    (add-sprite
+     (make-instance
+      'sprite
+      :position (random-point)
+      :bounding-box rect
+      :tickfun
+      (lambda ()
+	;;mouse coordinates
+	(setf (fill-pointer numbuf) 0)
+	(with-output-to-string (stream numbuf :element-type 'character)
+	  (princ (list (floor *mouse-x*)
+		       (floor *mouse-y*)) stream))
+	(string-bounding-box numbuf rect))
+      :string numbuf
+      ))))
+
+(defun new-layer ()
+  (push-sprite-chain-stack)
+  (add-sprite
+   (plain-button
+    (lambda (this)
+      (declare (ignorable this))
+      (new-layer))
+    "new"))
+  (add-sprite
+   (plain-button
+    (lambda (this)
+      (declare (ignorable this))
+      (pop-sprite-chain-stack))
+    "back"))
+  (add-sprite
+   (plain-button
+    nil
+    (format nil "layer ~a" *sprite-chain-stack-depth*))))
+
+(progn
+  (setf sprite-chain::*sprites* (sprite-chain:make-sprite-chain))
+  (bottom-layer))
