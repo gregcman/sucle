@@ -43,7 +43,7 @@
 	  :initform '(1.0 1.0 1.0 1.0)
 	  :initarg :color)
    (string :accessor sprite.string
-	   :initform "mehzer"
+	   :initform "Hello World"
 	   :initarg :string)
    (position :accessor sprite.position
 	     :initform (make-instance 'point)
@@ -209,58 +209,66 @@
 	  (mesh-vertex-tex-coord-color)))
       ))
 
+(defun draw-string
+    (x y string &optional
+		  (fgcol
+		   (byte/255		    
+		    (text-sub::color-rgba 0 0 0 3)
+		    ))
+		  (bgcol
+		   (byte/255
+		    (text-sub::color-rgba 3 3 3 3)
+		    )))
+  (let ((start x))
+    (let ((len (length string)))
+      (dotimes (index len)
+	(let ((char (aref string index)))
+	  (cond ((char= char #\Newline)
+		 (setf x start)
+		 (decf y))
+		(t
+		 (color (byte/255 (char-code char))
+			bgcol
+			fgcol)
+		 (vertex (floatify x)
+			 (floatify y)
+			 0.0)			  
+		 (setf x (1+ x))))))
+      len)))
+
 (progn
   (defparameter *numbuf* (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character))
   (defun render-stuff ()
     (text-sub::with-data-shader (uniform rebase)
       (gl:clear :color-buffer-bit)
       (gl:disable :depth-test)
-      (setf (fill-pointer *numbuf*) 0)
-      (with-output-to-string (stream *numbuf* :element-type 'character)
-	(princ (list (floor *ndc-mouse-x*)
-		     (floor *ndc-mouse-y*)) stream)
-	(print "Hello World" stream)
-	*numbuf*)
-      (rebase -128.0 -128.0)
-      (gl:point-size 1.0)
+
+      ;;a rainbow
       (let ((count 0))
 	(dotimes (x 16)
 	  (dotimes (y 16)
 	    (render-tile count x y count (- 255 count))
 	    (incf count))))
-      (flet ((draw-string (x y string &optional
-			     (fgcol
-			      (byte/255		    
-			       (text-sub::color-rgba 0 0 0 3)
-			       ))
-			     (bgcol
-			      (byte/255
-			       (text-sub::color-rgba 3 3 3 3)
-			       )))
-	       (let ((start x))
-		 (let ((len (length string)))
-		   (dotimes (index len)
-		     (let ((char (aref string index)))
-		       (cond ((char= char #\Newline)
-			      (setf x start)
-			      (decf y))
-			     (t
-			      (color (byte/255 (char-code char))
-				     bgcol
-				     fgcol)
-			      (vertex (floatify x)
-				      (floatify y)
-				      0.0)			  
-			      (setf x (1+ x))))))
-		   len))))
-	(draw-string 10.0 10.0 *numbuf*)
-	(do-sprite-chain (sprite t) ()
-	  (with-slots (position string)
-	      sprite
-	    (with-slots ((xpos x) (ypos y)) position
-	      (draw-string (+ 1.0 (/ xpos *glyph-width*))
-			   (/ ypos *glyph-height*)
-			   string))))))
+
+      ;;mouse coordinates
+      (setf (fill-pointer *numbuf*) 0)
+      (with-output-to-string (stream *numbuf* :element-type 'character)
+	(princ (list (floor *ndc-mouse-x*)
+		     (floor *ndc-mouse-y*)) stream)
+	*numbuf*)
+      (draw-string 10.0 10.0 *numbuf*)
+
+      ;;"sprites"
+      (do-sprite-chain (sprite t) ()
+	(with-slots (position string)
+	    sprite
+	  (with-slots ((xpos x) (ypos y)) position
+	    (draw-string (+ 1.0 (/ xpos *glyph-width*))
+			 (/ ypos *glyph-height*)
+			 string))))
+      
+      (rebase -128.0 -128.0))
+    (gl:point-size 1.0)
     (gl:with-primitives :points
       (opengl-immediate::mesh-vertex-color))
     (text-sub::with-text-shader (uniform)
