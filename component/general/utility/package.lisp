@@ -39,4 +39,7 @@
 
   (:export
    #:fixnum-bits
-   #:print-bits))
+   #:print-bits)
+
+  (:export
+   #:any))

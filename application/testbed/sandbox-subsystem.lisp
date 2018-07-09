@@ -568,7 +568,7 @@
     (flet ((color ()
 	     (let ((value (random 256)))
 	       (foliage-color value (random (1+ value))))))
-      (modify-greens 80 192 :color (foliage-color 0 0) :terrain terrain)
+      (modify-greens 80 192 :color (foliage-color 255 255) :terrain terrain)
       (modify-greens 0 240 :color (foliage-color 255 255) :terrain terrain))
     terrain)
   (defun getapixel (h w image)

@@ -235,3 +235,7 @@
 			      ",'0b"))
 	  (logand n most-positive-fixnum))
   n)
+
+(defmacro any (&body body)
+  (let ((n (list-length body)))
+    (nth (random n) body)))
