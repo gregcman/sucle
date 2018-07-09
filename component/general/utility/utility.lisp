@@ -238,4 +238,6 @@
 
 (defmacro any (&body body)
   (let ((n (list-length body)))
-    (nth (random n) body)))
+    (if (zerop n)
+	nil
+	(nth (random n) body))))
