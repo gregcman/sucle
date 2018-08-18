@@ -149,10 +149,11 @@
 	  (let* ((walkspeed 4.317)
 		 (speed walkspeed)
 		 (step-power 4.0))
+	    
 	    (case is-sneaking 
 	      (0 (and (not fly)
 		      (*= speed 0.25)))
-	      (1 (*= speed 1.3)))
+	      (1 (*= speed (or 3.0 1.3))))
 	    (cond
 	      (fly
 	       (*= speed 4.0))		
@@ -178,7 +179,7 @@
 					    (cond ((eql 0 is-sneaking) 0.0)
 						  (t foo))))
 		      (let ((base 4.0))
-			#+nil
+		;	#+nil
 			(incf base (* 2.0 foo))
 			(modify nsb-cga:%vec+ force
 				(vec
@@ -186,7 +187,7 @@
 				 (* base *ticks-per-second*)
 				 0.0))))))
 		 (t (*= step-power 0.6)))
-	       #+nil
+	      ; #+nil
 	       (when *jump-rising*
 		 (when (and is-jumping (< *jump-frame-count*
 					  *jump-count*))
@@ -478,16 +479,16 @@
   (sandbox::designatemeshing)
   (render-stuff))
 
-(defparameter *fov* (* (floatify pi) (/ 110 180)))
+(defparameter *fov* (* (floatify pi) (/ 85 180)))
 
 (defparameter *camera* (camera-matrix:make-camera
 			:frustum-far (* 256.0)
 			:frustum-near (/ 1.0 8.0)))
 
 (defparameter *sky-color*
-;  #+nil
-  (vector 0.0 0.0 0.0)
   #+nil
+  (vector 0.0 0.0 0.0)
+  ;#+nil
   (vector 0.68 0.8 1.0))
   
 (defparameter *fog-ratio* 0.75)
