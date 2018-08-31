@@ -1,8 +1,8 @@
 ## So What Is This Repository?
-- a game engine: graphics, sound, some physics
-- bindings for various c libraries
-- a few end-user[me] applications
-- personal utility libraries
+- A game engine: graphics, sound, some simple physics.
+- Bindings for various C libraries.
+- A few end-user applications for my personal use.
+- Personal utility Libraries  
 - This repository could probably be broken into multiple repositories, but I currently do not see the need.
 
 ## Personal Use Cases
@@ -13,12 +13,7 @@ I've spent many hours building and jumping around in this Minecraft Clone. I rea
 The graphics and input for [3b's terminal emulator](https://github.com/3b/3bst). I don't use it, but it works as a dumb terminal emulator.
 
 ## Requirements
-- Glfw3
-- FFmpeg
-- OpenAL
-- OpenGL
-- Common Lisp
-- Some quicklisp libraries
+- GLFW3, FFmpeg, OpenAL, OpenGL, Common Lisp, Some quicklisp libraries.
 
 ### Platforms
 Tested on:
