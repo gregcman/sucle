@@ -2,7 +2,7 @@
 - A game engine: graphics, sound, some simple physics.
 - Bindings for various C libraries.
 - A few end-user applications for my personal use.
-- Personal utility Libraries  
+- Personal utility libraries  
 - This repository could probably be broken into multiple repositories, but I currently do not see the need.
 
 ## Personal Use Cases
