@@ -32,7 +32,7 @@ Tested on:
 - Ubuntu 16.04 sbcl x86_64
  
 ## Contact
- - Any feedback would be greatly appreciated. My email is gregoriomanabat@gmail.com.
+ - zpersoncool@gmail.com
  
  ## Use Cases
 ![voxel game](https://user-images.githubusercontent.com/14166099/39225064-57b43bfa-4818-11e8-9f33-4737ae6f18b7.png) 
