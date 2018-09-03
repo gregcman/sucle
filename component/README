@@ -3,8 +3,7 @@ spacetime:
 	- geometry in 2d and 3d
 
 general:
-	- convenience macros
-	- utility libraries
+	- math
 
 data-structures:
 	- ???
