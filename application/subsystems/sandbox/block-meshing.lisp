@@ -94,14 +94,20 @@
 		   (1 0 0))))))
 
 (eval-when (:compile-toplevel)
+  (defun manhattan-perimeter (n)
+    (if (zerop n)
+	1
+	(+ (* n n
+	      4)
+	   2)))
+  
   (defun light-gen (x)
-    (let ((a (/ x 15)))
-      (gamma-correction:gamma-correct
-       (* a a)))
-    #+nil
-    (let ((value
-	   ))
-      (* value value)))
+    (gamma-correction:gamma-correct
+     ;#+nil
+     (/ (manhattan-perimeter x) 902)
+     #+nil
+     (let ((a (/ x 15)))
+       (* a a))))
 
   (defparameter light-index-table
     (let ((foo-array (make-array 16 :element-type 'single-float)))
@@ -148,36 +154,37 @@
 		      (i3 j3 k3))
   (let ((light-edge-code (funcall (symbol-function light-edge-fnc) 'xpos 'ypos 'zpos))
 	(sky-edge-code (funcall (symbol-function skylight-edge-fnc) 'xpos 'ypos 'zpos)))
-    (let ((dark
-	   (flet ((darkify (x) `(* ,color ,x)))
-	     `(dark ,@(mapcar #'darkify light-edge-code)
-		    ,@(mapcar #'darkify sky-edge-code)))
-	    #+nil
-	    `(dark (dark-fun
-		    ,color
-		    ,@light-edge-code
-		    ,@sky-edge-code))))
-      `(progn
-	 (let ((xpos (+ i ,i0))
-	       (ypos (+ j ,j0))
-	       (zpos (+ k ,k0)))
-	   (declare (type fixnum xpos ypos zpos))
-	   ,dark)
-	 (let ((xpos (+ i ,i1))
-	       (ypos (+ j ,j1))
-	       (zpos (+ k ,k1)))
-	   (declare (type fixnum xpos ypos zpos ))
-	   ,dark)
-	 (let ((xpos (+ i ,i2))
-	       (ypos (+ j ,j2))
-	       (zpos (+ k ,k2)))
-	   (declare (type fixnum xpos ypos zpos))
-	   ,dark)     
-	 (let ((xpos (+ i ,i3))
-	       (ypos (+ j ,j3))
-	       (zpos (+ k ,k3)))
-	   (declare (type fixnum xpos ypos zpos ))
-	   ,dark)))))
+    (with-gensyms (actual-color)
+      (let ((dark
+	     (flet ((darkify (x) `(* ,actual-color ,x)))
+	       `(dark ,@(mapcar #'darkify light-edge-code)
+		      ,@(mapcar #'darkify sky-edge-code)))
+	      #+nil
+	      `(dark (dark-fun
+		      ,color
+		      ,@light-edge-code
+		      ,@sky-edge-code))))
+	`(let ((,actual-color ,color))
+	   (let ((xpos (+ i ,i0))
+		 (ypos (+ j ,j0))
+		 (zpos (+ k ,k0)))
+	     (declare (type fixnum xpos ypos zpos))
+	     ,dark)
+	   (let ((xpos (+ i ,i1))
+		 (ypos (+ j ,j1))
+		 (zpos (+ k ,k1)))
+	     (declare (type fixnum xpos ypos zpos ))
+	     ,dark)
+	   (let ((xpos (+ i ,i2))
+		 (ypos (+ j ,j2))
+		 (zpos (+ k ,k2)))
+	     (declare (type fixnum xpos ypos zpos))
+	     ,dark)     
+	   (let ((xpos (+ i ,i3))
+		 (ypos (+ j ,j3))
+		 (zpos (+ k ,k3)))
+	     (declare (type fixnum xpos ypos zpos ))
+	     ,dark))))))
 
 (defmacro posface ((x0 y0 z0) 
 		   (x1 y1 z1)		      
@@ -225,6 +232,14 @@
 	(dark single-float) *mesh-dark*	
 	,@body)))))
 
+(defun simple-float-array (&rest args)
+  (make-array (length args) :initial-contents args :element-type 'single-float))
+
+(defparameter *blockface-color*
+  ;#+nil
+  (simple-float-array 0.6 0.6 0.5 1.0 0.8 0.8)
+  #+nil
+  (simple-float-array 1.0 1.0 1.0 1.0 1.0 1.0))
 (with-unsafe-speed
   (face-header side-i  
     (posface (0 0 0)
@@ -234,7 +249,7 @@
     (texface2 u0 u1 v0 v1 3 nil)
     (squareface light-edge-i
 		skylight-edge-i
-		0.6
+		(etouq (aref *blockface-color* 0))
 		(-1 -1 -1)
 		(-1 -1 00)
 		(-1 00 00)
@@ -247,7 +262,7 @@
     (texface2 u0 u1 v0 v1 4 nil)
     (squareface light-edge-i
 		skylight-edge-i
-		0.6
+		(etouq (aref *blockface-color* 1))
 		(1 -1 -1)
 		(1 00 -1)
 		(1 00 00)
@@ -259,8 +274,8 @@
 	     (0 0 1))
     (texface2 u0 u1 v0 v1 3 nil) 
     (squareface light-edge-j
-		skylight-edge-j
-		0.5		  
+		skylight-edge-j		
+		(etouq (aref *blockface-color* 2))
 		(-1 -1 -1)		   
 		(00 -1 -1)		  
 		(00 -1 00)		   
@@ -273,7 +288,7 @@
     (texface2 u0 u1 v0 v1 3 nil)
     (squareface light-edge-j
 		skylight-edge-j
-		1.0
+		(etouq (aref *blockface-color* 3))
 		(-1 1 -1)
 		(-1 1 00)
 		(00 1 00)
@@ -286,7 +301,7 @@
     (texface2 u0 u1 v0 v1 4 nil)
     (squareface light-edge-k
 		skylight-edge-k
-		0.8   
+		(etouq (aref *blockface-color* 4))
 		(-1 -1 -1)
 		(-1 00 -1)
 		(00 00 -1)
@@ -299,7 +314,7 @@
     (texface2 u0 u1 v0 v1 3 nil)
     (squareface light-edge-k
 		skylight-edge-k
-		0.8     
+		(etouq (aref *blockface-color* 5))
 		(-1 -1 1)
 		(00 -1 1)    
 		(00 00 1)    

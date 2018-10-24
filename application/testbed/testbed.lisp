@@ -491,7 +491,7 @@
 	  (let ((*box* (translate-box x y z *box*)))
 	    (map-box
 	     (sphere
-	      (nth 0
+	      (nth (random 6)
 		   (list
 		    (lambda (x y z)
 		      (dotimes (i 5)

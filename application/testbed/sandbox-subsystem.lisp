@@ -569,8 +569,15 @@
     (flet ((color ()
 	     (let ((value (random 256)))
 	       (foliage-color value (random (1+ value))))))
-      (modify-greens 80 192 :color (foliage-color 255 255) :terrain terrain)
-      (modify-greens 0 240 :color (foliage-color 255 255) :terrain terrain))
+      (modify-greens 80 192 :color (color)
+		     #+nil
+		     (foliage-color 255 255)
+		     :terrain terrain)
+      (modify-greens 0 240 :color
+		     (color)
+		     #+nil
+		     (foliage-color 255 255)
+		     :terrain terrain))
     terrain)
   (defun getapixel (h w image)
     (destructuring-bind (height width c) (array-dimensions image)
@@ -585,6 +592,11 @@
 			  (terrain (error "no image"))
 			  (height 256)
 			  (texheight 16))
+    #+nil
+    (setf xpos (* 2 xpos)
+	  ypos (* 2 ypos)
+	  height (* 2 height)
+	  texheight (* 2 texheight))
     (dobox ((x xpos (+ texheight xpos))
 	    (y ypos (+ texheight ypos)))
 	   ((lambda (vecinto other)

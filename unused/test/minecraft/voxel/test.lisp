@@ -167,7 +167,7 @@
   (lambda (x y z)
     (let ((blockid (world:getblock x y z)))
       (when (= other blockid)
-	(world:setblock x y z id)))))
+	(sandbox::plain-setblock x y z id)))))
 
 (defun dirt-sand (x y z)
   (let ((blockid (world:getblock x y z)))
