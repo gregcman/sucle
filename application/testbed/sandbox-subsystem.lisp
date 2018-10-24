@@ -592,7 +592,7 @@
 			  (terrain (error "no image"))
 			  (height 256)
 			  (texheight 16))
-    #+nil
+    ;#+nil
     (setf xpos (* 2 xpos)
 	  ypos (* 2 ypos)
 	  height (* 2 height)

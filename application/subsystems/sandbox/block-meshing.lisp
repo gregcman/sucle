@@ -94,21 +94,33 @@
 		   (1 0 0))))))
 
 (eval-when (:compile-toplevel)
+  ;;;;total faces touched by a light of distance n
   (defun manhattan-perimeter (n)
-    (let ((a (- n 1)))
-      (+ (* a a
+    (let ((n (+ n 1)))
+      (+ (* n n
 	    4)
 	 2)))
+
+  (defun light-gen-aux-fun (x &optional (max 15))
+    (log
+     (/
+      (/ 1 (manhattan-perimeter (- max x)))
+      (/ 1 (manhattan-perimeter max)))))
   
-  (defun light-gen (x)
+  (defun light-gen (x &optional (max 15))
+    (let ((umm (/ 1.0 (light-gen-aux-fun max max))))
+      (*
+       (light-gen-aux-fun x max)
+       umm))
+       
+    #+nil
     (gamma-correction:gamma-correct
-     ;#+nil
-     (/ (manhattan-perimeter x)
-	(manhattan-perimeter 15))
      #+nil
+     (expt 0.8 (- 15 x))
      (let ((a (/ x 15)))
        (* a a))
-     1.0))
+     1.0)
+     )
 
   (defparameter light-index-table
     (let ((foo-array (make-array 16 :element-type 'single-float)))
@@ -237,9 +249,10 @@
   (make-array (length args) :initial-contents args :element-type 'single-float))
 
 (defparameter *blockface-color*
-  ;#+nil
-  (simple-float-array 0.6 0.6 0.5 1.0 0.8 0.8)
   #+nil
+  (simple-float-array 0.6 0.6 0.5 1.0 0.8 0.8)
+  ;(simple-float-array 0.55 0.95 0.2 1.0 0.45 0.85)
+  ;#+nil
   (simple-float-array 1.0 1.0 1.0 1.0 1.0 1.0))
 (with-unsafe-speed
   (face-header side-i  
