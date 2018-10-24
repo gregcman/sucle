@@ -95,19 +95,20 @@
 
 (eval-when (:compile-toplevel)
   (defun manhattan-perimeter (n)
-    (if (zerop n)
-	1
-	(+ (* n n
-	      4)
-	   2)))
+    (let ((a (- n 1)))
+      (+ (* a a
+	    4)
+	 2)))
   
   (defun light-gen (x)
     (gamma-correction:gamma-correct
      ;#+nil
-     (/ (manhattan-perimeter x) 902)
+     (/ (manhattan-perimeter x)
+	(manhattan-perimeter 15))
      #+nil
      (let ((a (/ x 15)))
-       (* a a))))
+       (* a a))
+     1.0))
 
   (defparameter light-index-table
     (let ((foo-array (make-array 16 :element-type 'single-float)))

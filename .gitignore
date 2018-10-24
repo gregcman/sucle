@@ -44,3 +44,4 @@ flycheck_*.el
 # quicklisp libraries
 /foreign/quicklisp/bundle/
 
+~*
