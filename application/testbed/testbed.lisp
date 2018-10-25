@@ -228,7 +228,7 @@
 	    (incf *ticks*)
 	    (let ((seconds (or 60 840)))
 	      (setf sandbox::*daytime*
-		    (floatify
+		    (floatify		     
 		     1.0
 		     #+nil
 		     (sin

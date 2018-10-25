@@ -564,19 +564,53 @@
   ;;render chunks
   (sandbox::draw-world))
 
+(defun quadratic-formula (a b c)
+  (let ((two-a (+ a a)))
+    (let ((term2 (/ (sqrt (- (* b b)
+			     (* 4 a c)))
+		    two-a))
+	  (term1 (/ (- b)
+		    two-a)))
+      (values (+ term1 term2)
+	      (- term1 term2)))))
+
+(defun sum-of-first-n-integers (n)
+  (/ (* (+ n 1) n)
+     2))
+
+(defun reverse-sum-of-first-n-integers (n)
+  (quadratic-formula 0.5 0.5 (- n)))
+
+(defun oct-24-2018 ()
+  (let ((pick
+	 (random
+	  (sum-of-first-n-integers 256))
+	  ))
+    (let ((a (floor
+	      (reverse-sum-of-first-n-integers pick))))
+      (values a
+	      (- pick (sum-of-first-n-integers a))))))
+
 (progn
   (defun color-grasses (terrain)
     (flet ((color ()
+	     (multiple-value-call #'foliage-color (oct-24-2018))
+	     
+	     ;;;does not distribute evenly. it picks a slice, then a height on the slice.
+	     ;;;points on small slices have a greater chance of being picked than
+	     ;;;points on large slices.
+	     #+nil
 	     (let ((value (random 256)))
 	       (foliage-color value (random (1+ value))))))
-      (modify-greens 80 192 :color (color)
-		     #+nil
-		     (foliage-color 255 255)
+      (modify-greens 80 192 :color
+		     (color)
+		    
+		     ;(foliage-color 255 0)
 		     :terrain terrain)
       (modify-greens 0 240 :color
 		     (color)
-		     #+nil
-		     (foliage-color 255 255)
+		     
+		     ;(foliage-color 255 0)
 		     :terrain terrain))
     terrain)
   (defun getapixel (h w image)
