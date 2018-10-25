@@ -226,11 +226,11 @@
       (multiple-value-bind (fraction times)
 	  (fps-independent-timestep::tick *ticker* ()
 	    (incf *ticks*)
-	    (let ((seconds (or 60 840)))
-	      (setf sandbox::*daytime*
-		    (floatify		     
-		     1.0
-		     #+nil
+	    (setf sandbox::*daytime*
+		  (floatify		     
+		   1.0
+		   #+nil
+		   (let ((seconds (or 60 840)))
 		     (sin
 		      (/ *ticks*
 			 60
@@ -253,6 +253,7 @@
 	    (let ((vec (camera-matrix:camera-vec-position camera))
 		  (cev (camera-matrix:camera-vec-noitisop camera)))
 	      (nsb-cga:%vec-lerp vec prev curr fraction)
+	      #+nil
 	      (when (and (not fly)
 			 (eql 0 is-sneaking))
 		(nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))

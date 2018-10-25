@@ -94,9 +94,9 @@
     `(,fun ,a ,a ,@rest)))
 (defparameter *ticks-per-second* 60.0)
 (defparameter *temp-vec* (nsb-cga:vec 0.0 0.0 0.0))
-(defparameter *jump-frame-count* 0)
-(defparameter *jump-rising* nil)
-(defparameter *jump-count* 0.0)
+;;(defparameter *jump-frame-count* 0)
+;;(defparameter *jump-rising* nil)
+;;(defparameter *jump-count* 0.0)
 (defun physics (entity yaw dir pointmass
 		noclip gravity fly
 		is-jumping
@@ -143,13 +143,15 @@
 		  force
 		  temp-vec))
 	(let ((onground (logtest contact-state #b000100)))
+	  #+nil
 	  (if onground
 	      (setf *jump-frame-count* 0)
 	      (incf *jump-frame-count*))
 	  (let* ((walkspeed 4.317)
 		 (speed walkspeed)
 		 (step-power 4.0))
-	    
+
+	    #+nil
 	    (case is-sneaking 
 	      (0 (and (not fly)
 		      (*= speed 0.25)))
@@ -158,10 +160,12 @@
 	      (fly
 	       (*= speed 4.0))		
 	      (t
+	       #+nil
 	       (when (> 0.0 (aref vel 1))
 		 (setf *jump-rising* nil))
 	       (cond
 		 (onground
+		  #+nil
 		  (setf *jump-rising* nil)
 		  (unless dir
 		    (nsb-cga:%vec* temp-vec vel *ticks-per-second*)
@@ -172,22 +176,28 @@
 			    force
 			    temp-vec))
 		  (when is-jumping
+		    #+nil
 		    (setf *jump-rising* t)
-		    (let ((foo (/ (- (max walkspeed ground-speed)
-				     walkspeed) walkspeed)))
-		      (setf *jump-count* (* *ticks-per-second*
-					    (cond ((eql 0 is-sneaking) 0.0)
-						  (t foo))))
-		      (let ((base 4.0))
-		;	#+nil
-			(incf base (* 2.0 foo))
-			(modify nsb-cga:%vec+ force
-				(vec
-				 0.0
-				 (* base *ticks-per-second*)
-				 0.0))))))
-		 (t (*= step-power 0.6)))
-	      ; #+nil
+		    (;let
+		     progn
+		     #+nil
+		     ((foo (/ (- (max walkspeed ground-speed)
+				 walkspeed) walkspeed)))
+		     #+nil
+		     (setf *jump-count* (* *ticks-per-second*
+					   (cond ((eql 0 is-sneaking) 0.0)
+						 (t foo))))
+		     
+		     (let ((base 4.0))
+		      #+nil
+		      (incf base (* 2.0 foo))
+		      (modify nsb-cga:%vec+ force
+			      (vec
+			       0.0
+			       (* base *ticks-per-second*)
+			       0.0))))))
+		 (t (*= step-power 0.1)))
+	       #+nil
 	       (when *jump-rising*
 		 (when (and is-jumping (< *jump-frame-count*
 					  *jump-count*))
