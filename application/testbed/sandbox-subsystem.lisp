@@ -94,9 +94,6 @@
     `(,fun ,a ,a ,@rest)))
 (defparameter *ticks-per-second* 60.0)
 (defparameter *temp-vec* (nsb-cga:vec 0.0 0.0 0.0))
-;;(defparameter *jump-frame-count* 0)
-;;(defparameter *jump-rising* nil)
-;;(defparameter *jump-count* 0.0)
 (defun physics (entity yaw dir pointmass
 		noclip gravity fly
 		is-jumping
@@ -105,7 +102,8 @@
 		world-collision-fun
 		aabb &optional
 		       (temp-vec *temp-vec*))
-  (declare (optimize (debug 3)))
+  (declare (optimize (debug 3))
+	   (ignorable is-sneaking))
   (step-pointmass pointmass)
   (flet ((vec (x y z)
 	   (with-vec (a b c) (temp-vec symbol-macrolet)
@@ -123,14 +121,10 @@
 				(with-vec (px py pz) (pos)
 				  (funcall contact-handler px py pz aabb))))
 	     (vel-length (nsb-cga:vec-length vel))
-	     (total-speed (* *ticks-per-second* vel-length))
-	     (ground-speed
-	      (let ((x (* *ticks-per-second* (aref vel 0)))
-		    (z (* *ticks-per-second* (aref vel 2))))
-		(sqrt (+ (* x x)
-			 (* z z))))))
+	     (total-speed (* *ticks-per-second* vel-length)))
 
 	;;wind resistance
+					;	#+nil
 	(let ((drag (* total-speed
 		       total-speed))
 	      (drag-scale (if fly
@@ -143,30 +137,16 @@
 		  force
 		  temp-vec))
 	(let ((onground (logtest contact-state #b000100)))
-	  #+nil
-	  (if onground
-	      (setf *jump-frame-count* 0)
-	      (incf *jump-frame-count*))
 	  (let* ((walkspeed 4.317)
 		 (speed walkspeed)
 		 (step-power 4.0))
-
-	    #+nil
-	    (case is-sneaking 
-	      (0 (and (not fly)
-		      (*= speed 0.25)))
-	      (1 (*= speed (or 3.0 1.3))))
 	    (cond
 	      (fly
 	       (*= speed 4.0))		
 	      (t
-	       #+nil
-	       (when (> 0.0 (aref vel 1))
-		 (setf *jump-rising* nil))
 	       (cond
 		 (onground
-		  #+nil
-		  (setf *jump-rising* nil)
+
 		  (unless dir
 		    (nsb-cga:%vec* temp-vec vel *ticks-per-second*)
 		    (modify nsb-cga:%vec* temp-vec
@@ -176,43 +156,19 @@
 			    force
 			    temp-vec))
 		  (when is-jumping
-		    #+nil
-		    (setf *jump-rising* t)
-		    (;let
-		     progn
-		     #+nil
-		     ((foo (/ (- (max walkspeed ground-speed)
-				 walkspeed) walkspeed)))
-		     #+nil
-		     (setf *jump-count* (* *ticks-per-second*
-					   (cond ((eql 0 is-sneaking) 0.0)
-						 (t foo))))
-		     
-		     (let ((base 4.0))
-		      #+nil
-		      (incf base (* 2.0 foo))
+		    
+		    (let ((base 4.0))
 		      (modify nsb-cga:%vec+ force
 			      (vec
 			       0.0
 			       (* base *ticks-per-second*)
-			       0.0))))))
-		 (t (*= step-power 0.1)))
-	       #+nil
-	       (when *jump-rising*
-		 (when (and is-jumping (< *jump-frame-count*
-					  *jump-count*))
-		   (modify nsb-cga:%vec+ force
-			   (vec
-			    0.0
-			    (* 6.0 (/ (- *jump-count* *jump-frame-count*)
-				      *jump-count*))
-			    0.0))))))
+			       0.0)))))
+		 (t (*= step-power 0.1
+			)))))
 	    (let* ((yvalue (if fly
 			       (if is-jumping
 				   speed
-				   (case is-sneaking
-				     (0 (- speed))
-				     (otherwise 0.0)))
+				   0.0)
 			       0.0))
 		   (target-vec
 		    (if dir
@@ -246,7 +202,7 @@
 				   (let ((value (nsb-cga:vec-length vec)))
 				     (if (zerop value)
 					 (progn
-				;	   (error "wtf")
+					;	   (error "wtf")
 					   vec
 					   )
 					 (nsb-cga:vec/ vec value))))
@@ -293,13 +249,7 @@
 		    (c (floatify c))
 		    (d (floatify d))
 		    (e (floatify e))
-		    (f (floatify f)))
-;		(assert (float-good-p a))
-;		(assert (float-good-p b))
-;		(assert (float-good-p c))
-;		(assert (float-good-p d))
-;		(assert (float-good-p e))
-;		(assert (float-good-p f))		
+		    (f (floatify f)))		
 		(setf (values px py pz vx vy vz)
 		      (values a b c d e f))))))))))
 
