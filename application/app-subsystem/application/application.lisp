@@ -116,6 +116,10 @@
   (window:poll)
   (window::update-control-state))
 
+(defmethod deflazy::cleanup-node-value ((object glhelp::gl-object))
+  (when (glhelp:alive-p object)
+    (glhelp::gl-delete* object)))
+
 (deflazy al-context ()
   (music::really-start)
   music::*al-context*)
