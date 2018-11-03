@@ -239,7 +239,8 @@
 	(declare (ignorable times))
 	(let ((neck (sandbox-sub::entity-neck *ent*)))
 	  (when (window:mice-locked-p)
-	    (update-moused *mouse-multiplier-aux* 0.5)
+	    (update-moused *mouse-multiplier-aux* 0.5
+			   )
 	    (setf (sandbox-sub::necking-yaw neck)
 		  (floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
 		  (sandbox-sub::necking-pitch neck)

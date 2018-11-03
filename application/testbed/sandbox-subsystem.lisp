@@ -121,10 +121,11 @@
 				(with-vec (px py pz) (pos)
 				  (funcall contact-handler px py pz aabb))))
 	     (vel-length (nsb-cga:vec-length vel))
-	     (total-speed (* *ticks-per-second* vel-length)))
+	     (total-speed (* *ticks-per-second* vel-length))
+	     (old-onground (logtest (entity-contact entity) #b000100)))
 
 	;;wind resistance
-					;	#+nil
+	;;#+nil
 	(let ((drag (* total-speed
 		       total-speed))
 	      (drag-scale (if fly
@@ -146,8 +147,8 @@
 	      (t
 	       (cond
 		 (onground
-
-		  (unless dir
+		  (when (and (not dir)
+			     old-onground)
 		    (nsb-cga:%vec* temp-vec vel *ticks-per-second*)
 		    (modify nsb-cga:%vec* temp-vec
 			    4.0
@@ -163,12 +164,14 @@
 			       0.0
 			       (* base *ticks-per-second*)
 			       0.0)))))
-		 (t (*= step-power 0.1
+		 (t (*= step-power 0.6
 			)))))
 	    (let* ((yvalue (if fly
 			       (if is-jumping
 				   speed
-				   0.0)
+				   (if is-sneaking
+				       (- speed )
+				       0.0))
 			       0.0))
 		   (target-vec
 		    (if dir
@@ -180,53 +183,53 @@
 			(prog1
 			    (nsb-cga:vec 0.0 yvalue 0.0)
 			  (setf step-power 1.0)))))
-	      (let ((velocity (nsb-cga:vec (* (aref vel 0) *ticks-per-second*)
-					   (if fly
-					       (* (aref vel 1) *ticks-per-second*)
-					       0.0)
-					   (* (aref vel 2) *ticks-per-second*))))
-		(let* ((difference (nsb-cga:vec-
-				    target-vec
-				    velocity))
-		       (difference-length (nsb-cga:vec-length difference)))
-		  (unless (zerop difference-length)
-		    (let* ((dot (nsb-cga:dot-product difference target-vec)))
-		      (let ((bump-direction			     
-			     (if (and (not onground)
-				      (> 0.0 dot))
-				 ;;in the air?
-				 (let ((vec
-					(nsb-cga:cross-product
-					 (nsb-cga:cross-product target-vec difference)
-					 target-vec)))
-				   (let ((value (nsb-cga:vec-length vec)))
-				     (if (zerop value)
-					 (progn
+	      (when (or dir fly)
+		(let ((velocity (nsb-cga:vec (* (aref vel 0) *ticks-per-second*)
+					     (if fly
+						 (* (aref vel 1) *ticks-per-second*)
+						 0.0)
+					     (* (aref vel 2) *ticks-per-second*))))
+		  (let* ((difference (nsb-cga:vec-
+				      target-vec
+				      velocity))
+			 (difference-length (nsb-cga:vec-length difference)))
+		    (unless (zerop difference-length)
+		      (let* ((dot (nsb-cga:dot-product difference target-vec)))
+			(let ((bump-direction			     
+			       (if (and (not onground)
+					(> 0.0 dot))
+				   ;;in the air?
+				   (let ((vec
+					  (nsb-cga:cross-product
+					   (nsb-cga:cross-product target-vec difference)
+					   target-vec)))
+				     (let ((value (nsb-cga:vec-length vec)))
+				       (if (zerop value)
+					   (progn
 					;	   (error "wtf")
-					   vec
-					   )
-					 (nsb-cga:vec/ vec value))))
-				 (nsb-cga:vec/ 
-				  difference
-				  difference-length))))
-			(let ((step-force (* 2.0 difference-length)))
-			  (modify nsb-cga:%vec+ force
-				  (nsb-cga:vec* bump-direction
-						(* step-power step-force))))))))))))
+					     vec
+					     )
+					   (nsb-cga:vec/ vec value))))
+				   (nsb-cga:vec/ 
+				    difference
+				    difference-length))))
+			  (let ((step-force (* 2.0 difference-length)))
+			    (modify nsb-cga:%vec+ force
+				    (nsb-cga:vec* bump-direction
+						  (* step-power step-force)))))))))))))
 	;;to allow walking around block corners
 	;;we introduce a frame of gravity lag
 	(progn
-	  (let ((old-onground (logtest (entity-contact entity) #b000100)))
-	    (when (and (not old-onground)
-		       gravity)
-	      (modify nsb-cga:%vec- force
-		      (load-time-value
-		       (nsb-cga:vec
-			0.0
-			(or 13.0
-					;9.8
-			    )
-			0.0)))))
+	  (when (and (not old-onground)
+		     gravity)
+	    (modify nsb-cga:%vec- force
+		    (load-time-value
+		     (nsb-cga:vec
+		      0.0
+		      (or 13.0
+					;		9.8
+			  )
+		      0.0))))
 	  (setf (entity-contact entity) contact-state))
 	(modify nsb-cga:%vec/ force (* (* *ticks-per-second*
 					  *ticks-per-second* 0.5) mass))
@@ -586,7 +589,7 @@
 			  (terrain (error "no image"))
 			  (height 256)
 			  (texheight 16))
-    ;#+nil
+   ;; #+nil
     (setf xpos (* 2 xpos)
 	  ypos (* 2 ypos)
 	  height (* 2 height)
