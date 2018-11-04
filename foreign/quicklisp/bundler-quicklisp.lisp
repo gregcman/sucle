@@ -31,6 +31,7 @@
     "sb-cga"
     "defpackage-plus"
     "trivial-features"
+    "cl-glfw3"
     ))
 
 (defun load-bundle ()
