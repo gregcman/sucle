@@ -1,10 +1,24 @@
 ![Minecraft in lisp](https://user-images.githubusercontent.com/14166099/47961916-ccb74a80-dfe1-11e8-8bf1-a2d599a0234e.png)
 
 # This One Weird Repo Micro:shit:soft Doesn't Want You To Know Will :astonished:Change Your Life :weary: [SECRET]  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+\-\_\-  
+0\_\-  
+0\_0 
+0\_0 
 :pill:  
 :gem:   
 :bomb:   
 :meat_on_bone:  
+0_0 
 :gem:     
 :pill:   
 :meat_on_bone:    
@@ -14,6 +28,7 @@
 :gem:  
 :bomb: 
 :meat_on_bone:  
+0_0 
 :bomb: 
 :pill: 
 :meat_on_bone:  
