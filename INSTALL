@@ -1,1 +1,3 @@
+# Requirements
+- GLFW3, FFmpeg, OpenAL, OpenGL, Common Lisp, Some quicklisp libraries. ![https://github.com/terminal625/a-sound-system](a-sound-system)
 
