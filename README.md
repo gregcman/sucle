@@ -13,7 +13,7 @@ I've spent many hours building and jumping around in this Minecraft Clone. I rea
 The graphics and input for [3b's terminal emulator](https://github.com/3b/3bst). I don't use it, but it works as a dumb terminal emulator.
 
 ## Requirements
-- GLFW3, FFmpeg, OpenAL, OpenGL, Common Lisp, Some quicklisp libraries.
+- GLFW3, FFmpeg, OpenAL, OpenGL, Common Lisp, Some quicklisp libraries. ![https://github.com/terminal625/a-sound-system]a-sound-system
 
 ### Platforms
 Tested on:
@@ -24,17 +24,8 @@ Tested on:
     - Interactive applications
     - Subsystems	
 		
-- component/
-    - Convenience macros
-    - Utility libraries
-    - Math
-    - Data structures
+- src/
+    - source
 
-- foreign/
-    - Foreign library bindings
-    - Binaries
-    - Unmodified forks
-    - Convenience wrappers around standard APIs and libraries
-
-- unused/
-    - random code which is not necessarily maintained or functional
+- lib/
+    - foreign libraries and binaries to bundle for distribution
