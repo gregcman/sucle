@@ -71,7 +71,8 @@
 			  `(when (window::skey-j-p-or-repeat (window::keyval ,a))
 			     ,(list (ecase x
 				      (0 'enter)
-				      (1 'enter-string)) b))))
+				      (1 'enter-string))
+				    b))))
 	       (foo 0 :enter #\return)
 	       (foo 0 :backspace #\del)
 	       (foo 0 :tab #\Tab)
