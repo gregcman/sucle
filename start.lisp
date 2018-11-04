@@ -49,5 +49,5 @@
 (asdf:load-system "trivial-features")
 (asdf:load-system "cffi")
 
-(load (merge-pathnames "foreign/binaries/binaries.lisp"
+(load (merge-pathnames "foreign/lib/bin.lisp"
 		       start::*this-directory*))
