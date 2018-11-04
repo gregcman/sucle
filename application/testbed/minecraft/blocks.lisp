@@ -1,35 +1,36 @@
 (in-package :sandbox-sub)
-#+nil
+
 (defun preload ()
   (let ((array (make-array (* 4 7))))
     (dobox ((number 0 4)
 	    (name 0 7))
 	   (setf (aref array (+ number (* name 4)))
 		 (music::load-all
-		(print
-		  (concatenate
-		   'string
-		   "/home/imac/Downloads/sound/footstep/"
-		   
-		   (string-downcase (symbol-name 'stone))
-		   (aref #("0" "1" "2" "3") number
-			 )
-		   ".ogg"))
+		  (print
+		   (concatenate
+		    'string
+		    "/home/imac/Downloads/sound/footstep/"
+		    
+		    (string-downcase (symbol-name 'stone))
+		    (aref #("0" "1" "2" "3") number
+			  )
+		    ".mp3"))
 		  :mono8)))
     array))
 
-#+nil
+
 (application::deflazy preloaded-sounds (application::al-context)
   (declare (ignorable application::al-context))
   (print "loading-sounds")
   (preload))
+
 #+nil
 (map nil
      (lambda (x) (music::free-preloaded x))
      (application::getfnc 'PRELOADED-SOUNDS))
-#+nil
+
 (defparameter *wot-counter* 0)
-#+nil
+
 (defun wot (value)
   (incf *wot-counter*)
   (aref 
@@ -37,7 +38,7 @@
    (+ (mod *wot-counter* 4)
       (* 4 (sound-dispatch value)))))
 
-#+nil
+
 (defun sound-dispatch (value)
   (case value
     (0 0) ;air
@@ -49,18 +50,14 @@
     ((35 81) 6)
     (otherwise (random 7))))
 
-    #+nil
-    (let ((blockid (world::getblock x y z)))
-      (unless (= blockid 0)
-	(music::play-at (wot blockid) 
-			(+ x 0.5) (+ y 0.5) (+ 0.5 z)
-			0.8
-			1.0)))
-    	#+nil
-	(music::play-at (wot id) x y z 0.8 1.0)
-		#+nil
-	(music::play-at (wot value) (+ x 0.5) (+ y 0.5) (+ 0.5 z)
-			      0.8 1.0)
+
+(defun blocksound (x y z)
+  (let ((blockid (world::getblock x y z)))
+    (unless (= blockid 0)
+      (music::play-at (wot blockid) 
+		      (+ x 0.5) (+ y 0.5) (+ 0.5 z)
+		      0.8
+		      1.0))))
  
 
 ;   (6 "sapling" 15 0 NIL NIL) 

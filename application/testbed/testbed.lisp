@@ -6,7 +6,8 @@
   (let ((pos (sandbox-sub::pointmass-position particle))
 	(vel (sandbox-sub::pointmass-velocity particle)))
     (al:listener :position pos)
-    (al:listener :velocity vel)))
+    (al:listener :velocity vel)
+    ))
 (defun camera-al-listener (camera)
   (let ((look (camera-matrix::camera-vec-forward camera))
 	(up (camera-matrix::camera-vec-up camera)))   
@@ -24,7 +25,8 @@
 	    (add x)
 	    (add y)
 	    (add z))))
-      (%al:listener-fv :orientation array))))
+      (%al:listener-fv :orientation array)
+      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
@@ -330,7 +332,7 @@
   (lambda (x y z)
     (when 
 	(not-occupied x y z)
-      
+
       (let ((blockval (let ((seq
 			     #(3 13 12 24 1 2 18 17 20 5 89)))
 			(elt seq (mod (round window::*scroll-y*)
@@ -340,7 +342,9 @@
 	 y
 	 z
 	 blockval
-	 (aref block-data:*lightvalue* blockval))))))
+	 (aref block-data:*lightvalue* blockval))
+	(sandbox-sub::blocksound x y z)
+	))))
 
 (defun dirtngrass (x y z)
   (dirts x y z)
@@ -514,4 +518,5 @@
 			(sandbox::setblock-with-update x y z 1)))))))))
 	#'tree
 	(lambda (x y z)
+	  (sandbox-sub::blocksound x y z)
 	  (sandbox::setblock-with-update x y z 0 0)))))

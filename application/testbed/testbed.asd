@@ -15,4 +15,6 @@
   :serial t
   :components 
   ((:file "sandbox-subsystem")
+   (:module "minecraft" :serial t 
+	    :components ((:file "blocks")))
    (:file "testbed")))
