@@ -1,30 +1,4 @@
-
-;    (2 (rendergrass blockid i j k))
-
-#+nl
-(defun rendergrass (id i j k)
-  (with-texture-translator2 (u0 u1 v0 v1) 2
-    (let ((adj-id (world:getblock i (1- j) k)))
-      (when (show-sidep id adj-id)
-	(side-j i j k u0 v0 u1 v1))))
-  (with-texture-translator2 (u0 u1 v0 v1) 0
-    (let ((adj-id (world:getblock i (1+ j) k)))
-      (when (show-sidep id adj-id)
-	(side+j i j k u0 v0 u1 v1))))
-  (with-texture-translator2 (u0 u1 v0 v1) 3
-    (let ((adj-id (world:getblock (1- i) j k)))
-      (when (show-sidep id adj-id)
-	(side-i i j k u0 v0 u1 v1)))
-    (let ((adj-id (world:getblock (1+ i) j k)))
-      (when (show-sidep id adj-id)
-	(side+i i j k u0 v0 u1 v1)))    
-    (let ((adj-id (world:getblock i j (1- k))))
-      (when (show-sidep id adj-id)
-	(side-k i j k u0 v0 u1 v1)))
-    (let ((adj-id (world:getblock i j (1+ k))))
-      (when (show-sidep id adj-id)
-	(side+k i j k u0 v0 u1 v1)))))
-
+(in-package :sandbox-sub)
 #+nil
 (defun preload ()
   (let ((array (make-array (* 4 7))))
