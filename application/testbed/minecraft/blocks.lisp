@@ -9,12 +9,14 @@
 		  (print
 		   (concatenate
 		    'string
-		    "/home/imac/Downloads/sound/footstep/"
+		    "/media/imac/share/space/lispysaves/assets/sandbox-assets/resources/sound3/dig/"
 		    
-		    (string-downcase (symbol-name 'stone))
-		    (aref #("0" "1" "2" "3") number
+		    (string-downcase (symbol-name
+				      (aref #(stone wood gravel grass sand cloth snow)
+					    name)))
+		    (aref #("1" "2" "3" "4") number
 			  )
-		    ".mp3"))
+		    ".ogg"))
 		  :mono8)))
     array))
 
