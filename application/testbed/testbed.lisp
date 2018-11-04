@@ -191,6 +191,11 @@
 (defparameter *reach* 64.0)
 
 (defun stuff ()
+  (setf *blockid* (let ((seq
+			 #(3 13 12 24 1 2 18 17 20 5 89)))
+		    (elt seq (mod (round window::*scroll-y*)
+				  (length seq)))))
+  
   (let* ((player-pointmass (sandbox-sub::entity-particle *ent*))
 	 (pos (sandbox-sub::pointmass-position player-pointmass))
 	 (entity *ent*))
@@ -332,11 +337,7 @@
   (lambda (x y z)
     (when 
 	(not-occupied x y z)
-
-      (let ((blockval (let ((seq
-			     #(3 13 12 24 1 2 18 17 20 5 89)))
-			(elt seq (mod (round window::*scroll-y*)
-				      (length seq))))))
+      (let ((blockval *blockid*))
 	(sandbox::setblock-with-update
 	 x
 	 y

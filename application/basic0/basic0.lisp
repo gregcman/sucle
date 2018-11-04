@@ -20,9 +20,14 @@
    (lambda ()
      (loop
 	(application:poll-app)
-	(if *app*
-	    nil
-	    (per-frame))
+	;(if *app*)
+	(testbed::per-frame)
+	(progn
+	  (per-frame)
+	  #+nil
+	  (when (window:skey-j-p (window::keyval #\e))
+	    (window::toggle-mouse-capture)))
+	#+nil
 	(when (window:skey-j-p (window::keyval #\h))
 	  (toggle *app*))))
    :width (floor (* 80 *glyph-width*))
@@ -148,7 +153,7 @@
 
   (glhelp:set-render-area 0 0 window:*width* window:*height*)
   (gl:clear-color 0.5 0.25 0.25 0.0)
-  (gl:clear :color-buffer-bit)
+  ;(gl:clear :color-buffer-bit)
   (gl:polygon-mode :front-and-back :fill)
   (gl:disable :cull-face)
   (gl:disable :blend)
@@ -184,7 +189,7 @@
      (glslgen2::make-shader-stage
       :in '((value "vec4"))
       :program
-      '(defun "main" void ()	 
+      '(defun "main" void ()
 	(=
 	 :gl-frag-color
 	 value
@@ -332,8 +337,14 @@
 	;;mouse coordinates
 	(setf (fill-pointer numbuf) 0)
 	(with-output-to-string (stream numbuf :element-type 'character)
+	  #+nil
 	  (princ (list (floor *mouse-x*)
-		       (floor *mouse-y*)) stream))
+		       (floor *mouse-y*))
+		 stream)
+	  (princ (aref block-data::*names*
+		       testbed::*blockid*)
+		 stream)
+	  )
 	(string-bounding-box numbuf rect))
       :string numbuf
       ))))

@@ -8,7 +8,8 @@
 	       #:character-modifier-bits
 	       #:uncommon-lisp
 	       #:quads
-	       #:point)
+	       #:point
+	       #:testbed)
   :serial t
   :components 
   ((:file "basic0")))
