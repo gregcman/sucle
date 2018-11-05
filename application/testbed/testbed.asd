@@ -3,7 +3,6 @@
 	       #:sandbox
 	       #:image-utility
 	       #:reverse-array-iterator
-	       #:singleton-lparallel
 	       #:uncommon-lisp
 	       #:math-modify-macros
 	       #:fps-independent-timestep

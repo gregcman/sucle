@@ -18,9 +18,17 @@
   (defun remove-chunk-display-list (name)
     (remhash name *g/chunk-call-list*)))
 
+(defvar *world-mesh-lparallel-kernel* (lparallel:make-kernel 2))
+(defmacro with-world-mesh-lparallel-kernel (&body body)
+  `(let ((lparallel:*kernel* *world-mesh-lparallel-kernel*)) ,@body))
+(defparameter *achannel*
+  (With-world-mesh-lparallel-kernel
+    (lparallel:make-channel)))
+
 (defun update-world-vao (x y z)
   (clean-dirty)
-  (lparallel:kill-tasks 'mesh-chunk)
+  (With-world-mesh-lparallel-kernel
+    (lparallel:kill-tasks 'mesh-chunk))
   (maphash (lambda (k v)
 	     (declare (ignorable k))
 	     (gl:delete-lists v 1)
@@ -76,7 +84,6 @@
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)
 	    (function scratch-buffer:my-iterator)))
-(defparameter *achannel* (lparallel:make-channel))
 (defun designatemeshing ()
   (loop
      (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)

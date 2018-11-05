@@ -2,7 +2,6 @@
   :depends-on (#:cl-opengl
 	       #:utility
 	       #:reverse-array-iterator
-	       #:singleton-lparallel
 	       #:glhelp
 	       #:gamma-correction
 
