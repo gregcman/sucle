@@ -123,6 +123,7 @@
 (deflazy al-context ()
   (music::really-start)
   music::*al-context*)
+
 (getfnc 'al-context)
 (defun restart-sound-system ()
   (music::restart-al)

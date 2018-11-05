@@ -8,7 +8,9 @@
     #+(and windows x86)
     "win32/"
     #+(and windows x86-64)
-    "win64/"))
+    "win64/"
+    #+(and linux x86-64)
+    "linux/x86-64/"))
 (when *folder*
   (pushnew
    (merge-pathnames
