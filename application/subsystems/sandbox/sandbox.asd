@@ -3,7 +3,6 @@
 	       #:utility
 	       #:reverse-array-iterator
 	       #:glhelp
-	       #:gamma-correction
 
 	       #:bordeaux-threads
 	       #:nsb-cga

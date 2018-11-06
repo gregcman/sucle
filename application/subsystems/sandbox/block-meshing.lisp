@@ -106,6 +106,9 @@
      (/
       (/ 1 (manhattan-perimeter (- max x)))
       (/ 1 (manhattan-perimeter max)))))
+  #+nil
+  (defun gamma-correct (x &optional (gamma-value 2.33))
+    (expt x gamma-value))
   
   (defun light-gen (x &optional (max 15))
     (let ((umm (/ 1.0 (light-gen-aux-fun max max))))
