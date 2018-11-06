@@ -5,7 +5,7 @@
 (defparameter *bundles-dir*
   (merge-pathnames
    "bundle/"
-   (filesystem-util:this-directory)))
+   (asdf:system-source-directory :bundler-quicklisp)))
 
 (defparameter *bundle-file*
   (merge-pathnames

@@ -33,7 +33,6 @@
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))
    :title ""))
-(defvar *this-directory* (filesystem-util:this-directory))
 
 (defclass sprite ()
   ((bounding-box :accessor sprite.bounding-box

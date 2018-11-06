@@ -89,12 +89,12 @@
      (font-data (:fragment-shader font-atlas))
      (font-texture (:fragment-shader font-texture)))))
 
-(defvar *this-directory* (filesystem-util:this-directory))
+(defvar *this-directory* (asdf:system-source-directory :text-subsystem))
 (deflazy font-png ()
   (let ((array
 	 (image-utility:read-png-file
-	  (filesystem-util:rebase-path #P"font.png"
-				       *this-directory*))))
+	  (utility:rebase-path #P"font.png"
+			       *this-directory*))))
     (destructuring-bind (w h) (array-dimensions array)
       (let ((new
 	     (make-array (list w h 4) :element-type '(unsigned-byte 8))))

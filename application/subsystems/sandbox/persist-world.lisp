@@ -2,11 +2,11 @@
 
 (defparameter *some-saves* nil)
 (defun msave (path)
-  (let ((newpath (filesystem-util:rebase-path path *some-saves*)))
+  (let ((newpath (utility:rebase-path path *some-saves*)))
     (ensure-directories-exist newpath)
     (save-world newpath)))
 (defun mload (path)
-  (let ((newpath (filesystem-util:rebase-path path *some-saves*)))
+  (let ((newpath (utility:rebase-path path *some-saves*)))
     (load-world newpath)))
 
 (defun savechunk (path position)

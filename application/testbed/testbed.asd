@@ -4,7 +4,6 @@
 	       #:image-utility
 	       #:reverse-array-iterator
 	       #:uncommon-lisp
-	       #:math-modify-macros
 	       #:fps-independent-timestep
 	       #:aabbcc
 	       #:control

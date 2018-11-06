@@ -1,6 +1,23 @@
 (defpackage #:sandbox-sub
-  (:use :cl :utility :application :struct-to-clos :math-modify-macros))
+  (:use :cl :utility :application :struct-to-clos))
 (in-package #:sandbox-sub)
+
+;;;math modify macros
+(define-modify-macro *= (&rest args) *)
+(define-modify-macro += (&rest args) +)
+(define-modify-macro -= (&rest args) -)
+(define-modify-macro /f (&rest args) /)
+(define-modify-macro &= (&rest args) logand)
+(define-modify-macro ^= (&rest args) logxor)
+(define-modify-macro |\|=| (&rest args) logior)
+(define-modify-macro <<= (&rest args) ash)
+(define-modify-macro >>= (&rest args) hsa)
+(defmacro hsa (a b)
+  `(ash ,b ,a))
+
+(define-modify-macro logiorf (&rest args) logior)
+;;;end math modify macros
+
 
 (defun collide-world2 (aabb-gen-fnc x y z dx dy dz aabb)
   (multiple-value-bind (new-x new-y new-z xyzclamp)
@@ -603,7 +620,7 @@
 (defun load-png (filename)
   (image-utility:read-png-file filename))
 
-(defvar *ourdir* (filesystem-util:this-directory))
+(defvar *ourdir* (asdf:system-source-directory :testbed))
 
 (defun  foliage-color (a b)
   (multiple-value-bind (w1 w2 w3)
@@ -618,7 +635,7 @@
 
 (deflazy terrain-png ()
   (load-png 
-   (filesystem-util:rebase-path #P"terrain.png" *ourdir*)))
+   (utility:rebase-path #P"terrain.png" *ourdir*)))
 
 (deflazy modified-terrain-png (terrain-png)
   (color-grasses

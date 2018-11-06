@@ -1,6 +1,5 @@
 (asdf:defsystem #:bundler-quicklisp
-  :depends-on (#:quicklisp
-	       #:filesystem-util)
+  :depends-on (#:quicklisp)
   :components 
   ((:file "bundler-quicklisp"))) 
 
