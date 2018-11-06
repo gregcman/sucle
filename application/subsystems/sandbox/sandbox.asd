@@ -6,11 +6,11 @@
 
 	       #:bordeaux-threads
 	       #:nsb-cga
-	       #:filesystem-util
 	       #:quads)
   :serial t
   :components
   ((:file "queue")
+   (:file "filesystem-util")
    (:file "package")
    (:file "vox") ;;generate a voxel hash structure  
    (:file "world")

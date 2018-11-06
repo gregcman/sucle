@@ -1,5 +1,26 @@
 (in-package #:sandbox)
 
+(defun save (path things)
+  (with-open-file (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
+    (dolist (thing things)
+      (print thing stream))))
+
+(defun myload (path)
+  (let ((things nil))
+    (with-open-file (stream path :direction :input :if-does-not-exist nil)
+      (tagbody rep
+	 (let ((thing (read stream nil nil)))
+	   (when thing
+	     (push thing things)
+	     (go rep)))))
+    (nreverse things)))
+
+(defun save2 (path thingfilename &rest things)
+  (save (merge-pathnames (format nil "~s" thingfilename) path) things))
+(defun myload2 (path thingfilename)
+  (myload (merge-pathnames (format nil "~s" thingfilename) path)))
+
+
 (defparameter *some-saves* nil)
 (defun msave (path)
   (let ((newpath (utility:rebase-path path *some-saves*)))
@@ -13,7 +34,7 @@
   (let ((position-list (multiple-value-list (world:unhashfunc position))))
     (rotatef (second position-list)
 	     (third position-list))
-    (filesystem-util:save2
+    (save2
      path
      position-list
      (gethash position world::*lispobj*))))
@@ -22,7 +43,7 @@
   (let ((position
 	 (destructuring-bind (x y z) position-list
 	     (world:chunkhashfunc x z y))))
-    (let ((data (filesystem-util:myload2 path position-list)))
+    (let ((data (myload2 path position-list)))
       (case (length data)
 	(3
 	 (destructuring-bind (blocks light sky) data
