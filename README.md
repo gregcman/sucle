@@ -89,7 +89,6 @@
 (ﾉ◕ヮ◕)ﾉ
 :gem:  
 :bomb: 
-# Minecraft Obsessed Lisp Weenie Rants About Something No One Cares About
 ## The Most Moddable Voxel Engine That Has Ever Existed
 ### Features:
 * Edit the source code on the fly, making it very easy to write mods
@@ -114,7 +113,7 @@
 5. Be a creative and interesting and artistic mineman pvp parkour legend 
 
 ## Please comment below if you:
-* are aware of a voxel engine  that is superior in modding capabilities
+* are aware of a voxel engine that is superior in modding capabilities
 * share that burning passion for Minecraft
 * have a suggestion on how to get a real, non Minecraft life
 * do not know what Minecraft is
