@@ -2,12 +2,14 @@
   (:use #:cl #:utility #:control))
 (in-package :testbed)
 
+#+nil
 (defun particle-al-listener (particle)
   (let ((pos (sandbox-sub::pointmass-position particle))
 	(vel (sandbox-sub::pointmass-velocity particle)))
     (al:listener :position pos)
     (al:listener :velocity vel)
     ))
+#+nil
 (defun camera-al-listener (camera)
   (let ((look (camera-matrix::camera-vec-forward camera))
 	(up (camera-matrix::camera-vec-up camera)))   
@@ -162,9 +164,11 @@
 	(t
 	 (sandbox-sub::per-frame)
 	 (render?)
-	 (stuff))) 
-  (particle-al-listener (sandbox-sub::entity-particle *ent*))
-  (camera-al-listener sandbox-sub::*camera*))
+	 (stuff)))
+  #+nil
+  (progn
+    (particle-al-listener (sandbox-sub::entity-particle *ent*))
+    (camera-al-listener sandbox-sub::*camera*)))
 
 ;;;
 (defparameter *mouse-multiplier* 0.002617)

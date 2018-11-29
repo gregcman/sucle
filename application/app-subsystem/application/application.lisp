@@ -120,11 +120,14 @@
   (when (glhelp:alive-p object)
     (glhelp::gl-delete* object)))
 
+#+nil
 (deflazy al-context ()
   (music::really-start)
   music::*al-context*)
 
+#+nil
 (getfnc 'al-context)
+#+nil
 (defun restart-sound-system ()
   (music::restart-al)
   (refresh 'al-context t))

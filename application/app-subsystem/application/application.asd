@@ -5,7 +5,7 @@
 	       #:nsb-cga
 	       #:bordeaux-threads
 	       #:cl-opengl
-	       #:music
+	       ;;#:music
 	       #:glhelp
 	       #:deflazy)
   :components

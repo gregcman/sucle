@@ -3,7 +3,7 @@
 	       #:utility
 	       #:reverse-array-iterator
 	       #:glhelp
-
+	       #:lparallel
 	       #:bordeaux-threads
 	       #:nsb-cga
 	       #:quads)

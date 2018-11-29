@@ -471,7 +471,8 @@
   ;#+nil
   (vector 0.68 0.8 1.0))
   
-(defparameter *fog-ratio* 0.75)
+(defparameter *fog-ratio* 1.0 ;;0.75
+  )
 
 (defun render-stuff ()
   ;;camera setup
@@ -606,7 +607,7 @@
 			  (terrain (error "no image"))
 			  (height 256)
 			  (texheight 16))
-   ;; #+nil
+    #+nil
     (setf xpos (* 2 xpos)
 	  ypos (* 2 ypos)
 	  height (* 2 height)
@@ -680,7 +681,10 @@
     :program
     '(defun "main" void ()
       (= "gl_Position" (* projection-model-view position))
-      (= color-out (dot (max (* skylight time)
+      (= color-out (dot
+		   ;; blocklight
+		    ;;#+nil		    
+		    (max (* skylight time)
 			     blocklight)
 		    (vec4 0.25)))
       (= texcoord-out texcoord)
@@ -699,14 +703,15 @@
       (/**/ vec4 pixdata)
       (= pixdata ("texture2D" sampler texcoord))
       (/**/ vec3 temp)
-      (= temp 
+      (= temp
        (mix 
 	fogcolor
 	(* color
 	   (|.| pixdata "rgb"))
 	fogratio
 	))
-    ;  #+nil
+     ;; (= temp (- (vec3 1.0) temp))
+      ;;#+nil
       (if (== (|.| pixdata "a") 0.0)
 	  (/**/ "discard;"))
       (= (|.| :gl-frag-color "rgb") temp)))

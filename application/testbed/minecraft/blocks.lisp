@@ -1,5 +1,6 @@
 (in-package :sandbox-sub)
 
+#+nil
 (defun preload ()
   (let ((array (make-array (* 4 7))))
     (dobox ((number 0 4)
@@ -20,7 +21,7 @@
 		  :mono8)))
     array))
 
-
+#+nil
 (application::deflazy preloaded-sounds (application::al-context)
   (declare (ignorable application::al-context))
   (print "loading-sounds")
@@ -33,6 +34,7 @@
 
 (defparameter *wot-counter* 0)
 
+#+nil
 (defun wot (value)
   (incf *wot-counter*)
   (aref 
@@ -54,6 +56,7 @@
 
 
 (defun blocksound (x y z)
+  #+nil
   (let ((blockid (world::getblock x y z)))
     (unless (= blockid 0)
       (music::play-at (wot blockid) 
