@@ -122,4 +122,6 @@
 
 It would be great if everyone could pool together their Common Lisp game engines. That way I'd have a better Minecraft clone. 
 
+# Installation instructions:
+https://github.com/terminal625/sucle/blob/master/INSTALL.md
 
