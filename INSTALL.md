@@ -15,6 +15,7 @@ If you are:
 -
 - A suitable Common Lisp
 - [This utility library](https://github.com/terminal625/utility)
+- [sucle, this repository](https://github.com/terminal625/sucle)
 - [quicklisp](https://www.quicklisp.org/beta/)
 - [OpenGL](https://www.opengl.org/) 
 - [GLFW 3.2](https://www.glfw.org/)
