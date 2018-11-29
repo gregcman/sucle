@@ -2,7 +2,7 @@
   (:use :cl
 	:utility))
 (in-package :atest)
-(defparameter *box* #(0 128 0 128 -128 0))
+(defparameter *box* #(-64 64 -64 64 -64 64))
 
 (defun find-top (x z min max test)
   (let ((delta (- max min)))
@@ -50,14 +50,14 @@
 	   box)
   (map-box (lambda (x y z)
 	     (multiple-value-bind (height obj)
-		 (find-top x z 0 y (lambda (x y z)
+		 (find-top x z -64 y (lambda (x y z)
 				     (not (zerop (world:getblock x y z)))))
 	       (declare (ignore obj))
 	       (unless height
 		 (setf height 0))
 	       (dobox ((upup (1+ height) y))
 		      (setf (world:skygetlight x upup z) 15))))
-	   #(0 128 128 129 -128 0))
+	   #(-64 64 64 65 -64 64))
   (map-box (lambda (x y z)
 	     (when (= 15 (world:skygetlight x y z))
 	       (sandbox::sky-light-node x y z)))
@@ -376,3 +376,20 @@
 		nil
 		(remhash k world::*lispobj*))))
 	   world::*lispobj*))
+
+(defun sdfsdf ()
+  (utility::dobox ((x -16 16)
+		   (y -15 -2)
+		   (z -16 16))
+		  (sandbox::plain-setblock x y z 1)))
+#+nil
+(defun perlin ()
+  (utility::dobox ((x -16 16)
+		   (y -15 16)
+		   (z 16 32))
+		  (let ((value
+			 (black-tie::simplex-noise-3d-single-float (/ (floatify x) 8.0)
+								   (floatify (/ y 16.0))
+								   (/ (floatify z) 8.0))))
+		    (when (> value 0.4)
+		      (sandbox::plain-setblock x y z 1)))))

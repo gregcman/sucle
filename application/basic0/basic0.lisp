@@ -283,8 +283,8 @@
 
 (defun plain-button (fun &optional
 			   (str (string (gensym "nameless-button-")))
-			   (sprite (make-instance 'sprite))
-			   (pos (random-point)))
+			   (pos (random-point))
+			   (sprite (make-instance 'sprite)))
   "a statically named button"
   (let ((rect (make-instance 'rectangle)))
     (string-bounding-box str rect)
@@ -312,6 +312,7 @@
     (push-sprite-chain-stack)))
 
 (defun bottom-layer ()
+  #+nil
   (add-sprite
    (plain-button
     (lambda (this) (remove-sprite this))
@@ -322,12 +323,14 @@
       (declare (ignorable this))
       (application::quit))
     "quit"))
+  #+nil
   (add-sprite
    (plain-button
     (lambda (this)
       (declare (ignorable this))
       (new-layer))
     "new"))
+  
   (let ((rect (make-instance 'rectangle))
 	(numbuf (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character)))
     (add-sprite
