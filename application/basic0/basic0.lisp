@@ -19,6 +19,8 @@
 (defun start ()
   (application:main
    (lambda ()
+     (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
+	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
      (our-load)
      (unwind-protect
 	  (loop
@@ -70,6 +72,11 @@
   (make-instance 'point
 		 :x (* *glyph-width* (random 80))
 		 :y (* *glyph-height* (random 25))))
+
+(defun integer-point (x y)
+  (make-instance 'point
+		 :x (* *glyph-width* x)
+		 :y (* *glyph-height* y)))
 
 (defun string-bounding-box (string &optional (rectangle (make-instance 'rectangle)))
   (multiple-value-bind (x y) (string-bounds string)
@@ -322,7 +329,8 @@
     (lambda (this)
       (declare (ignorable this))
       (application::quit))
-    "quit"))
+    "quit"
+    (integer-point 0 0)))
   #+nil
   (add-sprite
    (plain-button
@@ -336,7 +344,7 @@
     (add-sprite
      (make-instance
       'sprite
-      :position (random-point)
+      :position (integer-point 10 0)
       :bounding-box rect
       :tickfun
       (lambda ()

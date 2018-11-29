@@ -364,7 +364,7 @@
 	(when (zerop idabove)
 	  (sandbox::plain-setblock x y z 2 0))))))
 
-(let* ((b 10)
+(let* ((b 4)
        (a (- b)))
   (defparameter *box* (vector
 		       a b
@@ -497,7 +497,7 @@
 	  (let ((*box* (translate-box x y z *box*)))
 	    (map-box
 	     (sphere
-	      (nth (random 6)
+	      (nth 5 ;(random 6)
 		   (list
 		    (lambda (x y z)
 		      (dotimes (i 5)
@@ -514,8 +514,8 @@
 		       x y z
 		       *blockid*))
 		    (lambda (x y z)
-		      (unless (zerop (world:getblock x y z))
-			(sandbox::setblock-with-update x y z 1)))))))))
+		      ;(unless (zerop (world:getblock x y z)))
+		      (sandbox::setblock-with-update x y z 0))))))))
 	#'tree
 	(lambda (x y z)
 	  (sandbox-sub::blocksound x y z)
