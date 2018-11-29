@@ -39,7 +39,7 @@ Things to keep in mind when using another Common Lisp implementation:
 Most implementations start through an executable that has a similar name as the implementation. In the case of installing SBCL with a Linux package manager, entering `sbcl` at the command line will run SBCL. However, there are installation situations in which you may need to execute a script or navigate to a directory to run the Common Lisp implementation, and this is implementation specific. 
 
 ### 3. Using Quicklisp:
-[Quicklisp webpage](https://www.quicklisp.org/beta/)
+[Quicklisp webpage](https://www.quicklisp.org/beta/)  
 What is Quicklisp? Quicklisp is the de facto package manager for Common Lisp. 
 #### Installation
 [Installation instructions](https://www.quicklisp.org/beta/#installation)
