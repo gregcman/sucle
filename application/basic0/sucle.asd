@@ -1,4 +1,4 @@
-(asdf:defsystem #:basic0
+(asdf:defsystem #:sucle
   :depends-on (#:application
 	       #:utility
 	       #:sprite-chain

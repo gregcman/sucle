@@ -1,7 +1,7 @@
-(defpackage #:basic0
+(defpackage #:sucle
   (:use #:cl #:utility #:application #:opengl-immediate
 	#:sprite-chain #:point #:rectangle))
-(in-package :basic0)
+(in-package :sucle)
 
 (defparameter *ticks* 0)
 (defparameter *saved-session* nil)
@@ -18,18 +18,21 @@
 (defun start ()
   (application:main
    (lambda ()
-     (loop
-	(application:poll-app)
-	;(if *app*)
-	(testbed::per-frame)
-	(progn
-	  (per-frame)
-	  #+nil
-	  (when (window:skey-j-p (window::keyval #\e))
-	    (window::toggle-mouse-capture)))
-	#+nil
-	(when (window:skey-j-p (window::keyval #\h))
-	  (toggle *app*))))
+     (our-load)
+     (unwind-protect
+	  (loop
+	     (application:poll-app)
+					;(if *app*)
+	     (testbed::per-frame)
+	     (progn
+	       (per-frame)
+	       #+nil
+	       (when (window:skey-j-p (window::keyval #\e))
+		 (window::toggle-mouse-capture)))
+	     #+nil
+	     (when (window:skey-j-p (window::keyval #\h))
+	       (toggle *app*)))
+       (save)))
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))
    :title ""))
@@ -370,3 +373,22 @@
 (progn
   (setf sprite-chain::*sprites* (sprite-chain:make-sprite-chain))
   (bottom-layer))
+
+(defun save ()
+  (atest::remove-zeroes)
+  (sandbox::msave "test/"))
+
+(defun our-load ()
+  (sandbox::mload "test/"))
+
+
+(setf sandbox::*some-saves*
+      (merge-pathnames
+       "save/"
+       (asdf:system-source-directory :sucle)
+		       )
+      #+nil
+      (cdr (assoc (machine-instance) 
+		  '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
+		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
+		  :test 'equal)))

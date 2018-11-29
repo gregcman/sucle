@@ -348,7 +348,7 @@
 	       (dobox ((a x (+ x 16))
 		       (b y (+ y 16))
 		       (c z (+ z 16)))
-		      (funcall fun a c b))))
+		      (funcall fun a b c))))
 	   world::*lispobj*))
 
 (defun map-all-chunks1 (fun)
@@ -356,4 +356,23 @@
 	     (declare (ignore v))
 	     (multiple-value-bind (x y z) (world:unhashfunc k)
 	       (funcall fun x y z)))
+	   world::*lispobj*))
+
+(defun remove-zeroes ()
+  (maphash (lambda (k v)
+	     (declare (ignore v))
+	     (multiple-value-bind (x y z) (world:unhashfunc k)
+	       (if
+		(block nope
+		  (dobox ((x x (+ x 16))
+			  (y y (+ y 16))
+			  (z z (+ z 16)))
+			 (when
+			     (or (not (= 0 (world::getlight x y z)))
+				 (not (= 15 (world::skygetlight x y z)))
+				 (not (= 0 (world::getblock x y z))))
+			   (return-from nope :stuff)))
+		  nil)
+		nil
+		(remhash k world::*lispobj*))))
 	   world::*lispobj*))

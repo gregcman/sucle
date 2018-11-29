@@ -65,12 +65,7 @@
 	    z (* cos-pitch (cos yaw)))))
   result)
 
-;;;;;
-(setf sandbox::*some-saves*
-      (cdr (assoc (machine-instance) 
-		  '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-		  :test 'equal)))
+;;;;
 
 (defun start ()
   (application::main
