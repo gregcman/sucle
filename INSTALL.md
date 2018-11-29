@@ -83,6 +83,13 @@ shift down when flying
 Scroll wheel change block  
 Right click to place block left click to remove  
 
+### How to really use
+
+Using the command line as a REPL is a very difficult way to progam.  
+Recommended IDEs:  
+- [emacs](https://www.gnu.org/software/emacs/) + [SLIME](https://www.cliki.net/slime-howto)
+- [lem](https://github.com/cxxxr/lem)
+
 ### 6. Will My OpenGL setup work out of the box?
 Yes if:
 - If your OpenGL driver provides a compatibility profile, [which is likely for NVidia GPUs](https://stackoverflow.com/questions/4113989/why-were-display-lists-deprecated-in-opengl-3-1), for supporting display lists.
