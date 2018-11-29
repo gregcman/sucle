@@ -368,8 +368,8 @@
 			  (y y (+ y 16))
 			  (z z (+ z 16)))
 			 (when
-			     (or (not (= 0 (world::getlight x y z)))
-				 (not (= 15 (world::skygetlight x y z)))
+			     (or ;(not (= 0 (world::getlight x y z)))
+				 ;(not (= 15 (world::skygetlight x y z)))
 				 (not (= 0 (world::getblock x y z))))
 			   (return-from nope :stuff)))
 		  nil)
