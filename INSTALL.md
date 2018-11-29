@@ -1,4 +1,17 @@
-Requirements
+Contents
+-
+1. Requirements
+2. How to install Common Lisp
+3. How to install quicklisp
+4. How to install GLFW
+5. How to install this repository and how to use
+6. Opengl Mishaps
+
+If you are:  
+- New to Common Lisp, start at the beginning.
+- Familiar with Common Lisp and Quicklisp, skip to step 4, installing GLFW.
+
+1.Requirements
 -
 - A suitable Common Lisp
 - [This utility library](https://github.com/terminal625/utility)
@@ -10,7 +23,7 @@ Requirements
 Installation
 -
 
-### Installing/choosing the Common Lisp implementation:
+### 2. Installing/choosing the Common Lisp implementation:
 [Install SBCL](http://www.sbcl.org/). This means clicking on your architecture [from this table](http://www.sbcl.org/platform-table.html) and running the platform specific installer.
 If using Linux, an easier way to install is to enter
 `apt-get install sbcl` at the command line.
@@ -24,28 +37,28 @@ Things to keep in mind when using another Common Lisp implementation:
 ### How to run the Common Lisp REPL
 Most implementations start through an executable that has a similar name as the implementation. In the case of installing SBCL with a Linux package manager, entering `sbcl` at the command line will run SBCL. However, there are installation situations in which you may need to execute a script or navigate to a directory to run the Common Lisp implementation, and this is implementation specific. 
 
-### Using Quicklisp:
+### 3. Using Quicklisp:
 [Quicklisp webpage](https://www.quicklisp.org/beta/)
 What is Quicklisp? Quicklisp is the de facto package manager for Common Lisp. 
 #### Installation
 [Installation instructions](https://www.quicklisp.org/beta/#installation)
 1. Download the quicklisp.lisp file. 
 2. Open up your Common Lisp REPL
-3. [Load](http://clhs.lisp.se/Body/f_load.htm) the file into Common Lisp. It should look something like this:
+3. [Load](http://clhs.lisp.se/Body/f_load.htm) the file into Common Lisp. It should look something like this:  
 `CL-USER> (load "~/path-to-the-quicklisp-file-goes-here/quicklisp.lisp")`
-4. Install quicklisp in the default home location. For a custom installation directory, see the [quicklisp website](https://www.quicklisp.org/beta/#loading).
+4. Install quicklisp in the default home location. For a custom installation directory, see the [quicklisp website](https://www.quicklisp.org/beta/#loading).  
 `CL-USER> (quicklisp-quickstart:install)`
-5. [optional] Add quicklisp to implementation startup with 
+5. [optional] Add quicklisp to implementation startup with   
 `CL-USER> (ql:add-to-init-file)`
 
 Everything Quicklisp downloads, which is for the most part Common Lisp code, should be inside the `quicklisp` directory. Removing quicklisp amounts to deleting the `quicklisp` directory and being careful to remove the [Optional from step 5 above] code added by quicklisp to the implementation initialization file.
 #### For returning quicklisp users:
 1. Open the Common Lisp REPL
-2. If quicklisp has been added to implementation startup as in step 5 above then it is already loaded. Otherwise:
+2. If quicklisp has been added to implementation startup as in step 5 above then it is already loaded. Otherwise:  
 `CL-USER (load "~/path-to-quicklisp/quicklisp/setup.lisp")`
 
-#### Installing GLFW 3.2
-Linux:
+#### 4. Installing GLFW 3.2
+Linux:  
 `apt-get install libglfw3`
 
 Windows:
@@ -54,22 +67,22 @@ Get the [Windows binaries for GLFW from their website here](https://www.glfw.org
 macOS:
 This is easy if you have a macOS package manager like Homebrew, but more involved if you do not as you must [compile GLFW3 yourself.](https://www.glfw.org/docs/latest/compile.html)
 
-### Installing this and supporting repositories
+### 5. Installing this and supporting repositories
 The `quicklisp` directory you choose will have a `local-projects` sub-directory. For the default quicklisp installation, this will be `~/quicklisp/local-projects`. This is a directory quicklisp will be able to find when searching for projects to load. Clone or download and extract [this repository](https://github.com/terminal625/sucle) and [this utility library](https://github.com/terminal625/utility) into the `local-projects` directory as subdirectories.
 
 ### How to use 
-`(ql:quickload :sucle)`
+`(ql:quickload :sucle)`  
 `(sucle:start)`
 
-F - fly
-E - toggle input
-WASD move
-Space jump
-shift down when flying
-Scroll wheel change block
-Right click to place block left click to remove
+F - fly  
+E - toggle input  
+WASD move  
+Space jump  
+shift down when flying  
+Scroll wheel change block  
+Right click to place block left click to remove  
 
-### Will My OpenGL setup work out of the box?
+### 6. Will My OpenGL setup work out of the box?
 Yes if:
 - If your OpenGL driver provides a compatibility profile, [which is likely for NVidia GPUs](https://stackoverflow.com/questions/4113989/why-were-display-lists-deprecated-in-opengl-3-1), for supporting display lists.
 - Your OpenGL driver supports GLSL version 110.
