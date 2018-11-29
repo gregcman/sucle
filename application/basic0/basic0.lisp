@@ -1,6 +1,7 @@
 (defpackage #:sucle
   (:use #:cl #:utility #:application #:opengl-immediate
-	#:sprite-chain #:point #:rectangle))
+	#:sprite-chain #:point #:rectangle)
+  (:export #:start))
 (in-package :sucle)
 
 (defparameter *ticks* 0)
