@@ -43,7 +43,7 @@ Most implementations start through an executable that has a similar name as the 
 What is Quicklisp? Quicklisp is the de facto package manager for Common Lisp. 
 #### Installation
 [Installation instructions](https://www.quicklisp.org/beta/#installation)
-1. Download the quicklisp.lisp file. 
+1. Download the [quicklisp.lisp](https://beta.quicklisp.org/quicklisp.lisp) file. 
 2. Open up your Common Lisp REPL
 3. [Load](http://clhs.lisp.se/Body/f_load.htm) the file into Common Lisp. It should look something like this:  
 `CL-USER> (load "~/path-to-the-quicklisp-file-goes-here/quicklisp.lisp")`
@@ -82,6 +82,13 @@ Space jump
 shift down when flying  
 Scroll wheel change block  
 Right click to place block left click to remove  
+
+### How to really use
+
+Using the command line as a REPL is a very difficult way to progam.  
+Recommended IDEs:  
+- [emacs](https://www.gnu.org/software/emacs/) + [SLIME](https://www.cliki.net/slime-howto)
+- [lem](https://github.com/cxxxr/lem)
 
 ### 6. Will My OpenGL setup work out of the box?
 Yes if:
