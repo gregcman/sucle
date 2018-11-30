@@ -1,4 +1,8 @@
 ![Minecraft in lisp](https://user-images.githubusercontent.com/14166099/47961916-ccb74a80-dfe1-11e8-8bf1-a2d599a0234e.png)
+!
+
+click for video:  
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/QoK8Dvd4JTY/0.jpg)](https://www.youtube.com/watch?v=QoK8Dvd4JTY)
 
 # This One Weird Repo Microsoft Doesn't Want You To Know Will :astonished:Change Your Life :weary: [SECRET]  
 \-\_\-  
