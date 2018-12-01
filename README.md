@@ -31,7 +31,7 @@ click for video:
 
 3. An Open Source license means no one can steal and destroy your items. AKA Notch, Jeb, Mojang, and Microsoft...
 
-4. Do you want to build the city of your dreams? To become the master of the world you inhabit and wreak destruction on the natural environment? Unfortunately cube programs all too often fail to give their users what they really want. Why? Because these cube programs are made by bad people with bad languages. What makes this repo different? Everything here is 100% Pure Free and Open Source Common Lisp. If you are not familiar with Common Lisp, do yourself a favor and [click here](http://www.lispworks.com/documentation/HyperSpec/Front/Contents.htm). 
+4. Do you want to build the city of your dreams? To become the master of the world you inhabit and wreak destruction on the natural environment? Unfortunately cube programs all too often fail to give their users what they really want. What makes this repo different? Everything here is 100% Pure Free and Open Source Common Lisp. If you are not familiar with Common Lisp, do yourself a favor and [click here](http://www.lispworks.com/documentation/HyperSpec/Front/Contents.htm). 
 
 
 :gem:     
