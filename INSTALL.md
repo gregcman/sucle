@@ -60,7 +60,7 @@ Everything Quicklisp downloads, which is for the most part Common Lisp code, sho
 
 #### 4. Installing GLFW 3.2
 Linux:  
-`apt-get install libglfw3`
+`apt-get install libglfw3-dev`
 
 Windows:
 Get the [Windows binaries for GLFW from their website here](https://www.glfw.org/download.html) and put them in `C:\Windows\System32`. If you do not want to modify that directory, please open an issue for loading from a different directory.
