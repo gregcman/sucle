@@ -1,5 +1,6 @@
 (asdf:defsystem #:glhelp
-  :depends-on (#:cl-opengl)
+  :depends-on (#:cl-opengl
+	       #:split-sequence)
   :serial t
   :components
   ((:file "glhelp")

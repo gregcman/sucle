@@ -255,8 +255,7 @@
 
 (deflazy flat-shader-source ()
   (glslgen:ashader
-   :version 120
-   :vs
+   :version 120  :vs
    (glslgen2::make-shader-stage
     :out '((value-out "vec4"))
     :in '((position "vec4")
@@ -285,8 +284,7 @@
 ;;;;;;;;;;;;;;;;;;;;
 (deflazy indirection-shader-source ()
   (glslgen:ashader
-   :version 120
-   :vs
+   :version 120   :vs
    (glslgen2::make-shader-stage
     :out '((texcoord-out "vec2"))
     :in '((position "vec4")
@@ -364,4 +362,5 @@
       (application::refresh 'indirection t))
     (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
     (gl:clear :color-buffer-bit)
+    (gl:clear :depth-buffer-bit)
     (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad)))))

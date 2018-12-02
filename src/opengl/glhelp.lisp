@@ -65,9 +65,19 @@
   (gl:shader-source shader string)
   (gl:compile-shader shader)
   (let ((success (gl:get-shader-info-log shader)))
-    (unless (zerop (length success))
+    (unless (gl-success success)
       (print success)
       (error "~S" success))))
+
+(defun string-match? (a b)
+  (let ((log (remove "" (split-sequence:split-sequence #\Newline a)
+		     :test #'string=)))
+    (string= (car (last log))
+	     b)))
+
+(defun gl-success (success)
+  (or (zerop (length success))
+      (string-match? success "No errors.")))
 
 ;;;;attribs is an alist of pairs (a . b) with
 ;;;;(lambda (a b) (gl:bind-attrib-location ...[the program].. a b)
@@ -89,7 +99,7 @@
     
     (gl:link-program program)
     (let ((success (gl:get-program-info-log program)))
-      (unless (zerop (length success))
+      (unless (gl-success success)
 	(print success)
 	(error "~S" success)))
     (gl:detach-shader program vert)
@@ -116,15 +126,15 @@
     (gl:active-texture (+ num +gltexture0+))))
 
 (defun bind-default-framebuffer ()
-  (gl:bind-framebuffer-ext :framebuffer-ext 0))
+  (gl:bind-framebuffer :framebuffer 0))
 
 
 (defun create-framebuffer (w h)
-  (let ((framebuffer (first (gl:gen-framebuffers-ext 1)))
-        (depthbuffer (first (gl:gen-renderbuffers-ext 1)))
+  (let ((framebuffer (first (gl:gen-framebuffers 1)))
+        (depthbuffer (first (gl:gen-renderbuffers 1)))
         (texture (first (gl:gen-textures 1))))
     ;; setup framebuffer
-    (gl:bind-framebuffer-ext :framebuffer-ext framebuffer)
+    (gl:bind-framebuffer :framebuffer framebuffer)
 
     (progn
       ;; setup texture and attach it to the framebuffer
@@ -133,23 +143,24 @@
       (gl:tex-parameter :texture-2d :texture-mag-filter :nearest)
       (gl:tex-image-2d :texture-2d 0 :rgba w h 0 :rgba :unsigned-byte (cffi:null-pointer))
       (gl:bind-texture :texture-2d 0)
-      (gl:framebuffer-texture-2d-ext :framebuffer-ext
-				     :color-attachment0-ext
-				     :texture-2d
-				     texture
-				     0))
+      (gl:framebuffer-texture-2d :framebuffer
+				 :color-attachment0
+				 :texture-2d
+				 texture
+				 0))
     (progn
       ;; setup depth-buffer and attach it to the framebuffer
-      (gl:bind-renderbuffer-ext :renderbuffer-ext depthbuffer)
-      (gl:renderbuffer-storage-ext :renderbuffer-ext :depth-component24 w h)
-      (gl:framebuffer-renderbuffer-ext :framebuffer-ext
-				       :depth-attachment-ext
-				       :renderbuffer-ext
-				       depthbuffer))
+      (gl:bind-renderbuffer :renderbuffer depthbuffer)
+      (gl:renderbuffer-storage :renderbuffer :depth-component24 w h)
+      (gl:framebuffer-renderbuffer
+       :framebuffer
+       :depth-attachment
+       :renderbuffer
+       depthbuffer))
 
     ;; validate framebuffer
-    (let ((framebuffer-status (gl:check-framebuffer-status-ext :framebuffer-ext)))
-      (unless (gl::enum= framebuffer-status :framebuffer-complete-ext)
+    (let ((framebuffer-status (gl:check-framebuffer-status :framebuffer)))
+      (unless (gl::enum= framebuffer-status :framebuffer-complete)
         (error "Framebuffer not complete: ~A." framebuffer-status)))
 
     #+nil

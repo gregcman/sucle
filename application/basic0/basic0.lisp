@@ -330,7 +330,7 @@
       (declare (ignorable this))
       (application::quit))
     "quit"
-    (integer-point 0 0)))
+    (integer-point 0 1)))
   #+nil
   (add-sprite
    (plain-button
@@ -344,7 +344,7 @@
     (add-sprite
      (make-instance
       'sprite
-      :position (integer-point 10 0)
+      :position (integer-point 10 1)
       :bounding-box rect
       :tickfun
       (lambda ()
