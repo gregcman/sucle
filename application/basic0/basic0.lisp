@@ -28,6 +28,7 @@
 					;(if *app*)
 	     (testbed::per-frame)
 	     (progn
+	       #+nil
 	       (per-frame)
 	       #+nil
 	       (when (window:skey-j-p (window::keyval #\e))
