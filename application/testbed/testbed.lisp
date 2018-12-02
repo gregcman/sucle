@@ -82,7 +82,6 @@
   (glhelp::create-gl-program solidshader-text))
 (application:deflazy solidshader-text ()
   (glslgen::ashader
-   :version 120
    :vs
    (glslgen2::make-shader-stage
     :out '((color-out "vec3"))

@@ -3,6 +3,8 @@
 
 (in-package :glhelp)
 
+(defparameter *gl-version* "2.0") ;;abitrary, gets overwritten
+
 ;;;;in opengl horizontal lines must be multiples of 4 bytes
 (defun array-flatten (array)
   (make-array (array-total-size array)
@@ -172,3 +174,23 @@
     (gl:enable :depth-test ;:multisample
 	       )
     (values texture framebuffer depthbuffer)))
+
+(defun glsl-gl-version (&optional (version *gl-version*))
+  (let ((string (subseq version 0 3)))
+    (second
+     (assoc
+      string
+      (quote (("2.0" 110)
+	      ("2.1" 120)
+	      ("3.0" 130)
+	      ("3.1" 140)
+	      ("3.2" 150)
+	      ("3.3" 330)
+	      ("4.0" 400)
+	      ("4.1" 410)
+	      ("4.2" 420)
+	      ("4.3" 430)
+	      ("4.4" 440)
+	      ("4.5" 450)
+	      ("4.6" 460)))
+      :test 'string=))))

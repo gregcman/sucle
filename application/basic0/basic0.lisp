@@ -185,7 +185,6 @@
 (progn
   (deflazy flat-shader-source ()
     (glslgen:ashader
-     :version 120
      :vs
      (glslgen2::make-shader-stage
       :out '((value-out "vec4"))

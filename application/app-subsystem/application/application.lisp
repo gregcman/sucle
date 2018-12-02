@@ -91,6 +91,8 @@
 	(refresh item t))
       (window:set-vsync t)
       (gl:enable :scissor-test)
+      (setf glhelp::*gl-version* (gl:get-string :version))
+      (setf glslgen::*glsl-version* (glhelp::glsl-gl-version))
       (let ((*quit-token* (cons "trampoline" "token")))
 	(catch *quit-token*
 	  (funcall fun))))))

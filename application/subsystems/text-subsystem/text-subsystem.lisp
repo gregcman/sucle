@@ -10,7 +10,6 @@
 
 (deflazy text-shader-source ()
   (glslgen:ashader
-   :version 120
    :vs
    (glslgen2::make-shader-stage
     :out '((texcoord-out "vec2"))
@@ -255,7 +254,7 @@
 
 (deflazy flat-shader-source ()
   (glslgen:ashader
-   :version 120  :vs
+   :vs
    (glslgen2::make-shader-stage
     :out '((value-out "vec4"))
     :in '((position "vec4")
@@ -284,7 +283,7 @@
 ;;;;;;;;;;;;;;;;;;;;
 (deflazy indirection-shader-source ()
   (glslgen:ashader
-   :version 120   :vs
+   :vs
    (glslgen2::make-shader-stage
     :out '((texcoord-out "vec2"))
     :in '((position "vec4")

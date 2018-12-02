@@ -660,7 +660,6 @@
 
 (deflazy blockshader-text ()
   (glslgen::ashader
-   :version 120
    :vs
    (glslgen2::make-shader-stage
     :out '((color-out "float")

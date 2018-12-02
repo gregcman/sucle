@@ -128,7 +128,7 @@
 	      (if (consp string-cell) ;;means that the variable is shared 
 		  connected ;;attribute or varying
 		  not-connected))))))
-(defparameter *glsl-version* 110)
+(defparameter *glsl-version* 110) ;;arbitrary, overwritten
 (defparameter *stage* nil)
 (defun qualify-version (hash)
   (dohash (k v) hash
@@ -213,7 +213,12 @@
 			 (return
 			   (if (> *glsl-version* 120)
 			       "roloCgarF_lg"
-			       "gl_FragColor"))))))
+			       "gl_FragColor")))
+		       (when (string= x "texture2D")
+			 (return
+			   (if (>= *glsl-version* 150)
+			       "texture"
+			       x))))))
 	(cond (value
 	       (setf value (getf value :string))
 	       (if (listp value)
@@ -302,7 +307,7 @@
 	       :initform '())
    (version :accessor shader-program-data-version
 	    :initarg :version
-	    :initform 110)
+	    :initform *glsl-version*)
    (vars-attributes :accessor shader-program-data-vars-attributes)
    (raw-attributes :accessor shader-program-data-raw-attributes)
    (alias-uniform :accessor shader-program-data-alias-uniform)
@@ -324,8 +329,7 @@
 		   (shader-program-data-attributes data)
 		   (shader-program-data-varyings data)
 		   (shader-program-data-uniforms data))
-      
-  ;;    (print (list vs-string frag-string uniforms))
+      ;;      (print (list vs-string frag-string uniforms))
       (multiple-value-prog1
 	  (setf (values (shader-program-data-vs-string data)
 			(shader-program-data-frag-string data)
