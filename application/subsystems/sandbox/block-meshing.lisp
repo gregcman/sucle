@@ -15,33 +15,33 @@
 		i j k
 		blockid))))))
 
-
-(defmacro %edge-aux ((i j k)
-		     getfunc
-		     (x0 y0 z0)
-		     (x1 y1 z1)
-		     (x2 y2 z2)
-		     (x3 y3 z3))
-  `((let ((xd (+ ,i ,x0))
-	  (yd (+ ,j ,y0))
-	  (zd (+ ,k ,z0)))
-      (declare (type fixnum xd yd zd))
-      (lightfunc (,getfunc xd yd zd)))
-    (let ((xd (+ ,i ,x1))
-	  (yd (+ ,j ,y1))
-	  (zd (+ ,k ,z1)))
-      (declare (type fixnum xd yd zd))
-      (lightfunc (,getfunc xd yd zd)))
-    (let ((xd (+ ,i ,x2))
-	  (yd (+ ,j ,y2))
-	  (zd (+ ,k ,z2)))
-      (declare (type fixnum xd yd zd))
-      (lightfunc (,getfunc xd yd zd)))
-    (let ((xd (+ ,i ,x3))
-	  (yd (+ ,j ,y3))
-	  (zd (+ ,k ,z3)))
-      (declare (type fixnum xd yd zd))
-      (lightfunc (,getfunc xd yd zd)))))
+(eval-always
+  (defmacro %edge-aux ((i j k)
+		       getfunc
+		       (x0 y0 z0)
+		       (x1 y1 z1)
+		       (x2 y2 z2)
+		       (x3 y3 z3))
+    `((let ((xd (+ ,i ,x0))
+	    (yd (+ ,j ,y0))
+	    (zd (+ ,k ,z0)))
+	(declare (type fixnum xd yd zd))
+	(lightfunc (,getfunc xd yd zd)))
+      (let ((xd (+ ,i ,x1))
+	    (yd (+ ,j ,y1))
+	    (zd (+ ,k ,z1)))
+	(declare (type fixnum xd yd zd))
+	(lightfunc (,getfunc xd yd zd)))
+      (let ((xd (+ ,i ,x2))
+	    (yd (+ ,j ,y2))
+	    (zd (+ ,k ,z2)))
+	(declare (type fixnum xd yd zd))
+	(lightfunc (,getfunc xd yd zd)))
+      (let ((xd (+ ,i ,x3))
+	    (yd (+ ,j ,y3))
+	    (zd (+ ,k ,z3)))
+	(declare (type fixnum xd yd zd))
+	(lightfunc (,getfunc xd yd zd))))))
 (eval-always
   (progn
     (defun light-edge-i (i j k)
@@ -115,7 +115,7 @@
       (*
        (light-gen-aux-fun x max)
        umm))
-       
+    
     #+nil
     (gamma-correction:gamma-correct
      #+nil
@@ -123,7 +123,7 @@
      (let ((a (/ x 15)))
        (* a a))
      1.0)
-     )
+    )
 
   (defparameter light-index-table
     (let ((foo-array (make-array 16 :element-type 'single-float)))
@@ -258,87 +258,89 @@
 					;#+nil
     ;;(simple-float-array 1.0 1.0 1.0 1.0 1.0 1.0)
     ))
-(progn ;;ccl
- #+(or sbcl ecl)
-  with-unsafe-speed
-  (face-header side-i  
-    (posface (0 0 0)
-	     (0 0 1)
-	     (0 1 1)
-	     (0 1 0))
-    (texface2 u0 u1 v0 v1 3 nil)
-    (squareface light-edge-i
-		skylight-edge-i
-		(etouq (aref *blockface-color* 0))
-		(-1 -1 -1)
-		(-1 -1 00)
-		(-1 00 00)
-		(-1 00 -1)))
-  (face-header side+i  
-    (posface (1 0 0)
-	     (1 1 0)
-	     (1 1 1)
-	     (1 0 1))
-    (texface2 u0 u1 v0 v1 4 nil)
-    (squareface light-edge-i
-		skylight-edge-i
-		(etouq (aref *blockface-color* 1))
-		(1 -1 -1)
-		(1 00 -1)
-		(1 00 00)
-		(1 -1 00)))
-  (face-header side-j
-    (posface (0 0 0)
-	     (1 0 0)
-	     (1 0 1)
-	     (0 0 1))
-    (texface2 u0 u1 v0 v1 3 nil) 
-    (squareface light-edge-j
-		skylight-edge-j		
-		(etouq (aref *blockface-color* 2))
-		(-1 -1 -1)		   
-		(00 -1 -1)		  
-		(00 -1 00)		   
-		(-1 -1 00)))
-  (face-header side+j 
-    (posface (0 1 0)
-	     (0 1 1)
-	     (1 1 1)
-	     (1 1 0))
-    (texface2 u0 u1 v0 v1 3 nil)
-    (squareface light-edge-j
-		skylight-edge-j
-		(etouq (aref *blockface-color* 3))
-		(-1 1 -1)
-		(-1 1 00)
-		(00 1 00)
-		(00 1 -1)))
-  (face-header side-k 
-    (posface (0 0 0)
-	     (0 1 0)
-	     (1 1 0)
-	     (1 0 0))
-    (texface2 u0 u1 v0 v1 4 nil)
-    (squareface light-edge-k
-		skylight-edge-k
-		(etouq (aref *blockface-color* 4))
-		(-1 -1 -1)
-		(-1 00 -1)
-		(00 00 -1)
-		(00 -1 -1)))
-  (face-header side+k
-    (posface (0 0 1)
-	     (1 0 1)
-	     (1 1 1)
-	     (0 1 1))
-    (texface2 u0 u1 v0 v1 3 nil)
-    (squareface light-edge-k
-		skylight-edge-k
-		(etouq (aref *blockface-color* 5))
-		(-1 -1 1)
-		(00 -1 1)    
-		(00 00 1)    
-		(-1 00 1))))
+
+(#+(not (or sbcl ecl))
+   progn ;;ccl
+   #+(or sbcl ecl)
+   with-unsafe-speed
+   (face-header side-i  
+     (posface (0 0 0)
+	      (0 0 1)
+	      (0 1 1)
+	      (0 1 0))
+     (texface2 u0 u1 v0 v1 3 nil)
+     (squareface light-edge-i
+		 skylight-edge-i
+		 (etouq (aref *blockface-color* 0))
+		 (-1 -1 -1)
+		 (-1 -1 00)
+		 (-1 00 00)
+		 (-1 00 -1)))
+   (face-header side+i  
+     (posface (1 0 0)
+	      (1 1 0)
+	      (1 1 1)
+	      (1 0 1))
+     (texface2 u0 u1 v0 v1 4 nil)
+     (squareface light-edge-i
+		 skylight-edge-i
+		 (etouq (aref *blockface-color* 1))
+		 (1 -1 -1)
+		 (1 00 -1)
+		 (1 00 00)
+		 (1 -1 00)))
+   (face-header side-j
+     (posface (0 0 0)
+	      (1 0 0)
+	      (1 0 1)
+	      (0 0 1))
+     (texface2 u0 u1 v0 v1 3 nil) 
+     (squareface light-edge-j
+		 skylight-edge-j		
+		 (etouq (aref *blockface-color* 2))
+		 (-1 -1 -1)		   
+		 (00 -1 -1)		  
+		 (00 -1 00)		   
+		 (-1 -1 00)))
+   (face-header side+j 
+     (posface (0 1 0)
+	      (0 1 1)
+	      (1 1 1)
+	      (1 1 0))
+     (texface2 u0 u1 v0 v1 3 nil)
+     (squareface light-edge-j
+		 skylight-edge-j
+		 (etouq (aref *blockface-color* 3))
+		 (-1 1 -1)
+		 (-1 1 00)
+		 (00 1 00)
+		 (00 1 -1)))
+   (face-header side-k 
+     (posface (0 0 0)
+	      (0 1 0)
+	      (1 1 0)
+	      (1 0 0))
+     (texface2 u0 u1 v0 v1 4 nil)
+     (squareface light-edge-k
+		 skylight-edge-k
+		 (etouq (aref *blockface-color* 4))
+		 (-1 -1 -1)
+		 (-1 00 -1)
+		 (00 00 -1)
+		 (00 -1 -1)))
+   (face-header side+k
+     (posface (0 0 1)
+	      (1 0 1)
+	      (1 1 1)
+	      (0 1 1))
+     (texface2 u0 u1 v0 v1 3 nil)
+     (squareface light-edge-k
+		 skylight-edge-k
+		 (etouq (aref *blockface-color* 5))
+		 (-1 -1 1)
+		 (00 -1 1)    
+		 (00 00 1)    
+		 (-1 00 1))))
 
 (defun blockshape (i j k blockid)
   (case blockid
@@ -393,9 +395,9 @@
 	(when (show-sidep id adj-id)
 	  (side-j i j k u0 v0 u1 v1))))
     (with-texture-translator2 (u0 u1 v0 v1) texid
-	(let ((adj-id (world:getblock i (1+ j) k)))
-	  (when (show-sidep id adj-id)
-	    (side+j i j k u0 v0 u1 v1))))
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (side+j i j k u0 v0 u1 v1))))
     (with-texture-translator2 (u0 u1 v0 v1) 3
       (let ((adj-id (world:getblock (1- i) j k)))
 	(when (show-sidep id adj-id)
@@ -417,9 +419,9 @@
 	(when (show-sidep id adj-id)
 	  (side-j i j k u0 v0 u1 v1))))
     (with-texture-translator2 (u0 u1 v0 v1) (- 208 32)
-	(let ((adj-id (world:getblock i (1+ j) k)))
-	  (when (show-sidep id adj-id)
-	    (side+j i j k u0 v0 u1 v1))))
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (side+j i j k u0 v0 u1 v1))))
     (with-texture-translator2 (u0 u1 v0 v1) (- 208 16)
       (let ((adj-id (world:getblock (1- i) j k)))
 	(when (show-sidep id adj-id)
