@@ -4,6 +4,8 @@
 	       #:scratch-buffer
 	       #:nsb-cga
 	       #:bordeaux-threads
+	       #+darwin
+	       #:trivial-main-thread
 	       #:cl-opengl
 	       ;;#:music
 	       #:glhelp

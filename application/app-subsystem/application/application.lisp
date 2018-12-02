@@ -33,7 +33,11 @@
 	   *thread*
 	   (bordeaux-threads:make-thread
 	    fun)))
-	(funcall fun))))
+	(#+darwin
+	 trivial-main-thread:call-in-main-thread
+	 #-darwin
+	 funcall
+	 fun))))
 
 (eval-always
   (defparameter *parameters*
