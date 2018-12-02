@@ -258,7 +258,9 @@
 					;#+nil
     ;;(simple-float-array 1.0 1.0 1.0 1.0 1.0 1.0)
     ))
-(with-unsafe-speed
+(progn ;;ccl
+ #+(or sbcl ecl)
+  with-unsafe-speed
   (face-header side-i  
     (posface (0 0 0)
 	     (0 0 1)
