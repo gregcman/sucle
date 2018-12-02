@@ -18,7 +18,11 @@
    #:al-context))
 (in-package :application)
 
-(defparameter *main-subthread-p* t)
+(defparameter *main-subthread-p*
+  #-darwin
+  t
+  #+darwin
+  nil)
 (defparameter *thread* nil)
 (defun main (start-fun &rest rest)
   (let ((fun (apply #'just-main start-fun rest)))
