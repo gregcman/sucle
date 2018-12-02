@@ -42,7 +42,7 @@
 	  (zd (+ ,k ,z3)))
       (declare (type fixnum xd yd zd))
       (lightfunc (,getfunc xd yd zd)))))
-(eval-when (:compile-toplevel)
+(eval-always
   (progn
     (defun light-edge-i (i j k)
       (macroexpand-1
@@ -93,7 +93,7 @@
 		   (0 0 0)
 		   (1 0 0))))))
 
-(eval-when (:compile-toplevel)
+(eval-always
   ;;;;total faces touched by a light of distance n
   (defun manhattan-perimeter (n)
     (let ((n (+ n 1)))
