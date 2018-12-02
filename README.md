@@ -233,4 +233,4 @@ Unfortunately a configuration API for multiple GL versions is unimplemented. In 
 - If GLSL version 110 is not supported, the GLSL generator version number will need to be changed to match the supported GL version found [here](https://en.wikipedia.org/wiki/OpenGL_Shading_Language#Versions). This means changing the default `110` to the new number in [this file](https://github.com/terminal625/sucle/blob/master/src/opengl/glslgen.lisp) inside the `defclass shader-program-data` form.
 
 ### What quicklisp libraries does this use?
-`'(iterate alexandria closer-mop read-number cffi split-sequence opticl bordeaux-threads lparallel cl-opengl sb-cga defpackage-plus trivial-features cl-glfw3)`
+`'(iterate alexandria closer-mop read-number cffi split-sequence opticl bordeaux-threads lparallel cl-opengl sb-cga cl-reexport trivial-features cl-glfw3)`

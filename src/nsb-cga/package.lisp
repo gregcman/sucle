@@ -1,8 +1,6 @@
-(in-package :defpackage+-user-1)
-
-(defpackage+ #:nsb-cga
+(defpackage #:nsb-cga
   (:use #:cl)
-  (:inherit #:sb-cga)
+  (:use #:sb-cga)
   (:export
    #:%matrix
    #:%identity-matrix
@@ -19,3 +17,6 @@
    #:%matrix*
    #:%inverse-matrix
    #:%transpose-matrix))
+
+(in-package :nsb-cga)
+(cl-reexport:reexport-from :sb-cga)
