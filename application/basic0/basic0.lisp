@@ -23,19 +23,20 @@
 	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
      (our-load)
      (unwind-protect
-	  (loop
-	     (application:poll-app)
+	  (sandbox::with-world-meshing-lparallel
+	    (loop
+	       (application:poll-app)
 					;(if *app*)
-	     (testbed::per-frame)
-	     (progn
+	       (testbed::per-frame)
+	       (progn
+		 #+nil
+		 (per-frame)
+		 #+nil
+		 (when (window:skey-j-p (window::keyval #\e))
+		   (window::toggle-mouse-capture)))
 	       #+nil
-	       (per-frame)
-	       #+nil
-	       (when (window:skey-j-p (window::keyval #\e))
-		 (window::toggle-mouse-capture)))
-	     #+nil
-	     (when (window:skey-j-p (window::keyval #\h))
-	       (toggle *app*)))
+	       (when (window:skey-j-p (window::keyval #\h))
+		 (toggle *app*))))
        (save)))
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))

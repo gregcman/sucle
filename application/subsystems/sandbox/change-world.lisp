@@ -18,12 +18,20 @@
   (defun remove-chunk-display-list (name)
     (remhash name *g/chunk-call-list*)))
 
-(defvar *world-mesh-lparallel-kernel* (lparallel:make-kernel 2))
+(defvar *world-mesh-lparallel-kernel* nil)
 (defmacro with-world-mesh-lparallel-kernel (&body body)
   `(let ((lparallel:*kernel* *world-mesh-lparallel-kernel*)) ,@body))
-(defparameter *achannel*
-  (With-world-mesh-lparallel-kernel
-    (lparallel:make-channel)))
+(defparameter *achannel* nil)
+
+(defmacro with-world-meshing-lparallel (&body body)
+  `(let ((*world-mesh-lparallel-kernel* nil))
+     (unwind-protect (progn (setf *world-mesh-lparallel-kernel*
+				  (lparallel:make-kernel 2))
+			    (let ((*achannel*
+				   (lparallel:make-channel))))
+			    ,@body)
+       (when *world-mesh-lparallel-kernel*
+	 (lparallel:end-kernel)))))
 
 (defun update-world-vao (x y z)
   (clean-dirty)
