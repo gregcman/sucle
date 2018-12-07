@@ -27,9 +27,10 @@
   `(let ((*world-mesh-lparallel-kernel* nil))
      (unwind-protect (progn (setf *world-mesh-lparallel-kernel*
 				  (lparallel:make-kernel 2))
-			    (let ((*achannel*
-				   (lparallel:make-channel))))
-			    ,@body)
+			    (with-world-mesh-lparallel-kernel
+			      (let ((*achannel*
+				     (lparallel:make-channel)))
+				,@body)))
        (when *world-mesh-lparallel-kernel*
 	 (lparallel:end-kernel)))))
 
