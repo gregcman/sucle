@@ -37,8 +37,8 @@
 (defmethod gl-delete* ((obj gl-framebuffer))
   (destroy-gl-framebuffer obj))
 (defun destroy-gl-framebuffer (gl-framebuffer)
-  (gl:delete-renderbuffers-ext (list (depth gl-framebuffer)))
-  (gl:delete-framebuffers-ext (list (handle gl-framebuffer)))
+  (gl:delete-renderbuffers (list (depth gl-framebuffer)))
+  (gl:delete-framebuffers (list (handle gl-framebuffer)))
   (gl:delete-textures (list (texture gl-framebuffer))))
 
 
