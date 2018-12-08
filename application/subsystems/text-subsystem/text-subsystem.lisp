@@ -96,11 +96,11 @@
 			       *this-directory*))))
     (destructuring-bind (w h) (array-dimensions array)
       (let ((new
-	     (make-array (list w h 4) :element-type '(unsigned-byte 8))))
+	     (make-array (list w h 4) :element-type '(unsigned-byte 8) :initial-element 255)))
 	(dobox ((width 0 w)
 		(height 0 h))
 	       (let ((value (aref array width height)))
-		 (dotimes (i 4)
+		 (dotimes (i 3)
 		   (setf (aref new width height i) value))))
 	new))))
 (deflazy font-texture (font-png gl-context)
