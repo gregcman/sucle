@@ -173,7 +173,6 @@
 	 (setf (sbit array i) 1)))
      array))
  ;;escape, delete, backspace, tab, return/enter? are ascii?
- #+nil
  (defparameter *back-map* 
    (let ((back-map (make-array 128)))
      (flet ((thing (array enum)
