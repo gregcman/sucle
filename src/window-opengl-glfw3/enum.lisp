@@ -152,39 +152,45 @@
     (:home 126);;;268****
     (:delete 127) ;;261****
     )))
-  (defparameter *mouse-array*
-    (let ((array (make-array 8 :element-type '(unsigned-byte 8))))
-      (dolist (x *modified-mouse-enums*)
-	(when (listp x)
-	  (setf (aref array (cffi:foreign-enum-value '%glfw::mouse (first x)))
-		(second x))))
-      array))
-  (defparameter *key-array*
-    (let ((array (make-array 349 :element-type '(unsigned-byte 8))))
-      (dolist (x *modified-key-enums*)
-	(when (listp x)
-	  (setf (aref array (cffi:foreign-enum-value '%glfw::key (first x)))
-		(second x))))
-      array))
- (defparameter *character-keys*
-   (let ((array (make-array 128 :element-type 'bit :initial-element 0)))
-     (dotimes (i 97)
-       (unless (zerop (aref *key-array* i))
-	 (setf (sbit array i) 1)))
-     array))
- ;;escape, delete, backspace, tab, return/enter? are ascii?
- (defparameter *back-map* 
-   (let ((back-map (make-array 128)))
-     (flet ((thing (array enum)
-	      (dotimes (i (length array))
-		(let ((value (cffi:foreign-enum-keyword enum i :errorp nil)))
-		  (when value
-		    (setf (aref back-map (aref array i))
-			  (cons enum value)))))))
-       (thing *mouse-array* (quote %glfw::mouse))
-       (thing *key-array* (quote %glfw::key)))
-     back-map)))
+(defparameter *mouse-array*
+  (let ((array (make-array 8 :element-type '(unsigned-byte 8))))
+    (dolist (x *modified-mouse-enums*)
+      (when (listp x)
+	(setf (aref array (cffi:foreign-enum-value '%glfw::mouse (first x)))
+	      (second x))))
+    array))
+(defparameter *key-array*
+  (let ((array (make-array 349 :element-type '(unsigned-byte 8))))
+    (dolist (x *modified-key-enums*)
+      (when (listp x)
+	(setf (aref array (cffi:foreign-enum-value '%glfw::key (first x)))
+	      (second x))))
+    array))
+(defparameter *character-keys*
+  (let ((array (make-array 128 :element-type 'bit :initial-element 0)))
+    (dotimes (i 97)
+      (unless (zerop (aref *key-array* i))
+	(setf (sbit array i) 1)))
+    array))
+;;escape, delete, backspace, tab, return/enter? are ascii?
+(defparameter *back-map* 
+  (let ((back-map (make-array 128)))
+    (flet ((thing (array enum)
+	     (dotimes (i (length array))
+	       (let ((value (cffi:foreign-enum-keyword enum i :errorp nil)))
+		 (when value
+		   (setf (aref back-map (aref array i))
+			 (cons enum value)))))))
+      (thing *mouse-array* (quote %glfw::mouse))
+      (thing *key-array* (quote %glfw::key)))
+    back-map)))
 
+(defun back-value (n)
+  (let ((cell (aref *back-map* n)))
+    (values (cdr cell)
+	    (case (car cell)
+	      (%cl-glfw3::key :key)
+	      (%cl-glfw3::mouse :mouse)))))
 
 (defmacro mouseval (identifier)
   (etypecase identifier
