@@ -27,6 +27,7 @@
 	  (text-data "sampler2D")
 	  (font-atlas ("vec4" 256))
 	  (color-atlas ("vec4" 256))
+	  (attributeatlas ("vec4" 256))
 	  (font-texture "sampler2D"))
     :program
     '(defun "main" void ()
@@ -51,17 +52,31 @@
 	font-atlas
 	(|.| chardata "r")))
 
+      (/**/ vec4 attributedata)
+      (= attributedata
+       ([]
+	attributeatlas
+	(|.| chardata "a")))
+
+      (/**/ vec2 texindexraw)
+      (= texindexraw
+       (mix (|.| fontdata "xy")
+	(|.| fontdata "zw")
+	(|.| ind "rg")
+	))
+      
+      (/**/ vec2 texindex)
+      (= texindex
+       (vec2
+	(* 0.5 (|.| texindexraw "x"))
+	(|.| texindexraw "y")))
+      
       ;;font lookup
       (/**/ vec4 pixcolor)
       (= pixcolor
        ("texture2D"
 	font-texture
-	(* (vec2 0.5 1.0)
-	   (mix (|.| fontdata "xy")
-		(|.| fontdata "zw")
-					;(vec2 0.5 0.5)
-		(|.| ind "rg")
-		))))
+	texindex))
       
       (/**/ vec4 fin)
       (= fin
@@ -84,6 +99,7 @@
    :uniforms
    '((:pmv (:vertex-shader projection-model-view))
      (indirection (:fragment-shader indirection))
+     (attributedata (:fragment-shader attributeatlas))
      (text-data (:fragment-shader text-data))
      (color-data (:fragment-shader color-atlas))
      (font-data (:fragment-shader font-atlas))
@@ -223,6 +239,22 @@
 		   (row-major-aref ,lisp-array ,i)))
 	   ,@body)))))
 (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16))
+
+;;;each glyph gets a float which is a number that converts to 0 -> 255.
+;;;this is an instruction that indexes into an "instruction set" thats the *attribute-bits*
+(defparameter *attribute-bits*
+  (let ((array (make-array (* 4 256) :element-type 'single-float)))
+    (flet ((logbitter (index integer)
+	     (if (logtest index integer)
+		 1.0
+		 0.0)))
+      (dotimes (base 256)
+	(let ((offset (* base 4)))
+	  (setf (aref array (+ offset 0)) (logbitter 1 offset)
+		(aref array (+ offset 1)) (logbitter 2 offset)
+		(aref array (+ offset 2)) (logbitter 4 offset)
+		(aref array (+ offset 3)) (logbitter 8 offset)))))
+    array))
 (defparameter *terminal256color-lookup* (make-array (* 4 256) :element-type 'single-float))
 (defun write-to-color-lookup (color-fun)
   (let ((arr *terminal256color-lookup*))
@@ -251,6 +283,10 @@
     (glhelp:with-uniforms uniform shader
       (with-foreign-array (var *16x16-tilemap* :float len)
 	(%gl:uniform-4fv (uniform 'font-data)
+			 (/ len 4)
+			 var))      
+      (with-foreign-array (var *attribute-bits* :float len)
+	(%gl:uniform-4fv (uniform 'attributedata)
 			 (/ len 4)
 			 var)))
     shader))
