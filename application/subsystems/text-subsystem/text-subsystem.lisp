@@ -27,7 +27,7 @@
 	  (text-data "sampler2D")
 	  (font-atlas ("vec4" 256))
 	  (color-atlas ("vec4" 256))
-	  (attributeatlas ("vec4" 256))
+	  ;;(attributeatlas ("vec2" 256))
 	  (font-texture "sampler2D"))
     :program
     '(defun "main" void ()
@@ -52,39 +52,43 @@
 	font-atlas
 	(|.| chardata "r")))
 
-      (/**/ vec4 attributedata)
+      ;;;the following causes an opengl driver bug on my machine
+      #+nil
+      (/**/ vec2 attributedata)
+      #+nil
       (= attributedata
        ([]
 	attributeatlas
 	(|.| chardata "a")))
-
-      (/**/ vec2 texindexraw)
-      (= texindexraw
-       (mix (|.| fontdata "xy")
-	(|.| fontdata "zw")
-	(|.| ind "rg")
-	))
-
-      (if (== 1.0 (|.| attributedata "x"))
-	  (= texindexraw
-	     (+ texindexraw (vec2 0.5 0.0))))
-
-      (if (== 1.0 (|.| attributedata "y"))
-	  (= texindexraw
-	     (+ texindexraw (vec2 0.0 0.5))))
+      ;;;; the following is a replacement
+      (/**/ vec2 offset)
+      (= offset (vec2 0.0 0.0))
+      (if (== (|.| chardata "a") 0)
+	  (= offset (vec2 0.0 0.0)))
+      (if (== (|.| chardata "a") 1)
+	  (= offset (vec2 0.5 0.0)))
+      (if (== (|.| chardata "a") 2)
+	  (= offset (vec2 0.0 0.5)))
+      (if (== (|.| chardata "a") 3)
+	  (= offset (vec2 0.5 0.5)))
+      ;;;; end replacement
       
-      (/**/ vec2 texindex)
-      (= texindex
-       (vec2
-	(* 0.5 (|.| texindexraw "x"))
-	(|.| texindexraw "y")))
       
       ;;font lookup
       (/**/ vec4 pixcolor)
       (= pixcolor
        ("texture2D"
 	font-texture
-	texindex))
+	(+
+	 offset ;;;bug workaround
+	 #+nil	 ;;;bug workaround
+	 (* (vec2 0.5 0.5)
+	    (|.| attributedata "xy"))
+	 (* (vec2 0.5 1.0)
+	    (mix (|.| fontdata "xy")
+		 (|.| fontdata "zw")
+		 (|.| ind "rg")
+		 )))))
       
       (/**/ vec4 fin)
       (= fin
@@ -98,7 +102,7 @@
        (*
 	(|.| fin "a")
 	(|.| raw "a")))
-      ))
+	))
    :attributes
    '((position . 0) 
      (texcoord . 2))
@@ -107,7 +111,7 @@
    :uniforms
    '((:pmv (:vertex-shader projection-model-view))
      (indirection (:fragment-shader indirection))
-     (attributedata (:fragment-shader attributeatlas))
+     ;;(attributedata (:fragment-shader attributeatlas))
      (text-data (:fragment-shader text-data))
      (color-data (:fragment-shader color-atlas))
      (font-data (:fragment-shader font-atlas))
@@ -250,6 +254,7 @@
 
 ;;;each glyph gets a float which is a number that converts to 0 -> 255.
 ;;;this is an instruction that indexes into an "instruction set" thats the *attribute-bits*
+#+nil
 (defparameter *attribute-bits*
   (let ((array (make-array (* 4 256) :element-type 'single-float)))
     (flet ((logbitter (index integer)
@@ -292,7 +297,8 @@
       (with-foreign-array (var *16x16-tilemap* :float len)
 	(%gl:uniform-4fv (uniform 'font-data)
 			 (/ len 4)
-			 var))      
+			 var))
+      #+nil
       (with-foreign-array (var *attribute-bits* :float len)
 	(%gl:uniform-4fv (uniform 'attributedata)
 			 (/ len 4)
