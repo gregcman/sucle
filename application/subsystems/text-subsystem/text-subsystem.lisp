@@ -40,9 +40,9 @@
 	      (|.| ind "ba")))
 
       ;;where text changes go
-      (/**/ ivec3 chardata)
+      (/**/ ivec4 chardata)
       (= chardata
-       (ivec3 (* 255.0 raw)))
+       (ivec4 (* 255.0 raw)))
 
       ;;font atlass coordinates
       (/**/ vec4 fontdata)
@@ -56,11 +56,12 @@
       (= pixcolor
        ("texture2D"
 	font-texture
-	(mix (|.| fontdata "xy")
-	     (|.| fontdata "zw")
+	(* (vec2 0.5 1.0)
+	   (mix (|.| fontdata "xy")
+		(|.| fontdata "zw")
 					;(vec2 0.5 0.5)
-	     (|.| ind "rg")
-	     )))
+		(|.| ind "rg")
+		))))
       
       (/**/ vec4 fin)
       (= fin
@@ -113,8 +114,10 @@
 	:rgba
 	))
     (glhelp:apply-tex-params
-     (quote ((:texture-min-filter . :nearest)
-	     (:texture-mag-filter . :nearest)
+     (quote ((:texture-min-filter . :nearest
+				  )
+	     (:texture-mag-filter . :nearest
+				  )
 	     (:texture-wrap-s . :repeat)
 	     (:texture-wrap-t . :repeat))))))
 
