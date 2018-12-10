@@ -329,7 +329,7 @@
 		   (shader-program-data-attributes data)
 		   (shader-program-data-varyings data)
 		   (shader-program-data-uniforms data))
-      ;;      (print (list vs-string frag-string uniforms))
+      ;;(print (list vs-string frag-string uniforms))
       (multiple-value-prog1
 	  (setf (values (shader-program-data-vs-string data)
 			(shader-program-data-frag-string data)

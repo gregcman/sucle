@@ -296,7 +296,7 @@
       (list*
        "if"
        (paren (output-stuff test))
-       (glslgen::brackets (output-stuff first))
+       (glslgen::brackets (glslgen::blogn (output-stuff first)))
        end))))
 
 (defun glsl-func-def (op args)

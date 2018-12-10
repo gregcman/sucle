@@ -64,6 +64,14 @@
 	(|.| fontdata "zw")
 	(|.| ind "rg")
 	))
+
+      (if (== 1.0 (|.| attributedata "x"))
+	  (= texindexraw
+	     (+ texindexraw (vec2 0.5 0.0))))
+
+      (if (== 1.0 (|.| attributedata "y"))
+	  (= texindexraw
+	     (+ texindexraw (vec2 0.0 0.5))))
       
       (/**/ vec2 texindex)
       (= texindex
