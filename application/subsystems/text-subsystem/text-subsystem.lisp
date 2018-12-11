@@ -154,7 +154,6 @@
   (setf (aref trans 12) (/ x 128.0)
 	(aref trans 13) (/ y 128.0))
   trans)
-
 (defmacro with-data-shader ((uniform-fun rebase-fun) &body body)
   (with-gensyms (program)
     `(let ((,program (getfnc 'flat-shader)))
@@ -169,6 +168,7 @@
 		   nil)))
 	   ,@body)))))
 
+;;;;FIXME:: managing opengl state blows
 (defmacro with-text-shader ((uniform-fun) &body body)
   (with-gensyms (program)
     `(progn
@@ -181,7 +181,7 @@
 	       (gl:uniformi (,uniform-fun 'indirection) 0)
 	       (glhelp::set-active-texture 0)
 	       (gl:bind-texture :texture-2d
-				(glhelp::texture (getfnc 'indirection))))
+				(get-indirection-texture)))
 	     (progn
 	       (gl:uniformi (,uniform-fun 'font-texture) 2)
 	       (glhelp::set-active-texture 2)
@@ -302,6 +302,130 @@
 (deflazy flat-shader (flat-shader-source gl-context)
   (glhelp::create-gl-program flat-shader-source))
 
+;;;;;;;;;;;;;;;;
+(defparameter *block-height* 16.0)
+(defparameter *block-width* 8.0)
+(defparameter *indirection-width* 0)
+(defparameter *indirection-height* 0)
+;;;;a framebuffer is faster and allows rendering to it if thats what you want
+;;;;but a texture is easier to maintain. theres no -ext framebuffer madness,
+;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
+;;;;pattern to put in it.
+(defparameter *indirection-type*
+  ;:framebuffer
+  :texture-2d
+  )
+(defparameter *indirection-framebuffer-p* nil)
+(deflazy indirection (gl-context)
+  (declare (ignore gl-context))
+  (ecase *indirection-type*
+    (:framebuffer
+     (setf *indirection-framebuffer-p* t)
+     (glhelp::make-gl-framebuffer
+		   *indirection-width*
+		   *indirection-height*))
+    (:texture-2d
+     (setf *indirection-framebuffer-p* nil)
+     (make-instance
+      'glhelp::gl-texture
+      :handle
+      (prog1 (glhelp::create-texture
+	      nil
+	      #+nil
+	      (let ((array
+		     (make-array (* *indirection-width* *indirection-height* 4)
+				 :element-type '(unsigned-byte 8))))
+		(map-into array (lambda ()
+				  (random 256)))
+		array)
+	      *indirection-width*
+	      *indirection-height*
+	      :rgba
+	      :unsigned-byte)
+	(glhelp:apply-tex-params
+	 (quote ((:texture-min-filter . :nearest
+				      )
+		 (:texture-mag-filter . :nearest
+				      )
+		 (:texture-wrap-s . :repeat)
+		 (:texture-wrap-t . :repeat)))))))))
+(defun get-indirection-texture ()
+  (if *indirection-framebuffer-p*
+      (glhelp::texture (getfnc 'indirection))
+      (glhelp::handle (getfnc 'indirection))))
+
+;;;Round up to next power of two
+(defun power-of-2-ceiling (n)
+  (ash 1 (ceiling (log n 2))))
+(deflazy render-normal-text-indirection ((w application::w) (h application::h) gl-context)
+  (declare (ignorable gl-context))
+  (let* ((upw (power-of-2-ceiling w))
+	 (uph (power-of-2-ceiling h))
+	 (need-to-update-size
+	  (not (and (= *indirection-width* upw)
+		    (= *indirection-height* uph)))))
+    (when need-to-update-size
+      (setf *indirection-width* upw
+	    *indirection-height* uph)
+      (application::refresh 'indirection t))
+    (getfnc 'indirection) ;;;refresh the indirection
+    (cond (*indirection-framebuffer-p*
+	   (let ((refract (getfnc 'indirection-shader)))
+	     (glhelp::use-gl-program refract)
+	     (glhelp:with-uniforms uniform refract
+	       (gl:uniform-matrix-4fv
+		(uniform :pmv)
+		(load-time-value (nsb-cga:identity-matrix))
+		nil)
+	       (gl:uniformf (uniform 'size)
+			    (/ w *block-width*)
+			    (/ h *block-height*))))
+	   (gl:disable :cull-face)
+	   (gl:disable :depth-test)
+	   (gl:disable :blend)
+	   (glhelp:set-render-area 0 0 upw uph)
+	   (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
+	   (gl:clear :color-buffer-bit)
+	   (gl:clear :depth-buffer-bit)
+	   (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad))))
+	  (t
+	   (gl:bind-texture :texture-2d (get-indirection-texture))
+	   (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
+	     (let* ((tempx (floatify (* upw *block-width*)))
+		    (tempy (floatify (* uph *block-height*)))
+		    (bazx (floatify (/ tempx w)))
+		    (bazy (floatify (/ tempy h)))
+		    (wfloat (floatify w))
+		    (hfloat (floatify h)))
+	       (with-unsafe-speed
+		 ;;FIXME:: nonportably declares things to be fixnums for speed
+		 ;;The x and y components are independent of each other, so instead of
+		 ;;computing x and y per point, compute once per x value or v value.
+		 (dotimes (x (the fixnum upw))
+		   (let* ((tex-x (+ 0.5 (floatify x)))
+			  (barx (floor (* 255.0 (/ (mod tex-x bazx)
+						   bazx))))
+			  (foox (floor (/ (* wfloat tex-x)
+					  tempx)))
+			  (base (the fixnum (* 4 x)))
+			  (delta (the fixnum (* 4 upw))))
+		     (dotimes (y (the fixnum uph))
+		       (setf (cffi:mem-ref data :uint8 (+ base 0)) barx
+			     (cffi:mem-ref data :uint8 (+ base 2)) foox)
+		       (setf base (the fixnum (+ base delta))))))
+		 (dotimes (y (the fixnum uph))
+		   (let* ((tex-y (+ 0.5 (floatify y)))			
+			  (bary (floor (* 255.0 (/ (mod tex-y bazy)
+						   bazy))))			
+			  (fooy (floor (/ (* hfloat tex-y)
+					  tempy)))
+			  (base (the fixnum (* 4 (the fixnum (* upw y))))))
+		     (dotimes (x upw)
+		       (setf (cffi:mem-ref data :uint8 (+ base 1)) bary
+			     (cffi:mem-ref data :uint8 (+ base 3)) fooy)
+		       (setf base (the fixnum (+ base 4))))))))
+	     (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))))
+
 ;;;;;;;;;;;;;;;;;;;;
 (deflazy indirection-shader-source ()
   (glslgen:ashader
@@ -346,87 +470,6 @@
      (size (:fragment-shader size)))))
 (deflazy indirection-shader (indirection-shader-source gl-context)
   (glhelp::create-gl-program indirection-shader-source))
-
-(defparameter *indirection-framebuffer-p* nil)
-;;;;;;;;;;;;;;;;
-(defparameter *block-height* 16.0)
-(defparameter *block-width* 8.0)
-(defparameter *indirection-width* 0)
-(defparameter *indirection-height* 0)
-(deflazy indirection (gl-context)
-  (glhelp::make-gl-framebuffer
-   *indirection-width*
-   *indirection-height*))
-;;;Round up to next power of two
-(defun power-of-2-ceiling (n)
-  (ash 1 (ceiling (log n 2))))
-(deflazy render-normal-text-indirection ((w application::w) (h application::h) gl-context)
-  (declare (ignorable gl-context))
-  (let* ((upw (power-of-2-ceiling w))
-	 (uph (power-of-2-ceiling h))
-	 (xfoo (/ w *block-width*))
-	 (yfoo (/ h *block-height*))
-	 (need-to-update-size
-	  (not (and (= *indirection-width* upw)
-		    (= *indirection-height* uph)))))
-    (when need-to-update-size
-      (setf *indirection-width* upw
-	    *indirection-height* uph)
-      (application::refresh 'indirection t))
-    (cond (*indirection-framebuffer-p*
-	   (let ((refract (getfnc 'indirection-shader)))
-	     (glhelp::use-gl-program refract)
-	     (glhelp:with-uniforms uniform refract
-	       (gl:uniform-matrix-4fv
-		(uniform :pmv)
-		(load-time-value (nsb-cga:identity-matrix))
-		nil)
-	       (gl:uniformf (uniform 'size)
-			    xfoo
-			    yfoo)))
-	   (gl:disable :cull-face)
-	   (gl:disable :depth-test)
-	   (gl:disable :blend)
-	   (glhelp:set-render-area 0 0 upw uph)
-	   (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
-	   (gl:clear :color-buffer-bit)
-	   (gl:clear :depth-buffer-bit)
-	   (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad))))
-	  (t
-	   (gl:bind-texture :texture-2d (glhelp::texture (getfnc 'indirection)))
-	   (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
-	     (let* ((tempx (floatify (* upw *block-width*)))
-		    (tempy (floatify (* uph *block-height*)))
-		    (bazx (floatify (/ tempx w)))
-		    (bazy (floatify (/ tempy h)))
-		    (wfloat (floatify w))
-		    (hfloat (floatify h)))
-	       (with-unsafe-speed
-		 ;;FIXME:: nonportably declares things to be fixnums for speed
-		 (dotimes (x (the fixnum upw))
-		   (let* ((tex-x (+ 0.5 (floatify x)))
-			  (barx (floor (* 255.0 (/ (mod tex-x bazx)
-						   bazx))))
-			  (foox (floor (/ (* wfloat tex-x)
-					  tempx)))
-			  (base (the fixnum (* 4 x)))
-			  (delta (the fixnum (* 4 upw))))
-		     (dotimes (y (the fixnum uph))
-		       (setf (cffi:mem-ref data :uint8 (+ base 0)) barx
-			     (cffi:mem-ref data :uint8 (+ base 2)) foox)
-		       (setf base (the fixnum (+ base delta))))))
-		 (dotimes (y (the fixnum uph))
-		   (let* ((tex-y (+ 0.5 (floatify y)))			
-			  (bary (floor (* 255.0 (/ (mod tex-y bazy)
-						   bazy))))			
-			  (fooy (floor (/ (* hfloat tex-y)
-					  tempy)))
-			  (base (the fixnum (* 4 (the fixnum (* upw y))))))
-		     (dotimes (x upw)
-		       (setf (cffi:mem-ref data :uint8 (+ base 1)) bary
-			     (cffi:mem-ref data :uint8 (+ base 3)) fooy)
-		       (setf base (the fixnum (+ base 4))))))))
-	     (gl:tex-sub-image-2d :texture-2d 0 0 0 upw uph :rgba :unsigned-byte data))))))
 
 (deflazy fullscreen-quad (gl-context)
   (let ((a (scratch-buffer:my-iterator))
