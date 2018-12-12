@@ -9,8 +9,7 @@
   ;;:framebuffer
   :texture-2d)
 (defparameter *text-data-type* nil)
-(deflazy text-data (gl-context)
-  (declare (ignore gl-context))
+(glhelp:deflazy-gl text-data ()
   (setf *text-data-type* *text-data-what-type*)
   (ecase *text-data-what-type*
     (:framebuffer
@@ -163,7 +162,7 @@
 		 (dotimes (i 3)
 		   (setf (aref new width height i) value))))
 	new))))
-(deflazy font-texture (font-png gl-context)
+(glhelp:deflazy-gl font-texture (font-png)
   (prog1
       (make-instance
        'glhelp::gl-texture
@@ -283,14 +282,14 @@
 (defun change-color-lookup (color-fun)
   (application::refresh 'color-lookup)
   (write-to-color-lookup color-fun))
-(deflazy color-lookup (text-shader gl-context)
+(glhelp:deflazy-gl color-lookup (text-shader)
   (glhelp::use-gl-program text-shader)
   (glhelp:with-uniforms uniform text-shader
     (with-foreign-array (var *terminal256color-lookup* :float len)
       (%gl:uniform-4fv (uniform 'color-data)
 		       (/ len 4)
 		       var))))
-(deflazy text-shader (text-shader-source gl-context) 
+(glhelp:deflazy-gl text-shader (text-shader-source) 
   (let ((shader (glhelp::create-gl-program text-shader-source)))
     (glhelp::use-gl-program shader)
     (glhelp:with-uniforms uniform shader
@@ -330,7 +329,7 @@
    '((value-out . value))
    :uniforms
    '((:pmv (:vertex-shader projection-model-view)))))
-(deflazy flat-shader (flat-shader-source gl-context)
+(glhelp:deflazy-gl flat-shader (flat-shader-source)
   (glhelp::create-gl-program flat-shader-source))
 
 ;;;;;;;;;;;;;;;;
@@ -347,8 +346,7 @@
   :texture-2d
   )
 (defparameter *indirection-type* nil)
-(deflazy indirection (gl-context)
-  (declare (ignore gl-context))
+(glhelp:deflazy-gl indirection ()
   (setf *indirection-type* *indirection-what-type*)
   (ecase *indirection-what-type*
     (:framebuffer
@@ -380,8 +378,7 @@
 ;;;Round up to next power of two
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
-(deflazy render-normal-text-indirection ((w application::w) (h application::h) gl-context)
-  (declare (ignorable gl-context))
+(glhelp:deflazy-gl render-normal-text-indirection ((w application::w) (h application::h))
   (let* ((upw (power-of-2-ceiling w))
 	 (uph (power-of-2-ceiling h))
 	 (need-to-update-size
@@ -492,10 +489,10 @@
    :uniforms
    '((:pmv (:vertex-shader projection-model-view))
      (size (:fragment-shader size)))))
-(deflazy indirection-shader (indirection-shader-source gl-context)
+(glhelp:deflazy-gl indirection-shader (indirection-shader-source)
   (glhelp::create-gl-program indirection-shader-source))
 
-(deflazy fullscreen-quad (gl-context)
+(glhelp:deflazy-gl fullscreen-quad ()
   (let ((a (scratch-buffer:my-iterator))
 	(b (scratch-buffer:my-iterator))
 	(len 0))

@@ -20,8 +20,7 @@
   (image-utility:flip-image 
    (image-utility:read-png-file
     "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")))
-(deflazy :lady (gl-context)
-  (declare (ignore gl-context))
+(glhelp:deflazy-gl :lady ()
   (let ((texture (glhelp::pic-texture
 		  (getfnc :lady-png)
 		  :rgb)))
@@ -174,8 +173,7 @@
   ;; Once we're done, we can unbind the VAO, and rebind it when we want to render it.
   (gl:bind-vertex-array 0))
 
-(application:deflazy nightfox (nightfox-text gl-context)
-  (declare (ignorable gl-context))
+(glhelp:deflazy-gl nightfox (nightfox-text)
   (glhelp::create-gl-program nightfox-text))
 (application:deflazy nightfox-text ()
   (glslgen::ashader

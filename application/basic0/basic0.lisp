@@ -212,7 +212,7 @@
      '((value-out . value))
      :uniforms
      '((:pmv (:vertex-shader pmv)))))
-  (deflazy flat-shader (flat-shader-source gl-context)
+  (glhelp:deflazy-gl flat-shader (flat-shader-source)
     (glhelp::create-gl-program flat-shader-source)))
 
 (defun bytecolor (r g b &optional (a 3))

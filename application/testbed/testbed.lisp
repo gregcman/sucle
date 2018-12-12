@@ -79,7 +79,7 @@
    :title "conceptually simple block game"))
 
 
-(application:deflazy solidshader (solidshader-text application::gl-context)
+(glhelp:deflazy-gl solidshader (solidshader-text)
   (glhelp::create-gl-program solidshader-text))
 (application:deflazy solidshader-text ()
   (glslgen::ashader

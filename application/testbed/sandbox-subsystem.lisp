@@ -643,7 +643,7 @@
   (color-grasses
    (alexandria::copy-array terrain-png)))
 
-(deflazy terrain (modified-terrain-png gl-context)
+(glhelp:deflazy-gl terrain (modified-terrain-png)
   (make-instance
    'glhelp::gl-texture
    :handle
@@ -656,7 +656,7 @@
 	      (:texture-mag-filter . :nearest)
 	      (:texture-wrap-s . :repeat)
 	      (:texture-wrap-t . :repeat)))))))
-(deflazy blockshader (blockshader-text gl-context)
+(glhelp:deflazy-gl blockshader (blockshader-text)
   (glhelp::create-gl-program blockshader-text))
 
 (deflazy blockshader-text ()

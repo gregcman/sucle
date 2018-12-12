@@ -81,16 +81,13 @@
     (refresh 'h t))
   (unless (= (getfnc 'w) w)
     (refresh 'w t)))
-(deflazy gl-context ()
-  (unless glhelp::*gl-context*
-    (error "no opengl context you idiot!")))
 
 (defparameter *quit-token* nil)
 (defun init (fun)
   (lambda ()
     (glhelp:with-gl-context ((window:get-proc-address))
       (setf window::*resize-hook* 'root-window-change)
-      (dolist (item '(h w gl-context))
+      (dolist (item '(h w))
 	(refresh item t))
       (window:set-vsync t)
       (gl:enable :scissor-test)
@@ -122,10 +119,6 @@
   (flush-refreshes)
   (window:poll)
   (window::update-control-state))
-
-(defmethod deflazy::cleanup-node-value ((object glhelp::gl-object))
-  (when (glhelp:alive-p object)
-    (glhelp::gl-delete* object)))
 
 #+nil
 (deflazy al-context ()

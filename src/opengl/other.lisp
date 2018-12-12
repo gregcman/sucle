@@ -11,12 +11,29 @@
 
 (export '(with-gl-list))
 
+(deflazy:deflazy gl-context ()
+  (unless glhelp::*gl-context*
+    (error "no opengl context you idiot!")))
+
+(export '(deflazy-gl))
+(defmacro deflazy-gl (name (&rest deps) &rest gen-forms)
+  "for objects that should be forgotten because they were
+not made in the current OpenGL context, so they are garbage"
+  `(deflazy:deflazy ,name (,@deps gl-context)
+     (declare (ignorable gl-context))
+     ,@gen-forms))
+
+(defmethod deflazy::cleanup-node-value ((object glhelp::gl-object))
+  (when (glhelp:alive-p object)
+    (glhelp::gl-delete* object)))
+
 (defmacro with-gl-context ((gl-proc-address) &body body)
   `(unwind-protect (progn
 		     (setf %gl:*gl-get-proc-address* ,gl-proc-address)
 		     (setf glhelp::*gl-context* (cons "gl-context" "token"))
 		     (setf glhelp::*gl-version* (gl:get-string :version))
 		     (setf glslgen::*glsl-version* (glhelp::glsl-gl-version))
+		     (deflazy:refresh 'gl-context t)
 		     ,@body)
      (setf glhelp::*gl-context* nil)))
 
