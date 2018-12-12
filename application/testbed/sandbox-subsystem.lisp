@@ -543,6 +543,7 @@
 			 ))))
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
+
   (sandbox::draw-world))
 
 (defun quadratic-formula (a b c)
