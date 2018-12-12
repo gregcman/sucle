@@ -11,9 +11,12 @@
 
 (export '(with-gl-list))
 
-(defmacro with-gl-context (&body body)
+(defmacro with-gl-context ((gl-proc-address) &body body)
   `(unwind-protect (progn
+		     (setf %gl:*gl-get-proc-address* ,gl-proc-address)
 		     (setf glhelp::*gl-context* (cons "gl-context" "token"))
+		     (setf glhelp::*gl-version* (gl:get-string :version))
+		     (setf glslgen::*glsl-version* (glhelp::glsl-gl-version))
 		     ,@body)
      (setf glhelp::*gl-context* nil)))
 

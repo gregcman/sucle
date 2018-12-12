@@ -88,15 +88,12 @@
 (defparameter *quit-token* nil)
 (defun init (fun)
   (lambda ()
-    (glhelp:with-gl-context
-      (setf %gl:*gl-get-proc-address* (window:get-proc-address))
+    (glhelp:with-gl-context ((window:get-proc-address))
       (setf window::*resize-hook* 'root-window-change)
       (dolist (item '(h w gl-context))
 	(refresh item t))
       (window:set-vsync t)
       (gl:enable :scissor-test)
-      (setf glhelp::*gl-version* (gl:get-string :version))
-      (setf glslgen::*glsl-version* (glhelp::glsl-gl-version))
       (let ((*quit-token* (cons "trampoline" "token")))
 	(catch *quit-token*
 	  (funcall fun))))))
