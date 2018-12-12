@@ -1,22 +1,6 @@
 (defpackage #:broad
   (:use :cl :application))
 (in-package #:broad)
-  #+nil
-  (when *sandbox-on*
-       (initbag)
-    )
-
-	    #+nil
-	    (progn
-	      (gl:bind-texture
-	       :texture-2d
-	       (aplayground::get-stuff
-		:lady
-		aplayground::*stuff*
-		aplayground::*backup*
-		
-		))
-	      (fuck::draw-baggins))
 
 (defclass vao ()
   ((vbuff :accessor vertex-buffer)
