@@ -5,31 +5,36 @@
 	#:reverse-array-iterator-user))
 (in-package #:text-sub)
 
+;;FIXME:: 256 by 256 size limit for texture
+(defparameter *text-data-height* 256)
+(defparameter *text-data-width* 256)
 (defparameter *text-data-what-type*
   ;;:framebuffer
   :texture-2d)
 (defparameter *text-data-type* nil)
 (glhelp:deflazy-gl text-data ()
   (setf *text-data-type* *text-data-what-type*)
-  (ecase *text-data-what-type*
-    (:framebuffer
-     (glhelp::make-gl-framebuffer 256 256))
-    (:texture-2d
-     (make-instance
-      'glhelp::gl-texture
-      :handle
-      (prog1 (glhelp::create-texture
-	      nil
-	      256 256
-	      :rgba
-	      :unsigned-byte)
-	(glhelp:apply-tex-params
-	 (quote ((:texture-min-filter . :nearest
-				      )
-		 (:texture-mag-filter . :nearest
-				      )
-		 (:texture-wrap-s . :repeat)
-		 (:texture-wrap-t . :repeat)))))))))
+  (let ((w *text-data-width*)
+	(h *text-data-height*))
+    (ecase *text-data-what-type*
+      (:framebuffer
+       (glhelp::make-gl-framebuffer w h))
+      (:texture-2d
+       (make-instance
+	'glhelp::gl-texture
+	:handle
+	(prog1 (glhelp::create-texture
+		nil
+		w h
+		:rgba
+		:unsigned-byte)
+	  (glhelp:apply-tex-params
+	   (quote ((:texture-min-filter . :nearest
+					)
+		   (:texture-mag-filter . :nearest
+					)
+		   (:texture-wrap-s . :repeat)
+		   (:texture-wrap-t . :repeat))))))))))
 (defun get-text-texture ()
   ;;;;FIXME:: getfnc must go before, because it has side effects.
   ;;;;are side effects and state unavoidable? a property of opengl?
@@ -188,8 +193,13 @@
   (with-gensyms (program)
     `(let ((,program (getfnc 'flat-shader)))
        (glhelp::use-gl-program ,program)
-       (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'text-data)))
-       (glhelp:set-render-area 0 0 256 256)
+       (let ((framebuffer (getfnc 'text-data)))
+	 (gl:bind-framebuffer :framebuffer (glhelp::handle framebuffer))
+	 (glhelp:set-render-area 0 0
+				 ;;TODO: not use generic functions?
+				 (glhelp::x framebuffer)
+				 (glhelp::y framebuffer)
+				 ))
        (glhelp:with-uniforms ,uniform-fun ,program
 	 (flet ((,rebase-fun (x y)
 		  (gl:uniform-matrix-4fv

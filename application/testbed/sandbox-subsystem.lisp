@@ -501,7 +501,8 @@
   (gl:clear-depth 1.0)
   (gl:clear
    :color-buffer-bit
-   :depth-buffer-bit)
+   :depth-buffer-bit
+   )
   (gl:enable :cull-face)
   (gl:disable :blend)
 
