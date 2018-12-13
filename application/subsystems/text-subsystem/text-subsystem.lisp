@@ -223,9 +223,9 @@
 				(get-text-texture)))
 	     ,@body)))))
 
-(defun char-attribute (bold-p underline-p clear-p)
+(defun char-attribute (bold-p underline-p opaque-p)
   (logior
-   (if clear-p
+   (if opaque-p
        4
        0)
    (if bold-p
