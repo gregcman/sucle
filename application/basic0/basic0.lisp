@@ -22,22 +22,23 @@
      (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
 	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
      (our-load)
-     (unwind-protect
-	  (sandbox::with-world-meshing-lparallel
-	    (loop
-	       (application:poll-app)
+     (let ((text-sub::*text-data-what-type* :framebuffer))
+       (unwind-protect
+	    (sandbox::with-world-meshing-lparallel
+	      (loop
+		 (application:poll-app)
 					;(if *app*)
-	       (testbed::per-frame)
-	       (progn
+		 (testbed::per-frame)
+		 (progn
+		   #+nil
+		   (per-frame)
+		   #+nil
+		   (when (window:skey-j-p (window::keyval #\e))
+		     (window::toggle-mouse-capture)))
 		 #+nil
-		 (per-frame)
-		 #+nil
-		 (when (window:skey-j-p (window::keyval #\e))
-		   (window::toggle-mouse-capture)))
-	       #+nil
-	       (when (window:skey-j-p (window::keyval #\h))
-		 (toggle *app*))))
-       (save)))
+		 (when (window:skey-j-p (window::keyval #\h))
+		   (toggle *app*))))
+	 (save))))
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))
    :title ""))
@@ -164,7 +165,8 @@
   
 
   (glhelp:set-render-area 0 0 window:*width* window:*height*)
-  (gl:clear-color 0.5 0.25 0.25 0.0)
+  (gl:clear-color 0.5 0.25 0.25
+		  (byte/255 (text-sub::char-attribute nil nil nil)))
   ;(gl:clear :color-buffer-bit)
   (gl:polygon-mode :front-and-back :fill)
   (gl:disable :cull-face)
@@ -228,9 +230,12 @@
 		    ))
 		  (bgcol		   
 		   (bytecolor 3 3 3 3)
-		    ))
+		   )
+		  bold-p
+		  underline-p)
   (let ((start x)
-	(len (length string)))
+	(len (length string))
+	(attr (byte/255 (text-sub::char-attribute bold-p underline-p t))))
     (dotimes (index len)
       (let ((char (aref string index)))
 	(cond ((char= char #\Newline)
@@ -239,7 +244,8 @@
 	      (t
 	       (color (byte/255 (char-code char))
 		      bgcol
-		      fgcol)
+		      fgcol
+		      attr)
 	       (vertex (floatify x)
 		       (floatify y)
 		       0.0)			  
@@ -258,26 +264,35 @@
 	  (multiple-value-bind (fgcolor bgcolor) 
 	    (cond ((eq sprite *selection*)
 		   (values
+		    (bytecolor 0 3 3 3e)
 		    (bytecolor 3 0 0 3)
-		    (bytecolor 0 3 3 0)))
+		    ;;(byte/255 1)
+		    ;;(byte/255 15)
+		    ))
 		  ((eq sprite *hovering*)
 		   (values
-		    (bytecolor 0 0 0)
-		    (bytecolor 3 3 3)))
+		    (bytecolor 3 3 3)
+		    (bytecolor 0 0 0)))
 		  (t
 		   (values
+		    ;;(byte/255 0)
+		    (bytecolor 0 0 0)
 		    (bytecolor 3 3 3)
-		    (bytecolor 0 0 0))))
+		    ;;(byte/255 255)
+		    )))
 	    (draw-string (/ xpos *glyph-width*)
 			 (/ ypos *glyph-height*)
 			 string
 			 fgcolor
-			 bgcolor)))))
+			 bgcolor
+			 t
+			 nil)))))
     
     (rebase -128.0 -128.0))
   (gl:point-size 1.0)
   (gl:with-primitives :points
     (opengl-immediate::mesh-vertex-color))
+;;  (text-sub-test::fuzz)
   (text-sub::with-text-shader (uniform)
     (gl:uniform-matrix-4fv
      (uniform :pmv)

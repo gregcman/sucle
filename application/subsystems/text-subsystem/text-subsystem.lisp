@@ -10,7 +10,8 @@
 (defparameter *text-data-width* 256)
 (defparameter *text-data-what-type*
   ;;:framebuffer
-  :texture-2d)
+  :texture-2d
+  )
 (defparameter *text-data-type* nil)
 (glhelp:deflazy-gl text-data ()
   (setf *text-data-type* *text-data-what-type*)
@@ -60,9 +61,7 @@
     :in '((texcoord "vec2")
 	  (indirection "sampler2D")
 	  (text-data "sampler2D")
-	  (font-atlas ("vec4" 256))
-	  (color-atlas ("vec4" 256))
-	  ;;(attributeatlas ("vec2" 256))
+	  (color-font-info-atlas ("vec4" 400))
 	  (font-texture "sampler2D"))
     :program
     '(defun "main" void ()
@@ -80,35 +79,27 @@
       (= chardata
        (ivec4 (* 255.0 raw)))
 
+      ;;convert a 4-bit number to a vec4 of 1.0's and 0.0's
+      (/**/ vec4 infodata)
+      (= infodata
+       ([]
+	color-font-info-atlas
+	(+ 384 (|.| chardata "a"))))
+ 
+      (/**/ vec2 offset)
+      (= offset (* (vec2 0.5 0.5)
+		 (|.| infodata "xy")))
+      
+      (/**/ float opacity)
+      (= opacity (|.| infodata "z"))
+
       ;;font atlass coordinates
       (/**/ vec4 fontdata)
       (= fontdata
        ([]
-	font-atlas
-	(|.| chardata "r")))
-
-      ;;;the following causes an opengl driver bug on my machine
-      #+nil
-      (/**/ vec2 attributedata)
-      #+nil
-      (= attributedata
-       ([]
-	attributeatlas
-	(|.| chardata "a")))
-      ;;;; the following is a replacement
-      (/**/ vec2 offset)
-      (= offset (vec2 0.0 0.0))
-      (if (== (|.| chardata "a") 0)
-	  (= offset (vec2 0.0 0.0)))
-      (if (== (|.| chardata "a") 1)
-	  (= offset (vec2 0.5 0.0)))
-      (if (== (|.| chardata "a") 2)
-	  (= offset (vec2 0.0 0.5)))
-      (if (== (|.| chardata "a") 3)
-	  (= offset (vec2 0.5 0.5)))
-      ;;;; end replacement
-      
-      
+	color-font-info-atlas
+	(+ 256 (|.| chardata "r"))))
+          
       ;;font lookup
       (/**/ vec4 pixcolor)
       (= pixcolor
@@ -128,15 +119,14 @@
       (/**/ vec4 fin)
       (= fin
        (mix
-	([] color-atlas (|.| chardata "g"))
-	([] color-atlas (|.| chardata "b"))
+	([] color-font-info-atlas (|.| chardata "g"))
+	([] color-font-info-atlas (|.| chardata "b"))
 	pixcolor))
       (= (|.| :gl-frag-color "rgb")
        (|.| fin "rgb"))
       (= (|.| :gl-frag-color "a")
-       (*
-	(|.| fin "a")
-	(|.| raw "a")))
+       (* opacity (|.| fin "a"))
+	)
 	))
    :attributes
    '((position . 0) 
@@ -148,8 +138,7 @@
      (indirection (:fragment-shader indirection))
      ;;(attributedata (:fragment-shader attributeatlas))
      (text-data (:fragment-shader text-data))
-     (color-data (:fragment-shader color-atlas))
-     (font-data (:fragment-shader font-atlas))
+     (color-font-info-data (:fragment-shader color-font-info-atlas))
      (font-texture (:fragment-shader font-texture)))))
 
 (defvar *this-directory* (asdf:system-source-directory :text-subsystem))
@@ -234,6 +223,18 @@
 				(get-text-texture)))
 	     ,@body)))))
 
+(defun char-attribute (bold-p underline-p clear-p)
+  (logior
+   (if clear-p
+       4
+       0)
+   (if bold-p
+       2
+       0)
+   (if underline-p
+       1
+       0)))
+
 ;;;;4 shades each of r g b a 0.0 1/3 2/3 and 1.0
 (defun color-fun (color)
   (let ((one-third (etouq (coerce 1/3 'single-float))))
@@ -278,8 +279,30 @@
 		(aref array (+ offset 3)) (logbitter 8 offset)))))
     array))
 (defparameter *terminal256color-lookup* (make-array (* 4 256) :element-type 'single-float))
+;;;256 color - 128 fontdata - 16 bit decoder
+(defparameter *color-font-info-data*
+  (let ((array (make-array (* 4 (+ 256 ;;color
+				   128 ;;font
+				   16  ;;bit decoder
+				   )) :element-type 'single-float)))
+    (dotimes (i (* 4 128))
+      (setf (aref array (+ i (* 4 256)))
+	    (aref *16x16-tilemap* i)))
+    (flet ((fun (n)
+	     (if n
+		 1.0
+		 0.0)))
+      (dotimes (i 16)
+	(let ((offset (* 4 (+ 256
+			      128
+			      i))))
+	  (setf (aref array (+ offset 0)) (fun (logtest 1 i)))
+	  (setf (aref array (+ offset 1)) (fun (logtest 2 i)))
+	  (setf (aref array (+ offset 2)) (fun (logtest 4 i)))
+	  (setf (aref array (+ offset 3)) (fun (logtest 8 i))))))
+    array))
 (defun write-to-color-lookup (color-fun)
-  (let ((arr *terminal256color-lookup*))
+  (let ((arr *color-font-info-data*))
     (dotimes (x 256)
       (let ((offset (* 4 x)))
 	(multiple-value-bind (r g b a) (funcall color-fun x) 
@@ -295,16 +318,16 @@
 (glhelp:deflazy-gl color-lookup (text-shader)
   (glhelp::use-gl-program text-shader)
   (glhelp:with-uniforms uniform text-shader
-    (with-foreign-array (var *terminal256color-lookup* :float len)
-      (%gl:uniform-4fv (uniform 'color-data)
+    (with-foreign-array (var *color-font-info-data* :float len)
+      (%gl:uniform-4fv (uniform 'color-font-info-data)
 		       (/ len 4)
 		       var))))
 (glhelp:deflazy-gl text-shader (text-shader-source) 
   (let ((shader (glhelp::create-gl-program text-shader-source)))
     (glhelp::use-gl-program shader)
     (glhelp:with-uniforms uniform shader
-      (with-foreign-array (var *16x16-tilemap* :float len)
-	(%gl:uniform-4fv (uniform 'font-data)
+      (with-foreign-array (var *color-font-info-data* :float len)
+	(%gl:uniform-4fv (uniform 'color-font-info-data)
 			 (/ len 4)
 			 var))
       #+nil
