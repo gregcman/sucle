@@ -29,5 +29,6 @@
     (if flip-p
 	(flip-image array)
 	array)))
+
 (defun write-png-file (pathname image)
   (opticl:write-png-file pathname image))

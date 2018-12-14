@@ -2,22 +2,45 @@
   (:use :cl :application))
 (in-package #:broad)
 
-(glhelp::deflazy-gl lady-vertex-array ()
-  (let ((value (glhelp::make-vertex-array)))
-    (fill-vertex-array-object
-     (glhelp::vertex-array value)
-     (glhelp::vertex-buffer value)
-     (glhelp::index-buffer value)
-     vertbuf
-     indexbuf)
-    (setf (glhelp::indices value)
-	  (length indexbuf))
-    value))
+(defparameter *path*
+  "/home/imac/Documents/stuff2/NightFox/NightFox.obj")
+(defparameter *path-texture* "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")
+
+(defun wavefront-obj-to-vertex-and-index-buffer
+    (&optional (path *path*))
+  "parse a wavefront obj into a vertex array and index array for transfer to opengl"
+  (let ((woywoy (cl-mesh:parse-wavefront-obj path))
+	(unique-vertices (make-hash-table :test 'equalp)))
+    (generate-vertex-hash unique-vertices (gethash "indices" woywoy))
+    (values
+     ;;vertex array buffer
+     (let ((vertarray (order-vertices unique-vertices)))
+       (flatten-vert vertarray (gethash "vertices" woywoy)
+		     (gethash "uv" woywoy)))
+     ;;index array buffer
+     (gen-index-buf unique-vertices (gethash "indices" woywoy)))))
+
+(deflazy the-mesh ()
+  (multiple-value-bind (va ia) (wavefront-obj-to-vertex-and-index-buffer *path*)
+    (list va ia)))
+
+(glhelp::deflazy-gl lady-vertex-array (the-mesh)
+  (destructuring-bind (vertbuf indexbuf) the-mesh
+    (let ((value (glhelp::make-vertex-array)))
+      (fill-vertex-array-object
+       (glhelp::vertex-array value)
+       (glhelp::vertex-buffer value)
+       (glhelp::index-buffer value)
+       vertbuf
+       indexbuf)
+      (setf (glhelp::indices value)
+	    (length indexbuf))
+      value)))
 
 (deflazy :lady-png ()
-  (image-utility:flip-image 
-   (image-utility:read-png-file
-    "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")))
+  (image-utility:read-png-file
+   *path-texture*
+   t))
 (glhelp:deflazy-gl :lady ()
   (let ((texture (glhelp::pic-texture
 		  (getfnc :lady-png)
@@ -102,17 +125,6 @@
 	  (setf (aref arr (+ 1 base)) (gethash b hash))
 	  (setf (aref arr (+ 2 base)) (gethash c hash)))))
     arr))
-(defparameter woywoy
-  (cl-mesh:parse-wavefront-obj "/home/imac/Documents/stuff2/NightFox/NightFox.obj"))
-(defparameter unique-vertices (make-hash-table :test 'equalp))
-(defparameter vertarray nil)
-(defparameter vertbuf nil)
-(defparameter indexbuf nil)
-(progn (generate-vertex-hash unique-vertices (gethash "indices" woywoy))
-       (setf vertarray (order-vertices unique-vertices))
-       (setf vertbuf (flatten-vert vertarray (gethash "vertices" woywoy)
-				   (gethash "uv" woywoy)))
-       (setf indexbuf (gen-index-buf unique-vertices (gethash "indices" woywoy))))
 
 (defun fill-vertex-array-object (vertex-array vertex-buffer index-buffer verts indices)  
   (gl:bind-buffer :array-buffer vertex-buffer)
