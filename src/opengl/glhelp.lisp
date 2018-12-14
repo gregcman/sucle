@@ -19,6 +19,7 @@
 	  ("4.4" 440 :vertex-array-object)
 	  ("4.5" 450 :vertex-array-object)
 	  ("4.6" 460 :vertex-array-object))))
+(defparameter *slow-draw-type* :display-list)
 
 ;;;;in opengl horizontal lines must be multiples of 4 bytes
 (defun array-flatten (array)
@@ -192,6 +193,13 @@
 
 (defun glsl-gl-version (&optional (version *gl-version-substring*))
   (second
+   (assoc
+    version
+    *version-data*
+    :test 'string=)))
+
+(defun gl-slow-draw-type (&optional (version *gl-version-substring*))
+  (third
    (assoc
     version
     *version-data*
