@@ -6,33 +6,20 @@
   "/home/imac/Documents/stuff2/NightFox/NightFox.obj")
 (defparameter *path-texture* "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")
 
-(defun wavefront-obj-to-vertex-and-index-buffer
-    (&optional (path *path*))
-  "parse a wavefront obj into a vertex array and index array for transfer to opengl"
-  (let ((woywoy (cl-mesh:parse-wavefront-obj path))
-	(unique-vertices (make-hash-table :test 'equalp)))
-    (generate-vertex-hash unique-vertices (gethash "indices" woywoy))
-    (values
-     ;;vertex array buffer
-     (let ((vertarray (order-vertices unique-vertices)))
-       (flatten-vert vertarray (gethash "vertices" woywoy)
-		     (gethash "uv" woywoy)))
-     ;;index array buffer
-     (gen-index-buf unique-vertices (gethash "indices" woywoy)))))
-
 (deflazy the-mesh ()
-  (multiple-value-bind (va ia) (wavefront-obj-to-vertex-and-index-buffer *path*)
-    (list va ia)))
+  (multiple-value-bind (va ia layout) (wavefront-obj-to-vertex-and-index-buffer *path*)
+    (list va ia layout)))
 
 (glhelp::deflazy-gl lady-vertex-array (the-mesh)
-  (destructuring-bind (vertbuf indexbuf) the-mesh
+  (destructuring-bind (vertbuf indexbuf layout) the-mesh
     (let ((value (glhelp::make-vertex-array)))
-      (fill-vertex-array-object
+      (glhelp::fill-vertex-array-object
        (glhelp::vertex-array value)
        (glhelp::vertex-buffer value)
        (glhelp::index-buffer value)
        vertbuf
-       indexbuf)
+       indexbuf
+       layout)
       (setf (glhelp::indices value)
 	    (length indexbuf))
       value)))
@@ -67,6 +54,25 @@
 		      :count (glhelp::indices w)
 		      :offset 0)))
 
+(defun wavefront-obj-to-vertex-and-index-buffer
+    (&optional (path *path*))
+  "parse a wavefront obj into a vertex array and index array for transfer to opengl"
+  (let ((woywoy (cl-mesh:parse-wavefront-obj path))
+	(unique-vertices (make-hash-table :test 'equalp)))
+    (generate-vertex-hash unique-vertices (gethash "indices" woywoy))
+    (values
+     ;;vertex array buffer
+     (let ((vertarray (order-vertices unique-vertices)))
+       (flatten-vert vertarray (gethash "vertices" woywoy)
+		     (gethash "uv" woywoy)))
+     ;;index array buffer
+     (gen-index-buf unique-vertices (gethash "indices" woywoy))
+     ;; In this program, we use attribute 0 for position. If you had
+     ;; per-vertex normals, you could use a different attribute for those
+     ;; as well.
+     (glhelp::simple-vertex-array-layout
+      '((0 4)
+	(3 2))))))
 (defun generate-vertex-hash (unique-vertices indexes)
   (let* ((name 0)
 	 (len (array-total-size indexes))
@@ -125,56 +131,6 @@
 	  (setf (aref arr (+ 1 base)) (gethash b hash))
 	  (setf (aref arr (+ 2 base)) (gethash c hash)))))
     arr))
-
-(defun fill-vertex-array-object (vertex-array vertex-buffer index-buffer verts indices)  
-  (gl:bind-buffer :array-buffer vertex-buffer)
-  (let ((len (length verts)))
-    (let ((arr (gl:alloc-gl-array :float len)))
-      (dotimes (i len)
-	(setf (gl:glaref arr i) (aref verts i)))
-      (gl:buffer-data :array-buffer :static-draw arr)
-      (gl:free-gl-array arr)))
-  ;; 0 is always reserved as an unbound object.
-  (gl:bind-buffer :array-buffer 0)
-
-  ;; An element array buffer stores vertex indices. We fill it in the
-  ;; same way as an array buffer.
-  (gl:bind-buffer :element-array-buffer index-buffer)
-  (let ((len (length indices)))
-    (let ((arr (gl:alloc-gl-array :unsigned-int len)))
-      (dotimes (i len)
-	(setf (gl:glaref arr i) (aref indices i)))
-      (gl:buffer-data :element-array-buffer :static-draw arr)
-      (gl:free-gl-array arr)))
-  (gl:bind-buffer :element-array-buffer 0)
-
-  ;; Vertex array objects manage which vertex attributes are
-  ;; associated with which data buffers. 
-  (gl:bind-vertex-array vertex-array)
-
-  ;; To associate our VBO data with this VAO, we bind it, specify
-  ;; which vertex attribute we want to associate it with, and specify
-  ;; where the data comes from.
-  (gl:bind-buffer :array-buffer vertex-buffer)
-  ;; In this program, we use attribute 0 for position. If you had
-  ;; per-vertex normals, you could use a different attribute for those
-  ;; as well.
-  (gl:enable-vertex-attrib-array 0)
-  ;; Using a null pointer as the data source indicates that we want
-  ;; the vertex data to come from the currently bound array-buffer.
-  (gl:vertex-attrib-pointer 0 4 :float nil (* 4 6) 0)
-
-  (gl:enable-vertex-attrib-array 3)
-  (gl:vertex-attrib-pointer 3 2 :float nil (* 4 6) (* 4 4))
-
-
-
-  ;; To associate an element array with this VAO, all we need to do is
-  ;; bind the element array buffer we want to use.
-  (gl:bind-buffer :element-array-buffer index-buffer)
-
-  ;; Once we're done, we can unbind the VAO, and rebind it when we want to render it.
-  (gl:bind-vertex-array 0))
 
 (glhelp:deflazy-gl nightfox (nightfox-text)
   (glhelp::create-gl-program nightfox-text))

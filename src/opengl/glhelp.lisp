@@ -194,3 +194,80 @@
 	      ("4.5" 450)
 	      ("4.6" 460)))
       :test 'string=))))
+
+;;;;vertex array objects and layout
+
+(defun simple-vertex-array-layout (spec)
+  "spec is a list of (attribute-index size) starting from zero"
+  (let ((total-size (reduce '+ spec :key 'second))
+	(acc)
+	(index 0))
+    (dolist (item spec)
+      (destructuring-bind (attribute-index size) item
+	(push (list attribute-index size index) acc)
+	(incf index size)))
+    (make-vertex-array-layout
+     :total-size total-size
+     :attributes (nreverse acc))))
+
+(struct-to-clos:struct->class
+ (defstruct vertex-array-layout
+   total-size
+   attributes ;;(attr size start)
+   ))
+
+(defun gl-vertex-attributes (vertex-array-layout)
+  (let ((float-size (glhelp::sizeof :float))
+	(total-size (vertex-array-layout-total-size vertex-array-layout))
+	(attributes (vertex-array-layout-attributes vertex-array-layout)))
+    (dolist (spec attributes)
+      (destructuring-bind (attr size start) spec
+	(gl:enable-vertex-attrib-array attr)
+	(gl:vertex-attrib-pointer
+	 attr size
+	 :float
+	 ;; Using a null pointer as the data source indicates that we want
+	 ;; the vertex data to come from the currently bound array-buffer.
+	 nil
+	 (* float-size total-size)
+	 (* float-size start))))))
+
+(defun fill-vertex-array-object (vertex-array vertex-buffer index-buffer verts indices layout)  
+  (gl:bind-buffer :array-buffer vertex-buffer)
+  (let ((len (length verts)))
+    (let ((arr (gl:alloc-gl-array :float len)))
+      (dotimes (i len)
+	(setf (gl:glaref arr i) (aref verts i)))
+      (gl:buffer-data :array-buffer :static-draw arr)
+      (gl:free-gl-array arr)))
+  ;; 0 is always reserved as an unbound object.
+  (gl:bind-buffer :array-buffer 0)
+
+  ;; An element array buffer stores vertex indices. We fill it in the
+  ;; same way as an array buffer.
+  (gl:bind-buffer :element-array-buffer index-buffer)
+  (let ((len (length indices)))
+    (let ((arr (gl:alloc-gl-array :unsigned-int len)))
+      (dotimes (i len)
+	(setf (gl:glaref arr i) (aref indices i)))
+      (gl:buffer-data :element-array-buffer :static-draw arr)
+      (gl:free-gl-array arr)))
+  (gl:bind-buffer :element-array-buffer 0)
+
+  ;; Vertex array objects manage which vertex attributes are
+  ;; associated with which data buffers. 
+  (gl:bind-vertex-array vertex-array)
+
+  ;; To associate our VBO data with this VAO, we bind it, specify
+  ;; which vertex attribute we want to associate it with, and specify
+  ;; where the data comes from.
+  (gl:bind-buffer :array-buffer vertex-buffer)
+  
+  (gl-vertex-attributes layout)
+
+  ;; To associate an element array with this VAO, all we need to do is
+  ;; bind the element array buffer we want to use.
+  (gl:bind-buffer :element-array-buffer index-buffer)
+
+  ;; Once we're done, we can unbind the VAO, and rebind it when we want to render it.
+  (gl:bind-vertex-array 0))
