@@ -131,3 +131,16 @@
 	    (index-buffer w) (elt buffers 1)))
     (setf (vertex-array w) (gl:gen-vertex-array))
     w))
+
+(defun draw-vertex-array (vao)
+  (%draw-vertex-array
+   (glhelp::vertex-array vao)
+   (glhelp::indices vao)
+   (render-type vao)))
+
+;;;;
+(defgeneric slow-draw (gl-thing)) ;;;dispatch on either display-list or vao
+(defmethod slow-draw ((thing vao)) 
+  (draw-vertex-array thing))
+(defmethod slow-draw ((thing gl-list)) 
+  (glhelp::draw-display-list (glhelp::handle thing)))

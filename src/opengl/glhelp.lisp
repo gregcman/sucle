@@ -274,23 +274,20 @@
   ;; Once we're done, we can unbind the VAO, and rebind it when we want to render it.
   (gl:bind-vertex-array 0))
 
-
-(defun draw-vertex-array (w)
-  (gl:bind-vertex-array (glhelp::vertex-array w))   
+(defun %draw-vertex-array (vao length &optional (type :triangles))
+  (gl:bind-vertex-array vao)   
   ;; This call actually does the rendering. The vertex data comes from
   ;; the currently-bound VAO. If the input array is null, the indices
   ;; will be taken from the element array buffer bound in the current
   ;; VAO.
   (gl:draw-elements
-   (render-type w)
+   type
    (gl:make-null-gl-array :unsigned-int)
    :count
-   (glhelp::indices w)
+   length
    :offset 0))
 
-;;;;
-(defgeneric slow-draw (gl-thing)) ;;;dispatch on either display-list or vao
-(defmethod slow-draw ((thing vao)) 
-  (draw-vertex-array thing))
-(defmethod slow-draw ((thing gl-list)) 
-  (gl:call-list (glhelp::handle thing)))
+;;;
+
+(defun draw-display-list (display-list)
+  (gl:call-list display-list))
