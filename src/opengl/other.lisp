@@ -32,6 +32,8 @@ not made in the current OpenGL context, so they are garbage"
 		     (setf %gl:*gl-get-proc-address* ,gl-proc-address)
 		     (setf glhelp::*gl-context* (cons "gl-context" "token"))
 		     (setf glhelp::*gl-version* (gl:get-string :version))
+		     (setf glhelp::*gl-version-substring*
+			   (subseq glhelp::*gl-version* 0 3))
 		     (setf glslgen::*glsl-version* (glhelp::glsl-gl-version))
 		     (deflazy:refresh 'gl-context t)
 		     ,@body)

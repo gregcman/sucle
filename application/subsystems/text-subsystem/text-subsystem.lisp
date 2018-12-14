@@ -441,7 +441,7 @@
        (gl:bind-framebuffer :framebuffer (glhelp::handle (getfnc 'indirection)))
        (gl:clear :color-buffer-bit)
        (gl:clear :depth-buffer-bit)
-       (gl:call-list (glhelp::handle (getfnc 'fullscreen-quad))))
+       (glhelp::slow-draw (getfnc 'fullscreen-quad)))
       (:texture-2d
        (gl:bind-texture :texture-2d (get-indirection-texture))
        (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))

@@ -7,22 +7,12 @@
 (defparameter *path-texture* "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")
 
 (deflazy the-mesh ()
-  (multiple-value-bind (va ia layout) (wavefront-obj-to-vertex-and-index-buffer *path*)
-    (list va ia layout)))
+  (multiple-value-bind (va ia layout type) (wavefront-obj-to-vertex-and-index-buffer *path*)
+    (list va ia layout type)))
 
 (glhelp::deflazy-gl lady-vertex-array (the-mesh)
-  (destructuring-bind (vertbuf indexbuf layout) the-mesh
-    (let ((value (glhelp::make-vertex-array)))
-      (glhelp::fill-vertex-array-object
-       (glhelp::vertex-array value)
-       (glhelp::vertex-buffer value)
-       (glhelp::index-buffer value)
-       vertbuf
-       indexbuf
-       layout)
-      (setf (glhelp::indices value)
-	    (length indexbuf))
-      value)))
+  (destructuring-bind (vertbuf indexbuf layout type) the-mesh
+    (glhelp::make-vertex-array vertbuf indexbuf layout type)))
 
 (deflazy :lady-png ()
   (image-utility:read-png-file
@@ -41,18 +31,9 @@
 	       (:texture-wrap-t . :repeat)))))))
 
 (defun draw-baggins ()
-  (let ((w (getfnc 'lady-vertex-array)))
   ;;  (gl:disable :cull-face :blend)
-;;    (gl:polygon-mode :front-and-back :fill)
-    (gl:bind-vertex-array (glhelp::vertex-array w))
-    
-    ;; This call actually does the rendering. The vertex data comes from
-    ;; the currently-bound VAO. If the input array is null, the indices
-    ;; will be taken from the element array buffer bound in the current
-    ;; VAO.
-    (gl:draw-elements :triangles (gl:make-null-gl-array :unsigned-int)
-		      :count (glhelp::indices w)
-		      :offset 0)))
+  ;;    (gl:polygon-mode :front-and-back :fill)
+  (glhelp::draw-vertex-array (getfnc 'lady-vertex-array)))
 
 (defun wavefront-obj-to-vertex-and-index-buffer
     (&optional (path *path*))
@@ -72,7 +53,8 @@
      ;; as well.
      (glhelp::simple-vertex-array-layout
       '((0 4)
-	(3 2))))))
+	(3 2)))
+     :triangles)))
 (defun generate-vertex-hash (unique-vertices indexes)
   (let* ((name 0)
 	 (len (array-total-size indexes))

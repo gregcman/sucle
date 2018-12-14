@@ -103,15 +103,51 @@
   ((vbuff :accessor vertex-buffer)
    (ibuff :accessor index-buffer)
    (va :accessor vertex-array)
-   (indices :accessor indices :initform 0)))
+   (indices :accessor indices :initform 0)
+   (render-type :accessor render-type :initform :triangles)))
 (defmethod gl-delete* ((obj vao))
   (gl:delete-vertex-arrays (list (vertex-array obj)))
   (gl:delete-buffers (list (vertex-buffer obj) (index-buffer obj))))
 
-(defun make-vertex-array ()
+(defun make-vertex-array (vertbuf indexbuf layout type)
+  (let ((value (glhelp::allocate-vertex-array)))
+    (glhelp::fill-vertex-array-object
+     (glhelp::vertex-array value)
+     (glhelp::vertex-buffer value)
+     (glhelp::index-buffer value)
+     vertbuf
+     indexbuf
+     layout)
+    (setf (glhelp::indices value)
+	  (length indexbuf)
+	  (glhelp::render-type value)
+	  type)
+    value))
+
+(defun allocate-vertex-array ()
   (let ((w (make-instance 'vao)))
     (let ((buffers (gl:gen-buffers 2)))
       (setf (vertex-buffer w) (elt buffers 0)
 	    (index-buffer w) (elt buffers 1)))
     (setf (vertex-array w) (gl:gen-vertex-array))
     w))
+
+(defun draw-vertex-array (w)
+  (gl:bind-vertex-array (glhelp::vertex-array w))   
+  ;; This call actually does the rendering. The vertex data comes from
+  ;; the currently-bound VAO. If the input array is null, the indices
+  ;; will be taken from the element array buffer bound in the current
+  ;; VAO.
+  (gl:draw-elements
+   (render-type w)
+   (gl:make-null-gl-array :unsigned-int)
+   :count
+   (glhelp::indices w)
+   :offset 0))
+
+;;;;
+(defgeneric slow-draw (gl-thing)) ;;;dispatch on either display-list or vao
+(defmethod slow-draw ((thing vao)) 
+  (draw-vertex-array thing))
+(defmethod slow-draw ((thing gl-list)) 
+  (gl:call-list (glhelp::handle thing)))

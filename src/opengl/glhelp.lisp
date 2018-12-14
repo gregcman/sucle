@@ -4,6 +4,21 @@
 (in-package :glhelp)
 
 (defparameter *gl-version* "2.0") ;;abitrary, gets overwritten
+(defparameter *gl-version-substring* "2.0") ;;also arbitrary
+(defparameter *version-data*
+  (quote (("2.0" 110 :display-list)
+	  ("2.1" 120 :display-list)
+	  ("3.0" 130 :display-list)
+	  ("3.1" 140 :vertex-array-object)
+	  ("3.2" 150 :vertex-array-object)
+	  ("3.3" 330 :vertex-array-object)
+	  ("4.0" 400 :vertex-array-object)
+	  ("4.1" 410 :vertex-array-object)
+	  ("4.2" 420 :vertex-array-object)
+	  ("4.3" 430 :vertex-array-object)
+	  ("4.4" 440 :vertex-array-object)
+	  ("4.5" 450 :vertex-array-object)
+	  ("4.6" 460 :vertex-array-object))))
 
 ;;;;in opengl horizontal lines must be multiples of 4 bytes
 (defun array-flatten (array)
@@ -175,25 +190,12 @@
 	       )
     (values texture framebuffer depthbuffer)))
 
-(defun glsl-gl-version (&optional (version *gl-version*))
-  (let ((string (subseq version 0 3)))
-    (second
-     (assoc
-      string
-      (quote (("2.0" 110)
-	      ("2.1" 120)
-	      ("3.0" 130)
-	      ("3.1" 140)
-	      ("3.2" 150)
-	      ("3.3" 330)
-	      ("4.0" 400)
-	      ("4.1" 410)
-	      ("4.2" 420)
-	      ("4.3" 430)
-	      ("4.4" 440)
-	      ("4.5" 450)
-	      ("4.6" 460)))
-      :test 'string=))))
+(defun glsl-gl-version (&optional (version *gl-version-substring*))
+  (second
+   (assoc
+    version
+    *version-data*
+    :test 'string=)))
 
 ;;;;vertex array objects and layout
 
