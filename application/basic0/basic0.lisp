@@ -264,7 +264,7 @@
 	  (multiple-value-bind (fgcolor bgcolor) 
 	    (cond ((eq sprite *selection*)
 		   (values
-		    (bytecolor 0 3 3 3e)
+		    (bytecolor 0 3 3 3)
 		    (bytecolor 3 0 0 3)
 		    ;;(byte/255 1)
 		    ;;(byte/255 15)

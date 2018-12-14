@@ -96,3 +96,22 @@
   ())
 (defmethod gl-delete* ((obj gl-list))
   (gl:delete-lists (handle obj) 1))
+
+;;;;vertex array objects
+
+(defclass vao (gl-object)
+  ((vbuff :accessor vertex-buffer)
+   (ibuff :accessor index-buffer)
+   (va :accessor vertex-array)
+   (indices :accessor indices :initform 0)))
+(defmethod gl-delete* ((obj vao))
+  (gl:delete-vertex-arrays (list (vertex-array obj)))
+  (gl:delete-buffers (list (vertex-buffer obj) (index-buffer obj))))
+
+(defun make-vertex-array ()
+  (let ((w (make-instance 'vao)))
+    (let ((buffers (gl:gen-buffers 2)))
+      (setf (vertex-buffer w) (elt buffers 0)
+	    (index-buffer w) (elt buffers 1)))
+    (setf (vertex-array w) (gl:gen-vertex-array))
+    w))

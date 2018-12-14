@@ -2,21 +2,15 @@
   (:use :cl :application))
 (in-package #:broad)
 
-(defclass vao ()
-  ((vbuff :accessor vertex-buffer)
-   (ibuff :accessor index-buffer)
-   (va :accessor vertex-array)))
+(glhelp::deflazy-gl lady-vertex-array ()
+  (let ((value (glhelp::make-vertex-array)))
+    (fill-vertex-array-object
+     (glhelp::vertex-array value)
+     (glhelp::vertex-buffer value)
+     (glhelp::index-buffer value))
+    value))
 
-(defparameter *yolobaggins* (make-instance 'vao))
-
-(defun reset-bag ()
-  (let ((w *yolobaggins*))
-    (gl:delete-vertex-arrays (list (vertex-array w)))
-    (gl:delete-buffers (list (vertex-buffer w) (index-buffer w))))
-  (initbag))
-(deflazy 
-    :lady-png
-    ()
+(deflazy :lady-png ()
   (image-utility:flip-image 
    (image-utility:read-png-file
     "/home/imac/Documents/stuff2/NightFox/nightfox_d_4.png")))
@@ -32,14 +26,11 @@
 	       (:texture-wrap-s . :repeat)
 	       (:texture-wrap-t . :repeat)))))))
 
-(defun initbag ()  
-  (mostuff *yolobaggins*))
-
 (defun draw-baggins ()
-  (let ((w *yolobaggins*))
+  (let ((w (getfnc 'lady-vertex-array)))
   ;;  (gl:disable :cull-face :blend)
 ;;    (gl:polygon-mode :front-and-back :fill)
-    (gl:bind-vertex-array (vertex-array w))
+    (gl:bind-vertex-array (glhelp::vertex-array w))
     
     ;; This call actually does the rendering. The vertex data comes from
     ;; the currently-bound VAO. If the input array is null, the indices
@@ -49,14 +40,8 @@
 		      :count (* 3 (array-total-size (gethash "indices" woywoy)))
 		      :offset 0)))
 
-(defparameter woywoy (cl-mesh:parse-wavefront-obj "/home/imac/Documents/stuff2/NightFox/NightFox.obj"))
-
-
-
-(defparameter unique-vertices (make-hash-table :test 'equalp))
-(defun generate-vertex-hash ()
+(defun generate-vertex-hash (unique-vertices indexes)
   (let* ((name 0)
-	 (indexes (gethash "indices" woywoy))
 	 (len (array-total-size indexes))
 	 (hash unique-vertices))
     (flet ((ass (vec)
@@ -74,46 +59,43 @@
 	    (ass a)
 	    (ass b)
 	    (ass c)))))))
-(defparameter vertarray nil)
-(defun order-vertices ()
+(defun order-vertices (unique-vertices)
   (let ((hash unique-vertices))
     (let ((array (make-array (hash-table-count hash))))
       (maphash (lambda (k v)
 		 (setf (aref array v) k))
 	       hash)
-      (setf vertarray array))))
-(defparameter vertbuf nil)
-(defun flatten-vert ()
+      array)))
+(defun flatten-vert (vertarray verts uv)
   (let* ((array vertarray)
 	 (len (array-total-size array))
 	 (stride 6))
     (let ((buf (make-array (* len stride))))
-      (let ((verts (gethash "vertices" woywoy))
-	    (uv (gethash "uv" woywoy)))
-	(dotimes (index len)
-	  (let ((vec (aref array index)))
-	    (let ((base (* index stride)))
-	      (let ((verts (aref verts (aref vec 0)))
-		    (uv (aref uv (aref vec 1))))
-		(setf (aref buf (+ base 0)) (aref verts 0))
-		(setf (aref buf (+ base 1)) (aref verts 1))
-		(setf (aref buf (+ base 2)) (aref verts 2))
-		(setf (aref buf (+ base 3)) 1.0)
-		(setf (aref buf (+ base 4)) (aref uv 0))
-		(setf (aref buf (+ base 5)) (aref uv 1))
-		)))))
-      (setf vertbuf buf))))
+      (dotimes (index len)
+	(let ((vec (aref array index)))
+	  (let ((base (* index stride)))
+	    (let ((verts (aref verts (aref vec 0)))
+		  (uv (aref uv (aref vec 1))))
+	      (setf (aref buf (+ base 0)) (aref verts 0))
+	      (setf (aref buf (+ base 1)) (aref verts 1))
+	      (setf (aref buf (+ base 2)) (aref verts 2))
+	      (setf (aref buf (+ base 3)) 1.0)
+	      (setf (aref buf (+ base 4)) (aref uv 0))
+	      (setf (aref buf (+ base 5)) (aref uv 1))
+	      ))))
+      buf)))
+(defparameter woywoy
+  (cl-mesh:parse-wavefront-obj "/home/imac/Documents/stuff2/NightFox/NightFox.obj"))
+(defparameter unique-vertices (make-hash-table :test 'equalp))
+(defparameter vertarray nil)
+(defparameter vertbuf nil)
+(progn (generate-vertex-hash unique-vertices (gethash "indices" woywoy))
+       (setf vertarray (order-vertices unique-vertices))
+       (setf vertbuf (flatten-vert vertarray (gethash "vertices" woywoy)
+				   (gethash "uv" woywoy))))
 
-(progn (generate-vertex-hash)
-       (order-vertices)
-       (flatten-vert))
-
-
-(defun mostuff (w)
-  (let ((buffers (gl:gen-buffers 2)))
-    (setf (vertex-buffer w) (elt buffers 0)
-	  (index-buffer w) (elt buffers 1)))
-  (gl:bind-buffer :array-buffer (vertex-buffer w))
+(defun fill-vertex-array-object (vertex-array vertex-buffer index-buffer)  
+  (gl:bind-buffer :array-buffer vertex-buffer)
   (let ((verts vertbuf))
     (let ((arr (gl:alloc-gl-array :float (length verts))))
       (dotimes (i (array-total-size verts))
@@ -125,7 +107,7 @@
 
   ;; An element array buffer stores vertex indices. We fill it in the
   ;; same way as an array buffer.
-  (gl:bind-buffer :element-array-buffer (index-buffer w))
+  (gl:bind-buffer :element-array-buffer index-buffer)
   (let ((hash unique-vertices))
     (let* ((indexes (gethash "indices" woywoy))
 	   (len (array-total-size indexes)))
@@ -146,13 +128,12 @@
 
   ;; Vertex array objects manage which vertex attributes are
   ;; associated with which data buffers. 
-  (setf (vertex-array w) (gl:gen-vertex-array))
-  (gl:bind-vertex-array (vertex-array w))
+  (gl:bind-vertex-array vertex-array)
 
   ;; To associate our VBO data with this VAO, we bind it, specify
   ;; which vertex attribute we want to associate it with, and specify
   ;; where the data comes from.
-  (gl:bind-buffer :array-buffer (vertex-buffer w))
+  (gl:bind-buffer :array-buffer vertex-buffer)
   ;; In this program, we use attribute 0 for position. If you had
   ;; per-vertex normals, you could use a different attribute for those
   ;; as well.
@@ -168,7 +149,7 @@
 
   ;; To associate an element array with this VAO, all we need to do is
   ;; bind the element array buffer we want to use.
-  (gl:bind-buffer :element-array-buffer (index-buffer w))
+  (gl:bind-buffer :element-array-buffer index-buffer)
 
   ;; Once we're done, we can unbind the VAO, and rebind it when we want to render it.
   (gl:bind-vertex-array 0))
@@ -207,7 +188,6 @@
 (defun start ()
   (application::main
    (lambda ()
-     (broad::initbag)
      (sandbox::with-world-meshing-lparallel
        (loop
 	  (application:poll-app)

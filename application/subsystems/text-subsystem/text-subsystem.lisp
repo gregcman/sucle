@@ -225,14 +225,14 @@
 
 (defun char-attribute (bold-p underline-p opaque-p)
   (logior
-   (if opaque-p
-       4
-       0)
    (if bold-p
-       2
+       1
        0)
    (if underline-p
-       1
+       2
+       0)
+   (if opaque-p
+       4
        0)))
 
 ;;;;4 shades each of r g b a 0.0 1/3 2/3 and 1.0
