@@ -131,23 +131,3 @@
 	    (index-buffer w) (elt buffers 1)))
     (setf (vertex-array w) (gl:gen-vertex-array))
     w))
-
-(defun draw-vertex-array (w)
-  (gl:bind-vertex-array (glhelp::vertex-array w))   
-  ;; This call actually does the rendering. The vertex data comes from
-  ;; the currently-bound VAO. If the input array is null, the indices
-  ;; will be taken from the element array buffer bound in the current
-  ;; VAO.
-  (gl:draw-elements
-   (render-type w)
-   (gl:make-null-gl-array :unsigned-int)
-   :count
-   (glhelp::indices w)
-   :offset 0))
-
-;;;;
-(defgeneric slow-draw (gl-thing)) ;;;dispatch on either display-list or vao
-(defmethod slow-draw ((thing vao)) 
-  (draw-vertex-array thing))
-(defmethod slow-draw ((thing gl-list)) 
-  (gl:call-list (glhelp::handle thing)))
