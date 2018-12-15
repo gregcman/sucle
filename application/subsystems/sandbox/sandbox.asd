@@ -1,4 +1,7 @@
 (asdf:defsystem #:sandbox
+  :author "terminal625"
+  :license "MIT"
+  :description "The voxel backend for testbed"
   :depends-on (#:cl-opengl
 	       #:utility
 	       #:reverse-array-iterator

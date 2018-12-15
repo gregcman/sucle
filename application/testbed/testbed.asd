@@ -1,4 +1,7 @@
 (asdf:defsystem #:testbed
+  :author "terminal625"
+  :license "MIT"
+  :description "Cube Game Demo physics part"
   :depends-on (#:application
 	       #:sandbox
 	       #:image-utility
