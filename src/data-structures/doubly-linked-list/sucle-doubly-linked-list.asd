@@ -1,4 +1,4 @@
-(asdf:defsystem #:doubly-linked-list
+(asdf:defsystem #:sucle-doubly-linked-list
   :author "terminal625"
   :license "MIT"
   :description "implementation of doubly-linked list"
