@@ -22,32 +22,36 @@
 		       ""))
 		 nil)))))
 
+(defun title-from-name-and-options (name-and-options)
+  (cond ((symbolp name-and-options)
+	 name-and-options)
+	(t (first name-and-options))))
+
 (defun %struct->class (form)
-  (destructuring-bind (header title &rest slots) form
+  (destructuring-bind (header name-and-options &rest slots) form
     (declare (ignore header))
-    (unless (symbolp title)
-      (setf title (first title)))
-    (let ((conc-name (or (get-conc-name title)
-			 (conc-name title)))
-	  (new-slots ()))
-      (flet ((add-slot (name &optional value)
-	       (push `(,name :initform ,value
-			     :initarg ,(keywordify name)
-			     :accessor ,(symbolicate2 (list conc-name name)))
-		     new-slots)))
-	(dolist (slot slots)
-	  (etypecase slot
-	    (symbol (add-slot slot))
-	    (list (destructuring-bind (name initform &rest ignorable) slot
-		    (declare (ignorable ignorable))
-		    (add-slot name initform))))))
-      `(progn
-	 (defclass ,title ()
-	   ,new-slots)
-	 (defun ,(symbolicate2 (list conc-name "P")) (object)
-	   (typep object ',title))
-	 (defun ,(symbolicate2 (list "MAKE-" title)) (&rest rest &key &allow-other-keys)
-	   (apply #'make-instance ',title rest))))))
+    (let ((title (title-from-name-and-options name-and-options)))
+      (let ((conc-name (or (get-conc-name name-and-options)
+			   (conc-name title)))
+	    (new-slots ()))
+	(flet ((add-slot (name &optional value)
+		 (push `(,name :initform ,value
+			       :initarg ,(keywordify name)
+			       :accessor ,(symbolicate2 (list conc-name name)))
+		       new-slots)))
+	  (dolist (slot slots)
+	    (etypecase slot
+	      (symbol (add-slot slot))
+	      (list (destructuring-bind (name initform &rest ignorable) slot
+		      (declare (ignorable ignorable))
+		      (add-slot name initform))))))
+	`(progn
+	   (defclass ,title ()
+	     ,new-slots)
+	   (defun ,(symbolicate2 (list conc-name "P")) (object)
+	     (typep object ',title))
+	   (defun ,(symbolicate2 (list "MAKE-" title)) (&rest rest &key &allow-other-keys)
+	     (apply #'make-instance ',title rest)))))))
 #+nil
 (defstruct a
   (a 0 :type t)
