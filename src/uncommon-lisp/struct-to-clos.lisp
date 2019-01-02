@@ -31,7 +31,8 @@
   (destructuring-bind (header name-and-options &rest slots) form
     (declare (ignore header))
     (let ((title (title-from-name-and-options name-and-options)))
-      (let ((conc-name (or (get-conc-name name-and-options)
+      (let ((conc-name (or (and (listp name-and-options)
+				(get-conc-name name-and-options))
 			   (conc-name title)))
 	    (new-slots ()))
 	(flet ((add-slot (name &optional value)
