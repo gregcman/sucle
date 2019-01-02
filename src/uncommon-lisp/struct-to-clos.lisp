@@ -13,7 +13,9 @@
 ;;;;see http://www.lispworks.com/documentation/lw51/CLHS/Body/m_defstr.htm
 (defun get-conc-name (name-and-options)
   (cond ((find :conc-name name-and-options) "")
-	(t (let ((cell (find-if (lambda (x) (eq :conc-name (first x)))
+	(t (let ((cell (find-if (lambda (x)
+				  (and (listp x)
+				       (eq :conc-name (first x))))
 				name-and-options)))
 	     (if cell
 		 (let ((name (second cell)))
