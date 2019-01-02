@@ -51,7 +51,7 @@
 	`(progn
 	   (defclass ,title ()
 	     ,new-slots)
-	   (defun ,(symbolicate2 (list conc-name "P")) (object)
+	   (defun ,(symbolicate2 (list title "-P")) (object)
 	     (typep object ',title))
 	   (defun ,(symbolicate2 (list "MAKE-" title)) (&rest rest &key &allow-other-keys)
 	     (apply #'make-instance ',title rest)))))))
