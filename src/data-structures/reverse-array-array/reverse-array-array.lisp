@@ -1,7 +1,7 @@
 (defpackage #:reverse-array-array
   (:use #:cl
 	#:utility
-	#:iterator)
+	#:reverse-array-iterator)
   (:export
    #:raa
    #:make-raa ;;;;make the raa

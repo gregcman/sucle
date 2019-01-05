@@ -1,6 +1,6 @@
 (defpackage #:reverse-array-array-example
   (:use #:cl
-	#:iterator
+	#:reverse-array-iterator
 	#:reverse-array-array))
 
 (in-package :reverse-array-array-example)

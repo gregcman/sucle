@@ -4,6 +4,7 @@
   :description "The voxel backend for testbed"
   :depends-on (#:cl-opengl
 	       #:utility
+	       #:scratch-buffer
 	       #:reverse-array-iterator
 	       #:glhelp
 	       #:lparallel
