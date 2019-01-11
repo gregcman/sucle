@@ -14,8 +14,6 @@
 		 (load-op "cl-glfw3")
 		 (restore-cffi-load-foreign-library-op "window")
 		 (load-op "opengl-glfw3")))
-  :perform (load-op (s o)
-		    (print (list s o)))
   :perform (undefine-cffi-load-foreign-library-op
 	    (s o)
 	    (uiop:symbol-call :undefine-cffi-load-foreign-library
