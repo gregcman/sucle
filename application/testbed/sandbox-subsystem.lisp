@@ -314,14 +314,24 @@
    collision-fun
    contact-fun))
 
+;;;;FIXME::The point of this is to reduce the amount of bits to store the hitbox.
+;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
+;;;;get chopped off or something, thus leading to strange clipping.
+;;;;This effectively reduces the precision, giving leeway for math operations.
+;;;;My prediction could be wrong though.
+(defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
+  (* n (round (/ x n))))
 (defparameter *player-aabb*
-  (aabbcc:make-aabb
-   :minx -0.3
-   :miny -1.5
-   :minz -0.3
-   :maxx 0.3
-   :maxy 0.12
-   :maxz 0.3))
+  (apply #'aabbcc:make-aabb
+	 (mapcan (lambda (n param)
+		   `(,param ,(round-to-nearest n)))	 
+		 '(-0.3 -1.5 -0.3 0.3 0.12 0.3)
+		 '(:minx 
+		   :miny 
+		   :minz 
+		   :maxx
+		   :maxy 
+		   :maxz))))
 
 (defun gentity ()
   (make-entity :collision-fun (function collide-fucks)
