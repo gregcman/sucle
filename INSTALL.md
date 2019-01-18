@@ -16,11 +16,8 @@ If you:
 1.Requirements
 -
 - A suitable Common Lisp
-- [This other utility library](https://github.com/terminal625/utility)
-- [sucle, this repository](https://github.com/terminal625/sucle)
 - [quicklisp](https://www.quicklisp.org/beta/)
 - [OpenGL](https://www.opengl.org/) 
-- [GLFW 3.2](https://www.glfw.org/)
 - an internet connection to download quicklisp libraries
 
 Installation
@@ -32,9 +29,6 @@ If using Linux, an easier way to install is to enter
 `apt-get install sbcl` at the command line.
 
 Otherwise [skip if using SBCL]:
-Things to keep in mind when using another Common Lisp implementation:
-- [ECL](https://common-lisp.net/project/ecl/) has been tested before, but I do not recommend it as ECL creates a lot more garbage than SBCL thus causing frame stuttering on garbage collection.
-- If the implementation's [internal-time-units-per-second](http://clhs.lisp.se/Body/v_intern.htm) is too low, the microsecond clock may become too coarse grained, thus messing up frames.
 - The implementation needs to support [CFFI](https://common-lisp.net/project/cffi/) and [bordeaux-threads](https://common-lisp.net/project/bordeaux-threads/)
 
 ### How to run the Common Lisp REPL
