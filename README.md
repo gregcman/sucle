@@ -116,15 +116,11 @@ click for video:
 4. Repeat 2-3
 5. Be a creative and interesting and artistic mineman pvp parkour legend 
 
-## Please comment below if you:
+## Please let me know if you:
 * are aware of a voxel engine that is superior in modding capabilities
 * share that burning passion for Minecraft
 * have a suggestion on how to get a real, non Minecraft life
 * do not know what Minecraft is
 
-[click here to comment](https://terminal625.blogspot.com/2018/11/minecraft-obsessed-lisp-weenie-rants.html)
-
-It would be great if everyone could pool together their Common Lisp game engines. That way I'd have a better Minecraft clone. 
-
-# Installation instructions:
+# How To Install:
 https://github.com/terminal625/sucle/blob/master/INSTALL.md
