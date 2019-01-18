@@ -22,7 +22,7 @@ If you:
 
 2.Installing Common Lisp and Quicklisp
 -
-[see here](https://github.com/terminal625/shared-documents/blob/master/INSTALL-CL-AND-QUICKLISP.md)
+[see here](https://github.com/pupcraft/shared-documents/blob/master/INSTALL-CL-AND-QUICKLISP.md)
 
 3.How to use
 -
@@ -52,4 +52,4 @@ Yes if:
 
 Otherwise:
 For unsupported display lists, a few places would need minor edits to switch from display lists to vertex arrays for creation, deletion, rendering, and iterating, which requires an ability to refactor Common Lisp code.
-- If display lists are not supported, the code must be refactored to use vertex arrays. If you are having trouble with this please [open an issue](https://github.com/terminal625/sucle/issues). The transition is straightforward as the display lists are used as nothing but interleaved float data. Display lists were chosen over vertex arrays because they were faster on my particular NVidia GPUs.
+- If display lists are not supported, the code must be refactored to use vertex arrays. If you are having trouble with this please [open an issue](https://github.com/pupcraft/sucle/issues). The transition is straightforward as the display lists are used as nothing but interleaved float data. Display lists were chosen over vertex arrays because they were faster on my particular NVidia GPUs.
