@@ -20,10 +20,13 @@ If you:
 - an internet connection to download quicklisp libraries
 
 
+3.Installing Common Lisp and Quicklisp
+-
+
 Installing Common Lisp and Quicklisp
 -
 
-### 2. Installing/choosing the Common Lisp implementation:
+### Installing/choosing the Common Lisp implementation:
 [Install SBCL](http://www.sbcl.org/). This means clicking on your architecture [from this table](http://www.sbcl.org/platform-table.html) and running the platform specific installer.
 If using Linux, an easier way to install is to enter
 `apt-get install sbcl` at the command line.
@@ -31,7 +34,7 @@ If using Linux, an easier way to install is to enter
 ### How to run the Common Lisp REPL
 Most implementations start through an executable that has a similar name as the implementation. In the case of installing SBCL with a Linux package manager, entering `sbcl` at the command line will run SBCL. However, there are installation situations in which you may need to execute a script or navigate to a directory to run the Common Lisp implementation, and this is implementation specific. 
 
-### 3. Using Quicklisp:
+### Using Quicklisp:
 [Quicklisp webpage](https://www.quicklisp.org/beta/)  
 What is Quicklisp? Quicklisp is the de facto package manager for Common Lisp. 
 #### Installation
@@ -51,7 +54,7 @@ Everything Quicklisp downloads, which is for the most part Common Lisp code, sho
 2. If quicklisp has been added to implementation startup as in step 5 above then it is already loaded. Otherwise:  
 `CL-USER (load "~/path-to-quicklisp/quicklisp/setup.lisp")`
 
-4.How to use
+3.How to use
 -
 
 `(ql:quickload :sucle)`  
@@ -72,7 +75,7 @@ Recommended IDEs:
 - [emacs](https://www.gnu.org/software/emacs/) + [SLIME](https://www.cliki.net/slime-howto)
 - [lem](https://github.com/cxxxr/lem)
 
-5.Will My OpenGL setup work out of the box?
+4.Will My OpenGL setup work out of the box?
 -
 Yes if:
 - If your OpenGL driver provides a compatibility profile, [which is likely for NVidia GPUs](https://stackoverflow.com/questions/4113989/why-were-display-lists-deprecated-in-opengl-3-1), for supporting display lists.
