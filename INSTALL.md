@@ -3,33 +3,30 @@
 Contents
 -
 1. Requirements
-2. How to install Common Lisp
-3. How to install quicklisp
-4. How to use
-5. Opengl Mishaps
+2. How to install Common Lisp and quicklisp
+3. How to use
+4. Opengl Mishaps
 
 If you:  
 - Are new to Common Lisp, start at the beginning.
-- Are a Common Lisp and Quicklisp pro, skip to step 5, "How to use".
+- Are a Common Lisp and Quicklisp pro, skip to step 3, "How to use".
 - Have a system which is not a combination of {x86, x86-64}{Mac, Windows, Linux}, you will have to build GLFW 3.2 yourself
 
 1.Requirements
 -
-- A suitable Common Lisp
+- A suitable Common Lisp, which supports [CFFI](https://common-lisp.net/project/cffi/) and [bordeaux-threads](https://common-lisp.net/project/bordeaux-threads/)
 - [quicklisp](https://www.quicklisp.org/beta/)
 - [OpenGL](https://www.opengl.org/) 
 - an internet connection to download quicklisp libraries
 
-Installation
+
+Installing Common Lisp and Quicklisp
 -
 
 ### 2. Installing/choosing the Common Lisp implementation:
 [Install SBCL](http://www.sbcl.org/). This means clicking on your architecture [from this table](http://www.sbcl.org/platform-table.html) and running the platform specific installer.
 If using Linux, an easier way to install is to enter
 `apt-get install sbcl` at the command line.
-
-Otherwise [skip if using SBCL]:
-- The implementation needs to support [CFFI](https://common-lisp.net/project/cffi/) and [bordeaux-threads](https://common-lisp.net/project/bordeaux-threads/)
 
 ### How to run the Common Lisp REPL
 Most implementations start through an executable that has a similar name as the implementation. In the case of installing SBCL with a Linux package manager, entering `sbcl` at the command line will run SBCL. However, there are installation situations in which you may need to execute a script or navigate to a directory to run the Common Lisp implementation, and this is implementation specific. 
@@ -54,7 +51,9 @@ Everything Quicklisp downloads, which is for the most part Common Lisp code, sho
 2. If quicklisp has been added to implementation startup as in step 5 above then it is already loaded. Otherwise:  
 `CL-USER (load "~/path-to-quicklisp/quicklisp/setup.lisp")`
 
-### 4. How to use 
+4.How to use
+-
+
 `(ql:quickload :sucle)`  
 `(sucle:start)`
 
@@ -73,7 +72,8 @@ Recommended IDEs:
 - [emacs](https://www.gnu.org/software/emacs/) + [SLIME](https://www.cliki.net/slime-howto)
 - [lem](https://github.com/cxxxr/lem)
 
-### 5. Will My OpenGL setup work out of the box?
+5.Will My OpenGL setup work out of the box?
+-
 Yes if:
 - If your OpenGL driver provides a compatibility profile, [which is likely for NVidia GPUs](https://stackoverflow.com/questions/4113989/why-were-display-lists-deprecated-in-opengl-3-1), for supporting display lists.
 
