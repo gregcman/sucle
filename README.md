@@ -98,7 +98,7 @@ click for video:
 * Edit the source code on the fly, making it very easy to write mods
 * Livecode the graphics, play around with shaders, textures, display lists
 * Create ad-hoc functions for manipulating terrain and creating structures,
-* Read and write Minecraft McRegion and Anvil world formats [see [cl-nbt](https://github.com/terminal625/sucle)]
+* Read and write Minecraft McRegion and Anvil world formats [see [cl-nbt](https://github.com/terminal625/cl-nbt)]
 * 3d block physics
 * Quite fast, depending on the Common Lisp implementation
 
@@ -123,4 +123,4 @@ click for video:
 * do not know what Minecraft is
 
 # How To Install:
-https://github.com/terminal625/sucle/blob/master/INSTALL.md
+https://github.com/pupcraft/sucle/blob/master/INSTALL.md
