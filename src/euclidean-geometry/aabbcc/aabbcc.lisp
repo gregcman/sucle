@@ -149,6 +149,10 @@
 
 ;;;spits out three values which indicate movement in the x y z directions.
 (defun %%collide (ax0 ay0 az0 ax1 ay1 az1 dx dy dz bx0 by0 bz0 bx1 by1 bz1)
+  #+nil
+  (print (list (list ax0 ay0 az0 ax1 ay1 az1)
+	       (list dx dy dz)
+	       (list bx0 by0 bz0 bx1 by1 bz1)))
   (macrolet ((checkface ((op facea faceb) diff (d1 d2) (mx0 my0 mx1 my1 nx0 ny0 nx1 ny1))
 	       `(if (,op ,facea ,faceb)
 		    (let* ((delta (- ,faceb ,facea))
@@ -158,6 +162,7 @@
 					       (+ ddx ,mx1) (+ ddy ,my1)
 					       ,nx0 ,ny0
 					       ,nx1 ,ny1)))
+		      ;;(print (list ,diff delta))
 		      (if state
 			  (if (case state
 				((t) t)

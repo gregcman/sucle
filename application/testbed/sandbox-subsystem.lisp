@@ -64,33 +64,59 @@
    :minz 0.0
    :maxx 1.0 ;1.0
    :maxy 1.0 ;1.0
-   :maxz 1.0))
+   :maxz 1.0)
+  "an aabb representing a 1x1x1 cube")
+
+(defparameter *slab-aabb*
+  (aabbcc:make-aabb
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx 1.0 ;1.0
+   :maxy 0.1 ;1.0
+   :maxz 1.0)
+  "an aabb representing a 1x0.5x1 slab")
 
 (defun pos-to-block-aabb (x y z)
   (let ((the-block (world:getblock x y z)))
     (block-to-block-aabb the-block)))
 (defun block-to-block-aabb (blockid)
   (case blockid
+    (3 *slab-aabb*)
     (t *block-aabb*)))
 
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
   (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
+    ;;FIXME:: aabb-collect-blocks does not check slabs, only blocks upon entering.
+    ;;also check "intersecting shell blocks?"
     (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
       (declare (ignorable contact))
-      (when (aref block-data:*iscollidable*
-		  (world:getblock x y z))
-	(when *dirtying2*
-	  (sandbox::plain-setblock x y z (1+ (random 5)) 0))
-	(multiple-value-bind (minimum type)
-	    (aabbcc:aabb-collide
-	     aabb
-	     px py pz
-	     (sandbox-sub::pos-to-block-aabb x y z)
-	     x y z
-	     vx vy vz)
-	  (collect-touch minimum type))))
+      (let ((blockid (world:getblock x y z)))
+	(when (aref block-data:*iscollidable*
+		    blockid)
+	  (when *dirtying2*
+	    (sandbox::plain-setblock x y z (1+ (random 5)) 0))
+	  (let ((blockaabb (sandbox-sub::block-to-block-aabb blockid)))
+	    (let ((args
+		   (list
+		    aabb
+		    px py pz
+		    blockaabb
+		    x y z
+		    vx vy vz)))
+	      (multiple-value-bind (minimum type)
+		  (apply 'aabbcc:aabb-collide args)
+		#+nil
+		(aabbcc:aabb-collide
+		 aabb
+		 px py pz
+		 blockaabb
+		 x y z
+		 vx vy vz)
+		(print (list minimum type (cons 'aabbcc:aabb-collide args)))
+		(collect-touch minimum type)))))))
     (values
      (collapse-touch vx vy vz)
      min-ratio)))
@@ -343,8 +369,8 @@
 		   :maxz))))
 
 (defun gentity ()
-  (make-entity :collision-fun (function collide-fucks)
-	       :contact-fun (function a-contact-fun)
+  (make-entity :collision-fun 'collide-fucks
+	       :contact-fun 'a-contact-fun
 	       :particle (make-pointmass)
 	       :neck (make-necking)
 	       :aabb *player-aabb*
