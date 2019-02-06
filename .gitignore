@@ -45,4 +45,6 @@ flycheck_*.el
 /lib/quicklisp/bundle/
 
 ~*
-application/basic0/save/*
+
+#ignore save files
+/application/basic0/save/*
