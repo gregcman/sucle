@@ -45,4 +45,4 @@ flycheck_*.el
 /lib/quicklisp/bundle/
 
 ~*
-application/basic/save/*
+application/basic0/save/*
