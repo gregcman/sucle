@@ -356,7 +356,8 @@
 	    xflip yflip zflip xoffset yoffset zoffset x y z total
 	    i-next j-next k-next ratio min? fooi fooj fook i? j? k?
 	    x0 y0 z0 aabb-posx aabb-posy aabb-posz
-	    bmini bmaxi bminj bmaxj bmink bmaxk i j k contact)
+	    bmini bmaxi bminj bmaxj bmink bmaxk i j k contact
+	    test-shell flags)
     (once-only (px py pz dx dy dz aabb)
       `(let ((,xnotp (zerop ,dx))
 	     (,ynotp (zerop ,dy))
@@ -389,7 +390,30 @@
 		     ,z (- 0 ,z)))
 	     (labels
 		 ((,emit (,x-var ,y-var ,z-var ,contact-var)
-		    ,@body))
+		    ,@body)
+		  (,test-shell (,flags)
+		      (let ((,x0 (if ,xflip (- ,x) ,x))
+			    (,y0 (if ,yflip (- ,y) ,y))
+			    (,z0 (if ,zflip (- ,z) ,z)))
+			(let ((,aabb-posx (- ,x0 ,xoffset))
+			      (,aabb-posy (- ,y0 ,yoffset))
+			      (,aabb-posz (- ,z0 ,zoffset)))
+			  (let ((,bmini (ceiling (+ ,aabb-posx ,minx)))
+				(,bmaxi (floor (+ ,aabb-posx ,maxx)))
+				(,bminj (ceiling (+ ,aabb-posy ,miny)))
+				(,bmaxj (floor (+ ,aabb-posy ,maxy)))
+				(,bmink (ceiling (+ ,aabb-posz ,minz)))
+				(,bmaxk (floor (+ ,aabb-posz ,maxz))))
+			    (do-shell ((1- ,bmini) ,bmaxi
+				       (1- ,bminj) ,bmaxj
+				       (1- ,bmink) ,bmaxk
+				       ,xflip
+				       ,yflip
+				       ,zflip
+				       ,flags)
+				(,i ,j ,k ,contact)
+			      (,emit ,i ,j ,k ,contact)))))))
+	       (,test-shell #b111)
 	       (let ((,i-next (ceiling ,x))
 		     (,j-next (ceiling ,y))
 		     (,k-next (ceiling ,z)))
@@ -436,24 +460,4 @@
 			  (setf ,z (if ,k? ,k-next (+ ,z (* ,dz ,ratio))))
 			  (setf ,k-next (1+ (floor ,z))))
 			;;find the surface cubes
-			(let ((,x0 (if ,xflip (- ,x) ,x))
-			      (,y0 (if ,yflip (- ,y) ,y))
-			      (,z0 (if ,zflip (- ,z) ,z)))
-			  (let ((,aabb-posx (- ,x0 ,xoffset))
-				(,aabb-posy (- ,y0 ,yoffset))
-				(,aabb-posz (- ,z0 ,zoffset)))
-			    (let ((,bmini (ceiling (+ ,aabb-posx ,minx)))
-				  (,bmaxi (floor (+ ,aabb-posx ,maxx)))
-				  (,bminj (ceiling (+ ,aabb-posy ,miny)))
-				  (,bmaxj (floor (+ ,aabb-posy ,maxy)))
-				  (,bmink (ceiling (+ ,aabb-posz ,minz)))
-				  (,bmaxk (floor (+ ,aabb-posz ,maxz))))
-			      (do-shell ((1- ,bmini) ,bmaxi
-					 (1- ,bminj) ,bmaxj
-					 (1- ,bmink) ,bmaxk
-					 ,xflip
-					 ,yflip
-					 ,zflip
-					 ,min?)
-				  (,i ,j ,k ,contact)
-				(,emit ,i ,j ,k ,contact))))))))))))))))
+			(,test-shell ,min?))))))))))))

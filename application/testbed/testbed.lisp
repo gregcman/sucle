@@ -491,32 +491,32 @@
 	   (sandbox::setblock-with-update x y0 z 17))))
 
 (defparameter *left-fist-fnc*
-  (nth 2
-       (list
-	(lambda (x y z)
-	  (let ((*box* (translate-box x y z *box*)))
-	    (map-box
-	     (sphere
-	      (nth 5 ;(random 6)
-		   (list
-		    (lambda (x y z)
-		      (dotimes (i 5)
-			(bonder x y z)))
-		    (lambda (x y z)
-		      (dotimes (i 5)
-			(bonder2 x y z)))
-		    (lambda (x y z)
-		      (dotimes (i 5)
-			(bonder3 x y z)))
-		    #'dirtngrass
-		    (lambda (x y z)
-		      (sandbox::setblock-with-update
-		       x y z
-		       *blockid*))
-		    (lambda (x y z)
-		      ;(unless (zerop (world:getblock x y z)))
-		      (sandbox::setblock-with-update x y z 0))))))))
-	#'tree
-	(lambda (x y z)
-	  (sandbox-sub::blocksound x y z)
-	  (sandbox::setblock-with-update x y z 0 0)))))
+  #+nil
+  (lambda (x y z)
+    (let ((*box* (translate-box x y z *box*)))
+      (map-box
+       (sphere
+	(nth 5 ;(random 6)
+	     (list
+	      (lambda (x y z)
+		(dotimes (i 5)
+		  (bonder x y z)))
+	      (lambda (x y z)
+		(dotimes (i 5)
+		  (bonder2 x y z)))
+	      (lambda (x y z)
+		(dotimes (i 5)
+		  (bonder3 x y z)))
+	      #'dirtngrass
+	      (lambda (x y z)
+		(sandbox::setblock-with-update
+		 x y z
+		 *blockid*))
+	      (lambda (x y z)
+					;(unless (zerop (world:getblock x y z)))
+		(sandbox::setblock-with-update x y z 0))))))))
+  ;;#'tree
+  ;;#+nil
+  (lambda (x y z)
+    (sandbox-sub::blocksound x y z)
+    (sandbox::setblock-with-update x y z 0 0)))

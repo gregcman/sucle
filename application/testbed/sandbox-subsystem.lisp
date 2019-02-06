@@ -73,7 +73,7 @@
    :miny 0.0
    :minz 0.0
    :maxx 1.0 ;1.0
-   :maxy 0.1 ;1.0
+   :maxy 0.5 ;1.0
    :maxz 1.0)
   "an aabb representing a 1x0.5x1 slab")
 
@@ -99,23 +99,26 @@
 	  (when *dirtying2*
 	    (sandbox::plain-setblock x y z (1+ (random 5)) 0))
 	  (let ((blockaabb (sandbox-sub::block-to-block-aabb blockid)))
-	    (let ((args
+	    (#+nil
+	     let
+	     #+nil((args
 		   (list
 		    aabb
 		    px py pz
 		    blockaabb
 		    x y z
 		    vx vy vz)))
+	     progn
 	      (multiple-value-bind (minimum type)
-		  (apply 'aabbcc:aabb-collide args)
-		#+nil
+		  ;;(apply 'aabbcc:aabb-collide args)
+		;;#+nil
 		(aabbcc:aabb-collide
 		 aabb
 		 px py pz
 		 blockaabb
 		 x y z
 		 vx vy vz)
-		(print (list minimum type (cons 'aabbcc:aabb-collide args)))
+		;;(print (list minimum type (cons 'aabbcc:aabb-collide args)))
 		(collect-touch minimum type)))))))
     (values
      (collapse-touch vx vy vz)
