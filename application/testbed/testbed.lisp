@@ -321,7 +321,7 @@
 	(pos (sandbox-sub::pointmass-position
 	      (sandbox-sub::entity-particle ent))))
     (aabbcc::aabb-not-overlap
-     sandbox-sub::*block-aabb*
+     (sandbox-sub::pos-to-block-aabb x y z)
      (floatify x)
      (floatify y)
      (floatify z)

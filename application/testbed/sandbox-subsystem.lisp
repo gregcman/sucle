@@ -62,9 +62,16 @@
    :minx 0.0
    :miny 0.0
    :minz 0.0
-   :maxx 1.0
-   :maxy 1.0
+   :maxx 1.0 ;1.0
+   :maxy 1.0 ;1.0
    :maxz 1.0))
+
+(defun pos-to-block-aabb (x y z)
+  (let ((the-block (world:getblock x y z)))
+    (block-to-block-aabb the-block)))
+(defun block-to-block-aabb (blockid)
+  (case blockid
+    (t *block-aabb*)))
 
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
@@ -80,7 +87,7 @@
 	    (aabbcc:aabb-collide
 	     aabb
 	     px py pz
-	     *block-aabb*
+	     (sandbox-sub::pos-to-block-aabb x y z)
 	     x y z
 	     vx vy vz)
 	  (collect-touch minimum type))))
@@ -93,10 +100,12 @@
   (let ((acc #b000000))
     (aabbcc::get-blocks-around (px py pz aabb) (mx my mz contact-var)
       (declare (ignorable contact-var))
-      (when (aref block-data:*iscollidable* (world:getblock mx my mz))
-	(when *dirtying*
-	  (sandbox::plain-setblock mx my mz (1+ (random 5)) 0))
-	(logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz *block-aabb*))))
+      (let ((blockid (world:getblock mx my mz)))
+	(when (aref block-data:*iscollidable* blockid)
+	  (when *dirtying*
+	    (sandbox::plain-setblock mx my mz (1+ (random 5)) 0))
+	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
+					    (block-to-block-aabb blockid))))))
     acc))
 
   ;;;;150 ms delay for sprinting
@@ -429,7 +438,7 @@
 	    (aabbcc:aabb-collide
 	     aabb
 	     px py pz
-	     *block-aabb*
+	     (sandbox-sub::pos-to-block-aabb x y z)
 	     x y z
 	     vx vy vz)
 	  (declare (ignorable minimum))
