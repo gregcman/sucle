@@ -47,4 +47,4 @@ flycheck_*.el
 ~*
 
 #ignore save files
-/application/basic0/save/*
+/application/basic0/save/

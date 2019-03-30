@@ -479,7 +479,7 @@
    :handle
    (prog1
        (glhelp:pic-texture
-	(make-array `(,application::w ,application::h 4)) :rgba)
+	(make-array `(,application::h ,application::w 4)) :rgba)
      (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :linear)
 	      (:texture-mag-filter . :linear)
@@ -513,7 +513,7 @@
 
 (defun a-zpng ()
   (etouq
-    (nth 3
+    (nth 1
 	 '((vecto-test::star-clipping)
 	   (vecto-test::feedlike-icon)
 	   (vecto-test::gradient-example)
