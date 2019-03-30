@@ -473,17 +473,13 @@
   (glhelp::deflazy-gl flat-texture-shader (flat-texture-shader-source)
     (glhelp::create-gl-program flat-texture-shader-source)))
 
-
-(deflazy cons-png ()
-  (image-utility:read-png-file
-   #P"/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/gui-terminal-emulator/basic/cons-cell.png"
-   t))
-(glhelp::deflazy-gl cons-texture (cons-png)
+(glhelp::deflazy-gl cons-texture (application::w application::h)
   (make-instance
    'glhelp::gl-texture
    :handle
    (prog1
-       (glhelp:pic-texture cons-png)
+       (glhelp:pic-texture
+	(make-array `(,application::w ,application::h 4)) :rgba)
      (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :linear)
 	      (:texture-mag-filter . :linear)
@@ -492,12 +488,14 @@
 
 (defparameter *pic-tint* (vector 1.0 1.0 1.0 1.0))
 (defun draw-pic ()
+  (gl:polygon-mode :front-and-back :fill)
   (glhelp::bind-default-framebuffer)
+  (gl:disable :depth-test)
   (glhelp:set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
-  (gl:disable :blend)
+  (gl:enable :blend)
 
   (gl:blend-func :src-alpha :one-minus-src-alpha)
-  
+  (transfer-zpng-data (a-zpng))
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -512,3 +510,23 @@
     (gl:bind-texture :texture-2d
 		     (glhelp::handle (getfnc 'cons-texture)))
     (text-sub::draw-fullscreen-quad)))
+
+(defun a-zpng ()
+  (etouq
+    (nth 3
+	 '((vecto-test::star-clipping)
+	   (vecto-test::feedlike-icon)
+	   (vecto-test::gradient-example)
+	   (vecto-test::gradient-bilinear-example)
+	   (make-instance 'zpng::png
+	    :color-type :truecolor-alpha
+	    :width 16
+	    :height 16)))))
+
+(defun transfer-zpng-data (zpng)
+  (let ((texture (getfnc 'cons-texture)))
+    (gl:bind-texture :texture-2d (glhelp::handle texture))
+    (gl:tex-sub-image-2d :texture-2d 0 0 0
+			 (zpng:width zpng)
+			 (zpng:height zpng)
+			 :rgba :unsigned-byte (zpng:image-data zpng))))
