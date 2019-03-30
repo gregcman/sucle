@@ -16,6 +16,7 @@
 (defparameter *glyph-width* 8.0)
 
 (defparameter *app* nil)
+(defparameter *draw-pic* nil)
 (defun start ()
   (application:main
    (lambda ()
@@ -27,17 +28,23 @@
 	    (sandbox::with-world-meshing-lparallel
 	      (loop
 		 (application:poll-app)
-					;(if *app*)
+		 
 		 (testbed::per-frame)
-		 (progn
-		   #+nil
-		   (per-frame)
-		   #+nil
-		   (when (window:skey-j-p (window::keyval #\e))
-		     (window::toggle-mouse-capture)))
-		 #+nil
+		 (if *app*
+		     (progn
+		       ;;#+nil
+		       (per-frame)
+		       #+nil
+		       
+		       (when (window:skey-j-p (window::keyval #\e))
+			 (window::toggle-mouse-capture))))
+		 (when *draw-pic*
+		   (draw-pic))
+		 ;;#+nil
 		 (when (window:skey-j-p (window::keyval #\h))
-		   (toggle *app*))))
+		   (toggle *app*))
+		 (when (window:skey-j-p (window::keyval #\u))
+		   (toggle *draw-pic*))))
 	 (save))))
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))
@@ -302,7 +309,7 @@
     (glhelp:set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
     (gl:enable :blend)
     (gl:blend-func :src-alpha :one-minus-src-alpha)
-    (gl:call-list (glhelp::handle (getfnc 'text-sub::fullscreen-quad)))))
+    (text-sub::draw-fullscreen-quad)))
 
 (defun plain-button (fun &optional
 			   (str (string (gensym "nameless-button-")))
@@ -420,3 +427,88 @@
 		  '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
 		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		  :test 'equal)))
+;;;FIXME::duplicate in terminal625/basic
+(progn
+  (deflazy flat-texture-shader-source ()
+    (glslgen:ashader
+     :version 120
+     :vs
+     (glslgen2::make-shader-stage
+      :out '((value-out "vec4")
+	     (tex-out "vec2"))
+      :in '((position "vec4")
+	    (tex "vec2")
+	    (value "vec4")
+	    (pmv "mat4"))
+      :program
+      '(defun "main" void ()
+	(= "gl_Position" (* pmv position))
+	(= value-out value)
+	(= tex-out tex)))
+     :frag
+     (glslgen2::make-shader-stage
+      :in '((value "vec4")
+	    (tex "vec2")
+	    (sampler "sampler2D"))
+      :program
+      '(defun "main" void ()
+	(/**/ vec4 pixdata)
+	(= pixdata ("texture2D" sampler tex))
+	(=
+	 :gl-frag-color
+	 (* pixdata value)
+	 )))
+     :attributes
+     '((position . 0)
+       (tex . 2)
+       ;(value . 3)
+       )
+     :varyings
+     '((value-out . value)
+       (tex-out . tex))
+     :uniforms
+     '((sampler (:fragment-shader sampler))
+       (pmv (:vertex-shader pmv))
+       (value (:vertex-shader value)))))
+  (glhelp::deflazy-gl flat-texture-shader (flat-texture-shader-source)
+    (glhelp::create-gl-program flat-texture-shader-source)))
+
+
+(deflazy cons-png ()
+  (image-utility:read-png-file
+   #P"/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/gui-terminal-emulator/basic/cons-cell.png"
+   t))
+(glhelp::deflazy-gl cons-texture (cons-png)
+  (make-instance
+   'glhelp::gl-texture
+   :handle
+   (prog1
+       (glhelp:pic-texture cons-png)
+     (glhelp:apply-tex-params
+      (quote ((:texture-min-filter . :linear)
+	      (:texture-mag-filter . :linear)
+	      (:texture-wrap-s . :clamp)
+	      (:texture-wrap-t . :clamp)))))))
+
+(defparameter *pic-tint* (vector 1.0 1.0 1.0 1.0))
+(defun draw-pic ()
+  (glhelp::bind-default-framebuffer)
+  (glhelp:set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
+  (gl:disable :blend)
+
+  (gl:blend-func :src-alpha :one-minus-src-alpha)
+  
+  (let ((program (getfnc 'flat-texture-shader)))
+    (glhelp::use-gl-program program)
+    (glhelp:with-uniforms uniform program
+      (gl:uniformi (uniform 'sampler) 0)
+      (glhelp::set-active-texture 0)
+      (gl:uniform-matrix-4fv
+       (uniform 'pmv)
+       (load-time-value (nsb-cga:identity-matrix))
+       nil)
+      (gl:uniformfv (uniform 'value)
+		    *pic-tint*))   
+    (gl:bind-texture :texture-2d
+		     (glhelp::handle (getfnc 'cons-texture)))
+    (text-sub::draw-fullscreen-quad)))

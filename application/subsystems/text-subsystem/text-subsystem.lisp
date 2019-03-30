@@ -605,3 +605,6 @@
 	  (foo 4 2)
 	  (foo 5 3))))
     array))
+
+(defun draw-fullscreen-quad ()
+  (glhelp::slow-draw (getfnc 'text-sub::fullscreen-quad)))

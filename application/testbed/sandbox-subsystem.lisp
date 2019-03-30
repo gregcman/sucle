@@ -73,7 +73,7 @@
    :miny 0.0
    :minz 0.0
    :maxx 1.0 ;1.0
-   :maxy 0.5 ;1.0
+   :maxy 1.0 ;0.5
    :maxz 1.0)
   "an aabb representing a 1x0.5x1 slab")
 
