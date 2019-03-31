@@ -17,36 +17,54 @@
 
 (defparameter *app* nil)
 (defparameter *draw-pic* nil)
+
+(defparameter *with-functions*
+  #+nil
+  (list
+   (lambda (x)
+     (print 34)
+     (unwind-protect 
+	  (funcall x)
+       (print 2))))
+  (list
+   'call-with-zpng-lparallel
+   'sandbox::call-with-world-meshing-lparallel))
+(defun run-with (fun)
+  (flet ((nest (with-fun cont)
+	   (lambda ()
+	     (funcall with-fun cont))))
+    (dolist (with-fun *with-functions*)
+      (setf fun (nest with-fun fun))))
+  fun)
 (defun start ()
   (application:main
-   (lambda ()
-     (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
-	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
-     (our-load)
-     (let ((text-sub::*text-data-what-type* :framebuffer))
-       (unwind-protect
-	    (with-zpng-lparallel
-	      (sandbox::with-world-meshing-lparallel
-		(loop
-		   (application:poll-app)
-		   
-		   (testbed::per-frame)
-		   (if *app*
-		       (progn
-			 ;;#+nil
-			 (per-frame)
-			 #+nil
-			 
-			 (when (window:skey-j-p (window::keyval #\e))
-			   (window::toggle-mouse-capture))))
-		   (when *draw-pic*
-		     (draw-pic))
+   (run-with
+    (lambda ()
+      (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
+	    (sandbox-sub::entity-gravity? testbed::*ent*) t)
+      (our-load)
+      (let ((text-sub::*text-data-what-type* :framebuffer))
+	(unwind-protect
+	  (loop
+	     (application:poll-app)
+	     
+	     (testbed::per-frame)
+	     (if *app*
+		 (progn
 		   ;;#+nil
-		   (when (window:skey-j-p (window::keyval #\h))
-		     (toggle *app*))
-		   (when (window:skey-j-p (window::keyval #\u))
-		     (toggle *draw-pic*)))))
-	 (save))))
+		   (per-frame)
+		   #+nil
+		   
+		   (when (window:skey-j-p (window::keyval #\e))
+		     (window::toggle-mouse-capture))))
+	     (when *draw-pic*
+	       (draw-pic))
+	     ;;#+nil
+	     (when (window:skey-j-p (window::keyval #\h))
+	       (toggle *app*))
+	     (when (window:skey-j-p (window::keyval #\u))
+	       (toggle *draw-pic*)))
+	  (save)))))
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))
    :title ""))
@@ -474,7 +492,29 @@
   (glhelp::deflazy-gl flat-texture-shader (flat-texture-shader-source)
     (glhelp::create-gl-program flat-texture-shader-source)))
 
-(glhelp::deflazy-gl cons-texture (;;application::w application::h
+
+;;FIXME::see sandbox/change-world.lisp
+(defvar *zpng-lparallel-kernel* nil)
+(defmacro with-zpng-lparallel-kernel (&body body)
+  `(let ((lparallel:*kernel* *zpng-lparallel-kernel*)) ,@body))
+(defparameter *zpng-channel* nil)
+
+(defmacro with-zpng-lparallel (&body body)
+  `(let ((*zpng-lparallel-kernel* nil))
+     (unwind-protect (progn (setf *zpng-lparallel-kernel*
+				  (lparallel:make-kernel 2))
+			    (with-zpng-lparallel-kernel
+			      (let ((*zpng-channel*
+				     (lparallel:make-channel)))
+				,@body)))
+       (when *zpng-lparallel-kernel*
+	 (lparallel:end-kernel)))))
+
+(defun call-with-zpng-lparallel (fun)
+  (with-zpng-lparallel
+    (funcall fun)))
+
+(glhelp::deflazy-gl cons-texture (application::w application::h
 				  )
   (setf *finished* nil)
   (make-instance
@@ -482,9 +522,9 @@
    :handle
    (prog1
        (glhelp:pic-texture
-	(make-array `(;;,application::h ,application::w
-		      512 512
-			 4)) :rgba)
+	(make-array `(,application::h ,application::w
+		      ;;512 512
+				      4)) :rgba)
      (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :linear)
 	      (:texture-mag-filter . :linear)
@@ -497,11 +537,11 @@
   (glhelp::bind-default-framebuffer)
   (gl:disable :depth-test)
   (glhelp:set-render-area 0 0
-			  512 512
-			  ;;(getfnc 'application::w) (getfnc 'application::h)
+			  ;;512 512
+			  (getfnc 'application::w) (getfnc 'application::h)
 			  )
-  ;(gl:enable :blend)
-  (gl:disable :blend)
+  (gl:enable :blend)
+  ;(gl:disable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (submit-zpng-draw-task 10 'a-zpng)
   (with-zpng-lparallel-kernel
@@ -544,22 +584,6 @@
 		(multiple-value-list
 		 (apply fun args))))
 	     args))))
-;;FIXME::see sandbox/change-world.lisp
-(defvar *zpng-lparallel-kernel* nil)
-(defmacro with-zpng-lparallel-kernel (&body body)
-  `(let ((lparallel:*kernel* *zpng-lparallel-kernel*)) ,@body))
-(defparameter *zpng-channel* nil)
-
-(defmacro with-zpng-lparallel (&body body)
-  `(let ((*zpng-lparallel-kernel* nil))
-     (unwind-protect (progn (setf *zpng-lparallel-kernel*
-				  (lparallel:make-kernel 2))
-			    (with-zpng-lparallel-kernel
-			      (let ((*zpng-channel*
-				     (lparallel:make-channel)))
-				,@body)))
-       (when *zpng-lparallel-kernel*
-	 (lparallel:end-kernel)))))
 
 (defun a-zpng ()
   (etouq

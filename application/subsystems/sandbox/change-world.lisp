@@ -34,6 +34,10 @@
        (when *world-mesh-lparallel-kernel*
 	 (lparallel:end-kernel)))))
 
+(defun call-with-world-meshing-lparallel (fun)
+  (with-world-meshing-lparallel
+    (funcall fun)))
+
 (defun update-world-vao (x y z)
   (clean-dirty)
   (With-world-mesh-lparallel-kernel
