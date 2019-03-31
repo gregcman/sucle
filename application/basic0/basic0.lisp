@@ -474,13 +474,17 @@
   (glhelp::deflazy-gl flat-texture-shader (flat-texture-shader-source)
     (glhelp::create-gl-program flat-texture-shader-source)))
 
-(glhelp::deflazy-gl cons-texture (application::w application::h)
+(glhelp::deflazy-gl cons-texture (;;application::w application::h
+				  )
+  (setf *finished* nil)
   (make-instance
    'glhelp::gl-texture
    :handle
    (prog1
        (glhelp:pic-texture
-	(make-array `(,application::h ,application::w 4)) :rgba)
+	(make-array `(;;,application::h ,application::w
+		      512 512
+			 4)) :rgba)
      (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :linear)
 	      (:texture-mag-filter . :linear)
@@ -492,9 +496,12 @@
   (gl:polygon-mode :front-and-back :fill)
   (glhelp::bind-default-framebuffer)
   (gl:disable :depth-test)
-  (glhelp:set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
-  (gl:enable :blend)
-
+  (glhelp:set-render-area 0 0
+			  512 512
+			  ;;(getfnc 'application::w) (getfnc 'application::h)
+			  )
+  ;(gl:enable :blend)
+  (gl:disable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (submit-zpng-draw-task 10 'a-zpng)
   (with-zpng-lparallel-kernel
@@ -503,6 +510,7 @@
 	  (progn
 	    (destructuring-bind (id data) value
 	      (remhash id *draw-tasks*)
+	      (pushnew id *finished* :test 'eql)
 	      (transfer-zpng-data data)))
 	  )))
   (let ((program (getfnc 'flat-texture-shader)))
@@ -522,8 +530,10 @@
 
 
 (defparameter *draw-tasks* (make-hash-table :test 'eql))
+(defparameter *finished* nil) ;;FIXME:::uses a list, not a hash table
 (defun submit-zpng-draw-task (id fun &rest args)
-  (unless (gethash id *draw-tasks*)
+  (unless (or (member id *finished*)
+	      (gethash id *draw-tasks*))
     (setf (gethash id *draw-tasks*) fun)
     (with-zpng-lparallel-kernel
       (apply 'lparallel:submit-task
