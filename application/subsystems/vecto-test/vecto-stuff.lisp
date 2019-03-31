@@ -88,7 +88,9 @@
 	      (:texture-wrap-t . :clamp)))))))
 
 (defparameter *pic-tint* (vector 1.0 1.0 1.0 1.0))
+(defparameter *ticks* 0)
 (defun draw-pic ()
+  (incf *ticks*)
   (gl:polygon-mode :front-and-back :fill)
   (glhelp::bind-default-framebuffer)
   (gl:disable :depth-test)
@@ -100,6 +102,8 @@
   ;(gl:disable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (submit-zpng-draw-task 10 'a-zpng)
+  (when (zerop (mod *ticks* 4))
+    (setf *finished* nil))
   (with-zpng-lparallel-kernel
     (multiple-value-bind (value success-p) (lparallel:try-receive-result *zpng-channel*)
       (if success-p
@@ -143,11 +147,12 @@
 
 (defun a-zpng ()
   (etouq
-    (nth 5
+    (nth 4
 	 '((vecto-test::star-clipping)
 	   (vecto-test::feedlike-icon)
 	   (vecto-test::gradient-example)
 	   (vecto-test::gradient-bilinear-example)
+	   (vecto-test::graph)
 	   (vecto-test::radiant-lambda)
 	   (vecto-test::text-paths)
 	   (make-instance 'zpng::png

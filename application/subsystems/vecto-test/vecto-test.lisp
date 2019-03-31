@@ -132,3 +132,34 @@
     (vecto-data)
     #+nil
     (save-png file)))
+
+(defun graph ()
+  (let ((width (application::getfnc 'application::w)))
+    (with-canvas (:width width
+			 :height (application::getfnc 'application::h))
+      (set-line-join :round)
+      (set-line-cap :round)
+      (set-line-width 2)
+      (set-rgba-stroke (/ (1+ (sin (nice-time))) 2.0)
+		       (/ (1+ (sin (nice-time))) 2.0)
+		       (/ (1+ (sin (nice-time))) 2.0)
+		       ;;0.5 0.5 0.5
+		       1.0)
+      (move-to 0 (math-fun 0))
+      (dotimes (xn width)
+	(let ((x (/ xn 50.0)))
+	  (line-to xn
+		   (math-fun x))))
+      (stroke)
+      (vecto-data))))
+
+(defun nice-time ()
+  (/ (get-internal-real-time)
+     (load-time-value (utility::floatify internal-time-units-per-second))))
+
+(defun math-fun (x)
+  (+ (* 20 (sin x))
+     (+ (* x x 2)
+	(- x))
+     (+ (* 20 (sin (+ x (nice-time)))))
+     ))
