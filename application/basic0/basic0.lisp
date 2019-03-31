@@ -49,6 +49,8 @@
 		     (window::toggle-mouse-capture))))
 	     (when *draw-pic*
 	       (vecto-stuff::draw-pic))
+	     (when *draw-graph*
+	       (cartesian-graphing::draw-graph))
 	     ;;#+nil
 	     (when (window:skey-j-p (window::keyval #\h))
 	       (toggle *app*))
