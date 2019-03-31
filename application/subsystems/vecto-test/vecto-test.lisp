@@ -133,10 +133,15 @@
     #+nil
     (save-png file)))
 
+(defun reverse-lerp (start end value)
+  (/ (- value start)
+     (- end start)))
+
 (defun graph ()
-  (let ((width (application::getfnc 'application::w)))
+  (let ((width (application::getfnc 'application::w))
+	(height (application::getfnc 'application::h)))
     (with-canvas (:width width
-			 :height (application::getfnc 'application::h))
+			 :height height)
       (set-line-join :round)
       (set-line-cap :round)
       (set-line-width 2)
@@ -145,11 +150,21 @@
 		       (/ (1+ (sin (nice-time))) 2.0)
 		       ;;0.5 0.5 0.5
 		       1.0)
-      (move-to 0 (math-fun 0))
-      (dotimes (xn width)
-	(let ((x (/ xn 50.0)))
-	  (line-to xn
-		   (math-fun x))))
+      (let ((minx -10)
+	    (maxx 10)
+	    (miny -10)
+	    (maxy 10))
+	(flet ((translate-x (n)
+		 (alexandria:lerp (/ n width) minx maxx))
+	       (translate-y (n)
+		 (* height (reverse-lerp miny maxy n))))
+	  
+	  (move-to 0 (translate-y (math-fun (translate-x minx))))
+	  (dotimes (xn width)
+	    (line-to xn
+		     (translate-y
+		      (math-fun
+		       (translate-x xn)))))))
       (stroke)
       (vecto-data))))
 
@@ -158,9 +173,20 @@
      (load-time-value (utility::floatify internal-time-units-per-second))))
 
 (defun math-fun (x)
+  ;;(math-fun2 x)
+  (math-fun3 x))
+
+(defun math-fun2 (x)
   (+ (* 20 (sin x))
      (+ (* x x 2)
 	(- x))
      (+ (* 50 (sin (+ x (nice-time))))
 	(* 20 (cos (+ (- x) (* 3 (nice-time))))))
      ))
+
+(defun math-fun3 (x)
+  (let ((offset 0))
+    (if (< x offset)
+	0
+	(let ((value (- x offset)))
+	  (* value value)))))

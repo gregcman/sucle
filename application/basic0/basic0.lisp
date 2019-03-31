@@ -6,6 +6,7 @@
 (defparameter *app* nil)
 (defparameter *draw-pic* nil)
 (defparameter *sandbox* t)
+(defparameter *draw-graph* nil)
 
 (defparameter *with-functions*
   #+nil
@@ -54,7 +55,9 @@
 	     (when (window:skey-j-p (window::keyval #\u))
 	       (toggle *draw-pic*))
 	     (when (window:skey-j-p (window::keyval #\j))
-	       (toggle *sandbox*)))
+	       (toggle *sandbox*))
+	     (when (window:skey-j-p (window::keyval #\i))
+	       (toggle *draw-graph*)))
 	  (save)))))
    :width (floor (* 80 fast-text-grid-sprites::*glyph-width*))
    :height (floor (* 25 fast-text-grid-sprites::*glyph-height*))

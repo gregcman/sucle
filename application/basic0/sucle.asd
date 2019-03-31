@@ -6,7 +6,8 @@
 	       #:utility
 	       #:testbed
 	       #:fast-text-grid-sprites
-	       #:vecto-stuff)
+	       #:vecto-stuff
+	       #:cartesian-graphing)
   :serial t
   :components 
   ((:file "basic0")))

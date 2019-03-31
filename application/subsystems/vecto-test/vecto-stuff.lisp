@@ -179,4 +179,3 @@
 		(rotatef (row-major-aref image (+ (- magic h) w))
 			 (row-major-aref image (+ h w)))))))
   image)
- 
