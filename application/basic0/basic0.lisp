@@ -17,6 +17,7 @@
 
 (defparameter *app* nil)
 (defparameter *draw-pic* nil)
+(defparameter *sandbox* t)
 
 (defparameter *with-functions*
   #+nil
@@ -47,15 +48,15 @@
 	(unwind-protect
 	  (loop
 	     (application:poll-app)
-	     
-	     (testbed::per-frame)
-	     (if *app*
-		 (progn
-		   ;;#+nil
-		   (per-frame)
-		   #+nil
-		   
-		   (when (window:skey-j-p (window::keyval #\e))
+	     (when *sandbox*
+	       (testbed::per-frame))
+	     (when *app*
+	       (progn
+		 ;;#+nil
+		 (per-frame)
+		 #+nil
+		 
+		 (when (window:skey-j-p (window::keyval #\e))
 		     (window::toggle-mouse-capture))))
 	     (when *draw-pic*
 	       (draw-pic))
@@ -63,7 +64,9 @@
 	     (when (window:skey-j-p (window::keyval #\h))
 	       (toggle *app*))
 	     (when (window:skey-j-p (window::keyval #\u))
-	       (toggle *draw-pic*)))
+	       (toggle *draw-pic*))
+	     (when (window:skey-j-p (window::keyval #\j))
+	       (toggle *sandbox*)))
 	  (save)))))
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))

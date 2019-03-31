@@ -226,10 +226,10 @@
 (defun char-attribute (bold-p underline-p opaque-p)
   (logior
    (if bold-p
-       1
+       2
        0)
    (if underline-p
-       2
+       1
        0)
    (if opaque-p
        4
