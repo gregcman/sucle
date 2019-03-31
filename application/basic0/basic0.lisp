@@ -25,26 +25,27 @@
      (our-load)
      (let ((text-sub::*text-data-what-type* :framebuffer))
        (unwind-protect
-	    (sandbox::with-world-meshing-lparallel
-	      (loop
-		 (application:poll-app)
-		 
-		 (testbed::per-frame)
-		 (if *app*
-		     (progn
-		       ;;#+nil
-		       (per-frame)
-		       #+nil
-		       
-		       (when (window:skey-j-p (window::keyval #\e))
-			 (window::toggle-mouse-capture))))
-		 (when *draw-pic*
-		   (draw-pic))
-		 ;;#+nil
-		 (when (window:skey-j-p (window::keyval #\h))
-		   (toggle *app*))
-		 (when (window:skey-j-p (window::keyval #\u))
-		   (toggle *draw-pic*))))
+	    (with-zpng-lparallel
+	      (sandbox::with-world-meshing-lparallel
+		(loop
+		   (application:poll-app)
+		   
+		   (testbed::per-frame)
+		   (if *app*
+		       (progn
+			 ;;#+nil
+			 (per-frame)
+			 #+nil
+			 
+			 (when (window:skey-j-p (window::keyval #\e))
+			   (window::toggle-mouse-capture))))
+		   (when *draw-pic*
+		     (draw-pic))
+		   ;;#+nil
+		   (when (window:skey-j-p (window::keyval #\h))
+		     (toggle *app*))
+		   (when (window:skey-j-p (window::keyval #\u))
+		     (toggle *draw-pic*)))))
 	 (save))))
    :width (floor (* 80 *glyph-width*))
    :height (floor (* 25 *glyph-height*))
@@ -495,7 +496,15 @@
   (gl:enable :blend)
 
   (gl:blend-func :src-alpha :one-minus-src-alpha)
-  (transfer-zpng-data (a-zpng))
+  (submit-zpng-draw-task 10 'a-zpng)
+  (with-zpng-lparallel-kernel
+    (multiple-value-bind (value success-p) (lparallel:try-receive-result *zpng-channel*)
+      (if success-p
+	  (progn
+	    (destructuring-bind (id data) value
+	      (remhash id *draw-tasks*)
+	      (transfer-zpng-data data)))
+	  )))
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -511,13 +520,46 @@
 		     (glhelp::handle (getfnc 'cons-texture)))
     (text-sub::draw-fullscreen-quad)))
 
+
+(defparameter *draw-tasks* (make-hash-table :test 'eql))
+(defun submit-zpng-draw-task (id fun &rest args)
+  (unless (gethash id *draw-tasks*)
+    (setf (gethash id *draw-tasks*) fun)
+    (with-zpng-lparallel-kernel
+      (apply 'lparallel:submit-task
+	     *zpng-channel*
+	     (lambda (&rest args)
+	       (cons
+		id
+		(multiple-value-list
+		 (apply fun args))))
+	     args))))
+;;FIXME::see sandbox/change-world.lisp
+(defvar *zpng-lparallel-kernel* nil)
+(defmacro with-zpng-lparallel-kernel (&body body)
+  `(let ((lparallel:*kernel* *zpng-lparallel-kernel*)) ,@body))
+(defparameter *zpng-channel* nil)
+
+(defmacro with-zpng-lparallel (&body body)
+  `(let ((*zpng-lparallel-kernel* nil))
+     (unwind-protect (progn (setf *zpng-lparallel-kernel*
+				  (lparallel:make-kernel 2))
+			    (with-zpng-lparallel-kernel
+			      (let ((*zpng-channel*
+				     (lparallel:make-channel)))
+				,@body)))
+       (when *zpng-lparallel-kernel*
+	 (lparallel:end-kernel)))))
+
 (defun a-zpng ()
   (etouq
-    (nth 1
+    (nth 5
 	 '((vecto-test::star-clipping)
 	   (vecto-test::feedlike-icon)
 	   (vecto-test::gradient-example)
 	   (vecto-test::gradient-bilinear-example)
+	   (vecto-test::radiant-lambda)
+	   (vecto-test::text-paths)
 	   (make-instance 'zpng::png
 	    :color-type :truecolor-alpha
 	    :width 16
@@ -529,4 +571,16 @@
     (gl:tex-sub-image-2d :texture-2d 0 0 0
 			 (zpng:width zpng)
 			 (zpng:height zpng)
-			 :rgba :unsigned-byte (zpng:image-data zpng))))
+			 :rgba :unsigned-byte (flip-zpng-image
+					       (zpng:height zpng)
+					       (zpng:image-data zpng)))))
+
+(defun flip-zpng-image (height image)
+  (let ((longjumps (/ (length image) height)))
+    (declare (type fixnum height longjumps))
+    (let ((magic (* longjumps (- height 1))))
+      (loop for h below (* longjumps (- height (floor height 2))) by longjumps do
+	   (loop for w below longjumps do
+		(rotatef (row-major-aref image (+ (- magic h) w))
+			 (row-major-aref image (+ h w)))))))
+  image)
