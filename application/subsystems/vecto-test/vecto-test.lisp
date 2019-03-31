@@ -161,5 +161,6 @@
   (+ (* 20 (sin x))
      (+ (* x x 2)
 	(- x))
-     (+ (* 20 (sin (+ x (nice-time)))))
+     (+ (* 50 (sin (+ x (nice-time))))
+	(* 20 (cos (+ (- x) (* 3 (nice-time))))))
      ))
