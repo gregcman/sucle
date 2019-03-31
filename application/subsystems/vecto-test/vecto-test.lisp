@@ -3,7 +3,9 @@
   (:use :cl :vecto))
 (in-package :vecto-test)
 
-(defparameter *output* #P"/home/imac/Documents/common-lisp/vecto.png")
+(defparameter *this-directory* (asdf:system-source-directory :vecto-stuff))
+(defparameter *output* (merge-pathnames "vecto.png"
+					*this-directory*))
 
 (defun vecto-data ()
   (if (boundp 'vecto::*graphics-state*)
@@ -114,9 +116,10 @@
     #+nil
     (save-png file)))
 
+(defparameter *vecto-ttf-path* (merge-pathnames "times.ttf" *this-directory*))
 (defun text-paths (&optional (file *output*))
   (with-canvas (:width 400 :height 100)
-    (set-font (get-font "times.ttf") 70)
+    (set-font (get-font *vecto-ttf-path*) 70)
     (centered-string-paths 200 15 "Hello, world!")
     (set-line-join :round)
     (set-line-cap :round)

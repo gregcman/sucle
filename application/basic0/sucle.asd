@@ -4,15 +4,8 @@
   :description "Cube Demo Game"
   :depends-on (#:application
 	       #:utility
-	       #:sprite-chain
-	       #:text-subsystem
-	       #:opengl-immediate
-	       #:image-utility
-	       #:character-modifier-bits
-	       #:uncommon-lisp
-	       #:quads
-	       #:point
 	       #:testbed
+	       #:fast-text-grid-sprites
 	       #:vecto-stuff)
   :serial t
   :components 
