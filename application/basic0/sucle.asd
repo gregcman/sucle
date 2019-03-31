@@ -12,7 +12,8 @@
 	       #:uncommon-lisp
 	       #:quads
 	       #:point
-	       #:testbed)
+	       #:testbed
+	       #:vecto-stuff)
   :serial t
   :components 
   ((:file "basic0")))
