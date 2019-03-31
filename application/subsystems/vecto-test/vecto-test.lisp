@@ -17,7 +17,7 @@
 
 (defun radiant-lambda (&optional (file *output*))
   (with-canvas (:width 90 :height 90)
-    (let ((font (get-font "times.ttf"))
+    (let ((font (get-font *vecto-ttf-path*))
           (step (/ pi 7)))
       (set-font font 40)
       (translate 45 45)
