@@ -7,7 +7,7 @@
 (defun draw-graph ()
   (glhelp::set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
   (gl:disable :depth-test)
-  (gl:line-width 10.0)
+  (gl:line-width 3.0)
   (gl:point-size 10.0)
   (let ((program (getfnc 'flat-shader)))
     (glhelp::use-gl-program program))
@@ -23,7 +23,7 @@
       (color 0.0 0.0 1.0)
       (vertex 0.5 -0.5))
     ))
- 
+
 (progn
   (deflazy flat-shader-source ()
     (glslgen:ashader
@@ -69,13 +69,13 @@
 	  (b (/ (1+ (sin (nice-time))) 2.0))
 	  ;;0.5 0.5 0.5
 	  (a 1.0))
-      (let ((minx -10)
-	    (maxx 10)
-	    (miny -10)
-	    (maxy 10))
+      (let ((minx 0)
+	    (maxx 50)
+	    (miny 0)
+	    (maxy 1024))
 	(flet ((fun1 (n)
-		    (floatify
-		     (- (* 2 (/ n width)) 1)))
+		 (floatify
+		  (- (* 2 (/ n width)) 1)))
 	       (translate-x (n)
 		 (alexandria:lerp (/ n width) minx maxx))
 	       (translate-y (n)
@@ -93,8 +93,9 @@
      (load-time-value (utility::floatify internal-time-units-per-second))))
 
 (defun math-fun (x)
-  ;;(math-fun2 x)
-  (math-fun3 x))
+  (math-fun2 x)
+  ;;(math-fun3 x)
+  )
 
 (defun math-fun2 (x)
   (+ (* 20 (sin x))
