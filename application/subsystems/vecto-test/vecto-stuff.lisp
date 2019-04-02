@@ -70,7 +70,7 @@
   (with-zpng-lparallel
     (funcall fun)))
 
-(glhelp::deflazy-gl cons-texture (application::w application::h
+(glhelp::deflazy-gl cons-texture (;;application::w application::h
 				  )
   (setf *finished* nil)
   (make-instance
@@ -78,9 +78,14 @@
    :handle
    (prog1
        (glhelp:pic-texture
+	(image-utility:read-png-file
+	 "/home/imac/Documents/handwritten\ notes/batch\ 1/IMG_20190321_012106.615.png" t)
+	#+nil
 	(make-array `(,application::h ,application::w
 		      ;;512 512
-				      4)) :rgba)
+				      4))
+	;:rgba
+	)
      (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :linear)
 	      (:texture-mag-filter . :linear)
@@ -91,6 +96,25 @@
 (defparameter *ticks* 0)
 (defun draw-pic ()
   (incf *ticks*)
+  #+nil
+  (progn
+    (submit-zpng-draw-task 10 'a-zpng)
+    (when (zerop (mod *ticks* 4))
+      (setf *finished* nil))
+    (with-zpng-lparallel-kernel
+      (multiple-value-bind (value success-p) (lparallel:try-receive-result *zpng-channel*)
+	(if success-p
+	    (progn
+	      (destructuring-bind (id data) value
+		(remhash id *draw-tasks*)
+		(pushnew id *finished* :test 'eql)
+		(transfer-zpng-data data)))
+	    ))))
+
+  (draw-texture
+   (glhelp::handle (getfnc 'cons-texture))))
+
+(defun draw-texture (texture)
   (gl:polygon-mode :front-and-back :fill)
   (glhelp::bind-default-framebuffer)
   (gl:disable :depth-test)
@@ -99,20 +123,9 @@
 			  (getfnc 'application::w) (getfnc 'application::h)
 			  )
   (gl:enable :blend)
-  ;(gl:disable :blend)
+					;(gl:disable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
-  (submit-zpng-draw-task 10 'a-zpng)
-  (when (zerop (mod *ticks* 4))
-    (setf *finished* nil))
-  (with-zpng-lparallel-kernel
-    (multiple-value-bind (value success-p) (lparallel:try-receive-result *zpng-channel*)
-      (if success-p
-	  (progn
-	    (destructuring-bind (id data) value
-	      (remhash id *draw-tasks*)
-	      (pushnew id *finished* :test 'eql)
-	      (transfer-zpng-data data)))
-	  )))
+
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
@@ -125,8 +138,9 @@
       (gl:uniformfv (uniform 'value)
 		    *pic-tint*))   
     (gl:bind-texture :texture-2d
-		     (glhelp::handle (getfnc 'cons-texture)))
+		     texture)
     (text-sub::draw-fullscreen-quad)))
+
 
 
 (defparameter *draw-tasks* (make-hash-table :test 'eql))

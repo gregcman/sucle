@@ -18,9 +18,10 @@
   (bailout (floor 1000000 4) :type fixnum)
   (aux 0.0 :type double-float))
 
-(declaim (ftype (function (fixnum fixnum)) make-ticker))
-(defun make-ticker (dt time)
-  (%make-ticker :dt dt :current-time time :aux (coerce (/ 1 dt) 'double-float)))
+(declaim (ftype (function (fixnum fixnum &optional fixnum)) make-ticker))
+(defun make-ticker (dt time &optional (bailout (floor 1000000 4))) ;;FIXME
+  (%make-ticker :dt dt :current-time time :aux (coerce (/ 1 dt) 'double-float)
+		:bailout bailout))
 
 (defmacro tick-physics (ticker &body body)
   (with-gensyms (accumulator ticks times)
