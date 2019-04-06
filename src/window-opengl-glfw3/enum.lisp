@@ -152,18 +152,37 @@
     (:home 126);;;268****
     (:delete 127) ;;261****
     )))
+(defun to-claw (prefix sym &key (errorp t))
+  (let ((string (concatenate 'string "+" prefix "-"(symbol-name sym) "+")))
+    (multiple-value-bind (sym existsp)
+	(find-symbol
+	 string
+	 (find-package "%GLFW"))
+      (if existsp
+	  (values sym t)
+	  (if errorp
+	      (error "~a not found in %GLFW package" string)
+	      (values nil nil))))))
+(defun substitute-foreign-enum-value (type name)
+  (symbol-value (to-claw type name)))
 (defparameter *mouse-array*
   (let ((array (make-array 8 :element-type '(unsigned-byte 8))))
     (dolist (x *modified-mouse-enums*)
       (when (listp x)
-	(setf (aref array (cffi:foreign-enum-value '%glfw::mouse (first x)))
+	(setf (aref array
+		    (substitute-foreign-enum-value "MOUSE-BUTTON" (first x))
+		    ;;(cffi:foreign-enum-value '%glfw::mouse (first x))
+		    )
 	      (second x))))
     array))
 (defparameter *key-array*
   (let ((array (make-array 349 :element-type '(unsigned-byte 8))))
     (dolist (x *modified-key-enums*)
       (when (listp x)
-	(setf (aref array (cffi:foreign-enum-value '%glfw::key (first x)))
+	(setf (aref array
+		    (substitute-foreign-enum-value "KEY" (first x))
+		    ;;(cffi:foreign-enum-value '%glfw::key (first x))
+		    )
 	      (second x))))
     array))
 (defparameter *character-keys*
@@ -175,6 +194,15 @@
 ;;escape, delete, backspace, tab, return/enter? are ascii?
 (defparameter *back-map* 
   (let ((back-map (make-array 128)))
+    (dolist (item *modified-mouse-enums*)
+      (when (listp item)
+	(setf (aref back-map (second item))
+	      (cons :mouse (first item)))))
+    (dolist (item *modified-key-enums*)
+      (when (listp item)
+	(setf (aref back-map (second item))
+	      (cons :mouse (first item)))))
+    #+nil
     (flet ((thing (array enum)
 	     (dotimes (i (length array))
 	       (let ((value (cffi:foreign-enum-keyword enum i :errorp nil)))
@@ -189,22 +217,30 @@
   (let ((cell (aref *back-map* n)))
     (values (cdr cell)
 	    (case (car cell)
-	      (%cl-glfw3::key :key)
-	      (%cl-glfw3::mouse :mouse)))))
+	      (;;%cl-glfw3::key
+	       :key
+	       :key)
+	      (;;%cl-glfw3::mouse
+	       :mouse
+	       :mouse)))))
 
 (defmacro mouseval (identifier)
   (etypecase identifier
     (keyword
      (aref *mouse-array*
-	(cffi:foreign-enum-value (quote %glfw::mouse) identifier)))
+	   (substitute-foreign-enum-value "MOUSE-BUTTON" identifier)
+	   ;;(cffi:foreign-enum-value (quote %glfw::mouse) identifier)
+	   ))
     (integer
      (aref *mouse-array* (1- identifier)))))
 (defmacro keyval (identifier)
   (etypecase identifier
     (keyword
      (aref *key-array*
-	(cffi:foreign-enum-value (quote %glfw::key)
-				 identifier)))
+	   (substitute-foreign-enum-value "KEY" identifier)
+	   #+nil
+	   (cffi:foreign-enum-value (quote %glfw::key)
+				    identifier)))
     (character
      (char-code (char-upcase identifier)))
     (integer

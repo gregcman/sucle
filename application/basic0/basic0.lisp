@@ -35,31 +35,31 @@
       (our-load)
       (let ((text-sub::*text-data-what-type* :framebuffer))
 	(unwind-protect
-	  (loop
-	     (application:poll-app)
-	     (when *sandbox*
-	       (testbed::per-frame))
-	     (when *app*
-	       (progn
-		 ;;#+nil
-		 (fast-text-grid-sprites::per-frame)
-		 #+nil
-		 
-		 (when (window:skey-j-p (window::keyval #\e))
-		     (window::toggle-mouse-capture))))
-	     (when *draw-pic*
-	       (vecto-stuff::draw-pic))
-	     (when *draw-graph*
-	       (cartesian-graphing::draw-graph))
-	     ;;#+nil
-	     (when (window:skey-j-p (window::keyval #\h))
-	       (toggle *app*))
-	     (when (window:skey-j-p (window::keyval #\u))
-	       (toggle *draw-pic*))
-	     (when (window:skey-j-p (window::keyval #\j))
-	       (toggle *sandbox*))
-	     (when (window:skey-j-p (window::keyval #\i))
-	       (toggle *draw-graph*)))
+	     (loop
+		(application:poll-app)
+		(when *sandbox*
+		  (testbed::per-frame))
+		(when *app*
+		  (progn
+		    ;;#+nil
+		    (fast-text-grid-sprites::per-frame)
+		    #+nil
+		    
+		    (when (window:skey-j-p (window::keyval #\e))
+		      (window::toggle-mouse-capture))))
+		(when *draw-pic*
+		  (vecto-stuff::draw-pic))
+		(when *draw-graph*
+		  (cartesian-graphing::draw-graph))
+		;;#+nil
+		(when (window:skey-j-p (window::keyval #\h))
+		  (toggle *app*))
+		(when (window:skey-j-p (window::keyval #\u))
+		  (toggle *draw-pic*))
+		(when (window:skey-j-p (window::keyval #\j))
+		  (toggle *sandbox*))
+		(when (window:skey-j-p (window::keyval #\i))
+		  (toggle *draw-graph*)))
 	  (save)))))
    :width (floor (* 80 fast-text-grid-sprites::*glyph-width*))
    :height (floor (* 25 fast-text-grid-sprites::*glyph-height*))
