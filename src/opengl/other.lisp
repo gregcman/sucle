@@ -29,7 +29,7 @@ not made in the current OpenGL context, so they are garbage"
 
 (defmacro with-gl-context ((gl-proc-address) &body body)
   `(unwind-protect (progn
-		     (setf %gl:*gl-get-proc-address* ,gl-proc-address)
+		     (setf %gl:*gl-get-proc-address* ,gl-proc-address) ;;FIXME::is this needed?
 		     (setf glhelp::*gl-context* (cons "gl-context" "token"))
 		     (setf glhelp::*gl-version* (gl:get-string :version))
 		     (setf glhelp::*gl-version-substring*

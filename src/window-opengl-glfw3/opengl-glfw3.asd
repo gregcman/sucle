@@ -2,8 +2,10 @@
   :author "terminal625"
   :license "MIT"
   :description "glfw3 opengl context creation, windowing and input"
-  :depends-on (#:cl-glfw3
-	       #:utility)
+  :depends-on (#:bodge-glfw
+	       #:glfw-blob
+	       #:utility
+	       #:alexandria)
 
   :serial t
   :components  
