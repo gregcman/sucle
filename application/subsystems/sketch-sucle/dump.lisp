@@ -916,13 +916,15 @@ void main() {
   (curve-steps 100))
 
 (defmacro with-pen (pen &body body)
-  (alexandria:once-only (pen)
-    `(alexandria:with-gensyms (previous-pen)
-       (progn
-         (setf previous-pen (env-pen *env*)
-               (env-pen *env*) ,pen)
-         ,@body
-         (setf (env-pen *env*) previous-pen)))))
+  (alexandria:once-only
+   (pen)
+   (alexandria:with-gensyms
+    (previous-pen)
+    `(let ((,previous-pen (env-pen *env*)))
+       (unwind-protect (progn
+			 (setf (env-pen *env*) ,pen)
+			 ,@body)
+	 (setf (env-pen *env*) ,previous-pen))))))
 
 (defun set-pen (pen)
   "Sets environment pen to PEN."
@@ -1004,13 +1006,14 @@ void main() {
 		   :align (or align :left))))
 
 (defmacro with-font (font &body body)
-  (alexandria:once-only (font)
-			`(alexandria:with-gensyms (previous-font)
-						  (progn
-						    (setf previous-font (env-font *env*)
-							  (env-font *env*) ,font)
-						    ,@body
-						    (setf (env-font *env*) previous-font)))))
+  (alexandria:once-only
+   (font)
+   (alexandria:with-gensyms
+    (previous-font)			    
+    `(let ((,previous-font (env-font *env*)))
+       (unwind-protect (progn (setf (env-font *env*) ,font)
+			      ,@body)
+	 (setf (env-font *env*) ,previous-font))))))
 
 (defun set-font (font)
   (setf (env-font *env*) font))
@@ -1208,14 +1211,32 @@ void main() {
                (color :unsigned-byte 4 :out-type :float)))
 
 (defparameter *buffer-size* (expt 2 17))
-(defparameter *vertex-attributes* 5)
-(defparameter *bytes-per-vertex* (+ (* 4 *vertex-attributes*)))
+;;(defparameter *vertex-attributes* 5) ;;WTF?
+(defparameter *bytes-per-vertex*
+  (+
+   (* 2 4)
+   (* 2 4)
+   (* 4 1))
+  ;;(+ (* 4 *vertex-attributes*))
+  )
 
 (defparameter *draw-mode* :gpu)
 (defparameter *draw-sequence* nil)
 
 (defun start-draw ()
-  (%gl:bind-buffer :array-buffer 1)
+  #+nil
+  (%gl:bind-buffer :array-buffer
+
+		   ;;1
+		   (slot-value *instance* '%array-buffer)
+		   ) ;;FIXME::cleanup somewhere?
+  #+nil
+  (%gl:buffer-data :array-buffer *buffer-size* (cffi:null-pointer) :stream-draw)
+  ;;FIXME::THE VALUE OF the-vbo DEPENDS ON THE LAYOUT OF kit.gl.vao.vbos
+  ;;ORIGINALLY SKETCH ASSUMES THERE IS 1 VBO NAMED 1. THIS LEAD ME TO A WILD GOOSE CHASE
+  ;;OF NULL POINTER HUNTING.
+  (let ((the-vbo (aref (slot-value (env-vao *env*) 'kit.gl.vao::vbos) 0)))
+    (%gl:bind-buffer :array-buffer the-vbo))
   (%gl:buffer-data :array-buffer *buffer-size* (cffi:null-pointer) :stream-draw)
   (setf (env-buffer-position *env*) 0)
   (kit.gl.vao:vao-bind (env-vao *env*)))
@@ -1232,6 +1253,7 @@ void main() {
                    (or (image-texture res) (env-white-pixel-texture *env*))))))
 
 (defun draw-shape (primitive fill-vertices stroke-vertices)
+  (declare (optimize (debug 3)))
   (when (and fill-vertices (pen-fill (env-pen *env*)))
     (multiple-value-bind (shader-color shader-texture)
         (shader-color-texture-values (pen-fill (env-pen *env*)))
@@ -1253,22 +1275,31 @@ void main() {
                        *draw-mode*)))))
 
 (defmethod push-vertices (vertices color texture primitive (draw-mode (eql :gpu)))
+  (declare (optimize (debug 3)))
   (kit.gl.shader:uniform-matrix (env-programs *env*) :model-m 4
                                 (vector (env-model-matrix *env*)))
   (gl:bind-texture :texture-2d texture)
   (symbol-macrolet ((position (env-buffer-position *env*)))
+    ;;(print "what1")
+
+    ;;#+nil ;;FIXME::what is this for?
     (when (> (* *bytes-per-vertex* (+ position (length vertices))) *buffer-size*)
       (start-draw))
     (let ((buffer-pointer (%gl:map-buffer-range :array-buffer
-                                                (* position *bytes-per-vertex*)
-                                                (* (length vertices) *bytes-per-vertex*)
-                                                #x22)))
-      (fill-buffer buffer-pointer vertices color)
-      (%gl:unmap-buffer :array-buffer)
-      (%gl:draw-arrays primitive position (length vertices))
-      (setf position (+ position (length vertices))))))
+						(* position *bytes-per-vertex*)
+						(* (length vertices) *bytes-per-vertex*)
+						#x22)))
+      #+nil
+      (if (cffi:null-pointer-p buffer-pointer)
+	  (print "wtf"))
+      (progn (fill-buffer buffer-pointer vertices color)
+	     (gl:unmap-buffer :array-buffer)))
+    (gl:draw-arrays primitive position (length vertices))
+    ;;(print "what3")
+    (setf position (+ position (length vertices)))))
 
 (defmethod push-vertices (vertices color texture primitive (draw-mode (eql :figure)))
+  (declare (optimize (debug 3)))
   (let* ((buffer (static-vectors:make-static-vector
                   (* *bytes-per-vertex* (length vertices))
                   :element-type '(unsigned-byte 8)))
@@ -1278,19 +1309,21 @@ void main() {
                 :pointer buffer-pointer
                 :length (length vertices)) *draw-sequence*)))
 
-(defun fill-buffer (buffer-pointer vertices color)      
+(defun fill-buffer (buffer-pointer vertices color)
   (loop
-     for idx from 0 by *vertex-attributes*
+     for idx from 0 by 5;;*vertex-attributes* ;;FIXME ;;coincidence that it lines up? float =4 uint8s = 5 floats
      for (x y) in vertices
-     for (tx ty) in (normalize-to-bounding-box vertices)
-     do (setf (cffi:mem-aref buffer-pointer :float idx) (coerce-float x)
-	      (cffi:mem-aref buffer-pointer :float (+ idx 1)) (coerce-float y)
-	      (cffi:mem-aref buffer-pointer :float (+ idx 2)) (coerce-float tx)
-	      (cffi:mem-aref buffer-pointer :float (+ idx 3)) (coerce-float (* ty (env-y-axis-sgn *env*)))
-	      (cffi:mem-aref buffer-pointer :uint8 (* 4 (+ idx 4))) (aref color 0)
-	      (cffi:mem-aref buffer-pointer :uint8 (+ (* 4 (+ idx 4)) 1)) (aref color 1)
-	      (cffi:mem-aref buffer-pointer :uint8 (+ (* 4 (+ idx 4)) 2)) (aref color 2)
-	      (cffi:mem-aref buffer-pointer :uint8 (+ (* 4 (+ idx 4)) 3)) (aref color 3))))
+     for (tx ty) in (normalize-to-bounding-box vertices) ;;WTF?
+     do
+       (setf (cffi:mem-aref buffer-pointer :float (+ idx 0)) (coerce-float x)
+	     (cffi:mem-aref buffer-pointer :float (+ idx 1)) (coerce-float y)
+	     (cffi:mem-aref buffer-pointer :float (+ idx 2)) (coerce-float tx)
+	     (cffi:mem-aref buffer-pointer :float (+ idx 3)) (coerce-float (* ty (env-y-axis-sgn *env*)))
+	     (cffi:mem-aref buffer-pointer :uint8 (+ (* idx 4) 16)) (aref color 0)
+	     (cffi:mem-aref buffer-pointer :uint8 (+ (* idx 4) 17)) (aref color 1)
+	     (cffi:mem-aref buffer-pointer :uint8 (+ (* idx 4) 18)) (aref color 2)
+	     (cffi:mem-aref buffer-pointer :uint8 (+ (* idx 4) 19)) (aref color 3)
+	     )))
 
 
 ;;----------------------------------------------------------------------
@@ -1496,10 +1529,11 @@ void main() {
 
 (defmacro with-matrix (matrix &body body)
   `(progn
-     (push-matrix)
-     (set-matrix ,matrix)
-     ,@body
-     (pop-matrix)))
+     (unwind-protect
+	  (progn (push-matrix)
+		 (set-matrix ,matrix)
+		 ,@body)
+       (pop-matrix))))
 
 (defmacro with-identity-matrix (&body body)
   `(with-matrix sb-cga::+identity-matrix+
@@ -1547,6 +1581,7 @@ void main() {
 		     )
      ((%env :initform (make-env))
       (%restart :initform t)
+      ;;(%array-buffer :initform nil :reader sketch-array-buffer)
       ,@*default-slots*)))
 
 (define-sketch-class)
@@ -1677,30 +1712,33 @@ used for drawing, 60fps.")
 #+nil;;FIXME
 (defmethod kit.sdl2:render ((instance sketch))
   (render-sketch-instance instance))
-(defun render-sketch-instance (instance)  
-  (with-slots (%env %restart width height copy-pixels) instance
-    (with-environment %env
-      (with-pen (make-default-pen)
-	(with-font (make-default-font)
-	  (with-identity-matrix
-	    #+nil;;FIXME -> for integration with other opengl apps
-	    (unless copy-pixels
-	      (background (gray 0.4)))
-	    ;; Restart sketch on setup and when recovering from an error.
-	    (when %restart
-	      (gl-catch (rgb 1 1 0.3)
-		(setup instance))
-	      (setf (slot-value instance '%restart) nil))
-	    ;; If we're in the debug mode, we exit from it immediately,
-	    ;; so that the restarts are shown only once. Afterwards, we
-	    ;; continue presenting the user with the red screen, waiting for
-	    ;; the error to be fixed, or for the debug key to be pressed again.
-	    (if (debug-mode-p)
-		(progn
-		  (exit-debug-mode)
-		  (draw-window instance))
-		(gl-catch (rgb 0.7 0 0)
-		  (draw-window instance)))))))))
+(defparameter *instance* nil)
+(defun render-sketch-instance (instance)
+  (let ((*instance* instance))
+    (with-slots (%env %restart width height copy-pixels) instance
+      (with-environment %env
+	(with-pen (make-default-pen)
+	  (with-font (make-default-font)
+	    (with-identity-matrix
+	      #+nil;;FIXME -> for integration with other opengl apps
+	      (unless copy-pixels
+		(background (gray 0.4)))
+	      ;; Restart sketch on setup and when recovering from an error.
+
+	      (when %restart
+		(gl-catch (rgb 1 1 0.3)
+		  (setup instance))
+		(setf (slot-value instance '%restart) nil))
+	      ;; If we're in the debug mode, we exit from it immediately,
+	      ;; so that the restarts are shown only once. Afterwards, we
+	      ;; continue presenting the user with the red screen, waiting for
+	      ;; the error to be fixed, or for the debug key to be pressed again.
+	      (if (debug-mode-p)
+		  (progn
+		    (exit-debug-mode)
+		    (draw-window instance))
+		  (progn ;;gl-catch (rgb 0.7 0 0)
+		    (draw-window instance))))))))))
 
 ;;; Default events
 
@@ -1841,6 +1879,9 @@ used for drawing, 60fps.")
                     (declare (ignorable ,@(mapcar #'car *default-slots*) ,@(custom-slots bindings)))
                     ,(make-window-parameter-setf)
                     ,(make-custom-slots-setf sketch-name (custom-bindings bindings)))
+		  #+nil ;;FIXME::where do the buffers go?
+		  (setf (slot-value instance '%array-buffer)
+			(car (gl:gen-buffers 1)))
                   (setf (env-y-axis-sgn (slot-value instance '%env))
                         (if (eq (slot-value instance 'y-axis) :down) +1 -1)))
 
@@ -1871,6 +1912,7 @@ used for drawing, 60fps.")
 (defclass figure ()
   ((draws :initarg :draws)))
 
+#+nil ;;FIXME::what?
 (defmethod draw ((figure figure) &key &allow-other-keys)
   (symbol-macrolet ((position (env-buffer-position *env*)))
     (with-slots (draws) figure

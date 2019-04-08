@@ -65,10 +65,9 @@
 		  (toggle *draw-sketch*))
 
 		(when *draw-sketch*
-		  (if (zerop (random 2))
-		      (update-sketch-instance (getfnc 'sketch-sketch))
-		      ;;(update-sketch-instance (getfnc 'sketch-sketch2))
-		      )
+		  (update-sketch-instance (getfnc 'sketch-sketch))
+		  (update-sketch-instance (getfnc 'sketch-sketch2))
+		      
 		  ))
 	  (save)))))
    :width (floor (* 80 fast-text-grid-sprites::*glyph-width*))
@@ -85,7 +84,8 @@
   (gl:disable :cull-face)
   (gl:polygon-mode :front-and-back :fill)	
   (sketch-sucle::initialize-gl instance)
-  (sketch-sucle::render-sketch-instance instance))
+  (sketch-sucle::render-sketch-instance instance)
+  )
 
 (glhelp::deflazy-gl sketch-sketch ()
   ;;DO NOT REEVALUTE THIS WHEN RUNNING!!!
@@ -100,6 +100,15 @@
     (sketch-sucle::initialize-environment instance)
     (sketch-sucle::prepare instance)
     (values instance)))
+
+(defmethod deflazy::cleanup-node-value ((object sketch-sucle::sketch))
+  (sketch-sucle::with-environment
+   (slot-value object 'sketch-sucle::%env)
+   (let ((vao (sketch-sucle::env-vao sketch-sucle::*env*)))
+     (kit.gl.vao:vao-unbind)
+     (kit.gl.vao::gl-delete vao))
+    (loop for resource being the hash-values of (sketch-sucle::env-resources sketch-sucle::*env*)
+       do (sketch-sucle::free-resource resource))))
 
 (defun save ()
   (atest::remove-zeroes)
