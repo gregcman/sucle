@@ -118,7 +118,10 @@ for the current implementation."
 (defparameter *alt* nil)
 (defparameter *super* nil)
 (defun poll ()
-  ;;(setq *status* (%glfw:window-should-close *window*))
+  (setq *status* (let ((value (%glfw:window-should-close *window*)))
+		   (cond ((eql value %glfw:+true+) t)
+			 ((eql value %glfw:+false+) nil)
+			 (t (error "what is this value? ~a" value)))))
   (poll-events)
 
   (let ((mods *mod-keys*))
