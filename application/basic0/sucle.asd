@@ -7,7 +7,8 @@
 	       #:testbed
 	       #:fast-text-grid-sprites
 	       #:vecto-stuff
-	       #:cartesian-graphing)
+	       #:cartesian-graphing
+	       #:sketch-sucle-examples)
   :serial t
   :components 
   ((:file "basic0")))

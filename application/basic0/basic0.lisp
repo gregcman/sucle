@@ -7,6 +7,7 @@
 (defparameter *draw-pic* nil)
 (defparameter *sandbox* t)
 (defparameter *draw-graph* nil)
+(defparameter *draw-sketch* nil)
 
 (defparameter *with-functions*
   #+nil
@@ -59,11 +60,46 @@
 		(when (window:skey-j-p (window::keyval #\j))
 		  (toggle *sandbox*))
 		(when (window:skey-j-p (window::keyval #\i))
-		  (toggle *draw-graph*)))
+		  (toggle *draw-graph*))
+		(when (window:skey-j-p (window::keyval #\n))
+		  (toggle *draw-sketch*))
+
+		(when *draw-sketch*
+		  (if (zerop (random 2))
+		      (update-sketch-instance (getfnc 'sketch-sketch))
+		      ;;(update-sketch-instance (getfnc 'sketch-sketch2))
+		      )
+		  ))
 	  (save)))))
    :width (floor (* 80 fast-text-grid-sprites::*glyph-width*))
    :height (floor (* 25 fast-text-grid-sprites::*glyph-height*))
    :title ""))
+
+(defun update-sketch-instance (instance)
+  (setf (sketch-sucle::sketch-height instance) (getfnc 'application::h)
+	(sketch-sucle::sketch-width instance) (getfnc 'application::w))
+  (sketch-sucle::set-ortho-matrix instance)
+  (sketch-sucle::set-shader-values instance)
+  (glhelp::bind-default-framebuffer)
+  (gl:disable :depth-test)
+  (gl:disable :cull-face)
+  (gl:polygon-mode :front-and-back :fill)	
+  (sketch-sucle::initialize-gl instance)
+  (sketch-sucle::render-sketch-instance instance))
+
+(glhelp::deflazy-gl sketch-sketch ()
+  ;;DO NOT REEVALUTE THIS WHEN RUNNING!!!
+  (let ((instance (make-instance 'sketch-sucle-examples:sinewave)))
+    (sketch-sucle::initialize-environment instance)
+    (sketch-sucle::prepare instance)
+    (values instance)))
+
+(glhelp::deflazy-gl sketch-sketch2 ()
+  ;;DO NOT REEVALUTE THIS WHEN RUNNING!!!
+  (let ((instance (make-instance 'sketch-sucle-examples:lenna)))
+    (sketch-sucle::initialize-environment instance)
+    (sketch-sucle::prepare instance)
+    (values instance)))
 
 (defun save ()
   (atest::remove-zeroes)
