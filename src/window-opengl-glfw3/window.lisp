@@ -158,7 +158,6 @@ for the current implementation."
 (defparameter *window* nil)
 ;;Graphics calls on OS X must occur in the main thread
 (defun set-callbacks (&optional (window *window*))
-  (init)
   (%glfw:set-mouse-button-callback window
 				   (cffi:get-callback 'mouse-callback))
   (%glfw:set-key-callback window (cffi:get-callback 'key-callback))

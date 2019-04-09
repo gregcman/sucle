@@ -27,6 +27,7 @@
     (dolist (with-fun *with-functions*)
       (setf fun (nest with-fun fun))))
   fun)
+
 (defun start ()
   (application:main
    (run-with
