@@ -1,7 +1,7 @@
 (in-package #:window)
 
-(defparameter *scroll-x* nil)
-(defparameter *scroll-y* nil)
+(defparameter *scroll-x* 0)
+(defparameter *scroll-y* 0)
 (defparameter *mouse-x* 0.0d0)
 (defparameter *mouse-y* 0.0d0)
 (defparameter *width* nil)
@@ -131,31 +131,42 @@ for the current implementation."
 	  *super* (logtest +super+ mods))))
 
 (defmacro with-window (window-keys &body body)
-  `(let ((window (funcall #'%glfw:create-window
-			  (getf 
-			   ,window-keys
-			   :width )
-			  (getf 
-			   ,window-keys
-			   :height )
-			  (getf 
-			   ,window-keys
-			   :title )
-			  (getf 
-			   ,window-keys
-			   :monitor )
-			  (getf 
-			   ,window-keys
-			   :shared ))))
-     (unwind-protect
-	  (progn
-	    (let ((*window* window))
-	      (%glfw:make-context-current window)
-	      ,@body))
-       (%glfw:destroy-window window))))
+  (alexandria:with-gensyms (window)
+   `(let ((,window (funcall #'%glfw:create-window
+			   (getf 
+			    ,window-keys
+			    :width )
+			   (getf 
+			    ,window-keys
+			    :height )
+			   (getf 
+			    ,window-keys
+			    :title )
+			   (getf 
+			    ,window-keys
+			    :monitor )
+			   (getf 
+			    ,window-keys
+			    :shared ))))
+      (unwind-protect
+	   (progn
+	     (let ((*window* ,window))
+	       (%glfw:make-context-current ,window)
+	       ,@body))
+	(%glfw:destroy-window ,window)))))
 
 (defparameter *window* nil)
 ;;Graphics calls on OS X must occur in the main thread
+(defun set-callbacks (&optional (window *window*))
+  (init)
+  (%glfw:set-mouse-button-callback window
+				   (cffi:get-callback 'mouse-callback))
+  (%glfw:set-key-callback window (cffi:get-callback 'key-callback))
+  (%glfw:set-scroll-callback window (cffi:get-callback 'scroll-callback))
+  (%glfw:set-window-size-callback window (cffi:get-callback 'update-viewport))
+  (%glfw:set-char-callback window (cffi:get-callback 'char-callback)) 
+  (%glfw:set-cursor-pos-callback window (cffi:get-callback 'cursor-callback))
+  )
 (defun wrapper (func &optional (params
 				'(:title "window"
 				  :width 1
@@ -163,22 +174,14 @@ for the current implementation."
 				  :resizable nil)))
   (with-float-traps-saved-and-masked
     (glfw:with-init ()
-      (window:init)
+      (init)
       (glfw:with-window-hints
 	    ;;FIXME::better interface?
 	    ((%glfw:+resizable+ (if (getf params :resizable)
 				    %glfw:+true+
 				    %glfw:+false+)))
 	(with-window params
-	  (%glfw:set-mouse-button-callback *window*
-					   (cffi:get-callback 'mouse-callback))
-	  (%glfw:set-key-callback *window* (cffi:get-callback 'key-callback))
-	  (%glfw:set-scroll-callback *window* (cffi:get-callback 'scroll-callback))
-	  (%glfw:set-window-size-callback *window* (cffi:get-callback 'update-viewport))
-	  (%glfw:set-char-callback *window* (cffi:get-callback 'char-callback))
-	  
-	  (%glfw:set-cursor-pos-callback *window* (cffi:get-callback 'cursor-callback))
-	  
+	  (set-callbacks)
 	  (setf (values *width*
 			*height*)
 		(get-window-size))
