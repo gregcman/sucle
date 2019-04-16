@@ -80,8 +80,9 @@ for the current implementation."
 ;;;
 
 (glfw:define-char-callback char-callback (window char)
-  (declare (ignorable window char))
-  (with-float-traps-restored)
+  (declare (ignorable window))
+  (with-float-traps-restored
+    (push char *char-keys*))
   )
 ;;;
 (glfw:define-cursor-pos-callback cursor-callback (window x y)
@@ -117,7 +118,12 @@ for the current implementation."
 (defparameter *control* nil)
 (defparameter *alt* nil)
 (defparameter *super* nil)
+(defparameter *char-keys* ())
 (defun poll ()
+  #+nil
+  (when *char-keys*
+    (print *char-keys*))
+  (setf *char-keys* nil)
   (setq *status* (let ((value (%glfw:window-should-close *window*)))
 		   (cond ((eql value %glfw:+true+) t)
 			 ((eql value %glfw:+false+) nil)
