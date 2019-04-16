@@ -79,10 +79,24 @@ for the current implementation."
 	      1))))
 ;;;
 
+#+nil
 (glfw:define-char-callback char-callback (window char)
   (declare (ignorable window))
   (with-float-traps-restored
     (push char *char-keys*))
+  )
+
+(defmacro define-char-mods-callback (name (window codepoint mod-keys) &body body)
+  `(claw:defcallback ,name :void ((,window (:pointer %glfw:window))
+                                  (,codepoint :unsigned-int)
+				  (,mod-keys :int))
+     ,@body))
+;;;FIXME::move to bodge-glfw?
+(define-char-mods-callback char-mods-callback (window char mod-keys)
+  (declare (ignorable window))
+  (setf *mod-keys* mod-keys)
+  (with-float-traps-restored
+    (push (list char mod-keys) *char-keys*))
   )
 ;;;
 (glfw:define-cursor-pos-callback cursor-callback (window x y)
@@ -129,7 +143,7 @@ for the current implementation."
 			 ((eql value %glfw:+false+) nil)
 			 (t (error "what is this value? ~a" value)))))
   (poll-events)
-
+  ;;;FIXME::mod keys only updated indirectly through mouse or key or unicode char callback
   (let ((mods *mod-keys*))
     (setf *shift* (logtest +shift+ mods)
 	  *control* (logtest +control+ mods)
@@ -169,7 +183,8 @@ for the current implementation."
   (%glfw:set-key-callback window (cffi:get-callback 'key-callback))
   (%glfw:set-scroll-callback window (cffi:get-callback 'scroll-callback))
   (%glfw:set-window-size-callback window (cffi:get-callback 'update-viewport))
-  (%glfw:set-char-callback window (cffi:get-callback 'char-callback)) 
+  ;;(%glfw:set-char-callback window (cffi:get-callback 'char-callback))
+  (%glfw:set-char-mods-callback window (cffi:get-callback 'char-mods-callback)) 
   (%glfw:set-cursor-pos-callback window (cffi:get-callback 'cursor-callback))
   )
 (defun wrapper (func &optional (params
