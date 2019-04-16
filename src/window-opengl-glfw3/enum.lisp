@@ -201,7 +201,7 @@
     (dolist (item *modified-key-enums*)
       (when (listp item)
 	(setf (aref back-map (second item))
-	      (cons :mouse (first item)))))
+	      (cons :key (first item)))))
     #+nil
     (flet ((thing (array enum)
 	     (dotimes (i (length array))
