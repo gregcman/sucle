@@ -8,7 +8,10 @@
 	       #:fast-text-grid-sprites
 	       #:vecto-stuff
 	       #:cartesian-graphing
-	       #:sketch-sucle-examples)
+	       #:sketch-sucle-examples
+	       ;;#:trial-glfw
+	       ;;#:trial-assimp
+	       )
   :serial t
   :components 
   ((:file "basic0")))

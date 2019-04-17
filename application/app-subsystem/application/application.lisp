@@ -92,9 +92,14 @@
 	(refresh item t))
       (window:set-vsync t)
       (gl:enable :scissor-test)
-      (let ((*quit-token* (cons "trampoline" "token")))
-	(catch *quit-token*
-	  (funcall fun))))))
+      (with-quit-token ((cons "trampoline" "token"))
+	(funcall fun)))))
+
+(defmacro with-quit-token ((&optional (value '(cons "default" "quit token"))) &body body)
+  `(let ((*quit-token* ,value)
+	 (window::*status* nil)) ;;FIXME::nil = alive
+     (catch *quit-token*
+       ,@body)))
 
 (defmacro on-session-change (session-place &body body &environment env)
   (multiple-value-bind (vars vals stores setter getter)
@@ -109,7 +114,7 @@
 
 (defmacro quit (&optional form)
   `(progn
-     (setf window::*status* t)
+     (setf window::*status* t) ;;FIXME::t = exit
      (throw *quit-token* ,form)))
 
 (defun poll-app ()

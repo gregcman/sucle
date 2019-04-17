@@ -3,11 +3,12 @@
   (:export #:start))
 (in-package :sucle)
 
-(defparameter *app* nil)
+;;(defparameter *app* nil)
 (defparameter *draw-pic* nil)
 (defparameter *sandbox* t)
 (defparameter *draw-graph* nil)
 (defparameter *draw-sketch* nil)
+(defparameter *draw-trial* nil)
 
 (defparameter *with-functions*
   #+nil
@@ -30,50 +31,64 @@
 
 (defun start ()
   (application:main
-   (run-with
-    (lambda ()
-      (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
-	    (sandbox-sub::entity-gravity? testbed::*ent*) t)
-      (our-load)
-      (let ((text-sub::*text-data-what-type* :framebuffer))
-	(unwind-protect
-	     (loop
-		(application:poll-app)
-		(when *sandbox*
-		  (testbed::per-frame))
-		(when *app*
-		  (progn
-		    ;;#+nil
-		    (fast-text-grid-sprites::per-frame)
-		    #+nil
-		    
-		    (when (window:skey-j-p (window::keyval #\e))
-		      (window::toggle-mouse-capture))))
-		(when *draw-pic*
-		  (vecto-stuff::draw-pic))
-		(when *draw-graph*
-		  (cartesian-graphing::draw-graph))
-		;;#+nil
-		(when (window:skey-j-p (window::keyval #\h))
-		  (toggle *app*))
-		(when (window:skey-j-p (window::keyval #\u))
-		  (toggle *draw-pic*))
-		(when (window:skey-j-p (window::keyval #\j))
-		  (toggle *sandbox*))
-		(when (window:skey-j-p (window::keyval #\i))
-		  (toggle *draw-graph*))
-		(when (window:skey-j-p (window::keyval #\n))
-		  (toggle *draw-sketch*))
-
-		(when *draw-sketch*
-		  (update-sketch-instance (getfnc 'sketch-sketch))
-		  (update-sketch-instance (getfnc 'sketch-sketch2))
-		      
-		  ))
-	  (save)))))
+   *sucle-app-function*
    :width (floor (* 80 fast-text-grid-sprites::*glyph-width*))
    :height (floor (* 25 fast-text-grid-sprites::*glyph-height*))
    :title ""))
+
+(defparameter *sucle-app-function*
+  (run-with
+   (lambda ()
+     (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
+	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
+     (our-load)
+     (let ((text-sub::*text-data-what-type* :framebuffer)
+	   ;;(trial-thing (make-instance 'trial::workbench))
+	   )
+       (unwind-protect
+	    (loop
+	       (application:poll-app)
+	       (when *sandbox*
+		 (testbed::per-frame))
+	       #+nil
+	       (when *app*
+		 (progn
+		   ;;#+nil
+		   (fast-text-grid-sprites::per-frame)
+		   #+nil
+		   
+		   (when (window:skey-j-p (window::keyval #\e))
+		     (window::toggle-mouse-capture))))
+	       (when *draw-pic*
+		 (vecto-stuff::draw-pic))
+	       (when *draw-graph*
+		 (cartesian-graphing::draw-graph))
+	       #+nil
+	       (when (window:skey-j-p (window::keyval #\h))
+		 (toggle *app*))
+	       (when (window:skey-j-p (window::keyval #\u))
+		 (toggle *draw-pic*))
+	       (when (window:skey-j-p (window::keyval #\j))
+		 (toggle *sandbox*))
+	       (when (window:skey-j-p (window::keyval #\i))
+		 (toggle *draw-graph*))
+	       (when (window:skey-j-p (window::keyval #\n))
+		 (toggle *draw-sketch*))
+	       (when (window:skey-j-p (window::keyval #\t))
+		 (toggle *draw-trial*))
+	       #+nil
+	       (when *draw-trial*
+		 (trial:with-context ((trial:context trial-thing) :reentrant t)
+				     (gl:clear :color-buffer-bit :stencil-buffer-bit :depth-buffer-bit))
+		 (trial:render trial-thing trial-thing))
+	       (;trial:with-context ((trial:context trial-thing) :reentrant t)
+		progn
+		 (when *draw-sketch*
+		   (update-sketch-instance (getfnc 'sketch-sketch))
+		   (update-sketch-instance (getfnc 'sketch-sketch2))
+		   
+		   )))
+	 (save))))))
 
 (defun update-sketch-instance (instance)
   (setf (sketch-sucle::sketch-height instance) (getfnc 'application::h)
