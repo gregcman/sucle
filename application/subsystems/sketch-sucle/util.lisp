@@ -126,7 +126,7 @@
 
 (defparameter *path* (merge-pathnames
 		      "res/lenna.png"
-		      (asdf:system-source-directory :sketch)))
+		      (asdf:system-source-directory :sketch-sucle)))
 (defparameter *test* nil;;(sketch-util::opticl-load-image *path*)
   )
 (defun make-opticl-data (&optional (path *path*))
