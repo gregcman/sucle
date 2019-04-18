@@ -98,6 +98,20 @@ for the current implementation."
   (with-float-traps-restored
     (push (list char mod-keys) *char-keys*))
   )
+;;;;;;
+(defmacro define-drop-callback (name (window count paths) &body body)
+  `(claw:defcallback ,name :void ((,window (:pointer %glfw:window))
+                                  (,count :int)
+				  (,paths (:pointer (:pointer :char))))
+     ,@body))
+;;;FIXME::move to bodge-glfw?
+(define-drop-callback drop-callback (window count paths)
+  (declare (ignorable window))
+  (with-float-traps-restored
+    (dotimes (index count)
+      (push
+       (cffi:foreign-string-to-lisp (cffi:mem-aref paths :pointer index))
+       *dropped-files*))))
 ;;;
 (glfw:define-cursor-pos-callback cursor-callback (window x y)
   (declare (ignorable window))
@@ -133,11 +147,16 @@ for the current implementation."
 (defparameter *alt* nil)
 (defparameter *super* nil)
 (defparameter *char-keys* ())
+(defparameter *dropped-files* ())
 (defun poll ()
   #+nil
   (when *char-keys*
     (print *char-keys*))
   (setf *char-keys* nil)
+  #+nil
+  (when *dropped-files*
+    (print *dropped-files*))
+  (setf *dropped-files* nil)
   (setq *status* (let ((value (%glfw:window-should-close *window*)))
 		   (cond ((eql value %glfw:+true+) t)
 			 ((eql value %glfw:+false+) nil)
@@ -186,6 +205,7 @@ for the current implementation."
   ;;(%glfw:set-char-callback window (cffi:get-callback 'char-callback))
   (%glfw:set-char-mods-callback window (cffi:get-callback 'char-mods-callback)) 
   (%glfw:set-cursor-pos-callback window (cffi:get-callback 'cursor-callback))
+  (%glfw:set-drop-callback window (cffi:get-callback 'drop-callback))
   )
 (defun wrapper (func &optional (params
 				'(:title "window"
