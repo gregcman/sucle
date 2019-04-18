@@ -83,6 +83,11 @@
     (refresh 'w t)))
 
 (defparameter *quit-token* nil)
+(defmacro with-quit-token ((&optional (value '(cons "default" "quit token"))) &body body)
+  `(let ((*quit-token* ,value)
+	 (window::*status* nil)) ;;FIXME::nil = alive
+     (catch *quit-token*
+       ,@body)))
 (defun init (fun)
   (lambda ()
     (declare (optimize (debug 3)))
@@ -94,12 +99,6 @@
       (gl:enable :scissor-test)
       (with-quit-token ((cons "trampoline" "token"))
 	(funcall fun)))))
-
-(defmacro with-quit-token ((&optional (value '(cons "default" "quit token"))) &body body)
-  `(let ((*quit-token* ,value)
-	 (window::*status* nil)) ;;FIXME::nil = alive
-     (catch *quit-token*
-       ,@body)))
 
 (defmacro on-session-change (session-place &body body &environment env)
   (multiple-value-bind (vars vals stores setter getter)
