@@ -342,6 +342,7 @@
 	  (princ (list (floor *mouse-x*)
 		       (floor *mouse-y*))
 		 stream)
+	  #+nil
 	  (princ (aref block-data::*names*
 		       testbed::*blockid*)
 		 stream)

@@ -8,7 +8,6 @@
 (defparameter *sandbox* t)
 (defparameter *draw-graph* nil)
 (defparameter *draw-sketch* nil)
-(defparameter *draw-trial* nil)
 
 (defparameter *with-functions*
   #+nil
@@ -42,14 +41,13 @@
      (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
 	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
      (our-load)
-     (let ((text-sub::*text-data-what-type* :framebuffer)
-	   ;;(trial-thing (make-instance 'trial::workbench))
-	   )
+     (let ((text-sub::*text-data-what-type* :framebuffer))
        (unwind-protect
 	    (loop
 	       (application:poll-app)
 	       (when *sandbox*
 		 (testbed::per-frame))
+	       ;;#+nil
 	       #+nil
 	       (when *app*
 		 (progn
@@ -63,7 +61,7 @@
 		 (vecto-stuff::draw-pic))
 	       (when *draw-graph*
 		 (cartesian-graphing::draw-graph))
-	       #+nil
+	       ;;#+nil
 	       (when (window:skey-j-p (window::keyval #\h))
 		 (toggle *app*))
 	       (when (window:skey-j-p (window::keyval #\u))
@@ -76,18 +74,11 @@
 		 (toggle *draw-sketch*))
 	       (when (window:skey-j-p (window::keyval #\t))
 		 (toggle *draw-trial*))
-	       #+nil
-	       (when *draw-trial*
-		 (trial:with-context ((trial:context trial-thing) :reentrant t)
-				     (gl:clear :color-buffer-bit :stencil-buffer-bit :depth-buffer-bit))
-		 (trial:render trial-thing trial-thing))
-	       (;trial:with-context ((trial:context trial-thing) :reentrant t)
-		progn
-		 (when *draw-sketch*
-		   (update-sketch-instance (getfnc 'sketch-sketch))
-		   (update-sketch-instance (getfnc 'sketch-sketch2))
-		   
-		   )))
+	       (when *draw-sketch*
+		 (update-sketch-instance (getfnc 'sketch-sketch))
+		 (update-sketch-instance (getfnc 'sketch-sketch2))
+		 
+		 ))
 	 (save))))))
 
 (defun update-sketch-instance (instance)
