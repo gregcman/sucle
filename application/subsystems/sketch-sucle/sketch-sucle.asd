@@ -10,9 +10,9 @@
                #:mathkit
                #:md5
 	       #:uncommon-lisp
-	       #:opticl
                #:split-sequence
                #:static-vectors
+	       #:image-utility
 	       #:glhelp
 	       #:vecto)
   :components ((:file "util")

@@ -71,8 +71,6 @@
 		 (toggle *draw-graph*))
 	       (when (window:skey-j-p (window::keyval #\n))
 		 (toggle *draw-sketch*))
-	       (when (window:skey-j-p (window::keyval #\t))
-		 (toggle *draw-trial*))
 	       (when *draw-sketch*
 		 (update-sketch-instance (getfnc 'sketch-sketch))
 		 (update-sketch-instance (getfnc 'sketch-sketch2))

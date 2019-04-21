@@ -480,8 +480,8 @@ but may be considered unique for all practical purposes."
 
 (defun make-image-from-surface (surface)
   (let ((texture (car (gl:gen-textures 1)))
-	(width (sketch-util::opticl-loaded-surface-width surface))
-	(height (sketch-util::opticl-loaded-surface-height surface)))
+	(width (image-utility::opticl-loaded-surface-width surface))
+	(height (image-utility::opticl-loaded-surface-height surface)))
     (gl:bind-texture :texture-2d texture)
     (gl:tex-parameter :texture-2d :texture-min-filter :linear)
     (gl:tex-image-2d :texture-2d 0 :rgba
@@ -489,7 +489,7 @@ but may be considered unique for all practical purposes."
 		     height
 		     0
 		     :rgba
-		     :unsigned-byte (sketch-util::opticl-loaded-surface-data surface))
+		     :unsigned-byte (image-utility::opticl-loaded-surface-data surface))
     (gl:bind-texture :texture-2d 0)
     (make-instance 'image
 		   :width width
@@ -497,7 +497,7 @@ but may be considered unique for all practical purposes."
 		   :texture texture)))
 
 (defmethod load-typed-resource (filename (type (eql :image)) &key &allow-other-keys)
-  (make-image-from-surface (sketch-util::make-opticl-data filename)))
+  (make-image-from-surface (image-utility::make-opticl-data filename)))
 
 (defmethod load-typed-resource (filename (type (eql :typeface))
 				&key (size 18) &allow-other-keys)
