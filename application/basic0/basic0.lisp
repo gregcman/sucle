@@ -3,7 +3,7 @@
   (:export #:start))
 (in-package :sucle)
 
-;;(defparameter *app* nil)
+(defparameter *app* nil)
 (defparameter *draw-pic* nil)
 (defparameter *sandbox* t)
 (defparameter *draw-graph* nil)
@@ -48,7 +48,6 @@
 	       (when *sandbox*
 		 (testbed::per-frame))
 	       ;;#+nil
-	       #+nil
 	       (when *app*
 		 (progn
 		   ;;#+nil

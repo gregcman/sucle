@@ -5,7 +5,7 @@
   :depends-on (#:application
 	       #:utility
 	       #:testbed
-	       ;;#:fast-text-grid-sprites
+	       #:fast-text-grid-sprites
 	       #:vecto-stuff
 	       #:cartesian-graphing
 	       #:sketch-sucle-examples)
