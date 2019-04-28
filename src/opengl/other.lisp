@@ -15,6 +15,7 @@
   (unless glhelp::*gl-context*
     (error "no opengl context you idiot!")))
 
+;;FIXME::does code involving deflazy belong here at all?
 (export '(deflazy-gl))
 (defmacro deflazy-gl (name (&rest deps) &rest gen-forms)
   "for objects that should be forgotten because they were
