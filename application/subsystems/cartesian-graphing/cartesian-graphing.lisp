@@ -24,37 +24,24 @@
       (vertex 0.5 -0.5))
     ))
 
-(progn
-  (deflazy flat-shader-source ()
-    (glslgen:ashader
-     :version 120
-     :vs
-     (glslgen2::make-shader-stage
-      :out '((value-out "vec4"))
-      :in '((position "vec4")
-	    (value "vec4"))
-      :program
-      '(defun "main" void ()
-	(= "gl_Position" position)
-	(= value-out value)))
-     :frag
-     (glslgen2::make-shader-stage
-      :in '((value "vec4"))
-      :program
-      '(defun "main" void ()	 
-	(=
-	 :gl-frag-color
-	 value
-	 )))
-     :attributes
-     '((position . 0) 
-       (value . 3))
-     :varyings
-     '((value-out . value))
-     :uniforms
-     '()))
-  (glhelp::deflazy-gl flat-shader (flat-shader-source)
-    (glhelp::create-gl-program flat-shader-source)))
+(glhelp::deflazy-gl flat-shader ()
+  (glhelp::create-opengl-shader
+   "
+out vec4 value_out;
+in vec4 position;
+in vec4 value;
+void main () {
+gl_Position = position;
+value_out = value;
+}"
+   "
+in vec4 value_out;
+void main () {
+gl_FragColor = value_out;
+}"
+   '(("position" 0) 
+     ("value" 3))
+   nil))
 
 (defun reverse-lerp (start end value)
   (/ (- value start)
