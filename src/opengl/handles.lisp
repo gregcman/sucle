@@ -77,7 +77,7 @@
 (defclass gl-texture (gl-object)
   ())
 (defmethod gl-delete* ((obj gl-texture))
-  (gl:delete-textures (list (handle obj))))
+  (gl:delete-texture (handle obj)))
 
 ;;;;call lists
 

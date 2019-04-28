@@ -455,7 +455,7 @@ but may be considered unique for all practical purposes."
 			       (or type
 				   (case (alexandria:make-keyword
 					  (alexandria:symbolicate
-					   (string-upcase (sketch-util::file-name-extension filename))))
+					   (string-upcase (pathname-type filename))))
 				     ((:png
 				       ;;:jpg
 				       :jpeg
@@ -479,25 +479,17 @@ but may be considered unique for all practical purposes."
       (error (format nil "Unsupported resource type ~a" type))))
 
 (defun make-image-from-surface (surface)
-  (let ((texture (gl:gen-texture))
-	(width (image-utility::opticl-loaded-surface-width surface))
-	(height (image-utility::opticl-loaded-surface-height surface)))
+  (let ((texture (glhelp::create-opengl-texture-from-data surface)))
     (gl:bind-texture :texture-2d texture)
     (gl:tex-parameter :texture-2d :texture-min-filter :linear)
-    (gl:tex-image-2d :texture-2d 0 :rgba
-		     width
-		     height
-		     0
-		     :rgba
-		     :unsigned-byte (image-utility::opticl-loaded-surface-data surface))
     (gl:bind-texture :texture-2d 0)
     (make-instance 'image
-		   :width width
-		   :height height
+		   :width (image-utility::image-width surface)
+		   :height (image-utility::image-height surface)
 		   :texture texture)))
 
 (defmethod load-typed-resource (filename (type (eql :image)) &key &allow-other-keys)
-  (make-image-from-surface (image-utility::make-opticl-data filename)))
+  (make-image-from-surface (image-utility::load-image-from-file filename)))
 
 (defmethod load-typed-resource (filename (type (eql :typeface))
 				&key (size 18) &allow-other-keys)
