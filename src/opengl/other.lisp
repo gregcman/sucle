@@ -34,7 +34,7 @@ not made in the current OpenGL context, so they are garbage"
 		     (setf glhelp::*gl-version* (gl:get-string :version))
 		     (setf glhelp::*gl-version-substring*
 			   (subseq glhelp::*gl-version* 0 3))
-		     (setf glslgen::*glsl-version* (glhelp::glsl-gl-version))
+		     (setf glhelp::*glsl-version* (glhelp::glsl-gl-version))
 		     (setf glhelp::*slow-draw-type* (gl-slow-draw-type))
 		     (deflazy:refresh 'gl-context t)
 		     ,@body)
