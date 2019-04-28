@@ -370,7 +370,7 @@
     (nreverse acc)))
 
 (defparameter *debug-shader-gen*
- ; t
+  ;;t
   nil
   )
 (defun gl-dump-shader (data)

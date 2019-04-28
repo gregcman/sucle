@@ -81,6 +81,8 @@
     inst))
 
 (defun create-gl-program2 (src)
+  ;;FIXME::add ability to rename varyings so
+  ;;vertex shader and fragment shader can have different variable names
   (let ((raw-attributes (getf src :attributes))
 	(uniform-data (getf src :uniforms))
 	(frag (getf src :frag))
@@ -88,8 +90,8 @@
     (let ((inst
 	   (make-instance 'gl-program :src src))
 	  (obj (glhelp:make-shader-program-from-strings
-		vs
-		frag
+		(fixup-shader-for-version :vs vs)
+		(fixup-shader-for-version :frag frag)
 		raw-attributes)))
       (setf (handle inst) obj)
       (setf (gl-program-object-uniforms inst)
@@ -97,6 +99,19 @@
 	     obj
 	     uniform-data))
       inst)))
+
+(defun create-opengl-shader (vert-text frag-text attributes uniforms)
+  (create-gl-program2
+   (list :vs vert-text
+	 :frag frag-text
+	 :attributes (fixup-list-to-alist attributes)
+	 :uniforms (fixup-list-to-alist uniforms))))
+
+(defun fixup-list-to-alist (list)
+  (mapcar (lambda (x)
+	    (cons (first x)
+		  (second x)))
+	  list))
 
 (defun concatenate-strings (&rest strings)
   (with-output-to-string (str)
