@@ -3,50 +3,37 @@
 (in-package :vecto-stuff)
 
 ;;;FIXME::duplicate in terminal625/basic
-(progn
-  (deflazy flat-texture-shader-source ()
-    (glslgen:ashader
-     :version 120
-     :vs
-     (glslgen2::make-shader-stage
-      :out '((value-out "vec4")
-	     (tex-out "vec2"))
-      :in '((position "vec4")
-	    (tex "vec2")
-	    (value "vec4")
-	    (pmv "mat4"))
-      :program
-      '(defun "main" void ()
-	(= "gl_Position" (* pmv position))
-	(= value-out value)
-	(= tex-out tex)))
-     :frag
-     (glslgen2::make-shader-stage
-      :in '((value "vec4")
-	    (tex "vec2")
-	    (sampler "sampler2D"))
-      :program
-      '(defun "main" void ()
-	(/**/ vec4 pixdata)
-	(= pixdata ("texture2D" sampler tex))
-	(=
-	 :gl-frag-color
-	 (* pixdata value)
-	 )))
-     :attributes
-     '((position . 0)
-       (tex . 2)
-       ;(value . 3)
-       )
-     :varyings
-     '((value-out . value)
-       (tex-out . tex))
-     :uniforms
-     '((sampler (:fragment-shader sampler))
-       (pmv (:vertex-shader pmv))
-       (value (:vertex-shader value)))))
-  (glhelp::deflazy-gl flat-texture-shader (flat-texture-shader-source)
-    (glhelp::create-gl-program flat-texture-shader-source)))
+
+(glhelp::deflazy-gl flat-texture-shader ()
+  (glhelp::create-opengl-shader
+   "
+out vec4 value_out;
+out vec2 tex_out;
+in vec4 position;
+in vec2 tex;
+uniform vec4 value;
+uniform mat4 pmv;
+
+void main () {
+gl_Position = pmv * position;
+value_out = value;
+tex_out = tex;
+}"
+   "
+in vec4 value_out;
+in vec2 tex_out;
+uniform sampler2D sampler;
+void main () {
+vec4 pixdata = texture2D(sampler,tex_out);
+gl_FragColor = pixdata * value_out;
+}"
+   '(("position" 0)
+     ("tex" 2)
+     ;;("value" . 3)
+     )
+   '((sampler "sampler")
+     (pmv "pmv")
+     (value "value"))))
 
 
 ;;FIXME::see sandbox/change-world.lisp

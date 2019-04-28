@@ -44,102 +44,50 @@
       (:framebuffer (glhelp::texture value))
       (:texture-2d (glhelp::handle value)))))
 
-(deflazy text-shader-source ()
-  (glslgen:ashader
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((texcoord-out "vec2"))
-    :in '((position "vec4")
-	  (texcoord "vec2")
-	  (projection-model-view "mat4"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= texcoord-out texcoord)))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((texcoord "vec2")
-	  (indirection "sampler2D")
-	  (text-data "sampler2D")
-	  (color-font-info-atlas ("vec4" 400))
-	  (font-texture "sampler2D"))
-    :program
-    '(defun "main" void ()
-
-	 ;;;indirection
-      (/**/ vec4 ind)
-      (= ind ("texture2D" indirection texcoord))
-
-      (/**/ vec4 raw)
-      (= raw ("texture2D" text-data
-	      (|.| ind "ba")))
-
-      ;;where text changes go
-      (/**/ ivec4 chardata)
-      (= chardata
-       (ivec4 (* 255.0 raw)))
-
-      ;;convert a 4-bit number to a vec4 of 1.0's and 0.0's
-      (/**/ vec4 infodata)
-      (= infodata
-       ([]
-	color-font-info-atlas
-	(+ 384 (|.| chardata "a"))))
- 
-      (/**/ vec2 offset)
-      (= offset (* (vec2 0.5 0.5)
-		 (|.| infodata "xy")))
-      
-      (/**/ float opacity)
-      (= opacity (|.| infodata "z"))
-
-      ;;font atlass coordinates
-      (/**/ vec4 fontdata)
-      (= fontdata
-       ([]
-	color-font-info-atlas
-	(+ 256 (|.| chardata "r"))))
-          
-      ;;font lookup
-      (/**/ vec4 pixcolor)
-      (= pixcolor
-       ("texture2D"
-	font-texture
-	(+
-	 offset ;;;bug workaround
-	 #+nil	 ;;;bug workaround
-	 (* (vec2 0.5 0.5)
-	    (|.| attributedata "xy"))
-	 (* (vec2 0.5 1.0)
-	    (mix (|.| fontdata "xy")
-		 (|.| fontdata "zw")
-		 (|.| ind "rg")
-		 )))))
-      
-      (/**/ vec4 fin)
-      (= fin
-       (mix
-	([] color-font-info-atlas (|.| chardata "g"))
-	([] color-font-info-atlas (|.| chardata "b"))
-	pixcolor))
-      (= (|.| :gl-frag-color "rgb")
-       (|.| fin "rgb"))
-      (= (|.| :gl-frag-color "a")
-       (* opacity (|.| fin "a"))
-	)
-	))
-   :attributes
-   '((position . 0) 
-     (texcoord . 2))
-   :varyings
-   '((texcoord-out . texcoord))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view))
-     (indirection (:fragment-shader indirection))
+(deflazy text-shader-source2 ()
+  '(:vs
+    "
+out vec2 texcoord_out;
+in vec4 position;
+in vec2 texcoord;
+uniform mat4 projection_model_view;
+void main () {
+gl_Position = projection_model_view * position;
+texcoord_out = texcoord;
+}"
+    :frag
+    "
+in vec2 texcoord_out;
+uniform sampler2D indirection;
+uniform sampler2D text_data;
+uniform vec4[400] color_font_info_atlas;
+uniform sampler2D font_texture;
+void main () {
+vec4 ind = texture2D(indirection, texcoord_out); //indirection
+vec4 raw = texture2D(text_data, ind.ba);
+ivec4 chardata = ivec4(255.0 * raw); //where the text changes go
+//convert a 4-bit number to a vec4 of 1.0's and 0.0's
+vec4 infodata = color_font_info_atlas[384 + chardata.a];
+vec2 offset = vec2(0.5, 0.5) * infodata.xy;
+float opacity = infodata.z;
+//font atlass coordinates
+vec4 font_data = color_font_info_atlas[256 + chardata.r]; 
+//bug workaround?
+vec4 pixcolor = texture2D(font_texture,offset+vec2(0.5,1.0)*mix(font_data.xy,font_data.zw,ind.rg));
+vec4 fin = mix(color_font_info_atlas[chardata.g],color_font_info_atlas[chardata.b],pixcolor);
+gl_FragColor.rgb = fin.rgb;
+gl_FragColor.a = opacity * fin.a;
+}"
+    :attributes
+    (("position" . 0) 
+     ("texcoord" . 2))
+    :uniforms
+    ((:pmv . "projection_model_view")
+     (indirection . "indirection")
      ;;(attributedata (:fragment-shader attributeatlas))
-     (text-data (:fragment-shader text-data))
-     (color-font-info-data (:fragment-shader color-font-info-atlas))
-     (font-texture (:fragment-shader font-texture)))))
+     (text-data . "text_data")
+     (color-font-info-data . "color_font_info_atlas")
+     (font-texture . "font_texture"))))
 
 (defvar *this-directory* (asdf:system-source-directory :text-subsystem))
 (deflazy font-png ()
@@ -322,8 +270,8 @@
       (%gl:uniform-4fv (uniform 'color-font-info-data)
 		       (/ len 4)
 		       var))))
-(glhelp:deflazy-gl text-shader (text-shader-source) 
-  (let ((shader (glhelp::create-gl-program text-shader-source)))
+(glhelp:deflazy-gl text-shader (text-shader-source2) 
+  (let ((shader (glhelp::create-gl-program2 text-shader-source2)))
     (glhelp::use-gl-program shader)
     (glhelp:with-uniforms uniform shader
       (with-foreign-array (var *color-font-info-data* :float len)
@@ -337,33 +285,26 @@
 			 var)))
     shader))
 
-(deflazy flat-shader-source ()
-  (glslgen:ashader
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((value-out "vec4"))
-    :in '((position "vec4")
-	  (value "vec4")
-	  (projection-model-view "mat4"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= value-out value)))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((value "vec4"))
-    :program
-    '(defun "main" void ()	 
-      (= :gl-frag-color value)))
-   :attributes
-   '((position . 0) 
-     (value . 3))
-   :varyings
-   '((value-out . value))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view)))))
-(glhelp:deflazy-gl flat-shader (flat-shader-source)
-  (glhelp::create-gl-program flat-shader-source))
+(glhelp:deflazy-gl flat-shader ()
+  (glhelp::create-opengl-shader 
+   "
+out vec4 value_out;
+in vec4 value;
+in vec4 position;
+uniform mat4 projection_model_view;
+
+void main () {
+gl_Position = projection_model_view * position;
+value_out = value;
+}"
+   "
+in vec4 value_out;
+void main () {
+gl_FragColor = value_out;
+}"
+   '(("position" 0) 
+     ("value" 3))
+   '((:pmv "projection_model_view"))))
 
 ;;;;;;;;;;;;;;;;
 (defparameter *block-height* 16.0)
@@ -375,8 +316,8 @@
 ;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
 ;;;;pattern to put in it.
 (defparameter *indirection-what-type*
-  ;:framebuffer
-  :texture-2d
+  :framebuffer
+  ;;:texture-2d
   )
 (defparameter *indirection-type* nil)
 (glhelp:deflazy-gl indirection ()
@@ -481,49 +422,38 @@
 	 (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))))
 
 ;;;;;;;;;;;;;;;;;;;;
-(deflazy indirection-shader-source ()
-  (glslgen:ashader
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((texcoord-out "vec2"))
-    :in '((position "vec4")
-	  (texcoord "vec2")
-	  (projection-model-view "mat4"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= texcoord-out texcoord)))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((texcoord "vec2")
-	  (size "vec2"))
-    :program
-    '(defun "main" void ()
-      ;;rg = fraction
-      ;;ba = text lookup
-      (/**/ vec2 foo)
-      (= foo (/ (floor (* texcoord size))
-	      (vec2 255.0)))	 
-      (/**/ vec2 bar)
-      (= bar
-       (fract
-	(* 
-	 texcoord
-	 size)))         
-      (/**/ vec4 pixcolor) ;;font lookup
-      (= (|.| pixcolor "rg") bar)       ;;fraction
-      (= (|.| pixcolor "ba") foo)      ;;text lookup 
-      (= :gl-frag-color pixcolor)))
-   :attributes
-   '((position . 0) 
-     (texcoord . 2))
-   :varyings
-   '((texcoord-out . texcoord))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view))
-     (size (:fragment-shader size)))))
-(glhelp:deflazy-gl indirection-shader (indirection-shader-source)
-  (glhelp::create-gl-program indirection-shader-source))
+(glhelp:deflazy-gl indirection-shader ()
+  (glhelp::create-opengl-shader
+   "
+out vec2 texcoord_out;
+in vec4 position;
+in vec2 texcoord;
+uniform mat4 projection_model_view;
+
+void main () {
+gl_Position = projection_model_view * position;
+texcoord_out = texcoord;
+}"
+   "
+in vec2 texcoord_out;
+uniform vec2 size;
+
+void main () {
+//rg = fraction
+//ba = text lookup
+
+vec2 foo = floor(texcoord_out * size) / vec2(255.0);
+vec2 bar = fract(texcoord_out * size);
+vec4 pixcolor; //font lookup
+pixcolor.rg = bar; //fraction
+pixcolor.ba = foo; // text lookup
+
+gl_FragColor = pixcolor; 
+}"
+   '(("position" 0) 
+     ("texcoord" 2))
+   '((:pmv "projection_model_view")
+     (size "size"))))
 
 (glhelp:deflazy-gl fullscreen-quad ()
   (let ((a (scratch-buffer:my-iterator))

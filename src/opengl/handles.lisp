@@ -69,17 +69,6 @@
 (defun use-gl-program (src)
   (gl:use-program (handle src)))
 
-(defun create-gl-program (src)
-  (let ((inst
-	 (make-instance 'gl-program :src src))
-	(obj (glslgen::gl-dump-shader src)))
-    (setf (handle inst) obj)
-    (setf (gl-program-object-uniforms inst)
-	  (cache-program-uniforms
-	   obj
-	   (glslgen::shader-program-data-raw-uniform src)))
-    inst))
-
 (defmethod gl-delete* ((obj gl-program))
   (gl:delete-program (handle obj)))
 

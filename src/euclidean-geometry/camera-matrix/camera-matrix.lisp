@@ -75,35 +75,19 @@
      dx dy dz 0.0
      0.0 0.0 0.0 1.0)))
 
-
-;;#b100 - projection
-;;#b010 - rotation
-;;#b001 - translation
-
 (defun update-matrices (camera)
-  (let ((flags #b111))
-    (let ((translation? #b001)
-	  (rotation? #b010)
-	  (projection? #b100))
-      (let ((projection-matrix (camera-matrix-projection camera))
-	    (view-matrix (camera-matrix-view camera))
-	    (projection-view-matrix (camera-matrix-projection-view camera))
-	    (projection-view-player-matrix (camera-matrix-projection-view-player camera))
-	    (player-matrix (camera-matrix-player camera))
-	    (forward (camera-vec-forward camera))
-	    (up (camera-vec-up camera)))
-	(when (logtest projection? flags)
-	  (projection-matrix projection-matrix camera))
-	(when (logtest rotation? flags)
-	  (relative-lookat view-matrix forward up))
-	(let ((num (logior rotation? projection?)))
-	  (when (logtest num flags)
-	    (nsb-cga:%matrix* projection-view-matrix projection-matrix view-matrix)))
-	(when (logtest translation? flags)
-	  (nsb-cga:%translate player-matrix (camera-vec-noitisop camera)))
-	(let ((num (logior rotation? projection? translation?)))
-	  (when (logtest num flags)
-	    (nsb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))))))
+  (let ((projection-matrix (camera-matrix-projection camera))
+	(view-matrix (camera-matrix-view camera))
+	(projection-view-matrix (camera-matrix-projection-view camera))
+	(projection-view-player-matrix (camera-matrix-projection-view-player camera))
+	(player-matrix (camera-matrix-player camera))
+	(forward (camera-vec-forward camera))
+	(up (camera-vec-up camera)))
+    (projection-matrix projection-matrix camera)
+    (relative-lookat view-matrix forward up)
+    (nsb-cga:%matrix* projection-view-matrix projection-matrix view-matrix)
+    (nsb-cga:%translate player-matrix (camera-vec-noitisop camera))
+    (nsb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))
 
 
 ;;;

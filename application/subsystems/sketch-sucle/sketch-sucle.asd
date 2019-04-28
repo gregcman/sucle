@@ -13,6 +13,8 @@
                #:split-sequence
                #:static-vectors
 	       #:image-utility
-	       #:glhelp)
+	       #:glhelp
+	       ;;FIXME::move vecto text-drawing code to its own file?
+	       #:vecto)
   :components ((:file "util")
 	       (:file "dump")))

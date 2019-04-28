@@ -10,7 +10,6 @@
 	       #:fps-independent-timestep
 	       #:aabbcc
 	       #:control
-	       #:triangles
 	       #:camera-matrix
 	       #:alexandria)
   :serial t

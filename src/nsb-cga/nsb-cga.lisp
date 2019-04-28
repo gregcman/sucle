@@ -72,14 +72,19 @@ major order.)"
   "Multiply MATRICES. The result might not be freshly allocated if all,
 or all but one multiplicant is an identity matrix."
   (macrolet ((inline-mul (left right dest)
-               `(progn
-                  ,@(loop for i below 4
-                       append (loop for j below 4
-                            collect
-                              `(setf
-                                (mref ,dest ,i ,j)
-                                (+ ,@(loop for k below 4
-                                        collect `(* (mref ,left ,i ,k) (mref ,right ,k ,j))))))))))
+               `(psetf
+		 ,@ (let ((a nil))
+		      (loop for i below 4
+			   do
+			   (loop for j below 4
+			      do
+				(progn
+				  (push `(mref ,dest ,i ,j) a)
+				  (push
+				   `(+ ,@(loop for k below 4
+					    collect `(* (mref ,left ,i ,k) (mref ,right ,k ,j))))
+				   a))))
+		      (nreverse a)))))
     (inline-mul left right result)
     result))
 

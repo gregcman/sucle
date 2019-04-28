@@ -1,7 +1,15 @@
 (defpackage #:fast-text-grid-sprites
   (:use #:cl #:utility #:application #:opengl-immediate
-	#:sprite-chain #:point #:rectangle))
+	#:sprite-chain #:rectangle))
 (in-package :fast-text-grid-sprites)
+
+(defclass point ()
+  ((x :accessor point-x
+      :initform 0.0
+      :initarg :x)
+   (y :accessor point-y
+      :initform 0.0
+      :initarg :y))) 
 
 (defparameter *ticks* 0)
 (defparameter *saved-session* nil)
@@ -156,37 +164,26 @@
 	  (with-slots (x0 y0 x1 y1) absolute-rectangle
 	    (setf x0 px0 y0 py0 x1 px1 y1 py1)))))))
 
-(progn
-  (deflazy flat-shader-source ()
-    (glslgen:ashader
-     :vs
-     (glslgen2::make-shader-stage
-      :out '((value-out "vec4"))
-      :in '((position "vec4")
-	    (value "vec4")
-	    (pmv "mat4"))
-      :program
-      '(defun "main" void ()
-	(= "gl_Position" (* pmv position))
-	(= value-out value)))
-     :frag
-     (glslgen2::make-shader-stage
-      :in '((value "vec4"))
-      :program
-      '(defun "main" void ()
-	(=
-	 :gl-frag-color
-	 value
-	 )))
-     :attributes
-     '((position . 0) 
-       (value . 3))
-     :varyings
-     '((value-out . value))
-     :uniforms
-     '((:pmv (:vertex-shader pmv)))))
-  (glhelp:deflazy-gl flat-shader (flat-shader-source)
-    (glhelp::create-gl-program flat-shader-source)))
+;;FIXME::does this actually work?
+(glhelp:deflazy-gl flat-shader ()
+  (glhelp::create-opengl-shader
+   "
+out vec4 value_out;
+in vec4 position;
+in vec4 value;
+uniform mat4 pmv;
+void main () {
+gl_Position = pmv * position;
+value_out = value;
+}"
+   "
+in vec4 value_out;
+void main () {
+//gl_FragColor.rg = value_out.rg;
+}"
+   '(("position" 0) 
+     ("value" 3))
+   '((:pmv "pmv"))))
 
 (defun bytecolor (r g b &optional (a 3))
   "each channel is from 0 to 3"

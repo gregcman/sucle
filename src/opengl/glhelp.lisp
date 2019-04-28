@@ -5,6 +5,7 @@
 
 (defparameter *gl-version* "2.0") ;;abitrary, gets overwritten
 (defparameter *gl-version-substring* "2.0") ;;also arbitrary
+(defparameter *glsl-version* 110) ;;arbitrary, overwritten
 (defparameter *version-data*
   (quote (("2.0" 110 :display-list)
 	  ("2.1" 120 :display-list)
@@ -133,10 +134,6 @@
 (defun sizeof (type-keyword)
   "gets the size of a foreign c type"
   (cffi:foreign-type-size type-keyword))
-
-(defun get-gl-constant (keyword)
-  "gets a gl-constant"
-  (cffi:foreign-enum-value '%gl:enum keyword))
 
 (progn
   (defconstant +gltexture0+ (cffi:foreign-enum-value (quote %gl:enum) :texture0))
@@ -299,3 +296,146 @@
 
 (defun draw-display-list (display-list)
   (gl:call-list display-list))
+
+;;;;Shader programs
+
+(defun create-gl-program2 (src)
+  ;;FIXME::add ability to rename varyings so
+  ;;vertex shader and fragment shader can have different variable names
+  (let ((raw-attributes (getf src :attributes))
+	(uniform-data (getf src :uniforms))
+	(frag (getf src :frag))
+	(vs (getf src :vs)))
+    (let ((inst
+	   (make-instance 'gl-program :src src))
+	  (obj (make-shader-program-from-strings
+		(fixup-shader-for-version :vs vs)
+		(fixup-shader-for-version :frag frag)
+		raw-attributes)))
+      (setf (handle inst) obj)
+      (setf (gl-program-object-uniforms inst)
+	    (cache-program-uniforms
+	     obj
+	     uniform-data))
+      inst)))
+
+(defun create-opengl-shader (vert-text frag-text attributes uniforms)
+  (create-gl-program2
+   (list :vs vert-text
+	 :frag frag-text
+	 :attributes (fixup-list-to-alist attributes)
+	 :uniforms (fixup-list-to-alist uniforms))))
+
+(defun fixup-list-to-alist (list)
+  (mapcar (lambda (x)
+	    (cons (first x)
+		  (second x)))
+	  list))
+
+(defun concatenate-strings (&rest strings)
+  (with-output-to-string (str)
+    (labels ((rec (node)
+	       (if (listp node)
+		   (dolist (string node)
+		     (rec string))
+		   (write-string (string node) str))))
+      (rec strings))))
+
+(defparameter *test*
+  "
+in vec2 texcoord_out;
+uniform vec2 size = 10;
+
+void main () {
+//rg = fraction
+//ba = text lookup
+
+vec2 foo = floor(texcoord_out * size) / vec2(255.0);
+vec2 bar = fract(texcoord_out * size);
+vec4 pixcolor; //font lookup
+pixcolor.rg = bar; //fraction
+pixcolor.ba = foo; // text lookup
+
+gl_FragColor = pixcolor; 
+}")
+(defparameter *newline* (format nil "~%"))
+(defparameter *gl-fragcolor-replacement*
+  ;;FIXME::procedurally generate a name that definitely does not clash with
+  ;;any glsl names or other names
+  "roloCgarF_lg")
+(defun fixup-shader-for-version (&optional (shader-type (or :frag :vs))
+				   (fragment-shader *test*)
+				   (version *glsl-version*))
+  (assert (or (eq shader-type :frag)
+	      (eq shader-type :vs)))
+  (let* ((ast
+	  (glsl-toolkit:parse fragment-shader))
+	 (new-ast
+	  (glsl-toolkit:walk
+	   ast
+	   (lambda (ast context environment)
+	     (declare (ignorable context))
+	     (block out
+	       (flet ((walk-next (foo)
+			(return-from out foo)))
+		 (when (and (glsl-toolkit:function-identifier-p ast environment)
+			    (string= ast "texture2D")
+			    (>= version 150))
+		   (walk-next "texture"))
+		 (when (eq shader-type :frag)
+		   (when (and (glsl-toolkit:identifier-p ast environment)
+			      (> version 120)
+			      (string= ast "gl_FragColor"))
+		     (walk-next *gl-fragcolor-replacement*)))
+		 (when (and (consp ast)
+			    (eq (first ast)
+				'glsl-toolkit:variable-declaration))
+		   (let
+		       (;;FIXME::This assumes the type-qualifiers are in the second position
+			(type-qualifier-data (second ast)))
+		     (when (consp type-qualifier-data)
+		       (symbol-macrolet ((type-qualifiers (cdr type-qualifier-data)))
+			 (flet ((replace-qualifer (new old)
+				  (setf type-qualifiers
+					(nsubst new old type-qualifiers))))
+			   (when (member :uniform type-qualifiers)
+			     (unless (>= version 120)
+			       ;;FIXME::this represents the variable declaration.
+			       ;;How to actually refer? ask shinmera?
+			       ;;This hack code removes the optional init form.
+			       ;;glsl version 120 and greater allow initialization
+			       (setf (cdr (cdr (cdr (cdr (cdr ast)))))
+				     nil)))
+			   (unless (> version 120)
+			     (when (member :in type-qualifiers)
+			       (replace-qualifer
+				(ecase shader-type
+				  (:frag "varying")
+				  (:vs "attribute"))
+				:in))
+			     (when (member :out type-qualifiers)
+			       (ecase shader-type
+				 ;;FIXME out in the fragment shader?
+				 #+nil
+				 (:frag (add-qualifier "varying"))
+				 (:vs (replace-qualifer :out
+							"varying"))))
+			     #+nil ;;FIXME:: varying does not occur
+			     (when (member :varying type-qualifiers))))))))
+		 (walk-next ast)))))))
+    (concatenate-strings
+     (list
+      "#version "
+      (with-standard-io-syntax
+	(write-to-string version))
+      *newline*)
+
+     (when (= version 100)
+       (list
+	"precision mediump float;"
+	*newline*))
+     (when (eq shader-type :frag)
+       (when (> version 120)
+	 (list "out vec4 " *gl-fragcolor-replacement* ";" *newline*)))
+     
+     (glsl-toolkit:serialize new-ast))))

@@ -1,2 +1,0 @@
-(defpackage #:webglsl
-  (:use :cl))
