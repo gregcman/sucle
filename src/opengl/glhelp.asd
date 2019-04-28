@@ -5,7 +5,8 @@
   :depends-on (#:cl-opengl
 	       #:split-sequence
 	       #:deflazy
-	       #:uncommon-lisp)
+	       #:uncommon-lisp
+	       #:glsl-toolkit)
   :serial t
   :components
   ((:file "glhelp")

@@ -375,8 +375,8 @@
 ;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
 ;;;;pattern to put in it.
 (defparameter *indirection-what-type*
-  ;:framebuffer
-  :texture-2d
+  :framebuffer
+  ;;:texture-2d
   )
 (defparameter *indirection-type* nil)
 (glhelp:deflazy-gl indirection ()
@@ -522,8 +522,46 @@
    :uniforms
    '((:pmv (:vertex-shader projection-model-view))
      (size (:fragment-shader size)))))
-(glhelp:deflazy-gl indirection-shader (indirection-shader-source)
-  (glhelp::create-gl-program indirection-shader-source))
+(deflazy indirection-shader-source2 () 
+  '(:vs
+    "
+#version 330
+out vec2 texcoord_out;
+in vec4 position;
+in vec2 texcoord;
+uniform mat4 projection_model_view;
+
+void main () {
+gl_Position = projection_model_view * position;
+texcoord_out = texcoord;
+}"
+    :frag
+    "
+#version 330
+in vec2 texcoord_out;
+uniform vec2 size;
+out vec4 fragcolor;
+
+void main () {
+//rg = fraction
+//ba = text lookup
+
+vec2 foo = floor(texcoord_out * size) / vec2(255.0);
+vec2 bar = fract(texcoord_out * size);
+vec4 pixcolor; //font lookup
+pixcolor.rg = bar; //fraction
+pixcolor.ba = foo; // text lookup
+
+fragcolor = pixcolor; 
+}"
+    :attributes
+    (("position" . 0) 
+     ("texcoord" . 2))
+    :uniforms
+    ((:pmv . "projection_model_view")
+     (size . "size"))))
+(glhelp:deflazy-gl indirection-shader (indirection-shader-source2)
+  (glhelp::create-gl-program2 indirection-shader-source2))
 
 (glhelp:deflazy-gl fullscreen-quad ()
   (let ((a (scratch-buffer:my-iterator))

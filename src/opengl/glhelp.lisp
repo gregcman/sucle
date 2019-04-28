@@ -134,10 +134,6 @@
   "gets the size of a foreign c type"
   (cffi:foreign-type-size type-keyword))
 
-(defun get-gl-constant (keyword)
-  "gets a gl-constant"
-  (cffi:foreign-enum-value '%gl:enum keyword))
-
 (progn
   (defconstant +gltexture0+ (cffi:foreign-enum-value (quote %gl:enum) :texture0))
   (defun set-active-texture (num)
