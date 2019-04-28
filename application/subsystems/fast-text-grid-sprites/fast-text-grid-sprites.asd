@@ -8,8 +8,7 @@
 	       #:text-subsystem
 	       #:opengl-immediate
 	       #:image-utility
-	       #:quads
-	       #:point)
+	       #:quads)
   :serial t
   :components 
   ((:file "fast-text-grid-sprites")))

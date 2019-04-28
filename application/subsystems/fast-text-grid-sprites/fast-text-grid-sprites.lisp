@@ -1,7 +1,15 @@
 (defpackage #:fast-text-grid-sprites
   (:use #:cl #:utility #:application #:opengl-immediate
-	#:sprite-chain #:point #:rectangle))
+	#:sprite-chain #:rectangle))
 (in-package :fast-text-grid-sprites)
+
+(defclass point ()
+  ((x :accessor point-x
+      :initform 0.0
+      :initarg :x)
+   (y :accessor point-y
+      :initform 0.0
+      :initarg :y))) 
 
 (defparameter *ticks* 0)
 (defparameter *saved-session* nil)
