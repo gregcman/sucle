@@ -79,33 +79,26 @@
    :title "conceptually simple block game"))
 
 
-(glhelp:deflazy-gl solidshader (solidshader-text)
-  (glhelp::create-gl-program solidshader-text))
-(application:deflazy solidshader-text ()
-  (glslgen::ashader
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((color-out "vec3"))
-    :in '((position "vec4")
-	  (color "vec3")
-	  (projection-model-view "mat4"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= color-out color)))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((color "vec3"))
-    :program
-    '(defun "main" void ()
-      (= (|.| :gl-frag-color "rgb") color)))
-   :attributes
-   '((position . 0) 
-     (color . 3))
-   :varyings
-   '((color-out . color))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view)))))
+(glhelp:deflazy-gl solidshader ()
+  (glhelp::create-opengl-shader
+   "
+out vec3 color_out;
+in vec4 position;
+in vec3 color;
+uniform mat4 projection_model_view;
+
+void main () {
+gl_Position = projection_model_view * position;
+color_out = color;
+}"
+   "
+in vec3 color_out;
+void main () {
+gl_FragColor.rgb = color_out;
+}"
+   '(("position" 0) 
+     ("color" 3))
+   '((:pmv "projection-model-view"))))
 (defparameter *block-aabb2*
   (let* ((offset 0.001)
 	 (small (- 0.0 offset))

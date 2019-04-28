@@ -125,7 +125,7 @@
 (defparameter *test*
   "
 in vec2 texcoord_out;
-uniform vec2 size;
+uniform vec2 size = 10;
 
 void main () {
 //rg = fraction
@@ -179,6 +179,14 @@ gl_FragColor = pixcolor;
 			 (flet ((replace-qualifer (new old)
 				  (setf type-qualifiers
 					(nsubst new old type-qualifiers))))
+			   (when (member :uniform type-qualifiers)
+			     (unless (>= version 120)
+			       ;;FIXME::this represents the variable declaration.
+			       ;;How to actually refer? ask shinmera?
+			       ;;This hack code removes the optional init form.
+			       ;;glsl version 120 and greater allow initialization
+			       (setf (cdr (cdr (cdr (cdr (cdr ast)))))
+				     nil)))
 			   (unless (> version 120)
 			     (when (member :in type-qualifiers)
 			       (replace-qualifer

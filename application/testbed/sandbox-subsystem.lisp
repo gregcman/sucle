@@ -736,82 +736,53 @@
 	      (:texture-mag-filter . :nearest)
 	      (:texture-wrap-s . :repeat)
 	      (:texture-wrap-t . :repeat)))))))
-(glhelp:deflazy-gl blockshader (blockshader-text)
-  (glhelp::create-gl-program blockshader-text))
+(glhelp:deflazy-gl blockshader ()
+  (glhelp::create-opengl-shader
+   "
+out float color_out;
+out vec2 texcoord_out;
+out float fogratio_out;
+in vec4 position;
+in vec2 texcoord;
+in vec4 blocklight;
+in vec4 skylight;
+uniform mat4 projection_model_view;
+uniform float time = 0.0;
 
-(deflazy blockshader-text ()
-  (glslgen::ashader
-   :vs
-   (glslgen2::make-shader-stage
-    :out '((color-out "float")
-	   (texcoord-out "vec2")
-	   
-	   (fogratio-out "float"))
-    :in '((position "vec4")
-	  (texcoord "vec2")
-	  (blocklight "vec4")
-	  (skylight "vec4")
-	  (projection-model-view "mat4")
+uniform float foglet;
+uniform float aratio;
+uniform vec3 camera_pos;
 
-	  (time "float" 0.0)
-	  
-	  (foglet "float")
-	  (aratio "float")
-	  (camera-pos "vec3"))
-    :program
-    '(defun "main" void ()
-      (= "gl_Position" (* projection-model-view position))
-      (= color-out (dot
-		   ;; blocklight
-		    ;;#+nil		    
-		    (max (* skylight time)
-			     blocklight)
-		    (vec4 0.25)))
-      (= texcoord-out texcoord)
+void main () {
+gl_Position = projection_model_view * position;
+color_out = dot(max(skylight*time, blocklight),vec4(0.25));
+texcoord_out = texcoord;
+fogratio_out = min(1.0, aratio+foglet*distance(camera_pos, position.xyz));
+}"
+   "
+in vec2 texcoord_out;
+in float color_out;
+uniform sampler2D sampler;
+in float fogratio_out;
+uniform vec3 fogcolor;
 
-      (= fogratio-out (min 1.0 (+ (* foglet (distance camera-pos (|.| position "xyz"))) aratio)))))
-   :frag
-   (glslgen2::make-shader-stage
-    :in '((texcoord "vec2")
-	  (color "float")
-	  (sampler "sampler2D")
-
-	  (fogratio "float")
-	  (fogcolor "vec3"))
-    :program
-    '(defun "main" void ()
-      (/**/ vec4 pixdata)
-      (= pixdata ("texture2D" sampler texcoord))
-      (/**/ vec3 temp)
-      (= temp
-       (mix 
-	fogcolor
-	(* color
-	   (|.| pixdata "rgb"))
-	fogratio
-	))
-     ;; (= temp (- (vec3 1.0) temp))
-      ;;#+nil
-      (if (== (|.| pixdata "a") 0.0)
-	  (/**/ "discard;"))
-      (= (|.| :gl-frag-color "rgb") temp)))
-   :attributes
-   '((position . 2) 
-     (texcoord . 8)
-     (blocklight . 1)
-     (skylight . 0))
-   :varyings
-   '((color-out . color)
-     (texcoord-out . texcoord)
-     (fogratio-out . fogratio))
-   :uniforms
-   '((:pmv (:vertex-shader projection-model-view))
-     (:fogcolor (:fragment-shader fogcolor))
-     (:foglet (:vertex-shader foglet))
-     (:aratio (:vertex-shader aratio))
-     (:camera-pos (:vertex-shader camera-pos))
-     (:sampler (:fragment-shader sampler))
-     (:time (:vertex-shader time)))))
+void main () {
+vec4 pixdata = texture2D(sampler,texcoord_out);
+vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
+if (pixdata.a == 0.0){discard;}
+gl_FragColor.rgb = temp; 
+}"
+   '(("position" 2) 
+     ("texcoord" 8)
+     ("blocklight" 1)
+     ("skylight" 0))
+   '((:pmv "projection_model_view")
+     (:fogcolor "fogcolor")
+     (:foglet "foglet")
+     (:aratio "aratio")
+     (:camera-pos "camera_pos")
+     (:sampler "sampler")
+     (:time "time"))))
 
 (defun draw-aabb (x y z &optional (aabb *fist-aabb*))
   ;;;;draw the fist hitbox
