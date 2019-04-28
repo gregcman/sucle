@@ -13,7 +13,6 @@
                #:split-sequence
                #:static-vectors
 	       #:image-utility
-	       #:glhelp
-	       #:vecto)
+	       #:glhelp)
   :components ((:file "util")
 	       (:file "dump")))
