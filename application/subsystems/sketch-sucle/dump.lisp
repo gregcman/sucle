@@ -479,7 +479,7 @@ but may be considered unique for all practical purposes."
       (error (format nil "Unsupported resource type ~a" type))))
 
 (defun make-image-from-surface (surface)
-  (let ((texture (car (gl:gen-textures 1)))
+  (let ((texture (gl:gen-texture))
 	(width (image-utility::opticl-loaded-surface-width surface))
 	(height (image-utility::opticl-loaded-surface-height surface)))
     (gl:bind-texture :texture-2d texture)

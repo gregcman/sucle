@@ -29,7 +29,7 @@
 	      :element-type (array-element-type array)))
 
 (defun create-texture (tex-data width height format &optional (type :unsigned-byte))
-  (let ((tex (car (gl:gen-textures 1))))
+  (let ((tex (gl:gen-texture)))
     (gl:bind-texture :texture-2d tex)
     (gl:tex-image-2d :texture-2d 0 :rgba width height 0 format type tex-data)
     tex))
