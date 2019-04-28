@@ -22,24 +22,30 @@
 	  ("4.6" 460 :vertex-array-object))))
 (defparameter *slow-draw-type* :display-list)
 
-;;;;in opengl horizontal lines must be multiples of 4 bytes
-(defun array-flatten (array)
-  (make-array (array-total-size array)
-	      :displaced-to array
-	      :element-type (array-element-type array)))
+(defun wrap-opengl-texture (texture)
+  (make-instance
+   'glhelp::gl-texture
+   :handle
+   texture))
 
-(defun create-texture (tex-data width height format &optional (type :unsigned-byte))
-  (let ((tex (car (gl:gen-textures 1))))
+(defmethod create-opengl-texture-from-data ((data array))
+  (pic-texture data))
+
+(defun create-texture (tex-data width height &optional (format :rgba) (type :unsigned-byte))
+  (let ((tex (gl:gen-texture)))
     (gl:bind-texture :texture-2d tex)
     (gl:tex-image-2d :texture-2d 0 :rgba width height 0 format type tex-data)
+    (apply-tex-params *default-tex-params*)
+    (gl:bind-texture :texture-2d 0)
     tex))
-
 
 (defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
 					   (:texture-mag-filter . :nearest)
-;					   (:texture-wrap-s . :repeat)
-;					   (:texture-wrap-t . :repeat)
+					   (:texture-wrap-s . :repeat)
+					   (:texture-wrap-t . :repeat)
 					   )))
+
+;;;;in opengl horizontal lines must be multiples of 4 bytes
 
 ;;;;tex-parameters is an alist of pairs (a . b) with
 ;;;;(lambda (a b) (gl:tex-parameter :texture-2d a b))
@@ -61,7 +67,12 @@
       (let* ((byte-width (* channels w))
 	     (foured (ash (ash byte-width -2) 2)))
 	(if (= byte-width foured)
-	    (create-texture (array-flatten thepic) w h type)
+	    (flet ((array-flatten (array)
+		     (make-array
+		      (array-total-size array)
+		      :displaced-to array
+		      :element-type (array-element-type array))))
+	      (create-texture (array-flatten thepic) w h type))
 	    (progn
 	      (incf foured 4)
 	      (let ((array (make-array (* foured h)

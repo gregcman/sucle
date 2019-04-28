@@ -668,9 +668,6 @@
 	      (map-into vecinto (lambda (a b) (truncate (* a b) height)) vecinto other))
 	    (getapixel (- (- height 1) y) x terrain) color))))
 
-(defun load-png (filename)
-  (image-utility:read-png-file filename))
-
 (defvar *ourdir* (asdf:system-source-directory :testbed))
 
 (defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
@@ -716,7 +713,7 @@
 	    '(128.0 180.0 151.0))))
 
 (deflazy terrain-png ()
-  (load-png 
+  (image-utility::load-image-from-file
    (utility:rebase-path #P"terrain.png" *ourdir*)))
 
 (deflazy modified-terrain-png (terrain-png)
@@ -724,18 +721,8 @@
    (alexandria::copy-array terrain-png)))
 
 (glhelp:deflazy-gl terrain (modified-terrain-png)
-  (make-instance
-   'glhelp::gl-texture
-   :handle
-   (prog1
-       (glhelp:pic-texture
-	modified-terrain-png
-	:rgba)
-     (glhelp:apply-tex-params
-      (quote ((:texture-min-filter . :nearest)
-	      (:texture-mag-filter . :nearest)
-	      (:texture-wrap-s . :repeat)
-	      (:texture-wrap-t . :repeat)))))))
+  (glhelp::wrap-opengl-texture
+   (glhelp::create-opengl-texture-from-data modified-terrain-png)))
 (glhelp:deflazy-gl blockshader ()
   (glhelp::create-opengl-shader
    "

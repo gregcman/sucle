@@ -60,24 +60,19 @@ gl_FragColor = pixdata * value_out;
 (glhelp::deflazy-gl cons-texture (;;application::w application::h
 				  )
   (setf *finished* nil)
-  (make-instance
-   'glhelp::gl-texture
-   :handle
-   (prog1
-       (glhelp:pic-texture
-	(image-utility:read-png-file
-	 "/home/imac/Documents/handwritten\ notes/batch\ 1/IMG_20190321_012106.615.png" t)
-	#+nil
-	(make-array `(,application::h ,application::w
-		      ;;512 512
-				      4))
-	;:rgba
-	)
-     (glhelp:apply-tex-params
+  (let ((texture
+	 (glhelp::create-opengl-texture-from-data
+	  (image-utility::load-image-from-file
+	   ;;FIXME::allow flipping of images
+	   "/home/imac/Documents/handwritten\ notes/batch\ 1/IMG_20190321_012106.615.png"
+	   :flip t))))
+    (gl:bind-texture :texture-2d texture)
+    (glhelp:apply-tex-params
       (quote ((:texture-min-filter . :linear)
 	      (:texture-mag-filter . :linear)
 	      (:texture-wrap-s . :clamp)
-	      (:texture-wrap-t . :clamp)))))))
+	      (:texture-wrap-t . :clamp))))
+    (glhelp::wrap-opengl-texture texture)))
 
 (defparameter *pic-tint* (vector 1.0 1.0 1.0 1.0))
 (defparameter *ticks* 0)

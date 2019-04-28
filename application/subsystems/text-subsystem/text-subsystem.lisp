@@ -92,34 +92,19 @@ gl_FragColor.a = opacity * fin.a;
 (defvar *this-directory* (asdf:system-source-directory :text-subsystem))
 (deflazy font-png ()
   (let ((array
-	 (image-utility:read-png-file
+	 (image-utility::load-image-from-file
 	  (utility:rebase-path #P"font.png"
 			       *this-directory*))))
-    (destructuring-bind (w h) (array-dimensions array)
-      (let ((new
-	     (make-array (list w h 4) :element-type '(unsigned-byte 8) :initial-element 255)))
-	(dobox ((width 0 w)
-		(height 0 h))
-	       (let ((value (aref array width height)))
-		 (dotimes (i 3)
-		   (setf (aref new width height i) value))))
-	new))))
+    (dobox ((width 0 (image-utility::image-width array))
+	    (height 0 (image-utility::image-height array)))
+	   (let ((value (aref array width height 0)))
+	     (setf (aref array width height 3) 255)
+	     (dotimes (i 3)
+	       (setf (aref array width height i) value))))
+    array))
 (glhelp:deflazy-gl font-texture (font-png)
-  (prog1
-      (make-instance
-       'glhelp::gl-texture
-       :handle
-       (glhelp:pic-texture
-	font-png
-	:rgba
-	))
-    (glhelp:apply-tex-params
-     (quote ((:texture-min-filter . :nearest
-				  )
-	     (:texture-mag-filter . :nearest
-				  )
-	     (:texture-wrap-s . :repeat)
-	     (:texture-wrap-t . :repeat))))))
+  (let ((texture (glhelp::create-opengl-texture-from-data font-png)))
+    (glhelp::wrap-opengl-texture texture)))
 
 (defparameter *trans* (nsb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
 (defun retrans (x y &optional (trans *trans*))
