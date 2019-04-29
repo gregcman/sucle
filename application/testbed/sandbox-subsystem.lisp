@@ -584,12 +584,8 @@
       (%gl:uniform-1f (uniform :time)
 		      sandbox::*daytime*)
 
-      (progn
-	(gl:uniformi (uniform :sampler) 0)
-	(glhelp::set-active-texture 0)
-	(gl:bind-texture :texture-2d
-			 (glhelp::handle (getfnc 'terrain))
-			 ))))
+      (glhelp::set-uniforms-to-textures
+       ((uniform :sampler) (glhelp::handle (getfnc 'terrain))))))
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
 

@@ -450,3 +450,18 @@ gl_FragColor = pixcolor;
 	 (list "out vec4 " *gl-fragcolor-replacement* ";" *newline*)))
      
      (glsl-toolkit:serialize new-ast))))
+
+;;;;
+(defun set-uniform-to-texture (uniform-location texture num)
+  (gl:uniformi uniform-location num)
+  (glhelp::set-active-texture num)
+  (gl:bind-texture :texture-2d texture))
+
+;;FIXME::is a macro really necessary here? To prevent consing?
+(defmacro set-uniforms-to-textures (&rest specs)
+  (cons 'progn
+	(mapcar (lambda (spec number)
+		  (destructuring-bind (location texture) spec
+		    `(set-uniform-to-texture ,location ,texture ,number)))
+		specs
+		(alexandria:iota (length specs)))))

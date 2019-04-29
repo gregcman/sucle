@@ -125,21 +125,10 @@ gl_FragColor.a = opacity * fin.a;
 	 (let ((,program (getfnc 'text-shader)))
 	   (glhelp::use-gl-program ,program)
 	   (glhelp:with-uniforms ,uniform-fun ,program
-	     (progn
-	       (gl:uniformi (,uniform-fun 'indirection) 0)
-	       (glhelp::set-active-texture 0)
-	       (gl:bind-texture :texture-2d
-				(get-indirection-texture)))
-	     (progn
-	       (gl:uniformi (,uniform-fun 'font-texture) 2)
-	       (glhelp::set-active-texture 2)
-	       (gl:bind-texture :texture-2d
-				(glhelp::handle (getfnc 'font-texture))))
-	     (progn
-	       (gl:uniformi (,uniform-fun 'text-data) 1)
-	       (glhelp::set-active-texture 1)
-	       (gl:bind-texture :texture-2d
-				(get-text-texture)))
+	     (glhelp::set-uniforms-to-textures
+	      ((,uniform-fun 'indirection) (get-indirection-texture))
+	      ((,uniform-fun 'font-texture) (glhelp::handle (getfnc 'font-texture)))
+	      ((,uniform-fun 'text-data) (get-text-texture)))
 	     ,@body)))))
 
 (defun char-attribute (bold-p underline-p opaque-p)
