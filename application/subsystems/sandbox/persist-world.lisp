@@ -33,13 +33,13 @@
   (let ((newpath (world-path path)))
     (load-world newpath)))
 
-(defun savechunk (path position)
+(defun savechunk (position &optional (path (world-path)))
   ;;FIXME::undocumented swizzling and multiplication by 16, as well as loadchunk
   (save2
    path
    (chunk-coordinate-to-filename position)
    (world::chunk-data
-    (world::obtain-chunk-from-chunk-key position))))
+    (world::obtain-chunk-from-chunk-key position nil))))
 
 (defun loadchunk (path filename-position-list)
   (let ((position (filename-to-chunk-coordinate filename-position-list)))  
@@ -83,12 +83,11 @@
 	     (third position-list))
     position-list))
 
-(defun save-world (path)
-  (maphash (lambda (k v)
-	     (declare (ignorable v))
-	     (savechunk path k))
-	   world::*chunks*))
+(defun save-world (&optional (path (world-path)))
+  (loop :for key :being :the :hash-keys :of  world::*chunks* :do
+     (chunk-unload key path)))
 (defun load-world (path)
+  ;;FIXME::don't load the entire world
   (let ((files (uiop:directory-files path)))
     (dolist (file files)
       (loadchunk path (read-from-string (pathname-name file))))))

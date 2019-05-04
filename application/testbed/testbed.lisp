@@ -250,8 +250,10 @@ gl_FragColor.rgb = color_out;
 	  (let ((curr (sandbox-sub::pointmass-position player-pointmass))
 		(prev (sandbox-sub::pointmass-position-old player-pointmass))
 		(camera sandbox-sub::*camera*))
-	    (with-vec (x y z) (curr)
-	      (world::maybe-move-chunk-array x y z))
+	    (progn
+	      (with-vec (x y z) (curr)
+		(sandbox::set-chunk-coordinate-center x y z))
+	      (sandbox::maybe-move-chunk-array))
 	    (let ((vec (camera-matrix:camera-vec-position camera))
 		  (cev (camera-matrix:camera-vec-noitisop camera)))
 	      (nsb-cga:%vec-lerp vec prev curr fraction)

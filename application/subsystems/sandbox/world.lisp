@@ -21,6 +21,8 @@
 
 (struct-to-clos:struct->class
  (defstruct chunk
+   last-modified
+   last-saved
    x
    y
    z
@@ -66,10 +68,10 @@
 (defmacro with-chunk-key-coordinates ((x y z) chunk-key &body body)
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))
-(defun obtain-chunk-from-chunk-key (chunk-key)
+(defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
   ;;FIXME::is this a good api?
   (with-chunk-key-coordinates (x y z) chunk-key 
-    (obtain-chunk x y z)))
+    (obtain-chunk x y z force-load)))
 (defun create-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
   (declare (type chunk-coord chunk-x chunk-y chunk-z))
   (make-chunk :x chunk-x
@@ -80,6 +82,8 @@
 				:initial-element nil)))
 
 (defparameter *empty-chunk* (create-chunk 0 0 0))
+(defun empty-chunk-p (chunk)
+  (eq chunk *empty-chunk*))
 
 (defun make-chunk-from-key-and-data (key data)
   (with-chunk-key-coordinates (x y z) key
@@ -102,6 +106,11 @@
   (gethash key *chunks*))
 (defun remove-chunk-at (key)
   (remhash key *chunks*))
+
+(defun chunk-exists-p (key)
+  (multiple-value-bind (value existsp) (get-chunk-at key)
+    (declare (ignorable value))
+    existsp))
 
 (defun total-loaded-chunks ()
   (hash-table-count *chunks*))
@@ -306,41 +315,6 @@
 	(chunk-z (floor z (utility:etouq *chunk-size-z*))))
     (values chunk-x chunk-y chunk-z)))
 
-(defun maybe-move-chunk-array (player-x player-y player-z)
-  ;;center the chunk array around the player, but don't always, only if above a certain
-  ;;threshold
-  (multiple-value-bind (chunk-x chunk-y chunk-z)
-      (chunk-coordinates-from-block-coordinates
-       (floor player-x)
-       (floor player-y)
-       (floor player-z))
-    ;;FIXME::is this expensive to recompute every frame or does it matter?
-    ;;maybe put it in the chunk array object?
-    (let ((half-x-size (utility:etouq (floor *chunk-array-default-size-x* 2)))
-	  (half-y-size (utility:etouq (floor *chunk-array-default-size-y* 2)))
-	  (half-z-size (utility:etouq (floor *chunk-array-default-size-z* 2))))
-      (let ((center-x (+ 
-		       (chunk-array-x-min *chunk-array*)
-		       half-x-size))
-	    (center-y (+ 
-		       (chunk-array-y-min *chunk-array*)
-		       half-y-size))
-	    (center-z (+ 
-		       (chunk-array-z-min *chunk-array*)
-		       half-z-size)))
-	;;FIXME::hard-coded threshold for repositioning the chunk array? 4 chunks?
-	#+nil
-	(print (list (- chunk-x center-x)
-		     (- chunk-y center-y)
-		     (- chunk-z center-z)))
-	(when (or (<= 4 (abs (- chunk-x center-x)))
-		  (<= 4 (abs (- chunk-y center-y)))
-		  (<= 4 (abs (- chunk-z center-z))))
-	  ;;(format t "moving chunk array")
-	  (reposition-chunk-array (- chunk-x half-x-size)
-				  (- chunk-y half-y-size)
-				  (- chunk-z half-z-size)))))))
-
 (defun test ()
   (let ((times (expt 10 6)))
     (time (dotimes (x times) (setf (getobj 0 0 0) 0)))
@@ -362,48 +336,6 @@
 (defun clearworld ()
   (setf *chunks* (make-chunk-table)
 	*chunk-array* (create-chunk-array)))
-
-(defparameter *maximum-allowed-chunks* (* 16 16 16))
-(defun get-unloadable-chunks (&optional (x 0) (y 0) (z 0))
-  (multiple-value-bind (x0 y0 z0)
-      (chunk-coordinates-from-block-coordinates (floor x) (floor y) (floor z))
-    (let ((difference (- (total-loaded-chunks) *maximum-allowed-chunks*)))
-      (when (plusp difference)
-	(let ((distance-sorted-chunks
-	       (sort (alexandria:hash-table-keys world::*chunks*) #'< :key
-		     (lambda (position)
-		       ;;FIXME::destructuring bind of chunk-key happens in multiple places.
-		       ;;fix?
-		       (with-chunk-key-coordinates (x1 y1 z1) position
-			 (let ((dx (- x1 x0))
-			       (dy (- y1 y0))
-			       (dz (- z1 z0)))
-			   (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))))))
-	  (safe-subseq distance-sorted-chunks difference))))))
-
-(defun load-chunks-around (&optional (x 0) (y 0) (z 0))
-  (multiple-value-bind (x0 y0 z0)
-      (chunk-coordinates-from-block-coordinates (floor x) (floor y) (floor z))
-    (block out
-      (let ((chunk-count 0))
-	(flet ((add-chunk (x y z)
-		 (incf chunk-count)
-		 ;;do something
-		 (when (eq world::*empty-chunk* (world::get-chunk x y z nil))
-		   ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		   )
-		 (when (> chunk-count *maximum-allowed-chunks*)
-		   ;;exceeded the allowed chunks to load
-		   (return-from out))
-		 ))
-	  (let ((size 6))
-	    (utility::dobox ((chunk-x (- x0 size) (+ x0 size))
-			     (chunk-y (- y0 size) (+ y0 size))
-			     (chunk-z (- z0 size) (+ z0 size)))
-			    (add-chunk x y z))))))))
-
-(defun safe-subseq (seq end)
-  (subseq seq 0 (min (length seq) end)))
 
 (defgeneric lispobj-dispatch (obj))
 
@@ -462,7 +394,7 @@
 	  (kmask (mod k 16)))
       (labels ((add (x y z)
 		 (let ((chunk (world::obtain-chunk-from-block-coordinates x y z)))
-		   (unless (eq chunk world::*empty-chunk*)
+		   (unless (world::empty-chunk-p chunk)
 		     (dirty-push (world::chunk-key chunk)))))
 	       (i-permute ()
 		 (case imask

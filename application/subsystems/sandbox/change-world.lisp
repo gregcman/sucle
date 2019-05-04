@@ -40,15 +40,6 @@
        (when *world-mesh-lparallel-kernel*
 	 (lparallel:end-kernel)))))
 
-(defun chunk-unload (key)
-  ;;remove the opengl object
-  (remove-chunk-model key)
-  ;;remove from the chunk-array
-  (world::with-chunk-key-coordinates (x y z) key
-    (world::remove-chunk-from-chunk-array x y z))
-  ;;remove from the global table
-  (world::remove-chunk-at key))
-
 (defun call-with-world-meshing-lparallel (fun)
   (with-world-meshing-lparallel
     (funcall fun)))
@@ -163,3 +154,112 @@
     (setf (world:getlight i j k) new-light-value)
     (setf (world:skygetlight i j k) new-sky-light-value)
     (block-dirtify i j k)))
+
+;;;;chunk loading
+
+;;FIXME::architecture::one center, the player, and the chunk array centers around it
+(defparameter *chunk-coordinate-center-x* 0)
+(defparameter *chunk-coordinate-center-y* 0)
+(defparameter *chunk-coordinate-center-z* 0)
+(defun set-chunk-coordinate-center (player-x player-y player-z)
+  (multiple-value-bind (chunk-x chunk-y chunk-z)
+      (world::chunk-coordinates-from-block-coordinates
+       (floor player-x)
+       (floor player-y)
+       (floor player-z))
+    (setf *chunk-coordinate-center-x* chunk-x)
+    (setf *chunk-coordinate-center-y* chunk-y)
+    (setf *chunk-coordinate-center-z* chunk-z)))
+
+(defun maybe-move-chunk-array ()
+  ;;center the chunk array around the player, but don't always, only if above a certain
+  ;;threshold
+  ;;FIXME::is this expensive to recompute every frame or does it matter?
+  ;;maybe put it in the chunk array object?
+  (let ((half-x-size (utility:etouq (floor world::*chunk-array-default-size-x* 2)))
+	(half-y-size (utility:etouq (floor world::*chunk-array-default-size-y* 2)))
+	(half-z-size (utility:etouq (floor world::*chunk-array-default-size-z* 2))))
+    (let ((center-x (+ 
+		     (world::chunk-array-x-min world::*chunk-array*)
+		     half-x-size))
+	  (center-y (+ 
+		     (world::chunk-array-y-min world::*chunk-array*)
+		     half-y-size))
+	  (center-z (+ 
+		     (world::chunk-array-z-min world::*chunk-array*)
+		     half-z-size)))
+      ;;FIXME::hard-coded threshold for repositioning the chunk array? 4 chunks?
+      #+nil
+      (print (list (- chunk-x center-x)
+		   (- chunk-y center-y)
+		   (- chunk-z center-z)))
+      (let ((chunk-x *chunk-coordinate-center-x*)
+	    (chunk-y *chunk-coordinate-center-y*)
+	    (chunk-z *chunk-coordinate-center-z*))
+	(when (or (<= 4 (abs (- chunk-x center-x)))
+		  (<= 4 (abs (- chunk-y center-y)))
+		  (<= 4 (abs (- chunk-z center-z))))
+	  ;;(format t "moving chunk array")
+	  (world::reposition-chunk-array (- chunk-x half-x-size)
+					 (- chunk-y half-y-size)
+					 (- chunk-z half-z-size)))))))
+
+(defun safe-subseq (seq end)
+  (subseq seq 0 (min (length seq) end)))
+
+(defparameter *maximum-allowed-chunks* (* 16 16 16))
+(defun get-unloadable-chunks (&optional
+				(x0 *chunk-coordinate-center-x*)
+				(y0 *chunk-coordinate-center-y*)
+				(z0 *chunk-coordinate-center-z*))
+  (let ((difference (- (world::total-loaded-chunks) *maximum-allowed-chunks*)))
+    (when (plusp difference)
+      (let ((distance-sorted-chunks
+	     (sort (alexandria:hash-table-keys world::*chunks*) #'< :key
+		   (lambda (position)
+		     ;;FIXME::destructuring bind of chunk-key happens in multiple places.
+		     ;;fix?
+		     (world::with-chunk-key-coordinates (x1 y1 z1) position
+		       (let ((dx (- x1 x0))
+			     (dy (- y1 y0))
+			     (dz (- z1 z0)))
+			 (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))))))
+	(safe-subseq distance-sorted-chunks difference)))))
+
+(defun load-chunks-around (&optional
+				(x0 *chunk-coordinate-center-x*)
+				(y0 *chunk-coordinate-center-y*)
+				(z0 *chunk-coordinate-center-z*))
+  (block out
+    (let ((chunk-count 0))
+      (flet ((add-chunk (x y z)
+	       (incf chunk-count)
+	       ;;do something
+	       (when (empty-chunk-p (world::get-chunk x y z nil))
+		 ;;The chunk does not exist, therefore the *empty-chunk* was returned
+		 (sandbox::chunk-load (create-chunk-key x y z)))
+	       (when (> chunk-count *maximum-allowed-chunks*)
+		 ;;exceeded the allowed chunks to load
+		 (return-from out))
+	       ))
+	(let ((size 6))
+	  (utility::dobox ((chunk-x (- x0 size) (+ x0 size))
+			   (chunk-y (- y0 size) (+ y0 size))
+			   (chunk-z (- z0 size) (+ z0 size)))
+			  (add-chunk chunk-x chunk-y chunk-z)))))))
+
+(defun chunk-unload (key &optional (path (world-path)))
+  (when (world::chunk-exists-p key)
+    ;;save the chunk first?
+    (savechunk key path)
+    
+    ;;remove the opengl object
+    (remove-chunk-model key)
+    ;;remove from the chunk-array
+    (world::with-chunk-key-coordinates (x y z) key
+      (world::remove-chunk-from-chunk-array x y z))
+    ;;remove from the global table
+    (world::remove-chunk-at key)))
+
+(defun chunk-load (key &optional (path (world-path)))
+  (loadchunk path key))
