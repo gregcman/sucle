@@ -100,6 +100,8 @@
   (setf (gethash key *chunks*) chunk))
 (defun get-chunk-at (key)
   (gethash key *chunks*))
+(defun remove-chunk-at (key)
+  (remhash key *chunks*))
 
 (defun total-loaded-chunks ()
   (hash-table-count *chunks*))

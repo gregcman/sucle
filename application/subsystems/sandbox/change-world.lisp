@@ -18,6 +18,7 @@
   (defun remove-chunk-display-list (name)
     (remhash name *g/chunk-call-list*)))
 (defun remove-chunk-model (name)
+  ;;FIXME::this calls opengl. Use a queue instead?
   (multiple-value-bind (value existsp) (get-chunk-display-list name)
     (when existsp
       (gl:delete-lists value 1)
@@ -40,9 +41,12 @@
 	 (lparallel:end-kernel)))))
 
 (defun chunk-unload (key)
+  ;;remove the opengl object
   (remove-chunk-model key)
+  ;;remove from the chunk-array
   (world::with-chunk-key-coordinates (x y z) key
     (world::remove-chunk-from-chunk-array x y z))
+  ;;remove from the global table
   (world::remove-chunk-at key))
 
 (defun call-with-world-meshing-lparallel (fun)
