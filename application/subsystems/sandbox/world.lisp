@@ -55,8 +55,8 @@
      (type inner-chunk-coord-z inner-z))
     (+ (* (utility:etouq *chunk-size-z*)
 	  (+ (* (utility:etouq *chunk-size-y*)		      
-		inner-x))
-	  inner-y)
+		inner-x)
+	     inner-y))
        inner-z)))
 (deftype block-coord () 'fixnum)
 (defun create-chunk-key (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
@@ -125,7 +125,8 @@
     (dotimes (i (array-total-size array))
       (setf (row-major-aref array i) value))))
 
-(utility:with-unsafe-speed
+(;;utility:with-unsafe-speed
+ progn
   (utility::with-declaim-inline (obtain-chunk reference-inside-chunk get-chunk
 					      get-chunk-from-chunk-array
 					      (setf reference-inside-chunk)

@@ -63,6 +63,7 @@
 	 t)))))
 
 (defun save-world (path)
+  #+nil
   (maphash (lambda (k v)
 	     (declare (ignorable v))
 	     (savechunk path k))
