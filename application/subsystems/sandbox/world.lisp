@@ -264,6 +264,13 @@
     (defun setobj (x y z new)
       (setf (getobj x y z) new))))
 
+(defun chunk-coordinates-from-block-coordinates (&optional (x 0) (y 0) (z 0))
+  ;;FIXME? combine with obtain-chunk-from-block-coordinates? 
+  (declare (type block-coord x y z))
+  (let ((chunk-x (floor x (utility:etouq *chunk-size-x*)))
+	(chunk-y (floor y (utility:etouq *chunk-size-y*)))
+	(chunk-z (floor z (utility:etouq *chunk-size-z*))))
+    (values chunk-x chunk-y chunk-z)))
 
 (defun test ()
   (let ((times (expt 10 6)))
@@ -345,7 +352,8 @@
 	  (kmask (mod k 16)))
       (labels ((add (x y z)
 		 (let ((chunk (world::obtain-chunk-from-block-coordinates x y z)))
-		   (dirty-push (world::chunk-key chunk))))
+		   (unless (eq chunk world::*empty-chunk*)
+		     (dirty-push (world::chunk-key chunk)))))
 	       (i-permute ()
 		 (case imask
 		   (0 (j-permute (1- i)))
