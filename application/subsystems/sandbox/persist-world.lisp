@@ -41,9 +41,13 @@
       (world::obtain-chunk-from-chunk-key position-list)))))
 
 (defun loadchunk (path position-list)
-  (let ((position position-list))
+  (let ((position (mapcar
+		   ;;FIXME::assumes chunks are 16 by 16 by 16
+		   (lambda (n) (floor n 16))
+		   position-list)))
     (let ((data (myload2 path position-list)))
       (case (length data)
+	#+nil
 	(3
 	 (destructuring-bind (blocks light sky) data
 	   (let ((len (length blocks)))

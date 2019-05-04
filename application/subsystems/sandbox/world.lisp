@@ -55,9 +55,9 @@
      (type inner-chunk-coord-z inner-z))
     (+ (* (utility:etouq *chunk-size-z*)
 	  (+ (* (utility:etouq *chunk-size-y*)		      
-		inner-x)
-	     inner-y))
-       inner-z)))
+		inner-y)
+	     inner-z))
+       inner-x)))
 (deftype block-coord () 'fixnum)
 (defun create-chunk-key (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
   ;;in order to be correct, the key has to store each value unaltered
@@ -75,6 +75,8 @@
 	      :key (create-chunk-key chunk-x chunk-y chunk-z)
 	      :data (make-array (* *chunk-size-x* *chunk-size-y* *chunk-size-z*)
 				:initial-element nil)))
+
+(defparameter *empty-chunk* (create-chunk 0 0 0))
 
 (defun make-chunk-from-key-and-data (key data)
   (destructuring-bind (x y z) key
@@ -125,16 +127,19 @@
     (dotimes (i (array-total-size array))
       (setf (row-major-aref array i) value))))
 
-(;;utility:with-unsafe-speed
- progn
-  (utility::with-declaim-inline (obtain-chunk reference-inside-chunk get-chunk
-					      get-chunk-from-chunk-array
-					      (setf reference-inside-chunk)
-					      chunk-coordinates-match-p
-					      obtain-chunk-from-block-coordinates)
-    #+nil
-    (defun chunk-coordinates-match-p (chunk &optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
-      (declare (type chunk-coord chunk-x chunk-y chunk-z))
+(utility:with-unsafe-speed
+ ;;progn
+  (
+   utility::with-declaim-inline
+   ;;progn
+   (obtain-chunk reference-inside-chunk get-chunk
+		 get-chunk-from-chunk-array
+		 (setf reference-inside-chunk)
+		 chunk-coordinates-match-p
+		 obtain-chunk-from-block-coordinates)
+   #+nil
+   (defun chunk-coordinates-match-p (chunk &optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
+     (declare (type chunk-coord chunk-x chunk-y chunk-z))
       (and (= chunk-x (the chunk-coord (chunk-x chunk)))
 	   (= chunk-y (the chunk-coord (chunk-y chunk)))
 	   (= chunk-z (the chunk-coord (chunk-z chunk)))))
@@ -152,7 +157,7 @@
 			    (chunk-ref inner-x inner-y inner-z))
 	    value))
 
-    (defun get-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
+    (defun get-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0) (force-load nil))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
       (let ((key (create-chunk-key chunk-x chunk-y chunk-z)))
 	(multiple-value-bind (value existsp) (get-chunk-at key)
@@ -160,11 +165,13 @@
 	      (values value t)
 	      (progn
 		;;FIXME::load chunks here, unload chunks here?
-		#+nil
-		(values nil nil)
-		(let ((new-chunk (load-chunk chunk-x chunk-y chunk-z)))
-		  (set-chunk-at key new-chunk)
-		  (values new-chunk t)))))))
+		(if force-load
+		    (let ((new-chunk (load-chunk chunk-x chunk-y chunk-z)))
+		      (set-chunk-at key new-chunk)
+		      (values new-chunk t))
+		    (values
+		     *empty-chunk*
+		     nil)))))))
 
     (defun load-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
       ;;FIXME::actually load chunks
@@ -189,6 +196,7 @@
 
     (defun get-chunk-from-chunk-array (&optional 
 					 (chunk-x 0) (chunk-y 0) (chunk-z 0)
+					 (force-load nil)
 					 (chunk-array *chunk-array*))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
       ;;if the coordinates are correct, return a chunk, otherwise return nil
@@ -217,32 +225,37 @@
 			       (chunk-coordinates-match-p possible-chunk chunk-x chunk-y chunk-z))
 			  ;;The chunk is not nil, and the coordinates line up
 			  possible-chunk
-			  (let ((next-possible-chunk (get-chunk chunk-x chunk-y chunk-z)))
-			    (setf (aref data data-x data-y data-z) next-possible-chunk)
-			    next-possible-chunk)))))))))))
+			  (when force-load
+			    (let ((next-possible-chunk (get-chunk chunk-x chunk-y chunk-z force-load)))
+			      (setf (aref data data-x data-y data-z) next-possible-chunk)
+			      next-possible-chunk))))))))))))
 
-    (defun obtain-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
+    (defun obtain-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0) (force-load nil))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
-      (or (get-chunk-from-chunk-array chunk-x chunk-y chunk-z)
-	  (get-chunk chunk-x chunk-y chunk-z)))
+      (let ((chunk (or (get-chunk-from-chunk-array chunk-x chunk-y chunk-z force-load)
+		       (get-chunk chunk-x chunk-y chunk-z force-load))))
+	#+nil
+	(unless (typep chunk 'chunk)
+	  (error "not a chunk ~s" chunk))
+	chunk))
 
-    (defun obtain-chunk-from-block-coordinates (&optional (x 0) (y 0) (z 0))
+    (defun obtain-chunk-from-block-coordinates (&optional (x 0) (y 0) (z 0) (force-load nil))
       (declare (type block-coord x y z))
       (let ((chunk-x (floor x (utility:etouq *chunk-size-x*)))
 	    (chunk-y (floor y (utility:etouq *chunk-size-y*)))
 	    (chunk-z (floor z (utility:etouq *chunk-size-z*))))
-	(obtain-chunk chunk-x chunk-y chunk-z)))
+	(obtain-chunk chunk-x chunk-y chunk-z force-load)))
     
     (defun getobj (&optional (x 0) (y 0) (z 0))
       (declare (type block-coord x y z))
-      (let ((chunk (obtain-chunk-from-block-coordinates x y z))
+      (let ((chunk (obtain-chunk-from-block-coordinates x y z nil))
 	    (inner-x (mod x (utility:etouq *chunk-size-x*)))
 	    (inner-y (mod y (utility:etouq *chunk-size-y*)))
 	    (inner-z (mod z (utility:etouq *chunk-size-z*))))
 	(reference-inside-chunk chunk inner-x inner-y inner-z)))
     (defun (setf getobj) (value &optional (x 0) (y 0) (z 0))
       (declare (type block-coord x y z))
-      (let ((chunk (obtain-chunk-from-block-coordinates x y z))
+      (let ((chunk (obtain-chunk-from-block-coordinates x y z t))
 	    (inner-x (mod x (utility:etouq *chunk-size-x*)))
 	    (inner-y (mod y (utility:etouq *chunk-size-y*)))
 	    (inner-z (mod z (utility:etouq *chunk-size-z*))))
@@ -263,7 +276,10 @@
 ;;For backwards compatibility
 (defun unhashfunc (chunk-key)
   (destructuring-bind (x y z) chunk-key
-    (values x y z)))
+    (values (* (utility:etouq *chunk-size-x*) x)
+	    (* (utility:etouq *chunk-size-y*) y)
+	    (* (utility:etouq *chunk-size-z*) z))))
+#+nil
 (defun chunkhashfunc (x y z)
   (create-chunk-key x y z))
 ;;FIXME::clearworld does not handle loading and stuff?
@@ -311,7 +327,7 @@
   (blockify (logcount (sxhash obj)) 0 0))
 
 (defmethod lispobj-dispatch ((obj symbol))
-  56)
+  (blockify 0 0 15))
 
 (in-package :sandbox)
 ;;;;keeping track of the changes to the world

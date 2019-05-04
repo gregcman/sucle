@@ -10,7 +10,7 @@
   )
 
 (progn
-  (defparameter *g/chunk-call-list* (make-hash-table :test 'eq))
+  (defparameter *g/chunk-call-list* (make-hash-table :test 'equal))
   (defun get-chunk-display-list (name)
     (gethash name *g/chunk-call-list*))
   (defun set-chunk-display-list (name list-num)
