@@ -15,7 +15,6 @@
   :components
   ((:file "queue")
    (:file "package")
-   (:file "vox") ;;generate a voxel hash structure  
    (:file "world")
    (:file "persist-world") ;;world <-> filesystem
    (:file "block-data") ;;block data
