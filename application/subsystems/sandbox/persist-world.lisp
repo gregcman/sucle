@@ -31,6 +31,7 @@
     (load-world newpath)))
 
 (defun savechunk (path position)
+  ;;FIXME::undocumented swizzling and multiplication by 16, as well as loadchunk
   (let ((position-list (multiple-value-list (world:unhashfunc position))))
     (rotatef (second position-list)
 	     (third position-list))
@@ -38,7 +39,7 @@
      path
      position-list
      (world::chunk-data
-      (world::obtain-chunk-from-chunk-key position-list)))))
+      (world::obtain-chunk-from-chunk-key position)))))
 
 (defun loadchunk (path position-list)
   (let ((position (mapcar
@@ -69,7 +70,6 @@
 	 t)))))
 
 (defun save-world (path)
-  #+nil
   (maphash (lambda (k v)
 	     (declare (ignorable v))
 	     (savechunk path k))
