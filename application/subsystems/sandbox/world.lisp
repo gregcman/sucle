@@ -72,6 +72,13 @@
   ;;FIXME::is this a good api?
   (with-chunk-key-coordinates (x y z) chunk-key 
     (obtain-chunk x y z force-load)))
+
+;;FIXME::move this to a better place?
+(defun blockify (blockid light sky)
+  (dpb sky (byte 4 12)
+       (dpb light (byte 4 8) blockid)))
+(defparameter *empty-space* (blockify 0 0 15))
+
 (defun create-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
   (declare (type chunk-coord chunk-x chunk-y chunk-z))
   (make-chunk :x chunk-x
@@ -369,17 +376,12 @@
   (suite 4 8 getlight)
   (suite 4 12 skygetlight))
 
-(defun blockify (blockid light sky)
-  (dpb sky (byte 4 12)
-       (dpb light (byte 4 8) blockid)))
-
 (defmethod lispobj-dispatch ((obj character))
   (blockify (char-code obj) 0 0))
 
 (defmethod lispobj-dispatch ((obj t))
   (blockify (logcount (sxhash obj)) 0 0))
 
-(defparameter *empty-space* (blockify 0 0 15))
 (defmethod lispobj-dispatch ((obj symbol))
   *empty-space*)
 

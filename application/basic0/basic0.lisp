@@ -40,7 +40,7 @@
    (lambda ()
      (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
 	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
-     (our-load)
+     ;;(our-load)
      (let ((text-sub::*text-data-what-type* :framebuffer))
        (unwind-protect
 	    (loop
@@ -118,7 +118,7 @@
 (defun save ()
   (atest::remove-zeroes)
   (sandbox::msave))
-
+#+nil
 (defun our-load ()
   (sandbox::mload))
 

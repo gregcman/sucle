@@ -230,7 +230,8 @@
 (defun load-chunks-around (&optional
 				(x0 *chunk-coordinate-center-x*)
 				(y0 *chunk-coordinate-center-y*)
-				(z0 *chunk-coordinate-center-z*))
+			     (z0 *chunk-coordinate-center-z*))
+  ;;#+nil
   (block out
     (let ((chunk-count 0))
       (flet ((add-chunk (x y z)
@@ -238,7 +239,7 @@
 	       ;;do something
 	       (when (world::empty-chunk-p (world::get-chunk x y z nil))
 		 ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		 (sandbox::chunk-load (world::create-chunk-key x y z))
+		 ;;(sandbox::chunk-load (world::create-chunk-key x y z))
 		 ;;(print (list x y z))
 		 )
 	       (when (> chunk-count *maximum-allowed-chunks*)

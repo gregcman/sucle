@@ -32,6 +32,7 @@
   (let ((newpath (world-path path)))
     (ensure-directories-exist newpath)
     (save-world newpath)))
+
 (defun mload (&optional (path *world-directory*))
   (let ((newpath (world-path path)))
     (load-world newpath)))
@@ -95,6 +96,7 @@
 (defun save-world (&optional (path (world-path)))
   (loop :for key :being :the :hash-keys :of  world::*chunks* :do
      (chunk-unload key path)))
+
 (defun load-world (path)
   ;;FIXME::don't load the entire world
   (let ((files (uiop:directory-files path)))
