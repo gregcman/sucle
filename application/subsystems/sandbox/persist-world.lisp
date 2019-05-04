@@ -32,26 +32,18 @@
 
 (defun savechunk (path position)
   ;;FIXME::undocumented swizzling and multiplication by 16, as well as loadchunk
-  (let ((position-list (multiple-value-list (world:unhashfunc position))))
-    (rotatef (second position-list)
-	     (third position-list))
-    (save2
-     path
-     position-list
-     (world::chunk-data
-      (world::obtain-chunk-from-chunk-key position)))))
+  (save2
+   path
+   (chunk-coordinate-to-filename position)
+   (world::chunk-data
+    (world::obtain-chunk-from-chunk-key position))))
 
-(defun loadchunk (path position-list)
-  (let ((position (mapcar
-		   ;;FIXME::assumes chunks are 16 by 16 by 16
-		   (lambda (n) (floor n 16))
-		   position-list)))
-    (rotatef (third position)
-	     (second position))
-    (let ((data (myload2 path position-list)))
+(defun loadchunk (path filename-position-list)
+  (let ((position (filename-to-chunk-coordinate filename-position-list)))  
+    (let ((data (myload2 path filename-position-list)))
       (case (length data)
 	#+nil
-	(3
+	(3 ;;FIXME::does this even work?
 	 (destructuring-bind (blocks light sky) data
 	   (let ((len (length blocks)))
 	     (let ((new (make-array len)))
@@ -68,6 +60,25 @@
 	      position
 	      (coerce objdata '(simple-array t (*))))))
 	 t)))))
+
+;;The world is saved as a directory full of files named (x y z) in block coordinates, with
+;;x and y swizzled
+
+(defun filename-to-chunk-coordinate (filename-position-list)
+  (let ((position
+	 (mapcar
+	  ;;FIXME::assumes chunks are 16 by 16 by 16
+	  (lambda (n) (floor n 16))
+	  filename-position-list)))
+    (rotatef (third position)
+	     (second position))
+    position))
+
+(defun chunk-coordinate-to-filename (chunk-coordinate)
+  (let ((position-list (multiple-value-list (world:unhashfunc chunk-coordinate))))
+    (rotatef (second position-list)
+	     (third position-list))
+    position-list))
 
 (defun save-world (path)
   (maphash (lambda (k v)
