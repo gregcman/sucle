@@ -6,14 +6,17 @@
       (print thing stream))))
 
 (defun myload (path)
-  (let ((things nil))
-    (with-open-file (stream path :direction :input :if-does-not-exist nil)
-      (tagbody rep
-	 (let ((thing (read stream nil nil)))
-	   (when thing
-	     (push thing things)
-	     (go rep)))))
-    (nreverse things)))
+  (let ((file-existsp (probe-file path)))
+    ;;if it doesn't exist, what's the point of loading it
+    (when file-existsp
+      (let ((things nil)) 
+	(with-open-file (stream path :direction :input :if-does-not-exist nil)
+	  (tagbody rep
+	     (let ((thing (read stream nil nil)))
+	       (when thing
+		 (push thing things)
+		 (go rep)))))
+	(nreverse things)))))
 
 (defun save2 (path thingfilename &rest things)
   (save (merge-pathnames (format nil "~s" thingfilename) path) things))
@@ -45,6 +48,12 @@
   (let ((position (filename-to-chunk-coordinate filename-position-list)))  
     (let ((data (myload2 path filename-position-list)))
       (case (length data)
+	(0
+	 ;;if data is nil, just load an empty chunk
+	 (world::with-chunk-key-coordinates (x y z) position
+	   (world::set-chunk-at
+	    position
+	    (world::create-chunk x y z))))
 	#+nil
 	(3 ;;FIXME::does this even work?
 	 (destructuring-bind (blocks light sky) data

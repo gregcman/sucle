@@ -207,7 +207,8 @@
 (defun safe-subseq (seq end)
   (subseq seq 0 (min (length seq) end)))
 
-(defparameter *maximum-allowed-chunks* (* 16 16 16))
+(defparameter *chunk-radius* 5)
+(defparameter *maximum-allowed-chunks* (* (expt (* *chunk-radius* 2) 3)))
 (defun get-unloadable-chunks (&optional
 				(x0 *chunk-coordinate-center-x*)
 				(y0 *chunk-coordinate-center-y*)
@@ -235,9 +236,11 @@
       (flet ((add-chunk (x y z)
 	       (incf chunk-count)
 	       ;;do something
-	       (when (empty-chunk-p (world::get-chunk x y z nil))
+	       (when (world::empty-chunk-p (world::get-chunk x y z nil))
 		 ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		 (sandbox::chunk-load (create-chunk-key x y z)))
+		 (sandbox::chunk-load (world::create-chunk-key x y z))
+		 ;;(print (list x y z))
+		 )
 	       (when (> chunk-count *maximum-allowed-chunks*)
 		 ;;exceeded the allowed chunks to load
 		 (return-from out))
@@ -249,17 +252,30 @@
 			  (add-chunk chunk-x chunk-y chunk-z)))))))
 
 (defun chunk-unload (key &optional (path (world-path)))
-  (when (world::chunk-exists-p key)
-    ;;save the chunk first?
-    (savechunk key path)
-    
-    ;;remove the opengl object
-    (remove-chunk-model key)
-    ;;remove from the chunk-array
-    (world::with-chunk-key-coordinates (x y z) key
-      (world::remove-chunk-from-chunk-array x y z))
-    ;;remove from the global table
-    (world::remove-chunk-at key)))
+  (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
+    (unless (world::empty-chunk-p chunk)
+      (let ((worth-saving (world::chunk-worth-saving chunk)))
+	;;save the chunk first?
+	(if worth-saving
+	    ;;write the chunk to disk if its worth saving
+	    (savechunk key path)
+	    ;;otherwise, if there is a preexisting file, destroy it
+	    (let ((chunk-save-file (chunk-coordinate-to-filename key)))
+	      (let ((file-exists-p chunk-save-file))
+		(when file-exists-p
+		  (delete-file chunk-save-file))))))
+      
+      ;;remove the opengl object
+      (remove-chunk-model key)
+      ;;remove from the chunk-array
+      (world::with-chunk-key-coordinates (x y z) key
+	(world::remove-chunk-from-chunk-array x y z))
+      ;;remove from the global table
+      (world::remove-chunk-at key))))
 
 (defun chunk-load (key &optional (path (world-path)))
   (loadchunk path key))
+
+(defun unload-extra-chunks ()
+  (dolist (chunk (get-unloadable-chunks))
+    (chunk-unload chunk)))

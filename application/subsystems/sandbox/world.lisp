@@ -79,7 +79,7 @@
 	      :z chunk-z
 	      :key (create-chunk-key chunk-x chunk-y chunk-z)
 	      :data (make-array (* *chunk-size-x* *chunk-size-y* *chunk-size-z*)
-				:initial-element nil)))
+				:initial-element *empty-space*)))
 
 (defparameter *empty-chunk* (create-chunk 0 0 0))
 (defun empty-chunk-p (chunk)
@@ -337,6 +337,10 @@
   (setf *chunks* (make-chunk-table)
 	*chunk-array* (create-chunk-array)))
 
+(defun chunk-worth-saving (chunk)
+  (not (every (lambda (x) (eql x *empty-space*))
+	      (chunk-data chunk))))
+
 (defgeneric lispobj-dispatch (obj))
 
 (defun value-dispatch (value)
@@ -375,8 +379,9 @@
 (defmethod lispobj-dispatch ((obj t))
   (blockify (logcount (sxhash obj)) 0 0))
 
+(defparameter *empty-space* (blockify 0 0 15))
 (defmethod lispobj-dispatch ((obj symbol))
-  (blockify 0 0 15))
+  *empty-space*)
 
 (in-package :sandbox)
 ;;;;keeping track of the changes to the world

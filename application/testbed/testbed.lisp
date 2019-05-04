@@ -253,7 +253,9 @@ gl_FragColor.rgb = color_out;
 	    (progn
 	      (with-vec (x y z) (curr)
 		(sandbox::set-chunk-coordinate-center x y z))
-	      (sandbox::maybe-move-chunk-array))
+	      (sandbox::maybe-move-chunk-array)
+	      (sandbox::load-chunks-around)
+	      (sandbox::unload-extra-chunks))
 	    (let ((vec (camera-matrix:camera-vec-position camera))
 		  (cev (camera-matrix:camera-vec-noitisop camera)))
 	      (nsb-cga:%vec-lerp vec prev curr fraction)
