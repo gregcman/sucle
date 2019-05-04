@@ -73,7 +73,7 @@
 	      :y chunk-y
 	      :z chunk-z
 	      :key (create-chunk-key chunk-x chunk-y chunk-z)
-	      :data (make-array (list *chunk-size-x* *chunk-size-y* *chunk-size-z*)
+	      :data (make-array (* *chunk-size-x* *chunk-size-y* *chunk-size-z*)
 				:initial-element nil)))
 
 (defun make-chunk-from-key-and-data (key data)
