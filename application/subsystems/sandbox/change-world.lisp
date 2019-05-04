@@ -48,7 +48,7 @@
 	     (remove-chunk-display-list k))
 	   *g/chunk-call-list*)
   (map nil #'dirty-push
-       (sort (alexandria:hash-table-keys world::*lispobj*) #'< :key
+       (sort (alexandria:hash-table-keys world::*chunks*) #'< :key
 	     (lambda (position)
 	       (multiple-value-bind (i j k) (world:unhashfunc position)
 		 ((lambda (x0 y0 z0 x1 y1 z1)
@@ -123,14 +123,18 @@
 (defun setblock-with-update (i j k blockid &optional
 					     (new-light-value (aref block-data:*lightvalue* blockid)))
  (let ((old-light-value (world:getlight i j k)))
-    (when (setf (world:getblock i j k) blockid)
+   (when (setf (world:getblock i j k) blockid)
+     #+nil
       (when (< new-light-value old-light-value)
 	(de-light-node i j k))
       (unless (= old-light-value new-light-value)
 	(setf (world:getlight i j k) new-light-value))
+      #+nil
       (sky-de-light-node i j k)
+      #+nil
       (unless (zerop new-light-value)
 	(light-node i j k))
+      #+nil
       (flet ((check (a b c)
 	       (light-node (+ i a) (+ j b) (+ k c))
 	       (sky-light-node (+ i a) (+ j b) (+ k c))))

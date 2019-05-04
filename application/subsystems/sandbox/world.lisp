@@ -9,7 +9,8 @@
    
    #:unhashfunc
    #:chunkhashfunc
-   ))
+
+   #:clearworld))
 
 (in-package #:world)
 
@@ -37,15 +38,35 @@
 ;;FIXME::chunk-coord and block-coord being fixnums is not theoretically correct,
 ;;but its still a lot of space?
 (deftype chunk-coord () 'fixnum)
-(deftype chunk-data () `(simple-array t (,*chunk-size-x* ,*chunk-size-y* ,*chunk-size-z*)))
+(deftype chunk-data () `(simple-array t (,(* *chunk-size-x* *chunk-size-y* *chunk-size-z*))))
+(deftype inner-chunk-major-coord () `(integer 0 ,(* *chunk-size-x* *chunk-size-y* *chunk-size-z*)))
 (deftype inner-chunk-coord-x () `(integer 0 ,*chunk-size-x*))
 (deftype inner-chunk-coord-y () `(integer 0 ,*chunk-size-y*))
 (deftype inner-chunk-coord-z () `(integer 0 ,*chunk-size-z*))
+(utility:with-unsafe-speed
+  (declaim (inline chunk-ref)
+	   (ftype (function (inner-chunk-coord-x inner-chunk-coord-y inner-chunk-coord-z)
+			    inner-chunk-major-coord)
+		  chunk-ref))
+  (defun chunk-ref (inner-x inner-y inner-z)
+    (declare 
+     (type inner-chunk-coord-x inner-x)
+     (type inner-chunk-coord-y inner-y)
+     (type inner-chunk-coord-z inner-z))
+    (+ (* (utility:etouq *chunk-size-z*)
+	  (+ (* (utility:etouq *chunk-size-y*)		      
+		inner-x))
+	  inner-y)
+       inner-z)))
 (deftype block-coord () 'fixnum)
 (defun create-chunk-key (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
   ;;in order to be correct, the key has to store each value unaltered
   ;;This is for creating a key for a hash table
   (list chunk-x chunk-y chunk-z))
+(defun obtain-chunk-from-chunk-key (chunk-key)
+  ;;FIXME::is this a good api?
+  (destructuring-bind (x y z) chunk-key 
+      (obtain-chunk x y z)))
 (defun create-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
   (declare (type chunk-coord chunk-x chunk-y chunk-z))
   (make-chunk :x chunk-x
@@ -54,9 +75,26 @@
 	      :key (create-chunk-key chunk-x chunk-y chunk-z)
 	      :data (make-array (list *chunk-size-x* *chunk-size-y* *chunk-size-z*)
 				:initial-element nil)))
-  ;;equal is used because the key is a list of the chunk coordinates
-(defparameter *chunks* (make-hash-table :test 'equal))
 
+(defun make-chunk-from-key-and-data (key data)
+  (destructuring-bind (x y z) key
+    (make-chunk :x x
+		:y y
+		:z z
+		:key key
+		:data data)))
+(defun make-chunk-from-key-and-data-and-keep (key data)
+  (let ((new-chunk
+	 (make-chunk-from-key-and-data key data)))
+    (set-chunk-at key new-chunk)))
+;;equal is used because the key is a list of the chunk coordinates
+(defun make-chunk-table ()
+  (make-hash-table :test 'equal))
+(defparameter *chunks* (make-chunk-table))
+(defun set-chunk-at (key chunk)
+  (setf (gethash key *chunks*) chunk))
+(defun get-chunk-at (key)
+  (gethash key *chunks*))
 
 (utility::eval-always
   (defparameter *chunk-array-default-size-x* 32)
@@ -104,17 +142,19 @@
       (declare (type inner-chunk-coord-x inner-x)
 	       (type inner-chunk-coord-y inner-y)
 	       (type inner-chunk-coord-z inner-z))
-      (aref (the chunk-data (chunk-data chunk)) inner-x inner-y inner-z))
+      (row-major-aref (the chunk-data (chunk-data chunk)) (chunk-ref inner-x inner-y inner-z)))
     (defun (setf reference-inside-chunk) (value chunk inner-x inner-y inner-z)
       (declare (type inner-chunk-coord-x inner-x)
 	       (type inner-chunk-coord-y inner-y)
 	       (type inner-chunk-coord-z inner-z))
-      (setf (aref (the chunk-data (chunk-data chunk)) inner-x inner-y inner-z) value))
+      (setf (row-major-aref (the chunk-data (chunk-data chunk))
+			    (chunk-ref inner-x inner-y inner-z))
+	    value))
 
     (defun get-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
       (let ((key (create-chunk-key chunk-x chunk-y chunk-z)))
-	(multiple-value-bind (value existsp) (gethash key *chunks*)
+	(multiple-value-bind (value existsp) (get-chunk-at key)
 	  (if existsp
 	      (values value t)
 	      (progn
@@ -122,7 +162,7 @@
 		#+nil
 		(values nil nil)
 		(let ((new-chunk (load-chunk chunk-x chunk-y chunk-z)))
-		  (setf (gethash key *chunks*) new-chunk)
+		  (set-chunk-at key new-chunk)
 		  (values new-chunk t)))))))
 
     (defun load-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
@@ -225,6 +265,10 @@
     (values x y z)))
 (defun chunkhashfunc (x y z)
   (create-chunk-key x y z))
+;;FIXME::clearworld does not handle loading and stuff?
+(defun clearworld ()
+  (setf *chunks* (make-chunk-table)
+	*chunk-array* (create-chunk-array)))
 
 
 (defgeneric lispobj-dispatch (obj))

@@ -349,14 +349,14 @@
 		       (b y (+ y 16))
 		       (c z (+ z 16)))
 		      (funcall fun a b c))))
-	   world::*lispobj*))
+	   world::*chunks*))
 
 (defun map-all-chunks1 (fun)
   (maphash (lambda (k v)
 	     (declare (ignore v))
 	     (multiple-value-bind (x y z) (world:unhashfunc k)
 	       (funcall fun x y z)))
-	   world::*lispobj*))
+	   world::*chunks*))
 
 (defun remove-zeroes ()
   (maphash (lambda (k v)
@@ -374,8 +374,8 @@
 			   (return-from nope :stuff)))
 		  nil)
 		nil
-		(remhash k world::*lispobj*))))
-	   world::*lispobj*))
+		(remhash k world::*chunks*))))
+	   world::*chunks*))
 
 (defun sdfsdf ()
   (utility::dobox ((x -16 16)

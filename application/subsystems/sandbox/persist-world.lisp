@@ -37,20 +37,18 @@
     (save2
      path
      position-list
-     (gethash position world::*lispobj*))))
+     (world::chunk-data
+      (world::obtain-chunk-from-chunk-key position-list)))))
 
 (defun loadchunk (path position-list)
-  (let ((position
-	 (destructuring-bind (x y z) position-list
-	     (world:chunkhashfunc x z y))))
+  (let ((position position-list))
     (let ((data (myload2 path position-list)))
       (case (length data)
 	(3
 	 (destructuring-bind (blocks light sky) data
 	   (let ((len (length blocks)))
 	     (let ((new (make-array len)))
-	       (setf (gethash position world::*lispobj*)
-		     new)
+	       (world::make-chunk-from-key-and-data-and-keep position new)
 	       (dotimes (i len)
 		 (setf (aref new i)
 		       (dpb (aref sky i) (byte 4 12)
@@ -59,18 +57,27 @@
 	(1
 	 (let ((objdata (pop data)))
 	   (when objdata
-	     (setf (gethash position world::*lispobj*)
-		   (coerce objdata '(simple-array t (*))))))
+	     (world::make-chunk-from-key-and-data-and-keep
+	      position
+	      (coerce objdata '(simple-array t (*))))))
 	 t)))))
 
 (defun save-world (path)
   (maphash (lambda (k v)
 	     (declare (ignorable v))
 	     (savechunk path k))
-	   world::*lispobj*))
+	   world::*chunks*))
 (defun load-world (path)
   (let ((files (uiop:directory-files path)))
     (dolist (file files)
       (loadchunk path (read-from-string (pathname-name file))))))
+
+(defun delete-garbage (&optional (path (merge-pathnames "test/" *some-saves*)))
+  (let ((files (uiop:directory-files path)))
+    (dolist (file files)
+      (let ((data
+	     (myload file)))
+	(when (typep data '(cons array null))
+	  (delete-file file))))))
  
 
