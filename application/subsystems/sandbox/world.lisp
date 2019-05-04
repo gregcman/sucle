@@ -272,6 +272,41 @@
 	(chunk-z (floor z (utility:etouq *chunk-size-z*))))
     (values chunk-x chunk-y chunk-z)))
 
+(defun maybe-move-chunk-array (player-x player-y player-z)
+  ;;center the chunk array around the player, but don't always, only if above a certain
+  ;;threshold
+  (multiple-value-bind (chunk-x chunk-y chunk-z)
+      (chunk-coordinates-from-block-coordinates
+       (floor player-x)
+       (floor player-y)
+       (floor player-z))
+    ;;FIXME::is this expensive to recompute every frame or does it matter?
+    ;;maybe put it in the chunk array object?
+    (let ((half-x-size (utility:etouq (floor *chunk-array-default-size-x* 2)))
+	  (half-y-size (utility:etouq (floor *chunk-array-default-size-y* 2)))
+	  (half-z-size (utility:etouq (floor *chunk-array-default-size-z* 2))))
+      (let ((center-x (+ 
+			 (chunk-array-x-min *chunk-array*)
+			 half-x-size))
+	    (center-y (+ 
+			 (chunk-array-y-min *chunk-array*)
+			 half-y-size))
+	    (center-z (+ 
+			 (chunk-array-z-min *chunk-array*)
+			 half-z-size)))
+	;;FIXME::hard-coded threshold for repositioning the chunk array? 4 chunks?
+	#+nil
+	(print (list (- chunk-x center-x)
+		     (- chunk-y center-y)
+		     (- chunk-z center-z)))
+	(when (or (<= 4 (abs (- chunk-x center-x)))
+		  (<= 4 (abs (- chunk-y center-y)))
+		  (<= 4 (abs (- chunk-z center-z))))
+	  ;;(format t "moving chunk array")
+	  (reposition-chunk-array (- chunk-x half-x-size)
+				  (- chunk-y half-y-size)
+				  (- chunk-z half-z-size)))))))
+
 (defun test ()
   (let ((times (expt 10 6)))
     (time (dotimes (x times) (setf (getobj 0 0 0) 0)))
