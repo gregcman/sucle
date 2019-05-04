@@ -18,11 +18,12 @@
 		 (go rep)))))
 	(nreverse things)))))
 
+(defun convert-object-to-filename (obj)
+  (format nil "~s" obj))
 (defun save2 (path thingfilename &rest things)
-  (save (merge-pathnames (format nil "~s" thingfilename) path) things))
+  (save (merge-pathnames (convert-object-to-filename thingfilename) path) things))
 (defun myload2 (path thingfilename)
-  (myload (merge-pathnames (format nil "~s" thingfilename) path)))
-
+  (myload (merge-pathnames (convert-object-to-filename thingfilename) path)))
 
 (defparameter *some-saves* nil)
 (defparameter *world-directory* nil)

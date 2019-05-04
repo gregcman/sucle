@@ -38,6 +38,7 @@
 (defparameter *sucle-app-function*
   (run-with
    (lambda ()
+     #+nil
      (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
 	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
      ;;(our-load)
@@ -117,6 +118,7 @@
 (setf sandbox::*world-directory* "test/")
 (defun save ()
   (atest::remove-zeroes)
+  ;;FIXME::don't remove all the chunks?
   (sandbox::msave))
 #+nil
 (defun our-load ()

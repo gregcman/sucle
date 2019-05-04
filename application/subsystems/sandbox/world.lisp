@@ -342,7 +342,8 @@
 ;;FIXME::clearworld does not handle loading and stuff?
 (defun clearworld ()
   (setf *chunks* (make-chunk-table)
-	*chunk-array* (create-chunk-array)))
+	*chunk-array* (create-chunk-array))
+  (values))
 
 (defun chunk-worth-saving (chunk)
   (not (every (lambda (x) (eql x *empty-space*))

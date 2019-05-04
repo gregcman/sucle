@@ -503,6 +503,7 @@
   ;;handle chunk meshing
   (on-session-change *last-session*
     (clrhash sandbox::*g/chunk-call-list*)
+    ;;FIXME::update vao according to position, not 0 0 0
     (sandbox::update-world-vao 0 0 0))
   (sandbox::designatemeshing)
   (render-stuff))
@@ -578,7 +579,12 @@
 	    (gl:uniformfv (uniform :camera-pos)
 			  (camera-matrix:camera-vec-position *camera*))
 	    (%gl:uniform-1f (uniform :foglet)
-			    (/ -1.0 (or 128 (camera-matrix:camera-frustum-far *camera*)) *fog-ratio*))
+			    (/ -1.0
+			       ;;FIXME::16 assumes chunk is a 16x16x16 cube
+			       (* 16 sandbox::*chunk-radius*)
+			       #+nil
+			       (or 128 (camera-matrix:camera-frustum-far *camera*))
+			       *fog-ratio*))
 	    (%gl:uniform-1f (uniform :aratio)
 			    (/ 1.0 *fog-ratio*)))))
       (%gl:uniform-1f (uniform :time)

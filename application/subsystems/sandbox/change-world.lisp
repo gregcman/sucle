@@ -171,11 +171,13 @@
     (setf *chunk-coordinate-center-y* chunk-y)
     (setf *chunk-coordinate-center-z* chunk-z)))
 
+(defparameter *reposition-chunk-array-threshold* 1)
 (defun maybe-move-chunk-array ()
   ;;center the chunk array around the player, but don't always, only if above a certain
   ;;threshold
   ;;FIXME::is this expensive to recompute every frame or does it matter?
   ;;maybe put it in the chunk array object?
+  ;;return t if it was moved, nil otherwise
   (let ((half-x-size (utility:etouq (floor world::*chunk-array-default-size-x* 2)))
 	(half-y-size (utility:etouq (floor world::*chunk-array-default-size-y* 2)))
 	(half-z-size (utility:etouq (floor world::*chunk-array-default-size-z* 2))))
@@ -195,20 +197,28 @@
 		   (- chunk-z center-z)))
       (let ((chunk-x *chunk-coordinate-center-x*)
 	    (chunk-y *chunk-coordinate-center-y*)
-	    (chunk-z *chunk-coordinate-center-z*))
-	(when (or (<= 4 (abs (- chunk-x center-x)))
-		  (<= 4 (abs (- chunk-y center-y)))
-		  (<= 4 (abs (- chunk-z center-z))))
+	    (chunk-z *chunk-coordinate-center-z*)
+	    (threshold *reposition-chunk-array-threshold*))
+	(when (or (<= threshold (abs (- chunk-x center-x)))
+		  (<= threshold (abs (- chunk-y center-y)))
+		  (<= threshold (abs (- chunk-z center-z))))
 	  ;;(format t "moving chunk array")
 	  (world::reposition-chunk-array (- chunk-x half-x-size)
 					 (- chunk-y half-y-size)
-					 (- chunk-z half-z-size)))))))
+					 (- chunk-z half-z-size))
+	  (values t))))))
 
 (defun safe-subseq (seq end)
   (subseq seq 0 (min (length seq) end)))
 
 (defparameter *chunk-radius* 5)
-(defparameter *maximum-allowed-chunks* (* (expt (* *chunk-radius* 2) 3)))
+;;FIXME::how to determine the maximum allowed chunks? leave some leeway for loading?
+(defparameter *maximum-allowed-chunks* (* (expt (* (+ 1 *chunk-radius*) 2) 3)))
+(defun chunk-memory-usage (&optional (chunks *maximum-allowed-chunks*))
+  ;;in megabytes
+  (/ (* 8 #|8 bytes per word in 64bit sbcl|# chunks
+	(* world::*chunk-size-x* world::*chunk-size-y* world::*chunk-size-z*))
+     1024 1024 1.0 #|1.0 for converting to float|#))
 (defun get-unloadable-chunks (&optional
 				(x0 *chunk-coordinate-center-x*)
 				(y0 *chunk-coordinate-center-y*)
@@ -216,7 +226,7 @@
   (let ((difference (- (world::total-loaded-chunks) *maximum-allowed-chunks*)))
     (when (plusp difference)
       (let ((distance-sorted-chunks
-	     (sort (alexandria:hash-table-keys world::*chunks*) #'< :key
+	     (sort (alexandria:hash-table-keys world::*chunks*) #'> :key
 		   (lambda (position)
 		     ;;FIXME::destructuring bind of chunk-key happens in multiple places.
 		     ;;fix?
@@ -231,25 +241,35 @@
 				(x0 *chunk-coordinate-center-x*)
 				(y0 *chunk-coordinate-center-y*)
 			     (z0 *chunk-coordinate-center-z*))
-  ;;#+nil
+  (declare (optimize (speed 3) (safety 0))
+	   (type world::chunk-coord x0 y0 z0))
+  ;(time)
   (block out
     (let ((chunk-count 0))
+      (declare (type fixnum chunk-count))
       (flet ((add-chunk (x y z)
 	       (incf chunk-count)
 	       ;;do something
-	       (when (world::empty-chunk-p (world::get-chunk x y z nil))
+	       (unless (world::chunk-exists-p (world::create-chunk-key x y z))
 		 ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		 ;;(sandbox::chunk-load (world::create-chunk-key x y z))
+		 (sandbox::chunk-load (world::create-chunk-key x y z))
 		 ;;(print (list x y z))
 		 )
-	       (when (> chunk-count *maximum-allowed-chunks*)
+	       (when (>
+		      ;;FIXME::nonportably assume chunk-count and maxium allowed chunks are fixnums
+		      (the fixnum chunk-count)
+		      (the fixnum *maximum-allowed-chunks*))
 		 ;;exceeded the allowed chunks to load
 		 (return-from out))
 	       ))
-	(let ((size 6))
-	  (utility::dobox ((chunk-x (- x0 size) (+ x0 size))
-			   (chunk-y (- y0 size) (+ y0 size))
-			   (chunk-z (- z0 size) (+ z0 size)))
+	(let ((size *chunk-radius*))
+	  (declare (type world::chunk-coord size))
+	  (utility::dobox ((chunk-x (the world::chunk-coord (- x0 size))
+				    (the world::chunk-coord (+ x0 size)))
+			   (chunk-y (the world::chunk-coord (- y0 size))
+				    (the world::chunk-coord (+ y0 size)))
+			   (chunk-z (the world::chunk-coord (- z0 size))
+				    (the world::chunk-coord (+ z0 size))))
 			  (add-chunk chunk-x chunk-y chunk-z)))))))
 
 (defun chunk-unload (key &optional (path (world-path)))
@@ -261,8 +281,11 @@
 	    ;;write the chunk to disk if its worth saving
 	    (savechunk key path)
 	    ;;otherwise, if there is a preexisting file, destroy it
-	    (let ((chunk-save-file (chunk-coordinate-to-filename key)))
-	      (let ((file-exists-p chunk-save-file))
+	    (let ((chunk-save-file
+		   ;;FIXME::bad api?
+		   (merge-pathnames (convert-object-to-filename (chunk-coordinate-to-filename key))
+				    (world-path))))
+	      (let ((file-exists-p (probe-file chunk-save-file)))
 		(when file-exists-p
 		  (delete-file chunk-save-file))))))
       
@@ -272,11 +295,18 @@
       (world::with-chunk-key-coordinates (x y z) key
 	(world::remove-chunk-from-chunk-array x y z))
       ;;remove from the global table
-      (world::remove-chunk-at key))))
+      (world::remove-chunk-at key)
+      ;;FIXME::do we need to dirty-push it?
+      (dirty-push key))))
 
 (defun chunk-load (key &optional (path (world-path)))
-  (loadchunk path key))
+  ;;FIXME::using chunk-coordinate-to-filename before
+  ;;running loadchunk is a bad api?
+  (prog1 (loadchunk path (chunk-coordinate-to-filename key))
+    (dirty-push key)))
 
 (defun unload-extra-chunks ()
-  (dolist (chunk (get-unloadable-chunks))
-    (chunk-unload chunk)))
+  (let ((to-unload (get-unloadable-chunks)))
+    ;;(print (length to-unload))
+    (dolist (chunk to-unload)
+      (chunk-unload chunk))))
