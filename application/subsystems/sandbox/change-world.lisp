@@ -237,40 +237,41 @@
 			 (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))))))
 	(safe-subseq distance-sorted-chunks difference)))))
 
-(defun load-chunks-around (&optional
-				(x0 *chunk-coordinate-center-x*)
-				(y0 *chunk-coordinate-center-y*)
-			     (z0 *chunk-coordinate-center-z*))
-  (declare (optimize (speed 3) (safety 0))
-	   (type world::chunk-coord x0 y0 z0))
-  ;(time)
-  (block out
-    (let ((chunk-count 0))
-      (declare (type fixnum chunk-count))
-      (flet ((add-chunk (x y z)
-	       (incf chunk-count)
-	       ;;do something
-	       (unless (world::chunk-exists-p (world::create-chunk-key x y z))
-		 ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		 (sandbox::chunk-load (world::create-chunk-key x y z))
-		 ;;(print (list x y z))
-		 )
-	       (when (>
-		      ;;FIXME::nonportably assume chunk-count and maxium allowed chunks are fixnums
-		      (the fixnum chunk-count)
-		      (the fixnum *maximum-allowed-chunks*))
-		 ;;exceeded the allowed chunks to load
-		 (return-from out))
-	       ))
-	(let ((size *chunk-radius*))
-	  (declare (type world::chunk-coord size))
-	  (utility::dobox ((chunk-x (the world::chunk-coord (- x0 size))
-				    (the world::chunk-coord (+ x0 size)))
-			   (chunk-y (the world::chunk-coord (- y0 size))
-				    (the world::chunk-coord (+ y0 size)))
-			   (chunk-z (the world::chunk-coord (- z0 size))
-				    (the world::chunk-coord (+ z0 size))))
-			  (add-chunk chunk-x chunk-y chunk-z)))))))
+(defun load-chunks-around ()
+  (let ((x0 *chunk-coordinate-center-x*)
+	(y0 *chunk-coordinate-center-y*)
+	(z0 *chunk-coordinate-center-z*))
+    (declare (optimize (speed 3) (safety 0))
+	     (type world::chunk-coord x0 y0 z0))
+    ;;(time)
+    (block out
+      (let ((chunk-count 0))
+	(declare (type fixnum chunk-count))
+	(flet ((add-chunk (x y z)
+		 (incf chunk-count)
+		 ;;do something
+		 (let ((key (world::create-chunk-key x y z)))
+		   (unless (world::chunk-exists-p key)
+		     ;;The chunk does not exist, therefore the *empty-chunk* was returned
+		     (sandbox::chunk-load key)
+		     ;;(print (list x y z))
+		     ))
+		 (when (>
+			;;FIXME::nonportably assume chunk-count and maxium allowed chunks are fixnums
+			(the fixnum chunk-count)
+			(the fixnum *maximum-allowed-chunks*))
+		   ;;exceeded the allowed chunks to load
+		   (return-from out))
+		 ))
+	  (let ((size *chunk-radius*))
+	    (declare (type world::chunk-coord size))
+	    (utility::dobox ((chunk-x (the world::chunk-coord (- x0 size))
+				      (the world::chunk-coord (+ x0 size)))
+			     (chunk-y (the world::chunk-coord (- y0 size))
+				      (the world::chunk-coord (+ y0 size)))
+			     (chunk-z (the world::chunk-coord (- z0 size))
+				      (the world::chunk-coord (+ z0 size))))
+			    (add-chunk chunk-x chunk-y chunk-z))))))))
 
 (defun chunk-unload (key &optional (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))

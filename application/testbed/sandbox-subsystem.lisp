@@ -520,7 +520,7 @@
   ;#+nil
   (vector 0.68 0.8 1.0))
   
-(defparameter *fog-ratio* 1.0 ;;0.75
+(defparameter *fog-ratio* 0.75
   )
 
 (defun render-stuff ()
@@ -746,7 +746,7 @@ void main () {
 gl_Position = projection_model_view * position;
 color_out = dot(max(skylight*time, blocklight),vec4(0.25));
 texcoord_out = texcoord;
-fogratio_out = min(1.0, aratio+foglet*distance(camera_pos, position.xyz));
+fogratio_out = clamp(aratio+foglet*distance(camera_pos, position.xyz), 0.0, 1.0);
 }"
    "
 in vec2 texcoord_out;

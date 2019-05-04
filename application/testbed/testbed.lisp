@@ -140,7 +140,10 @@ gl_FragColor.rgb = color_out;
      )))
 
 (defparameter *paused* nil)
+(defparameter *session* nil)
 (defun per-frame ()
+  (application::on-session-change *session*
+    (load-world t))
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
@@ -181,7 +184,7 @@ gl_FragColor.rgb = color_out;
   (define-modify-macro easef (b &optional (modifier 0.5)) ease))
 
 (defparameter *reach* 64.0)
-
+;;FIXME::easier api for getting player position and such
 (defun stuff ()
   (setf *blockid* (let ((seq
 			 #(3 13 12 24 1 2 18 17 20 5 89)))
@@ -250,12 +253,7 @@ gl_FragColor.rgb = color_out;
 	  (let ((curr (sandbox-sub::pointmass-position player-pointmass))
 		(prev (sandbox-sub::pointmass-position-old player-pointmass))
 		(camera sandbox-sub::*camera*))
-	    (progn
-	      (with-vec (x y z) (curr)
-		(sandbox::set-chunk-coordinate-center x y z))
-	      (sandbox::maybe-move-chunk-array)
-	      (sandbox::load-chunks-around)
-	      (sandbox::unload-extra-chunks))
+	    (load-world)
 	    (let ((vec (camera-matrix:camera-vec-position camera))
 		  (cev (camera-matrix:camera-vec-noitisop camera)))
 	      (nsb-cga:%vec-lerp vec prev curr fraction)
@@ -264,6 +262,19 @@ gl_FragColor.rgb = color_out;
 			 (eql 0 is-sneaking))
 		(nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))
 	      (nsb-cga:%vec* cev vec -1.0))))))))
+
+(defun player-position ()
+  (let* ((player-pointmass (sandbox-sub::entity-particle *ent*))
+	 (curr (sandbox-sub::pointmass-position player-pointmass)))
+    curr))
+(defun load-world (&optional (force nil))
+  (with-vec (x y z) ((player-position))
+    (sandbox::set-chunk-coordinate-center x y z))
+  (let ((maybe-moved (sandbox::maybe-move-chunk-array)))
+    (when (or force
+	      maybe-moved)
+      (sandbox::load-chunks-around)
+      (sandbox::unload-extra-chunks))))
 
 (defun fist-stuff (pos)
   (let ((look-vec (load-time-value (nsb-cga:vec 0.0 0.0 0.0))))
@@ -405,8 +416,12 @@ gl_FragColor.rgb = color_out;
 	      (funcall fun x y z)))))))
 
 (defparameter *big-fist-fun*
-  (nth 0
-       (list 
+  (nth 1
+       (list
+	(lambda (x y z)
+	  (let ((id (world::getblock x y z)))
+	    (when (zerop id)
+	      (sandbox::setblock-with-update x y z *blockid* 0))))
 	#'dirtngrass
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
