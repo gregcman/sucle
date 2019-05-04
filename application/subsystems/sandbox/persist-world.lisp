@@ -22,12 +22,15 @@
 
 
 (defparameter *some-saves* nil)
-(defun msave (path)
-  (let ((newpath (utility:rebase-path path *some-saves*)))
+(defparameter *world-directory* nil)
+(defun world-path (&optional (path *world-directory*) (base-dir *some-saves*))
+  (utility:rebase-path path base-dir))
+(defun msave (&optional (path *world-directory*))
+  (let ((newpath (world-path path)))
     (ensure-directories-exist newpath)
     (save-world newpath)))
-(defun mload (path)
-  (let ((newpath (utility:rebase-path path *some-saves*)))
+(defun mload (&optional (path *world-directory*))
+  (let ((newpath (world-path path)))
     (load-world newpath)))
 
 (defun savechunk (path position)
@@ -90,7 +93,7 @@
     (dolist (file files)
       (loadchunk path (read-from-string (pathname-name file))))))
 
-(defun delete-garbage (&optional (path (merge-pathnames "test/" *some-saves*)))
+(defun delete-garbage (&optional (path (world-path)))
   (let ((files (uiop:directory-files path)))
     (dolist (file files)
       (let ((data

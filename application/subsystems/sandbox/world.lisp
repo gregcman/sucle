@@ -63,10 +63,13 @@
   ;;in order to be correct, the key has to store each value unaltered
   ;;This is for creating a key for a hash table
   (list chunk-x chunk-y chunk-z))
+(defmacro with-chunk-key-coordinates ((x y z) chunk-key &body body)
+  `(destructuring-bind (,x ,y ,z) ,chunk-key
+     ,@body))
 (defun obtain-chunk-from-chunk-key (chunk-key)
   ;;FIXME::is this a good api?
-  (destructuring-bind (x y z) chunk-key 
-      (obtain-chunk x y z)))
+  (with-chunk-key-coordinates (x y z) chunk-key 
+    (obtain-chunk x y z)))
 (defun create-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
   (declare (type chunk-coord chunk-x chunk-y chunk-z))
   (make-chunk :x chunk-x
@@ -79,7 +82,7 @@
 (defparameter *empty-chunk* (create-chunk 0 0 0))
 
 (defun make-chunk-from-key-and-data (key data)
-  (destructuring-bind (x y z) key
+  (with-chunk-key-coordinates (x y z) key
     (make-chunk :x x
 		:y y
 		:z z
@@ -232,6 +235,32 @@
 			    (let ((next-possible-chunk (get-chunk chunk-x chunk-y chunk-z force-load)))
 			      (setf (aref data data-x data-y data-z) next-possible-chunk)
 			      next-possible-chunk))))))))))))
+    (defun remove-chunk-from-chunk-array (&optional 
+					 (chunk-x 0) (chunk-y 0) (chunk-z 0)
+					    (chunk-array *chunk-array*))
+      ;;FIXME::Some of the code is identical to get-chunk-from-chunk-array,
+      ;;namely the when and lets establishing the bounds of the chunk coordinates
+      (declare (type chunk-coord chunk-x chunk-y chunk-z))
+      ;;if the coordinates are correct, return a chunk, otherwise return nil
+      (let ((data-x (- chunk-x (the chunk-coord (chunk-array-x-min chunk-array)))))
+	(declare (type chunk-coord data-x))
+	(when (< -1 data-x ;;(the chunk-coord (chunk-array-size-x chunk-array))
+		 (utility:etouq *chunk-array-default-size-x*))
+	  (let ((data-y (- chunk-y (the chunk-coord (chunk-array-y-min chunk-array)))))
+	    (declare (type chunk-coord data-y))
+	    (when (< -1 data-y ;;(the chunk-coord (chunk-array-size-y chunk-array))
+		     (utility:etouq *chunk-array-default-size-y*))
+	      (let ((data-z (- chunk-z (the chunk-coord (chunk-array-z-min chunk-array)))))
+		(declare (type chunk-coord data-z))
+		(when (< -1 data-z ;;(the chunk-coord (chunk-array-size-z chunk-array))
+			 (utility:etouq *chunk-array-default-size-z*))
+		  (let ((data (chunk-array-array chunk-array)))
+		    (declare (type chunk-array-data data))
+		    ;;the chunk is in the chunk-array's bounds
+		    (let ((possible-chunk
+			   (aref data data-x data-y data-z)))
+		      (when possible-chunk
+			(setf (aref data data-x data-y data-z) nil)))))))))))
 
     (defun obtain-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0) (force-load nil))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
@@ -320,7 +349,7 @@
 
 ;;For backwards compatibility
 (defun unhashfunc (chunk-key)
-  (destructuring-bind (x y z) chunk-key
+  (with-chunk-key-coordinates (x y z) chunk-key
     (values (* (utility:etouq *chunk-size-x*) x)
 	    (* (utility:etouq *chunk-size-y*) y)
 	    (* (utility:etouq *chunk-size-z*) z))))
@@ -343,7 +372,7 @@
 		     (lambda (position)
 		       ;;FIXME::destructuring bind of chunk-key happens in multiple places.
 		       ;;fix?
-		       (destructuring-bind (x1 y1 z1) position
+		       (with-chunk-key-coordinates (x1 y1 z1) position
 			 (let ((dx (- x1 x0))
 			       (dy (- y1 y0))
 			       (dz (- z1 z0)))

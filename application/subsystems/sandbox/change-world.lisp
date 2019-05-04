@@ -17,6 +17,11 @@
     (setf (gethash name *g/chunk-call-list*) list-num))
   (defun remove-chunk-display-list (name)
     (remhash name *g/chunk-call-list*)))
+(defun remove-chunk-model (name)
+  (multiple-value-bind (value existsp) (get-chunk-display-list name)
+    (when existsp
+      (gl:delete-lists value 1)
+      (remove-chunk-display-list name))))
 
 (defvar *world-mesh-lparallel-kernel* nil)
 (defmacro with-world-mesh-lparallel-kernel (&body body)
@@ -34,6 +39,12 @@
        (when *world-mesh-lparallel-kernel*
 	 (lparallel:end-kernel)))))
 
+(defun chunk-unload (key)
+  (remove-chunk-model key)
+  (world::with-chunk-key-coordinates (x y z) key
+    (world::remove-chunk-from-chunk-array x y z))
+  (world::remove-chunk-at key))
+
 (defun call-with-world-meshing-lparallel (fun)
   (with-world-meshing-lparallel
     (funcall fun)))
@@ -42,11 +53,8 @@
   (clean-dirty)
   (With-world-mesh-lparallel-kernel
     (lparallel:kill-tasks 'mesh-chunk))
-  (maphash (lambda (k v)
-	     (declare (ignorable k))
-	     (gl:delete-lists v 1)
-	     (remove-chunk-display-list k))
-	   *g/chunk-call-list*)
+  (loop :for key :being :the :hash-keys :of sandbox::*g/chunk-call-list* :do
+       (remove-chunk-model key))
   (map nil #'dirty-push
        (sort (alexandria:hash-table-keys world::*chunks*) #'< :key
 	     (lambda (position)
@@ -63,20 +71,18 @@
 
 (defun update-chunk-mesh (coords iter)
   (when coords
-    (let ((old-call-list (get-chunk-display-list coords)))     
-      (when old-call-list (gl:delete-lists old-call-list 1)))
+    (remove-chunk-model coords)
     (with-vec (a b c) (iter)
       (let ((len (floor (scratch-buffer:iterator-fill-pointer a) 3)))
-	(if (zerop len)
-	    (remove-chunk-display-list coords)	  
-	    (set-chunk-display-list
-	     coords
-	     (glhelp:with-gl-list
-	       (gl:with-primitives :quads	     
-		 (scratch-buffer:flush-my-iterator a
-		   (scratch-buffer:flush-my-iterator b
-		     (scratch-buffer:flush-my-iterator c
-		       (mesh-chunk len a b c))))))))))))
+	(unless (zerop len)
+	  (set-chunk-display-list
+	   coords
+	   (glhelp:with-gl-list
+	     (gl:with-primitives :quads	     
+	       (scratch-buffer:flush-my-iterator a
+		 (scratch-buffer:flush-my-iterator b
+		   (scratch-buffer:flush-my-iterator c
+		     (mesh-chunk len a b c))))))))))))
 
 (defun mesh-chunk (times a b c)
   (declare (type fixnum times))
@@ -153,30 +159,3 @@
     (setf (world:getlight i j k) new-light-value)
     (setf (world:skygetlight i j k) new-sky-light-value)
     (block-dirtify i j k)))
-
-#+nil
-(defparameter *save*
-  '("#version 100
-precision lowp float;
-attribute vec4 position;
-attribute vec2 texCoord;
-attribute float darkness;
-uniform mat4 projectionmodelview;
-varying vec2 TexCoord;
-varying float mycolor;
-void main(){
-gl_Position = projectionmodelview * position;
-mycolor = darkness;
-TexCoord = texCoord;
-}
-"
-    "#version 100
-precision lowp float;
-varying vec2 TexCoord;
-varying float mycolor;
-uniform sampler2D ourTexture;
-void main(){
-vec4 texcolor = texture2D(ourTexture, TexCoord);
-gl_FragColor.rgb = mycolor * texcolor.rgb;
-}
-") )

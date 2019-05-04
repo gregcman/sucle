@@ -114,12 +114,13 @@
     (loop for resource being the hash-values of (sketch-sucle::env-resources sketch-sucle::*env*)
        do (sketch-sucle::free-resource resource))))
 
+(setf sandbox::*world-directory* "test/")
 (defun save ()
   (atest::remove-zeroes)
-  (sandbox::msave "test/"))
+  (sandbox::msave))
 
 (defun our-load ()
-  (sandbox::mload "test/"))
+  (sandbox::mload))
 
 
 (setf sandbox::*some-saves*
