@@ -423,13 +423,13 @@
 (in-package :sandbox)
 ;;;;keeping track of the changes to the world
 (progn
-  (defparameter dirtychunks (queue:make-uniq-q))
+  (defparameter *dirty-chunks* (queue:make-uniq-q))
   (defun clean-dirty ()
-    (setf dirtychunks (queue:make-uniq-q)))
+    (setf *dirty-chunks* (queue:make-uniq-q)))
   (defun dirty-pop ()
-    (queue:uniq-pop dirtychunks))
+    (queue:uniq-pop *dirty-chunks*))
   (defun dirty-push (item)
-    (queue:uniq-push item dirtychunks))
+    (queue:uniq-push item *dirty-chunks*))
   (defun block-dirtify (i j k)
     (let ((imask (mod i 16))
 	  (jmask (mod j 16))

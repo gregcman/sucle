@@ -44,19 +44,14 @@
   (with-world-meshing-lparallel
     (funcall fun)))
 
-(defun update-world-vao (&optional
-			   (x sandbox::*chunk-coordinate-center-x*)
-			   (y sandbox::*chunk-coordinate-center-y*)
-			   (z sandbox::*chunk-coordinate-center-z*))
+(defun update-world-vao ()
   (clean-dirty)
-  (With-world-mesh-lparallel-kernel
-    (lparallel:kill-tasks 'mesh-chunk))
+  (reset-meshers)
   (loop :for key :being :the :hash-keys :of sandbox::*g/chunk-call-list* :do
      (remove-chunk-model key))
   (mapc #'dirty-push
 	(sort (alexandria:hash-table-keys world::*chunks*) #'< :key
-	      (lambda (position)
-		(unsquared-chunk-distance x y z position)))))
+	      'unsquared-chunk-distance)))
 
 (defun update-chunk-mesh (coords iter)
   (when coords
@@ -92,28 +87,48 @@
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)
 	    (function scratch-buffer:my-iterator)))
+(defparameter *chunk-render-radius* 6)
+(defparameter *total-background-chunk-mesh-jobs* 0)
+(defparameter *max-total-background-chunk-mesh-jobs* 5)
+(defun reset-meshers ()
+  (With-world-mesh-lparallel-kernel
+    (lparallel:kill-tasks 'mesh-chunk)
+    (setf *total-background-chunk-mesh-jobs* 0)))
+;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
   (loop
      (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)
-       (if success-p
-	   (apply (car value) (cdr value))
-	   (return))))
-  (loop
-     (let ((thechunk (dirty-pop)))
-       (if thechunk
-	   (when (world::chunk-exists-p thechunk)
-	     (let ((lparallel:*task-category* 'mesh-chunk))
-	       (lparallel:submit-task
-		*achannel*
-		(lambda (iter space chunk-pos)
-		  (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
-		  (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
-		    (chunk-shape iter io jo ko)
-		    (%list space #'update-chunk-mesh chunk-pos iter)))
-		(attrib-buffer-iterators)
-		(make-list 3)
-		thechunk)))
-	   (return)))))
+       (cond (success-p
+	      (apply (car value) (cdr value))
+	      (decf *total-background-chunk-mesh-jobs*))
+	     (t (return)))))
+  ;;remove chunks from the queue that are too far away, don't try to mesh them
+  #+nil ;;WRONG!!FIXME::separate world loading code from opengl
+  (queue::sort-queue
+   *dirty-chunks*
+   (lambda (list)
+     (sort (delete-if (lambda (x)
+			(>= (blocky-chunk-distance x) *chunk-render-radius*))
+		      list)
+	   '< :key 'unsquared-chunk-distance)))
+  (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
+    (loop
+       (let ((thechunk (dirty-pop)))
+	 (if thechunk
+	     (when (world::chunk-exists-p thechunk)
+	       (incf *total-background-chunk-mesh-jobs*)
+	       (let ((lparallel:*task-category* 'mesh-chunk))
+		 (lparallel:submit-task
+		  *achannel*
+		  (lambda (iter space chunk-pos)
+		    (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
+		    (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
+		      (chunk-shape iter io jo ko)
+		      (%list space #'update-chunk-mesh chunk-pos iter)))
+		  (attrib-buffer-iterators)
+		  (make-list 3)
+		  thechunk)))
+	     (return))))))
 
 
 (defun setblock-with-update (i j k blockid &optional
@@ -216,28 +231,37 @@
      1024 1024 1.0 #|1.0 for converting to float|#))
 (defparameter *threshold* (* 8 8))
 ;;threshold so that when too many chunks exist, over compensate, so not unloading every time
-(defun unsquared-chunk-distance (x0 y0 z0 position-key)
-  ;;FIXME::destructuring bind of chunk-key happens in multiple places.
-  ;;fix?
-  (world::with-chunk-key-coordinates
-   (x1 y1 z1) position-key
-   (let ((dx (- x1 x0))
-	 (dy (- y1 y0))
-	 (dz (- z1 z0)))
-     ;;FIXME::we don't need the sqrt for sorting
-     (+ (* dx dx) (* dy dy) (* dz dz)))))
-(defun get-unloadable-chunks (&optional
-				(x0 *chunk-coordinate-center-x*)
-				(y0 *chunk-coordinate-center-y*)
-				(z0 *chunk-coordinate-center-z*))
+(defun unsquared-chunk-distance (position-key)
+  (let ((x0 *chunk-coordinate-center-x*)
+	(y0 *chunk-coordinate-center-y*)
+	(z0 *chunk-coordinate-center-z*))
+    (world::with-chunk-key-coordinates
+     (x1 y1 z1) position-key
+     (let ((dx (- x1 x0))
+	   (dy (- y1 y0))
+	   (dz (- z1 z0)))
+       ;;FIXME::we don't need the sqrt for sorting
+       (+ (* dx dx) (* dy dy) (* dz dz))))))
+(defun blocky-chunk-distance (position-key)
+  (let ((x0 *chunk-coordinate-center-x*)
+	(y0 *chunk-coordinate-center-y*)
+	(z0 *chunk-coordinate-center-z*))
+    (world::with-chunk-key-coordinates
+     (x1 y1 z1) position-key
+     (let ((dx (- x1 x0))
+	   (dy (- y1 y0))
+	   (dz (- z1 z0)))
+       (max (abs dx)
+	    (abs dy)
+	    (abs dz))))))
+(defun get-unloadable-chunks ()
   ;;FIXME::optimize?
   (let ((difference (- (- (world::total-loaded-chunks) *maximum-allowed-chunks*)
 		       *threshold*)))
     (when (plusp difference)
       (let ((distance-sorted-chunks	     
 	     (sort (alexandria:hash-table-keys world::*chunks*) #'> :key
-		   (lambda (position)
-		     (unsquared-chunk-distance x0 y0 z0 position)))))
+		   'unsquared-chunk-distance)))
 	(safe-subseq distance-sorted-chunks difference)))))
 
 (defun load-chunks-around ()
