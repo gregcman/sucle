@@ -107,17 +107,18 @@
   (loop
      (let ((thechunk (dirty-pop)))
        (if thechunk
-	   (let ((lparallel:*task-category* 'mesh-chunk))
-	     (lparallel:submit-task
-	      *achannel*
-	      (lambda (iter space chunk-pos)
-		(map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
-		(multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
-		  (chunk-shape iter io jo ko)
-		  (%list space #'update-chunk-mesh chunk-pos iter)))
-	      (attrib-buffer-iterators)
-	      (make-list 3)
-	      thechunk))
+	   (when (world::chunk-exists-p thechunk)
+	     (let ((lparallel:*task-category* 'mesh-chunk))
+	       (lparallel:submit-task
+		*achannel*
+		(lambda (iter space chunk-pos)
+		  (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
+		  (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
+		    (chunk-shape iter io jo ko)
+		    (%list space #'update-chunk-mesh chunk-pos iter)))
+		(attrib-buffer-iterators)
+		(make-list 3)
+		thechunk)))
 	   (return)))))
 
 
@@ -211,7 +212,7 @@
 (defun safe-subseq (seq end)
   (subseq seq 0 (min (length seq) end)))
 
-(defparameter *chunk-radius* 5)
+(defparameter *chunk-radius* 6)
 ;;FIXME::how to determine the maximum allowed chunks? leave some leeway for loading?
 (defparameter *maximum-allowed-chunks* (* (expt (* (+ 1 *chunk-radius*) 2) 3)))
 (defun chunk-memory-usage (&optional (chunks *maximum-allowed-chunks*))
@@ -276,6 +277,7 @@
 (defun chunk-unload (key &optional (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
     (unless (world::empty-chunk-p chunk)
+      #+nil
       (let ((worth-saving (world::chunk-worth-saving chunk)))
 	;;save the chunk first?
 	(if worth-saving
@@ -296,15 +298,27 @@
       (world::with-chunk-key-coordinates (x y z) key
 	(world::remove-chunk-from-chunk-array x y z))
       ;;remove from the global table
-      (world::remove-chunk-at key)
-      ;;FIXME::do we need to dirty-push it?
-      (dirty-push key))))
+      (world::remove-chunk-at key))))
+
+(defun dirty-push-around (key)
+  ;;FIXME::although this is correct, it
+  ;;lags behind player movement?
+  (world::with-chunk-key-coordinates
+   (x y z) key
+   (dobox ((x0 (1- x) (+ x 2))
+	   (y0 (1- y) (+ y 2))
+	   (z0 (1- z) (+ z 2)))
+	  (let ((new-key (world::create-chunk-key x0 y0 z0)))
+	    (when (world::chunk-exists-p new-key)
+	      (dirty-push new-key))))))
+
 
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
-  (prog1 (loadchunk path (chunk-coordinate-to-filename key))
-    (dirty-push key)))
+  (let ((chunk-load-type (loadchunk path (chunk-coordinate-to-filename key))))
+    (unless (eq chunk-load-type :empty) ;;FIXME::better api?
+      (dirty-push-around key))))
 
 (defun unload-extra-chunks ()
   (let ((to-unload (get-unloadable-chunks)))

@@ -294,13 +294,21 @@ gl_FragColor.rgb = color_out;
 	      (aabbcc::aabb-collect-blocks
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      (load-time-value
+		       #+nil
 		       (aabbcc:make-aabb
 			:minx -1.5
 			:miny -1.5
 			:minz -1.5
 			:maxx  1.5
 			:maxy  1.5
-			:maxz  1.5)))
+			:maxz  1.5)
+		       (aabbcc:make-aabb
+			:minx -0.5
+			:miny -0.5
+			:minz -0.5
+			:maxx  0.5
+			:maxy  0.5
+			:maxz  0.5)))
 		  (x y z contact)
 		(declare (ignorable contact))		     
 		(funcall *big-fist-fun* x y z)))))
@@ -416,12 +424,16 @@ gl_FragColor.rgb = color_out;
 	      (funcall fun x y z)))))))
 
 (defparameter *big-fist-fun*
-  (nth 1
+  (nth 0
        (list
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
 	    (when (zerop id)
 	      (sandbox::setblock-with-update x y z *blockid* 0))))
+	(lambda (x y z)
+	  (let ((id (world::getblock x y z)))
+	    (unless (zerop id)
+	      (sandbox::plain-setblock x y z 0 0 15))))
 	#'dirtngrass
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
