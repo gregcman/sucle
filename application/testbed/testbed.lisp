@@ -120,31 +120,31 @@ gl_FragColor.rgb = color_out;
    :maxy (floatify world::*chunk-size-y*)
    :maxz (floatify world::*chunk-size-z*)))
 (defun render? ()
+  (let ((shader (application:getfnc 'solidshader)))
+    (glhelp::use-gl-program shader)
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms
+     uniform shader
+     (gl:uniform-matrix-4fv 
+      (uniform :pmv)
+      ;;(nsb-cga::identity-matrix)
+      
+      (camera-matrix:camera-matrix-projection-view-player sandbox-sub::*camera*)
+      nil)))
+  (gl:disable :blend)
+  (gl:disable :cull-face)
+  (gl:polygon-mode :front-and-back :line)
+  (gl:line-width 2)
   (when (sandbox-sub::fister-exists *fist*)
-    (let ((shader (application:getfnc 'solidshader)))
-      (glhelp::use-gl-program shader)
-      ;;uniform crucial for first person 3d
-      (glhelp:with-uniforms uniform shader
-	(gl:uniform-matrix-4fv 
-	 (uniform :pmv)
-	 ;;(nsb-cga::identity-matrix)
-	 
-	 (camera-matrix:camera-matrix-projection-view-player sandbox-sub::*camera*)
-	 nil)))
-    (gl:disable :blend)
-    (gl:disable :cull-face)
-    (gl:polygon-mode :front-and-back :line)
-    (gl:line-width 2)
     (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
       (with-vec (a b c) (selected-block)
-	(sandbox-sub::draw-aabb a b c *block-aabb2*)))
-    #+nil
-    (sandbox-sub::draw-aabb
-     ;;(* 16.0 sandbox::*chunk-coordinate-center-x*)
-     ;;(* 16.0 sandbox::*chunk-coordinate-center-y*)
-     ;;(* 16.0 sandbox::*chunk-coordinate-center-z*)
-     ;;testbed::*chunk-aabb*
-     ))
+	(sandbox-sub::draw-aabb a b c *block-aabb2*))))
+  #+nil
+  (sandbox-sub::draw-aabb
+   (* 16.0 sandbox::*chunk-coordinate-center-x*)
+   (* 16.0 sandbox::*chunk-coordinate-center-y*)
+   (* 16.0 sandbox::*chunk-coordinate-center-z*)
+   testbed::*chunk-aabb*)
   ;;render crosshairs
   (progn
     (glhelp:set-render-area
