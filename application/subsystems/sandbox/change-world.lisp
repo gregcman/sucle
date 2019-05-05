@@ -298,7 +298,6 @@
 	 (cond
 	   (worth-saving
 	    ;;write the chunk to disk if its worth saving
-	    ;;(format t "~%Saving chunk ~s" key)
 	    (savechunk key path))
 	   (t
 	    ;;otherwise, if there is a preexisting file, destroy it
