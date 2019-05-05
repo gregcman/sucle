@@ -229,13 +229,14 @@ gl_FragColor.rgb = color_out;
 	    (incf *ticks*)
 	    (setf sandbox::*daytime*
 		  (floatify		     
-		   1.0
+		   0.8
 		   #+nil
 		   (let ((seconds (or 60 840)))
-		     (sin
-		      (/ *ticks*
-			 60
-			 seconds)))))
+		     (/ (+ 1 (sin
+			     (/ *ticks*
+				;;60
+				seconds)))
+			2))))
 	    (sandbox-sub::physentity *ent*))
 	(declare (ignorable times))
 	(let ((neck (sandbox-sub::entity-neck *ent*)))
@@ -289,7 +290,7 @@ gl_FragColor.rgb = color_out;
 	  (when (window::skey-j-p (window::keyval 3))
 	    (toggle *swinging*))
 	  (when *swinging*
-	    (let ((u 32))
+	    (let ((u 8))
 	      (aabbcc::aabb-collect-blocks
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      (load-time-value
@@ -423,12 +424,14 @@ gl_FragColor.rgb = color_out;
 	      (funcall fun x y z)))))))
 
 (defparameter *big-fist-fun*
-  (nth 0
+  (nth 1
        (list
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
 	    (when (zerop id)
-	      (sandbox::setblock-with-update x y z *blockid*))))
+	      (sandbox::plain-setblock x y z *blockid* (case *blockid*
+							 (0 15)
+							 (otherwise 0))))))
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
 	    (unless (zerop id)
