@@ -11,7 +11,9 @@
 	       #:bordeaux-threads
 	       #:nsb-cga
 	       #:quads
-	       #:cl-conspack)
+	       #:cl-conspack
+	       #:salza2
+	       #:chipz)
   :serial t
   :components
   ((:file "queue")

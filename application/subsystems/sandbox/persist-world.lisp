@@ -6,29 +6,37 @@
   (defun store-lisp-objects-to-file-lisp-reader (path things)
     (assert (typep things 'list))
     ;;Store a lisp object to a file by simple printing
-    (with-standard-io-syntax
-      (let ((*read-eval* nil)
-	    (*print-circle* t))
-	(with-open-file
-	    (stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
-	  (dolist (thing things)
-	    ;;FIXME::maybe use prin1, same, but saves a newline?
-	    (print thing stream))))))
+    (with-open-file
+	(stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
+      (dolist (thing things)
+	(safer-print thing stream))))
   (defun retrieve-lisp-objects-from-file-lisp-reader (path)
-    (with-standard-io-syntax
+    (let ((file-existsp (probe-file path)))
+      ;;if it doesn't exist, what's the point of loading it
+      (when file-existsp
+	(let ((things nil)
+	      (eof (load-time-value (cons "eof" "token")))) 
+	  (with-open-file (stream path :direction :input :if-does-not-exist nil)
+	    (tagbody rep
+	       (let ((thing (safer-read stream nil eof)))
+		 (unless (eq thing eof)
+		   (push thing things)
+		   (go rep)))))
+	  (nreverse things))))))
+
+(defun safer-read (&optional (stream *standard-input*)
+		     (eof-error-p nil) (eof-value nil) (recursive-p nil))
+  (with-standard-io-syntax
+    (let ((*package* (load-time-value (find-package :cl))))
       (let ((*read-eval* nil))
-	(let ((file-existsp (probe-file path)))
-	  ;;if it doesn't exist, what's the point of loading it
-	  (when file-existsp
-	    (let ((things nil)
-		  (eof (load-time-value (cons "eof" "token")))) 
-	      (with-open-file (stream path :direction :input :if-does-not-exist nil)
-		(tagbody rep
-		   (let ((thing (read stream nil eof)))
-		     (unless (eq thing eof)
-		       (push thing things)
-		       (go rep)))))
-	      (nreverse things))))))))
+	(read stream eof-error-p eof-value recursive-p)))))
+(defun safer-print (object &optional (stream *standard-output*))
+  (with-standard-io-syntax
+    (let ((*package* (load-time-value (find-package :cl))))
+      (let ((*read-eval* nil)
+	    (*print-circle* t)
+	    (*print-readably* t))
+	(print object stream)))))
  
 ;;File format
 ;;https://www.cs.cmu.edu/Groups/AI/html/cltl/clm/node191.html
@@ -38,22 +46,19 @@
 (defparameter *reading-error* "#)")
 (defun determine-file-type (path)
   (with-open-file (stream path :direction :input :if-does-not-exist :error)
-    (unless (file-position stream 0)
-      (error "why can't the file-stream be repositioned?"))
-    (let ((file-type nil))
-      (let ((eof (load-time-value (cons "eof" "token"))))
-	(let ((char1 (read-char stream nil eof)))
-	  (cond ((eq eof char1) #|EOF|#)
-		(t
-		 (let ((char2 (read-char stream nil eof)))
-		   (cond ((eq eof char2)  #|EOF|#)
-			 (t
-			  (when (and (char= char1
-					    (elt *reading-error* 0))
-				     (char= char2
-					    (elt *reading-error* 1)))
-			    (setf file-type :not-lisp-printed-objects)))))))))
-      file-type)))
+    (let ((eof (load-time-value (cons "eof" "token"))))
+      (let ((char1 (read-char stream nil eof)))
+	(cond ((eq eof char1) #|EOF|#)
+	      (t
+	       (let ((char2 (read-char stream nil eof)))
+		 (cond ((eq eof char2)  #|EOF|#)
+		       (t
+			(when (and (char= char1
+					  (elt *reading-error* 0))
+				   (char= char2
+					  (elt *reading-error* 1)))
+			  (return-from determine-file-type :not-lisp-printed-objects)))))))))
+    nil))
 (defun insert-reading-error-bytes (stream)
   (loop :for char :across *reading-error* :do
      (write-byte (char-code char) stream)))
@@ -92,10 +97,10 @@
   (let ((file-existsp (probe-file path)))
     ;;if it doesn't exist, what's the point of loading it
     (when file-existsp
-      (let ((type (determine-file-type path)))
-	(case type
-	  ((:not-lisp-printed-objects) (retrieve-lisp-objects-from-file-conspack path))
-	  ((nil) (retrieve-lisp-objects-from-file-lisp-reader path)))))))
+      (case (determine-file-type path)
+	((:not-lisp-printed-objects)
+	 (retrieve-lisp-objects-from-file-conspack path))
+	((nil) (retrieve-lisp-objects-from-file-lisp-reader path))))))
 
 ;;FIXME::move generic loading and saving with printer and conspack to a separate file?
 ;;And have chunk loading in another file?
