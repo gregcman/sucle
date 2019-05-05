@@ -117,7 +117,7 @@
 
 (setf sandbox::*world-directory* "test/")
 (defun save ()
-  (atest::remove-zeroes)
+  ;;(atest::remove-zeroes)
   ;;FIXME::don't remove all the chunks?
   (sandbox::msave))
 #+nil

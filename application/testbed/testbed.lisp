@@ -428,7 +428,7 @@ gl_FragColor.rgb = color_out;
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
 	    (when (zerop id)
-	      (sandbox::setblock-with-update x y z *blockid* 0))))
+	      (sandbox::setblock-with-update x y z *blockid*))))
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
 	    (unless (zerop id)
@@ -544,4 +544,4 @@ gl_FragColor.rgb = color_out;
   ;;#+nil
   (lambda (x y z)
     (sandbox-sub::blocksound x y z)
-    (sandbox::setblock-with-update x y z 0 0)))
+    (sandbox::plain-setblock x y z 0 15)))

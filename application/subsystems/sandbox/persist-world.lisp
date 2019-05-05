@@ -56,7 +56,8 @@
 	   (world::set-chunk-at
 	    position
 	    (world::create-chunk x y z :type :empty)))
-
+	 ;;return :EMPTY to signify that
+	 ;;an empty chunk has been loaded
 	 :empty)
 	#+nil
 	(3 ;;FIXME::does this even work?
@@ -97,8 +98,8 @@
     position-list))
 
 (defun save-world (&optional (path (world-path)))
-  (loop :for key :being :the :hash-keys :of  world::*chunks* :do
-     (chunk-unload key path)))
+  (loop :for chunk :being :the :hash-values :of  world::*chunks* :do
+     (chunk-save chunk :path path)))
 
 (defun load-world (path)
   ;;FIXME::don't load the entire world

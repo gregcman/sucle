@@ -52,16 +52,18 @@
   (With-world-mesh-lparallel-kernel
     (lparallel:kill-tasks 'mesh-chunk))
   (loop :for key :being :the :hash-keys :of sandbox::*g/chunk-call-list* :do
-       (remove-chunk-model key))
-  (map nil #'dirty-push
-       (sort (alexandria:hash-table-keys world::*chunks*) #'< :key
-	     (lambda (position)
-	       (world::with-chunk-key-coordinates (i j k) position
+     (remove-chunk-model key))
+  (mapc #'dirty-push
+	(sort (alexandria:hash-table-keys world::*chunks*) #'< :key
+	      (lambda (position)
+		(world::with-chunk-key-coordinates
+		 (i j k) position
 		 ((lambda (x0 y0 z0 x1 y1 z1)
 		    (let ((dx (- x1 x0))
 			  (dy (- y1 y0))
 			  (dz (- z1 z0)))
-		      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
+		      ;;FIXME::we don't need the sqrt for sorting
+		      (+ (* dx dx) (* dy dy) (* dz dz))))
 		  x y z
 		  i
 		  j
@@ -223,22 +225,28 @@
   (/ (* 8 #|8 bytes per word in 64bit sbcl|# chunks
 	(* world::*chunk-size-x* world::*chunk-size-y* world::*chunk-size-z*))
      1024 1024 1.0 #|1.0 for converting to float|#))
+(defparameter *threshold* (* 8 8))
+;;threshold so that when too many chunks exist, over compensate, so not unloading every time
 (defun get-unloadable-chunks (&optional
 				(x0 *chunk-coordinate-center-x*)
 				(y0 *chunk-coordinate-center-y*)
 				(z0 *chunk-coordinate-center-z*))
-  (let ((difference (- (world::total-loaded-chunks) *maximum-allowed-chunks*)))
+  ;;FIXME::optimize?
+  (let ((difference (- (- (world::total-loaded-chunks) *maximum-allowed-chunks*)
+		       *threshold*)))
     (when (plusp difference)
-      (let ((distance-sorted-chunks
+      (let ((distance-sorted-chunks	     
 	     (sort (alexandria:hash-table-keys world::*chunks*) #'> :key
 		   (lambda (position)
 		     ;;FIXME::destructuring bind of chunk-key happens in multiple places.
 		     ;;fix?
-		     (world::with-chunk-key-coordinates (x1 y1 z1) position
-		       (let ((dx (- x1 x0))
-			     (dy (- y1 y0))
-			     (dz (- z1 z0)))
-			 (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))))))
+		     (world::with-chunk-key-coordinates
+		      (x1 y1 z1) position
+		      (let ((dx (- x1 x0))
+			    (dy (- y1 y0))
+			    (dz (- z1 z0)))
+			;;FIXME::we don't need the sqrt for sorting
+			(+ (* dx dx) (* dy dy) (* dz dz))))))))
 	(safe-subseq distance-sorted-chunks difference)))))
 
 (defun load-chunks-around ()
@@ -247,7 +255,6 @@
 	(z0 *chunk-coordinate-center-z*))
     (declare (optimize (speed 3) (safety 0))
 	     (type world::chunk-coord x0 y0 z0))
-    ;;(time)
     (block out
       (let ((chunk-count 0))
 	(declare (type fixnum chunk-count))
@@ -277,15 +284,23 @@
 				      (the world::chunk-coord (+ z0 size))))
 			    (add-chunk chunk-x chunk-y chunk-z))))))))
 
-(defun chunk-unload (key &optional (path (world-path)))
-  (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
-    (unless (world::empty-chunk-p chunk)
-      ;;#+nil
-      (let ((worth-saving (world::chunk-worth-saving chunk)))
-	;;save the chunk first?
-	(if worth-saving
+(defun chunk-save (chunk &key (path (world-path)))
+  (cond
+    ((world::empty-chunk-p chunk)
+     ;;when the chunk is obviously empty
+     )
+    (t
+     ;;when the chunk is not obviously empty
+     (when (world::chunk-modified chunk) ;;if it wasn't modified, no point in saving
+       (let ((worth-saving (world::chunk-worth-saving chunk))
+	     (key (world::chunk-key chunk)))
+	 ;;save the chunk first?
+	 (cond
+	   (worth-saving
 	    ;;write the chunk to disk if its worth saving
-	    (savechunk key path)
+	    ;;(format t "~%Saving chunk ~s" key)
+	    (savechunk key path))
+	   (t
 	    ;;otherwise, if there is a preexisting file, destroy it
 	    (let ((chunk-save-file
 		   ;;FIXME::bad api?
@@ -293,15 +308,20 @@
 				    (world-path))))
 	      (let ((file-exists-p (probe-file chunk-save-file)))
 		(when file-exists-p
-		  (delete-file chunk-save-file))))))
-      
-      ;;remove the opengl object
-      (remove-chunk-model key)
-      ;;remove from the chunk-array
-      (world::with-chunk-key-coordinates (x y z) key
-	(world::remove-chunk-from-chunk-array x y z))
-      ;;remove from the global table
-      (world::remove-chunk-at key))))
+		  (delete-file chunk-save-file)))))))))))
+
+(defun chunk-unload (key &key (path (world-path)))
+  (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
+    (chunk-save chunk :path path)
+    ;;remove the opengl object
+    ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
+    ;;FIXME::remove anyway?
+    (remove-chunk-model key)
+    ;;remove from the chunk-array
+    (world::with-chunk-key-coordinates (x y z) key
+				       (world::remove-chunk-from-chunk-array x y z))
+    ;;remove from the global table
+    (world::remove-chunk-at key)))
 
 (defun dirty-push-around (key)
   ;;FIXME::although this is correct, it
@@ -319,15 +339,23 @@
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
-  (let ((chunk-load-type (loadchunk path (chunk-coordinate-to-filename key))))
-    (unless (eq chunk-load-type :empty) ;;FIXME::better api?
+  (let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
+    (unless (eq load-type :empty) ;;FIXME::better api?
       (dirty-push-around key))))
 
 (defun unload-extra-chunks ()
-  (let ((to-unload (get-unloadable-chunks)))
+  (let ((to-unload
+	 ;;FIXME::get a timer library? metering?
+	 (;;time
+	  progn
+	  (progn ;;(print "getting unloadable chunks")
+		 (get-unloadable-chunks)))))
     ;;(print (length to-unload))
-    (dolist (chunk to-unload)
-      (chunk-unload chunk))))
+    (;;time
+     progn
+     (progn ;;(print "unloading the chunks")
+	    (dolist (chunk to-unload)
+	      (chunk-unload chunk))))))
 
 (defun test34 ()
   ;;(with-output-to-string (print ))

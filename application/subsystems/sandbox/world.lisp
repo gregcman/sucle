@@ -21,7 +21,7 @@
 
 (struct-to-clos:struct->class
  (defstruct chunk
-   ;;last-modified
+   modified
    ;;last-saved
    type
    x
@@ -82,7 +82,6 @@
   (setf *empty-space* empty-space)
   (setf *empty-chunk-data* (make-chunk-data :initial-element *empty-space*))
   (setf *empty-chunk* (create-chunk 0 0 0 :data *empty-chunk-data* :type :empty)))
-(reset-empty-chunk-value)
 
 (defun empty-chunk-p (chunk)
   (or (eq chunk *empty-chunk*)
@@ -92,6 +91,11 @@
 	 (* *chunk-size-x* *chunk-size-y* *chunk-size-z*)
 	 :initial-element initial-element
 	 rest))
+
+(defun coerce-empty-chunk-to-regular-chunk (chunk)
+  (when (eq (chunk-type chunk) :empty)
+    (setf (chunk-data chunk) (make-chunk-data)
+	  (chunk-type chunk) :normal)))
 
 (defun create-chunk (chunk-x chunk-y chunk-z &key (type :normal) (data (make-chunk-data)))
   ;;type can be either :NORMAL or :EMPTY. empty is used to signify that
@@ -106,7 +110,7 @@
 		      (:normal (or data (make-chunk-data)))
 		      (:empty *empty-chunk-data*))
 	      :type type))
-
+(reset-empty-chunk-value)
 (defun make-chunk-from-key-and-data (key data)
   (with-chunk-key-coordinates (x y z) key
     (make-chunk :x x
@@ -325,6 +329,11 @@
 	    (inner-x (mod x (utility:etouq *chunk-size-x*)))
 	    (inner-y (mod y (utility:etouq *chunk-size-y*)))
 	    (inner-z (mod z (utility:etouq *chunk-size-z*))))
+	;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
+	;;chunk might be a chunk of type :EMPTY with shared data, but since it is being set,
+	;;coerce it to a regular chunk
+	(coerce-empty-chunk-to-regular-chunk chunk)
+	(setf (chunk-modified chunk) t)
 	(setf (reference-inside-chunk chunk inner-x inner-y inner-z) value)))
     ;;FIXME::setobj is provided for backwards compatibility?
     (defun setobj (x y z new)
