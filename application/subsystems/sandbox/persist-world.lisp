@@ -154,7 +154,7 @@
 					    (elt *reading-error* 0))
 				     (char= char2
 					    (elt *reading-error* 1)))
-			    (setf file-type :not-printed-objects)))))))))
+			    (setf file-type :not-lisp-printed-objects)))))))))
       file-type)))
 (defun insert-reading-error-bytes (stream)
   (loop :for char :across *reading-error* :do
@@ -196,5 +196,5 @@
     (when file-existsp
       (let ((type (determine-file-type path)))
 	(case type
-	  ((:not-lisp-objects) (retrieve-lisp-objects-from-file-conspack path))
+	  ((:not-lisp-printed-objects) (retrieve-lisp-objects-from-file-conspack path))
 	  ((nil) (retrieve-lisp-objects-from-file-lisp-reader path)))))))
