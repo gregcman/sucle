@@ -29,7 +29,78 @@
 		       (push thing things)
 		       (go rep)))))
 	      (nreverse things))))))))
+ 
+;;File format
+;;https://www.cs.cmu.edu/Groups/AI/html/cltl/clm/node191.html
+;;Current file format is just printing lisp objects using the lisp printer
+;;#) is first two bytes of a file if it's not just printed lisp objects
 
+(defparameter *reading-error* "#)")
+(defun determine-file-type (path)
+  (with-open-file (stream path :direction :input :if-does-not-exist :error)
+    (unless (file-position stream 0)
+      (error "why can't the file-stream be repositioned?"))
+    (let ((file-type nil))
+      (let ((eof (load-time-value (cons "eof" "token"))))
+	(let ((char1 (read-char stream nil eof)))
+	  (cond ((eq eof char1) #|EOF|#)
+		(t
+		 (let ((char2 (read-char stream nil eof)))
+		   (cond ((eq eof char2)  #|EOF|#)
+			 (t
+			  (when (and (char= char1
+					    (elt *reading-error* 0))
+				     (char= char2
+					    (elt *reading-error* 1)))
+			    (setf file-type :not-lisp-printed-objects)))))))))
+      file-type)))
+(defun insert-reading-error-bytes (stream)
+  (loop :for char :across *reading-error* :do
+     (write-byte (char-code char) stream)))
+
+(defun store-lisp-objects-to-file (path thing &key (storage-type :conspack))
+  (ecase storage-type
+    (:conspack (store-lisp-objects-to-file-conspack path thing))
+    (:standard (store-lisp-objects-to-file-lisp-reader path thing))))
+
+(defun store-lisp-objects-to-file-conspack (path things)
+  (assert (typep things 'list))
+  (with-open-file (stream path :direction :output :if-exists :supersede
+			  :element-type '(unsigned-byte 8))
+    (insert-reading-error-bytes stream)
+    (conspack::tracking-refs ()
+      (dolist (thing things)
+	(conspack::encode thing :stream stream)))))
+
+(defun retrieve-lisp-objects-from-file-conspack (path)
+  ;;ripped from conspack::decode-file
+  (with-open-file
+      (stream path :direction :input :element-type '(unsigned-byte 8)
+	      :if-does-not-exist :error)
+    (loop :repeat (length *reading-error*) :do (read-byte stream))
+    (let (eof)
+      (conspack::tracking-refs ()
+        (loop as object = (handler-case
+                              (conspack::decode-stream stream)
+                            (conspack::end-of-file () (setf eof t) (values)))
+              until eof
+              collect object)))))
+
+(defun retrieve-lisp-objects-from-file (path)
+  ;;A file contains 0 or more lisp objects.
+  ;;Thus, saving an individual object does not work, you have to save a list of objects
+  (let ((file-existsp (probe-file path)))
+    ;;if it doesn't exist, what's the point of loading it
+    (when file-existsp
+      (let ((type (determine-file-type path)))
+	(case type
+	  ((:not-lisp-printed-objects) (retrieve-lisp-objects-from-file-conspack path))
+	  ((nil) (retrieve-lisp-objects-from-file-lisp-reader path)))))))
+
+;;FIXME::move generic loading and saving with printer and conspack to a separate file?
+;;And have chunk loading in another file?
+
+;;world loading code below?
 (defun convert-object-to-filename (obj)
   (format nil "~s" obj))
 
@@ -62,7 +133,7 @@
 (defun loadchunk (path filename-position-list)
   (let ((position (filename-to-chunk-coordinate filename-position-list)))  
     (let ((data
-	   (retrieve-lisp-object-from-file
+	   (retrieve-lisp-objects-from-file
 	    (merge-pathnames (convert-object-to-filename filename-position-list) path))))
       (case (length data)
 	(0
@@ -128,73 +199,13 @@
   (let ((files (uiop:directory-files path)))
     (dolist (file files)
       (let ((data
-	     (myload file)))
+	     (retrieve-lisp-objects-from-file file)))
 	(when (typep data '(cons array null))
 	  (delete-file file))))))
- 
-;;File format
-;;https://www.cs.cmu.edu/Groups/AI/html/cltl/clm/node191.html
-;;Current file format is just printing lisp objects using the lisp printer
-;;#) is first two bytes of a file if it's not just printed lisp objects
 
-(defparameter *reading-error* "#)")
-(defun determine-file-type (path)
-  (with-open-file (stream path :direction :input :if-does-not-exist :error)
-    (unless (file-position stream 0)
-      (error "why can't the file-stream be repositioned?"))
-    (let ((file-type nil))
-      (let ((eof (load-time-value (cons "eof" "token"))))
-	(let ((char1 (read-char stream nil eof)))
-	  (cond ((eq eof char1) #|EOF|#)
-		(t
-		 (let ((char2 (read-char stream nil eof)))
-		   (cond ((eq eof char2)  #|EOF|#)
-			 (t
-			  (when (and (char= char1
-					    (elt *reading-error* 0))
-				     (char= char2
-					    (elt *reading-error* 1)))
-			    (setf file-type :not-lisp-printed-objects)))))))))
-      file-type)))
-(defun insert-reading-error-bytes (stream)
-  (loop :for char :across *reading-error* :do
-     (write-byte (char-code char) stream)))
-
-(defun store-lisp-objects-to-file (path thing &key (storage-type :conspack))
-  (ecase storage-type
-    (:conspack (store-lisp-objects-to-file-conspack path thing))
-    (:standard (store-lisp-objects-to-file-lisp-reader path thing))))
-
-(defun store-lisp-objects-to-file-conspack (path things)
-  (assert (typep things 'list))
-  (with-open-file (stream path :direction :output :if-exists :supersede
-			  :element-type '(unsigned-byte 8))
-    (insert-reading-error-bytes stream)
-    (conspack::tracking-refs ()
-      (dolist (thing things)
-	(conspack::encode thing :stream stream)))))
-
-(defun retrieve-lisp-objects-from-file-conspack (path)
-  ;;ripped from conspack::decode-file
-  (with-open-file
-      (stream path :direction :input :element-type '(unsigned-byte 8)
-	      :if-does-not-exist :error)
-    (loop :repeat (length *reading-error*) :do (read-byte stream))
-    (let (eof)
-      (conspack::tracking-refs ()
-        (loop as object = (handler-case
-                              (conspack::decode-stream stream)
-                            (conspack::end-of-file () (setf eof t) (values)))
-              until eof
-              collect object)))))
-
-(defun retrieve-lisp-object-from-file (path)
-  ;;A file contains 0 or more lisp objects.
-  ;;Thus, saving an individual object does not work, you have to save a list of objects
-  (let ((file-existsp (probe-file path)))
-    ;;if it doesn't exist, what's the point of loading it
-    (when file-existsp
-      (let ((type (determine-file-type path)))
-	(case type
-	  ((:not-lisp-printed-objects) (retrieve-lisp-objects-from-file-conspack path))
-	  ((nil) (retrieve-lisp-objects-from-file-lisp-reader path)))))))
+(defun convert-to-conspack (&optional (path (world-path)))
+  (let ((files (uiop:directory-files path)))
+    (dolist (file files)
+      (time
+       (let ((data (retrieve-lisp-objects-from-file file)))
+	 (store-lisp-objects-to-file file data))))))
