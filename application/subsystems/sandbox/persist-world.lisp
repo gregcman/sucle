@@ -47,7 +47,7 @@
 (defparameter *name-type-length* 16)
 (defparameter *header-length* (+ (length *reading-error*) *name-type-length*))
 (defun make-empty-header-string ()
-  (make-string *header-length* :initial-element #\space))
+  (make-string *name-type-length* :initial-element #\space))
 (defun determine-file-type (path)
   (with-open-file (stream path :direction :input :if-does-not-exist :error)
     (let ((eof (load-time-value (cons "eof" "token"))))
