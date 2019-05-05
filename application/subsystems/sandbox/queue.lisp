@@ -1,9 +1,6 @@
 (defpackage #:queue
   (:use #:cl)
   (:export 
-   #:get-queue
-   #:q-push
-   #:q-pop
    #:make-uniq-q
    #:uniq-push
    #:uniq-pop
@@ -15,32 +12,36 @@
 
 (in-package :queue)
 
-;;a basic fifo queue first in first out
-(defstruct queue
-  head
-  last
+;;queue taken from https://rosettacode.org/wiki/Queue/Definition#Common_Lisp
+;;but modified
+(defstruct (queue (:constructor %make-queue))
+  (items '() :type list)
+  (tail '() :type list)
   (len 0))
 
 (defun get-queue ()
-  (let ((tail (cons nil nil)))
-    (let ((head (cons nil tail)))
-      (make-queue
-       :head head
-       :last tail))))
+  "Returns an empty queue."
+  (%make-queue))
 
-(defun q-push (item queue)
-  (let ((new-end (cons nil nil)))
-    (setf (car (queue-last queue)) item)
-    (setf (cdr (queue-last queue)) new-end)
-    (setf (queue-last queue) new-end)
-    (incf (queue-len queue))))
+(defun queue-empty-p (queue)
+  "Returns true if the queue is empty."
+  (endp (queue-items queue)))
 
-(defun q-pop (queue)
-  (if (eq (cdr (queue-head queue)) (queue-last queue))
-      (values nil nil)
-      (progn
-	(decf (queue-len queue))
-	(values (pop (cdr (queue-head queue))) t))))
+(defun enqueue (item queue)
+  "Enqueue item in queue. Returns the queue."
+  (prog1 queue
+    (let ((new-item (list item)))
+      (if (queue-empty-p queue)
+	  (setf (queue-items queue) new-item
+		(queue-tail queue) new-item)
+	  (setf (cdr (queue-tail queue)) new-item
+		(queue-tail queue) new-item)))))
+
+(defun dequeue (queue)
+  ;;"Dequeues an item from queue. Signals an error if queue is empty."
+  (if (queue-empty-p queue)
+      (values nil nil) ;;(error "Cannot dequeue from empty queue.")
+      (values (pop (queue-items queue)) t)))
 
 ;;a fifo queue with the added restriction that members must be unique
 (defstruct uniq-q
@@ -56,10 +57,10 @@
       (declare (ignore fuck-me))
       (unless exists?
 	  (setf (gethash item hash) t)
-	  (q-push item (uniq-q-q uniq))))))
+	  (enqueue item (uniq-q-q uniq))))))
 
 (defun uniq-pop (uniq)
-  (multiple-value-bind (item yup) (q-pop (uniq-q-q uniq))
+  (multiple-value-bind (item yup) (dequeue (uniq-q-q uniq))
     (if yup
 	(remhash item (uniq-q-hash uniq)))
     (values item yup)))
@@ -72,10 +73,10 @@
       (declare (ignorable old-value))
       (unless exists?
 	  (setf (gethash key hash) value)
-	  (q-push key (uniq-q-q uniq))))))
+	  (enqueue key (uniq-q-q uniq))))))
 
 (defun kv-uniq-pop (uniq)
-  (multiple-value-bind (item yup) (q-pop (uniq-q-q uniq))
+  (multiple-value-bind (item yup) (dequeue (uniq-q-q uniq))
     (let ((hash (uniq-q-hash uniq)))
       (let ((value (gethash item hash)))
 	(if yup
@@ -87,10 +88,8 @@
 
 (defun clrq (q)
   (setf (queue-len q) 0)
-  (let ((tail (cons nil nil)))
-    (let ((head (cons nil tail)))
-      (setf (queue-head q) head)
-      (setf (queue-last q) tail))))
+  (setf (queue-items q) nil)
+  (setf (queue-tail q) nil))
 
 (defun clruniq (uniq)
   (clrq (uniq-q-q uniq))
