@@ -89,7 +89,7 @@
 	    (function scratch-buffer:my-iterator)))
 (defparameter *chunk-render-radius* 6)
 (defparameter *total-background-chunk-mesh-jobs* 0)
-(defparameter *max-total-background-chunk-mesh-jobs* 5)
+(defparameter *max-total-background-chunk-mesh-jobs* 1)
 (defun reset-meshers ()
   (With-world-mesh-lparallel-kernel
     (lparallel:kill-tasks 'mesh-chunk)
@@ -102,16 +102,17 @@
 	      (apply (car value) (cdr value))
 	      (decf *total-background-chunk-mesh-jobs*))
 	     (t (return)))))
-  ;;remove chunks from the queue that are too far away, don't try to mesh them
-  #+nil ;;WRONG!!FIXME::separate world loading code from opengl
-  (queue::sort-queue
-   *dirty-chunks*
-   (lambda (list)
-     (sort (delete-if (lambda (x)
-			(>= (blocky-chunk-distance x) *chunk-render-radius*))
-		      list)
-	   '< :key 'unsquared-chunk-distance)))
   (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
+    (queue::sort-queue
+     *dirty-chunks*
+     (lambda (list)
+       (sort list
+	     ;;remove chunks from the queue that are too far away, don't try to mesh them
+	     #+nil ;;WRONG!!FIXME::separate world loading code from opengl
+	     (delete-if (lambda (x)
+			  (>= (blocky-chunk-distance x) *chunk-render-radius*))
+			list)
+	     '< :key 'unsquared-chunk-distance)))
     (loop
        (let ((thechunk (dirty-pop)))
 	 (if thechunk

@@ -94,11 +94,12 @@ color_out = color;
    "
 in vec3 color_out;
 void main () {
+gl_FragColor.a = 1.0;
 gl_FragColor.rgb = color_out;
 }"
    '(("position" 0) 
      ("color" 3))
-   '((:pmv "projection-model-view"))))
+   '((:pmv "projection_model_view"))))
 (defparameter *block-aabb2*
   (let* ((offset 0.001)
 	 (small (- 0.0 offset))
@@ -110,6 +111,14 @@ gl_FragColor.rgb = color_out;
      :maxx large
      :maxy large
      :maxz large)))
+(defparameter *chunk-aabb*
+  (aabbcc:make-aabb
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx (floatify world::*chunk-size-x*)
+   :maxy (floatify world::*chunk-size-y*)
+   :maxz (floatify world::*chunk-size-z*)))
 (defun render? ()
   (when (sandbox-sub::fister-exists *fist*)
     (let ((shader (application:getfnc 'solidshader)))
@@ -118,15 +127,24 @@ gl_FragColor.rgb = color_out;
       (glhelp:with-uniforms uniform shader
 	(gl:uniform-matrix-4fv 
 	 (uniform :pmv)
+	 ;;(nsb-cga::identity-matrix)
+	 
 	 (camera-matrix:camera-matrix-projection-view-player sandbox-sub::*camera*)
 	 nil)))
-
+    (gl:disable :blend)
     (gl:disable :cull-face)
     (gl:polygon-mode :front-and-back :line)
     (gl:line-width 2)
     (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
       (with-vec (a b c) (selected-block)
-	(sandbox-sub::draw-aabb a b c *block-aabb2*))))
+	(sandbox-sub::draw-aabb a b c *block-aabb2*)))
+    #+nil
+    (sandbox-sub::draw-aabb
+     ;;(* 16.0 sandbox::*chunk-coordinate-center-x*)
+     ;;(* 16.0 sandbox::*chunk-coordinate-center-y*)
+     ;;(* 16.0 sandbox::*chunk-coordinate-center-z*)
+     ;;testbed::*chunk-aabb*
+     ))
   ;;render crosshairs
   (progn
     (glhelp:set-render-area
