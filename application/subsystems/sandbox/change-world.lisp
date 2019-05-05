@@ -140,7 +140,7 @@
 		  thechunk)))
 	     (return))))))
 
-
+#+nil
 (defun setblock-with-update (i j k blockid &optional
 					     (new-light-value (aref block-data:*lightvalue* blockid)))
  (let ((old-light-value (world:getlight i j k)))

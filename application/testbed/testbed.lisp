@@ -308,7 +308,7 @@ gl_FragColor.rgb = color_out;
 	  (when (window::skey-j-p (window::keyval 3))
 	    (toggle *swinging*))
 	  (when *swinging*
-	    (let ((u 8))
+	    (let ((u 80))
 	      (aabbcc::aabb-collect-blocks
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      (load-time-value
@@ -452,13 +452,18 @@ gl_FragColor.rgb = color_out;
 							 (otherwise 0))))))
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
+	    (when (zerop (random 800))
+	      (when (member id '(2 3))
+		(tree x y z)))))
+	(lambda (x y z)
+	  (let ((id (world::getblock x y z)))
 	    (unless (zerop id)
 	      (sandbox::plain-setblock x y z 0 0 15))))
 	#'dirtngrass
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
 	    (unless (zerop id)
-	      (sandbox::setblock-with-update x y z 0 0)))))))
+	      (sandbox::plain-setblock x y z 0 0)))))))
 
 (defun neighbors (x y z)
   (let ((tot 0))
@@ -478,19 +483,19 @@ gl_FragColor.rgb = color_out;
     (unless (zerop blockid)
       (let ((naybs (neighbors x y z)))
 	(when (> 3 naybs)	  
-	  (sandbox::setblock-with-update x y z 0))))))
+	  (sandbox::plain-setblock x y z 0))))))
 (defun bonder2 (x y z)
   (let ((blockid (world:getblock x y z)))
     (when (zerop blockid)
       (let ((naybs (neighbors x y z)))
 	(when (< 1 naybs)	  
-	  (sandbox::setblock-with-update x y z 1))))))
+	  (sandbox::plain-setblock x y z 1))))))
 (defun bonder3 (x y z)
   (let ((blockid (world:getblock x y z)))
     (when (zerop blockid)
       (let ((naybs (neighbors x y z)))
 	(when (< 2 naybs)	  
-	  (sandbox::setblock-with-update x y z 1))))))
+	  (sandbox::plain-setblock x y z 1))))))
 
 (defun remove-empty-chunks ()
   (let ((times 0))
@@ -519,7 +524,7 @@ gl_FragColor.rgb = color_out;
 			      (= x0 2))
 			  (= y0 1)
 			  (zerop (random 2)))
-	       (sandbox::setblock-with-update (+ x x0) (+ yup y0) (+ z z0) 18))))
+	       (sandbox::plain-setblock (+ x x0) (+ yup y0) (+ z z0) 18))))
     (let ((yup (+ y trunk-height 2)))
       (dobox ((x0 -1 2)
 	      (z0 -1 2)
@@ -532,9 +537,9 @@ gl_FragColor.rgb = color_out;
 			  (= x0 1))
 		      #+nil
 		      (zerop (random 2)))
-	       (sandbox::setblock-with-update (+ x x0) (+ yup y0) (+ z z0) 18))))
+	       (sandbox::plain-setblock (+ x x0) (+ yup y0) (+ z z0) 18))))
     (dobox ((y0 y (+ y (+ 3 trunk-height))))
-	   (sandbox::setblock-with-update x y0 z 17))))
+	   (sandbox::plain-setblock x y0 z 17))))
 
 (defparameter *left-fist-fnc*
   #+nil
@@ -555,12 +560,12 @@ gl_FragColor.rgb = color_out;
 		  (bonder3 x y z)))
 	      #'dirtngrass
 	      (lambda (x y z)
-		(sandbox::setblock-with-update
+		(sandbox::plain-setblock
 		 x y z
 		 *blockid*))
 	      (lambda (x y z)
 					;(unless (zerop (world:getblock x y z)))
-		(sandbox::setblock-with-update x y z 0))))))))
+		(sandbox::plain-setblock x y z 0))))))))
   ;;#'tree
   ;;#+nil
   (lambda (x y z)
