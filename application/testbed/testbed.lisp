@@ -247,7 +247,7 @@ gl_FragColor.rgb = color_out;
 	    (incf *ticks*)
 	    (setf sandbox::*daytime*
 		  (floatify		     
-		   0.8
+		   1.0;;0.8
 		   #+nil
 		   (let ((seconds (or 60 840)))
 		     (/ (+ 1 (sin
