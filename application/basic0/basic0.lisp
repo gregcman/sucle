@@ -115,7 +115,6 @@
     (loop for resource being the hash-values of (sketch-sucle::env-resources sketch-sucle::*env*)
        do (sketch-sucle::free-resource resource))))
 
-(setf sandbox::*world-directory* "test/")
 (defun save ()
   ;;(atest::remove-zeroes)
   ;;FIXME::don't remove all the chunks?
@@ -124,14 +123,15 @@
 (defun our-load ()
   (sandbox::mload))
 
-
-(setf sandbox::*some-saves*
-      (merge-pathnames
-       "save/"
-       (asdf:system-source-directory :sucle)
-		       )
-      #+nil
-      (cdr (assoc (machine-instance) 
-		  '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-		  :test 'equal)))
+(eval-when (:load-toplevel :execute)
+  (setf sandbox::*world-directory* "test/")
+  (setf sandbox::*some-saves*
+	(merge-pathnames
+	 "save/"
+	 (asdf:system-source-directory :sucle)
+	 )
+	#+nil
+	(cdr (assoc (machine-instance) 
+		    '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
+		      ("nootboke" . #P"/home/terminal256/Documents/saves/"))
+		    :test 'equal))))

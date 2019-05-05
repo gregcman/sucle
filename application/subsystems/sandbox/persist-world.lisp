@@ -44,6 +44,10 @@
 ;;#) is first two bytes of a file if it's not just printed lisp objects
 
 (defparameter *reading-error* "#)")
+(defparameter *name-type-length* 16)
+(defparameter *header-length* (+ (length *reading-error*) *name-type-length*))
+(defun make-empty-header-string ()
+  (make-string *header-length* :initial-element #\space))
 (defun determine-file-type (path)
   (with-open-file (stream path :direction :input :if-does-not-exist :error)
     (let ((eof (load-time-value (cons "eof" "token"))))
@@ -57,39 +61,68 @@
 					  (elt *reading-error* 0))
 				   (char= char2
 					  (elt *reading-error* 1)))
-			  (return-from determine-file-type :not-lisp-printed-objects)))))))))
+			  (let ((array (make-empty-header-string)))
+			   (read-sequence array stream :end *name-type-length*)
+			    (return-from determine-file-type array))))))))))
     nil))
-(defun insert-reading-error-bytes (stream)
+(defun insert-reading-error-bytes (stream name)
+  (assert (= *name-type-length* (length name)))
   (loop :for char :across *reading-error* :do
+     (write-byte (char-code char) stream))
+  (loop :for char :across name :do
      (write-byte (char-code char) stream)))
+
+(defun make-header-string (string)
+  (let ((output (make-empty-header-string)))
+    (read-sequence output (make-string-input-stream string))
+    output))
 
 (defun store-lisp-objects-to-file (path thing &key (storage-type :conspack))
   (ecase storage-type
-    (:conspack (store-lisp-objects-to-file-conspack path thing))
+    (:conspack (store-lisp-objects-to-file-zlib-conspack path thing))
     (:standard (store-lisp-objects-to-file-lisp-reader path thing))))
 
-(defun store-lisp-objects-to-file-conspack (path things)
+(defun skip-header-bytes (stream)
+  (loop :repeat *header-length* :do (read-byte stream)))
+
+(progn
+  (defun decode-zlib-payload (data)
+    (chipz:decompress nil 'chipz:zlib data))
+  (defun encode-zlib-payload (data)
+    (salza2:compress-data
+     data
+     'salza2:zlib-compressor)))
+(progn
+  (defun encode-conspack-payload (things)
+    (conspack::tracking-refs ()
+      (conspack::encode things)))
+  (defun decode-conspack-payload (data)
+    (conspack::tracking-refs ()
+      (conspack::decode data))))
+(progn
+  (defun decode-zlib-conspack-payload (data)
+    (decode-conspack-payload (decode-zlib-payload data)))
+  (defun encode-zlib-conspack-payload (things)
+    (encode-zlib-payload (encode-conspack-payload things))))
+
+(defparameter *zlib-conspack-header* (make-header-string "zlib-conspack"))
+(defun store-lisp-objects-to-file-zlib-conspack (path things)
   (assert (typep things 'list))
   (with-open-file (stream path :direction :output :if-exists :supersede
 			  :element-type '(unsigned-byte 8))
-    (insert-reading-error-bytes stream)
-    (conspack::tracking-refs ()
-      (dolist (thing things)
-	(conspack::encode thing :stream stream)))))
+    (insert-reading-error-bytes stream *zlib-conspack-header*)
+    (write-sequence (encode-zlib-conspack-payload things) stream)))
 
-(defun retrieve-lisp-objects-from-file-conspack (path)
+(defun retrieve-lisp-objects-from-file-zlib-conspack (path)
   ;;ripped from conspack::decode-file
   (with-open-file
       (stream path :direction :input :element-type '(unsigned-byte 8)
 	      :if-does-not-exist :error)
-    (loop :repeat (length *reading-error*) :do (read-byte stream))
-    (let (eof)
-      (conspack::tracking-refs ()
-        (loop as object = (handler-case
-                              (conspack::decode-stream stream)
-                            (conspack::end-of-file () (setf eof t) (values)))
-              until eof
-              collect object)))))
+    (skip-header-bytes stream)
+    (let* ((remaining-bytes (the fixnum (- (file-length stream) *header-length*)))
+	   (array (make-array remaining-bytes :element-type '(unsigned-byte 8))))
+      (read-sequence array stream)
+      (decode-zlib-conspack-payload array))))
 
 (defun retrieve-lisp-objects-from-file (path)
   ;;A file contains 0 or more lisp objects.
@@ -97,10 +130,13 @@
   (let ((file-existsp (probe-file path)))
     ;;if it doesn't exist, what's the point of loading it
     (when file-existsp
-      (case (determine-file-type path)
-	((:not-lisp-printed-objects)
-	 (retrieve-lisp-objects-from-file-conspack path))
-	((nil) (retrieve-lisp-objects-from-file-lisp-reader path))))))
+      (let ((type (determine-file-type path)))
+	(cond
+	  ((null type)
+	   (retrieve-lisp-objects-from-file-lisp-reader path))
+	  ((string= *zlib-conspack-header* type)
+	   (retrieve-lisp-objects-from-file-zlib-conspack path))
+	  (t (error "what is this? ~s" type)))))))
 
 ;;FIXME::move generic loading and saving with printer and conspack to a separate file?
 ;;And have chunk loading in another file?

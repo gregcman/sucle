@@ -409,7 +409,9 @@
 (defun blockify (blockid light sky)
   (dpb sky (byte 4 12)
        (dpb light (byte 4 8) blockid)))
-(world::reset-empty-chunk-value (blockify 0 0 15))
+
+(eval-when (:load-toplevel :execute)
+  (world::reset-empty-chunk-value (blockify 0 0 15)))
 
 (defmethod lispobj-dispatch ((obj character))
   (blockify (char-code obj) 0 0))
