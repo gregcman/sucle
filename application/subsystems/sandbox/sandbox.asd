@@ -10,7 +10,8 @@
 	       #:lparallel
 	       #:bordeaux-threads
 	       #:nsb-cga
-	       #:quads)
+	       #:quads
+	       #:cl-conspack)
   :serial t
   :components
   ((:file "queue")

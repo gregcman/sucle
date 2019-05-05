@@ -55,7 +55,7 @@
 	 (world::with-chunk-key-coordinates (x y z) position
 	   (world::set-chunk-at
 	    position
-	    (world::create-chunk x y z)))
+	    (world::create-chunk x y z :type :empty)))
 
 	 :empty)
 	#+nil

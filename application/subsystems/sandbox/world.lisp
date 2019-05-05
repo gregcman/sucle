@@ -21,8 +21,9 @@
 
 (struct-to-clos:struct->class
  (defstruct chunk
-   last-modified
-   last-saved
+   ;;last-modified
+   ;;last-saved
+   type
    x
    y
    z
@@ -73,24 +74,38 @@
   (with-chunk-key-coordinates (x y z) chunk-key 
     (obtain-chunk x y z force-load)))
 
-;;FIXME::move this to a better place?
-(defun blockify (blockid light sky)
-  (dpb sky (byte 4 12)
-       (dpb light (byte 4 8) blockid)))
-(defparameter *empty-space* (blockify 0 0 15))
+(defparameter *empty-space* nil)
+(defparameter *empty-chunk-data* nil)
+(defparameter *empty-chunk* nil)
+;;the empty-chunk is used as a placeholder when a chunk to reference is required
+(defun reset-empty-chunk-value (&optional (empty-space nil))
+  (setf *empty-space* empty-space)
+  (setf *empty-chunk-data* (make-chunk-data :initial-element *empty-space*))
+  (setf *empty-chunk* (create-chunk 0 0 0 :data *empty-chunk-data* :type :empty)))
+(reset-empty-chunk-value)
 
-(defun create-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
+(defun empty-chunk-p (chunk)
+  (or (eq chunk *empty-chunk*)
+      (eq (chunk-type chunk) :empty)))
+(defun make-chunk-data (&rest rest &key (initial-element *empty-space*))
+  (apply 'make-array
+	 (* *chunk-size-x* *chunk-size-y* *chunk-size-z*)
+	 :initial-element initial-element
+	 rest))
+
+(defun create-chunk (chunk-x chunk-y chunk-z &key (type :normal) (data (make-chunk-data)))
+  ;;type can be either :NORMAL or :EMPTY. empty is used to signify that
+  ;;all the chunk data is eql to *empty-space*
+  ;;this is an optimization to save memory
   (declare (type chunk-coord chunk-x chunk-y chunk-z))
   (make-chunk :x chunk-x
 	      :y chunk-y
 	      :z chunk-z
 	      :key (create-chunk-key chunk-x chunk-y chunk-z)
-	      :data (make-array (* *chunk-size-x* *chunk-size-y* *chunk-size-z*)
-				:initial-element *empty-space*)))
-
-(defparameter *empty-chunk* (create-chunk 0 0 0))
-(defun empty-chunk-p (chunk)
-  (eq chunk *empty-chunk*))
+	      :data (ecase type
+		      (:normal (or data (make-chunk-data)))
+		      (:empty *empty-chunk-data*))
+	      :type type))
 
 (defun make-chunk-from-key-and-data (key data)
   (with-chunk-key-coordinates (x y z) key
@@ -98,7 +113,8 @@
 		:y y
 		:z z
 		:key key
-		:data data)))
+		:data data
+		:type :normal)))
 (defun make-chunk-from-key-and-data-and-keep (key data)
   (let ((new-chunk
 	 (make-chunk-from-key-and-data key data)))
@@ -346,8 +362,11 @@
   (values))
 
 (defun chunk-worth-saving (chunk)
-  (not (every (lambda (x) (eql x *empty-space*))
-	      (chunk-data chunk))))
+  ;;a chunk is not worth saving if all the values are the empty value
+  ;;FIXME::optimize?
+  (let ((empty-space *empty-space*))
+    (not (every (lambda (x) (eql x empty-space))
+		(chunk-data chunk)))))
 
 (defgeneric lispobj-dispatch (obj))
 
@@ -376,6 +395,12 @@
   (suite 8 0 getblock)
   (suite 4 8 getlight)
   (suite 4 12 skygetlight))
+
+;;FIXME::move this to a better place?
+(defun blockify (blockid light sky)
+  (dpb sky (byte 4 12)
+       (dpb light (byte 4 8) blockid)))
+(world::reset-empty-chunk-value (blockify 0 0 15))
 
 (defmethod lispobj-dispatch ((obj character))
   (blockify (char-code obj) 0 0))

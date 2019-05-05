@@ -44,7 +44,10 @@
   (with-world-meshing-lparallel
     (funcall fun)))
 
-(defun update-world-vao (x y z)
+(defun update-world-vao (&optional
+			   (x sandbox::*chunk-coordinate-center-x*)
+			   (y sandbox::*chunk-coordinate-center-y*)
+			   (z sandbox::*chunk-coordinate-center-z*))
   (clean-dirty)
   (With-world-mesh-lparallel-kernel
     (lparallel:kill-tasks 'mesh-chunk))
@@ -53,16 +56,16 @@
   (map nil #'dirty-push
        (sort (alexandria:hash-table-keys world::*chunks*) #'< :key
 	     (lambda (position)
-	       (multiple-value-bind (i j k) (world:unhashfunc position)
+	       (world::with-chunk-key-coordinates (i j k) position
 		 ((lambda (x0 y0 z0 x1 y1 z1)
 		    (let ((dx (- x1 x0))
 			  (dy (- y1 y0))
 			  (dz (- z1 z0)))
 		      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
 		  x y z
-		  (- i 8)
-		  (- j 8)
-		  (- k 8)))))))
+		  i
+		  j
+		  k))))))
 
 (defun update-chunk-mesh (coords iter)
   (when coords
@@ -277,7 +280,7 @@
 (defun chunk-unload (key &optional (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
     (unless (world::empty-chunk-p chunk)
-      #+nil
+      ;;#+nil
       (let ((worth-saving (world::chunk-worth-saving chunk)))
 	;;save the chunk first?
 	(if worth-saving
@@ -325,3 +328,21 @@
     ;;(print (length to-unload))
     (dolist (chunk to-unload)
       (chunk-unload chunk))))
+
+(defun test34 ()
+  ;;(with-output-to-string (print ))
+  (let* ((data (world::chunk-data (world::get-chunk 1 1 1 nil)))
+	 (str (with-output-to-string (str)
+		(with-standard-io-syntax
+		  (print data str))))
+	 (conspack (conspack::tracking-refs () (conspack::encode data)))
+	 (times (expt 10 3)))
+    (time
+     (dotimes (x times)
+       (with-standard-io-syntax
+	 (read-from-string str))))
+    (time
+     (dotimes (x times)
+       (conspack::decode conspack)))
+    (values)))
+;;conspack is roughly 4 times faster than plain PRINT and READ?

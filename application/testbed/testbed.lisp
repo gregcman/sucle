@@ -208,9 +208,8 @@ gl_FragColor.rgb = color_out;
       (when (window:mice-locked-p)
 	(when (window::skey-j-p (window::keyval #\V))
 	  (toggle noclip))
-	(with-vec (x y z) (pos)
-	  (when (window::skey-j-p (window::keyval #\P))
-	    (sandbox::update-world-vao x y z)))
+	(when (window::skey-j-p (window::keyval #\P))
+	  (sandbox::update-world-vao))
 	(when (window::skey-j-p (window::keyval #\F))
 	  (toggle fly)
 	  (toggle gravity)))
@@ -355,7 +354,7 @@ gl_FragColor.rgb = color_out;
     (when 
 	(not-occupied x y z)
       (let ((blockval *blockid*))
-	(sandbox::setblock-with-update
+	(sandbox::plain-setblock
 	 x
 	 y
 	 z

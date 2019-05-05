@@ -504,7 +504,7 @@
   (on-session-change *last-session*
     (clrhash sandbox::*g/chunk-call-list*)
     ;;FIXME::update vao according to position, not 0 0 0
-    (sandbox::update-world-vao 0 0 0))
+    (sandbox::update-world-vao))
   (sandbox::designatemeshing)
   (render-stuff))
 
