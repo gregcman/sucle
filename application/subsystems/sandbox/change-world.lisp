@@ -93,14 +93,23 @@
 (defun reset-meshers ()
   (With-world-mesh-lparallel-kernel
     (lparallel:kill-tasks 'mesh-chunk)
+    #+nil
+    (progn
+      (lparallel:kill-tasks :chunk-load)
+      (lparallel:kill-tasks :chunk-save))
+    (reset-in-the-process-of-being-loaded)
     (setf *total-background-chunk-mesh-jobs* 0)))
 ;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
   (loop
      (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)
        (cond (success-p
-	      (apply (car value) (cdr value))
-	      (decf *total-background-chunk-mesh-jobs*))
+	      (destructuring-bind (type function . args) value
+		(apply function args)
+		(when (eq :mesh-chunk type)
+		  ;;FIXME::document this somewhere?
+		  ;;*achannel* becoming a generic command buffer?
+		  (decf *total-background-chunk-mesh-jobs*))))
 	     (t (return)))))
   (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
     (queue::sort-queue
@@ -125,9 +134,9 @@
 		    (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		    (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
 		      (chunk-shape iter io jo ko)
-		      (%list space #'update-chunk-mesh chunk-pos iter)))
+		      (%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
 		  (attrib-buffer-iterators)
-		  (make-list 3)
+		  (make-list 4)
 		  thechunk)))
 	     (return))))))
 
@@ -265,40 +274,60 @@
 		   'unsquared-chunk-distance)))
 	(safe-subseq distance-sorted-chunks difference)))))
 
+(defparameter *in-the-process-of-being-loaded* (make-hash-table :test 'equal))
+(defun reset-in-the-process-of-being-loaded ()
+  (clrhash *in-the-process-of-being-loaded*))
+(defun in-the-process-of-being-loaded-p (key)
+  (gethash key *in-the-process-of-being-loaded*))
+(defun finished-being-loaded (key)
+  (remhash key *in-the-process-of-being-loaded*))
 (defun load-chunks-around ()
+  (let ((lparallel:*task-category* :chunk-load))
+    (mapc (lambda (key)
+	    (unless (in-the-process-of-being-loaded-p key)
+	      (lparallel:submit-task
+	       *achannel*
+	       (lambda (key)
+		 (sandbox::chunk-load key)
+		 (list :chunk-load 'finished-being-loaded key))
+	       key)))
+	  (get-chunks-to-load))))
+(defun get-chunks-to-load ()
   (let ((x0 *chunk-coordinate-center-x*)
 	(y0 *chunk-coordinate-center-y*)
 	(z0 *chunk-coordinate-center-z*))
     (declare (optimize (speed 3) (safety 0))
 	     (type world::chunk-coord x0 y0 z0))
-    (block out
-      (let ((chunk-count 0))
-	(declare (type fixnum chunk-count))
-	(flet ((add-chunk (x y z)
-		 (incf chunk-count)
-		 ;;do something
-		 (let ((key (world::create-chunk-key x y z)))
-		   (unless (world::chunk-exists-p key)
-		     ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		     (sandbox::chunk-load key)
-		     ;;(print (list x y z))
-		     ))
-		 (when (>
-			;;FIXME::nonportably assume chunk-count and maxium allowed chunks are fixnums
-			(the fixnum chunk-count)
-			(the fixnum *maximum-allowed-chunks*))
-		   ;;exceeded the allowed chunks to load
-		   (return-from out))
-		 ))
-	  (let ((size *chunk-radius*))
-	    (declare (type world::chunk-coord size))
-	    (utility::dobox ((chunk-x (the world::chunk-coord (- x0 size))
-				      (the world::chunk-coord (+ x0 size)))
-			     (chunk-y (the world::chunk-coord (- y0 size))
-				      (the world::chunk-coord (+ y0 size)))
-			     (chunk-z (the world::chunk-coord (- z0 size))
-				      (the world::chunk-coord (+ z0 size))))
-			    (add-chunk chunk-x chunk-y chunk-z))))))))
+    (let ((acc nil))
+      (block out
+	(let ((chunk-count 0))
+	  (declare (type fixnum chunk-count))
+	  (flet ((add-chunk (x y z)
+		   (incf chunk-count)
+		   ;;do something
+		   (let ((key (world::create-chunk-key x y z)))
+		     (unless (world::chunk-exists-p key)
+		       ;;The chunk does not exist, therefore the *empty-chunk* was returned
+		       (push key acc)
+		       ;;(print (list x y z))
+		       ))
+		   (when (>
+			  ;;FIXME::nonportably assume chunk-count and maxium allowed chunks are fixnums
+			  (the fixnum chunk-count)
+			  (the fixnum *maximum-allowed-chunks*))
+		     ;;exceeded the allowed chunks to load
+		     (return-from out))
+		   ))
+	    (let ((size *chunk-radius*))
+	      (declare (type world::chunk-coord size))
+	      (utility::dobox ((chunk-x (the world::chunk-coord (- x0 size))
+					(the world::chunk-coord (+ x0 size)))
+			       (chunk-y (the world::chunk-coord (- y0 size))
+					(the world::chunk-coord (+ y0 size)))
+			       (chunk-z (the world::chunk-coord (- z0 size))
+					(the world::chunk-coord (+ z0 size))))
+			      (add-chunk chunk-x chunk-y chunk-z))))))
+      acc)))
 
 (defun chunk-save (chunk &key (path (world-path)))
   (cond
@@ -327,7 +356,13 @@
 
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
-    (chunk-save chunk :path path)
+    (let ((lparallel:*task-category* :chunk-save))
+      (lparallel:submit-task
+       *achannel*
+       ;;FIXME::document *achannel*
+       (lambda ()
+	 (chunk-save chunk :path path)
+	 (list :chunk-save 'identity nil))))
     ;;remove the opengl object
     ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
     ;;FIXME::remove anyway?
