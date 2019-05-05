@@ -47,8 +47,8 @@
   (q (get-queue))
   (hash (make-hash-table
 	 :test
-	 #+sbcl 'eq
-	 #-sbcl 'eql)))
+	 'eq
+	 )))
 
 (defun uniq-push (item uniq)
   (let ((hash (uniq-q-hash uniq)))

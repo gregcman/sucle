@@ -56,18 +56,7 @@
   (mapc #'dirty-push
 	(sort (alexandria:hash-table-keys world::*chunks*) #'< :key
 	      (lambda (position)
-		(world::with-chunk-key-coordinates
-		 (i j k) position
-		 ((lambda (x0 y0 z0 x1 y1 z1)
-		    (let ((dx (- x1 x0))
-			  (dy (- y1 y0))
-			  (dz (- z1 z0)))
-		      ;;FIXME::we don't need the sqrt for sorting
-		      (+ (* dx dx) (* dy dy) (* dz dz))))
-		  x y z
-		  i
-		  j
-		  k))))))
+		(unsquared-chunk-distance x y z position)))))
 
 (defun update-chunk-mesh (coords iter)
   (when coords
@@ -227,6 +216,16 @@
      1024 1024 1.0 #|1.0 for converting to float|#))
 (defparameter *threshold* (* 8 8))
 ;;threshold so that when too many chunks exist, over compensate, so not unloading every time
+(defun unsquared-chunk-distance (x0 y0 z0 position-key)
+  ;;FIXME::destructuring bind of chunk-key happens in multiple places.
+  ;;fix?
+  (world::with-chunk-key-coordinates
+   (x1 y1 z1) position-key
+   (let ((dx (- x1 x0))
+	 (dy (- y1 y0))
+	 (dz (- z1 z0)))
+     ;;FIXME::we don't need the sqrt for sorting
+     (+ (* dx dx) (* dy dy) (* dz dz)))))
 (defun get-unloadable-chunks (&optional
 				(x0 *chunk-coordinate-center-x*)
 				(y0 *chunk-coordinate-center-y*)
@@ -238,15 +237,7 @@
       (let ((distance-sorted-chunks	     
 	     (sort (alexandria:hash-table-keys world::*chunks*) #'> :key
 		   (lambda (position)
-		     ;;FIXME::destructuring bind of chunk-key happens in multiple places.
-		     ;;fix?
-		     (world::with-chunk-key-coordinates
-		      (x1 y1 z1) position
-		      (let ((dx (- x1 x0))
-			    (dy (- y1 y0))
-			    (dz (- z1 z0)))
-			;;FIXME::we don't need the sqrt for sorting
-			(+ (* dx dx) (* dy dy) (* dz dz))))))))
+		     (unsquared-chunk-distance x0 y0 z0 position)))))
 	(safe-subseq distance-sorted-chunks difference)))))
 
 (defun load-chunks-around ()
