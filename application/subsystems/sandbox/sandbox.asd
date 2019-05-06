@@ -19,6 +19,7 @@
   ((:file "queue")
    (:file "package")
    (:file "world")
+   (:file "serialize") ;;generic file loading and stuff
    (:file "persist-world") ;;world <-> filesystem
    (:file "block-data") ;;block data
    ;;(:file "block-light") ;;light propogation
