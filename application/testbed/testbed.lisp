@@ -94,11 +94,12 @@ color_out = color;
    "
 in vec3 color_out;
 void main () {
+gl_FragColor.a = 1.0;
 gl_FragColor.rgb = color_out;
 }"
    '(("position" 0) 
      ("color" 3))
-   '((:pmv "projection-model-view"))))
+   '((:pmv "projection_model_view"))))
 (defparameter *block-aabb2*
   (let* ((offset 0.001)
 	 (small (- 0.0 offset))
@@ -110,23 +111,40 @@ gl_FragColor.rgb = color_out;
      :maxx large
      :maxy large
      :maxz large)))
+(defparameter *chunk-aabb*
+  (aabbcc:make-aabb
+   :minx 0.0
+   :miny 0.0
+   :minz 0.0
+   :maxx (floatify world::*chunk-size-x*)
+   :maxy (floatify world::*chunk-size-y*)
+   :maxz (floatify world::*chunk-size-z*)))
 (defun render? ()
+  (let ((shader (application:getfnc 'solidshader)))
+    (glhelp::use-gl-program shader)
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms
+     uniform shader
+     (gl:uniform-matrix-4fv 
+      (uniform :pmv)
+      ;;(nsb-cga::identity-matrix)
+      
+      (camera-matrix:camera-matrix-projection-view-player sandbox-sub::*camera*)
+      nil)))
+  (gl:disable :blend)
+  (gl:disable :cull-face)
+  (gl:polygon-mode :front-and-back :line)
+  (gl:line-width 2)
   (when (sandbox-sub::fister-exists *fist*)
-    (let ((shader (application:getfnc 'solidshader)))
-      (glhelp::use-gl-program shader)
-      ;;uniform crucial for first person 3d
-      (glhelp:with-uniforms uniform shader
-	(gl:uniform-matrix-4fv 
-	 (uniform :pmv)
-	 (camera-matrix:camera-matrix-projection-view-player sandbox-sub::*camera*)
-	 nil)))
-
-    (gl:disable :cull-face)
-    (gl:polygon-mode :front-and-back :line)
-    (gl:line-width 2)
     (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
       (with-vec (a b c) (selected-block)
 	(sandbox-sub::draw-aabb a b c *block-aabb2*))))
+  #+nil
+  (sandbox-sub::draw-aabb
+   (* 16.0 sandbox::*chunk-coordinate-center-x*)
+   (* 16.0 sandbox::*chunk-coordinate-center-y*)
+   (* 16.0 sandbox::*chunk-coordinate-center-z*)
+   testbed::*chunk-aabb*)
   ;;render crosshairs
   (progn
     (glhelp:set-render-area
@@ -140,7 +158,10 @@ gl_FragColor.rgb = color_out;
      )))
 
 (defparameter *paused* nil)
+(defparameter *session* nil)
 (defun per-frame ()
+  (application::on-session-change *session*
+    (load-world t))
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
@@ -181,7 +202,7 @@ gl_FragColor.rgb = color_out;
   (define-modify-macro easef (b &optional (modifier 0.5)) ease))
 
 (defparameter *reach* 64.0)
-
+;;FIXME::easier api for getting player position and such
 (defun stuff ()
   (setf *blockid* (let ((seq
 			 #(3 13 12 24 1 2 18 17 20 5 89)))
@@ -205,9 +226,8 @@ gl_FragColor.rgb = color_out;
       (when (window:mice-locked-p)
 	(when (window::skey-j-p (window::keyval #\V))
 	  (toggle noclip))
-	(with-vec (x y z) (pos)
-	  (when (window::skey-j-p (window::keyval #\P))
-	    (sandbox::update-world-vao x y z)))
+	(when (window::skey-j-p (window::keyval #\P))
+	  (sandbox::update-world-vao))
 	(when (window::skey-j-p (window::keyval #\F))
 	  (toggle fly)
 	  (toggle gravity)))
@@ -227,13 +247,14 @@ gl_FragColor.rgb = color_out;
 	    (incf *ticks*)
 	    (setf sandbox::*daytime*
 		  (floatify		     
-		   1.0
+		   1.0;;0.8
 		   #+nil
 		   (let ((seconds (or 60 840)))
-		     (sin
-		      (/ *ticks*
-			 60
-			 seconds)))))
+		     (/ (+ 1 (sin
+			     (/ *ticks*
+				;;60
+				seconds)))
+			2))))
 	    (sandbox-sub::physentity *ent*))
 	(declare (ignorable times))
 	(let ((neck (sandbox-sub::entity-neck *ent*)))
@@ -250,6 +271,7 @@ gl_FragColor.rgb = color_out;
 	  (let ((curr (sandbox-sub::pointmass-position player-pointmass))
 		(prev (sandbox-sub::pointmass-position-old player-pointmass))
 		(camera sandbox-sub::*camera*))
+	    (load-world)
 	    (let ((vec (camera-matrix:camera-vec-position camera))
 		  (cev (camera-matrix:camera-vec-noitisop camera)))
 	      (nsb-cga:%vec-lerp vec prev curr fraction)
@@ -258,6 +280,19 @@ gl_FragColor.rgb = color_out;
 			 (eql 0 is-sneaking))
 		(nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))
 	      (nsb-cga:%vec* cev vec -1.0))))))))
+
+(defun player-position ()
+  (let* ((player-pointmass (sandbox-sub::entity-particle *ent*))
+	 (curr (sandbox-sub::pointmass-position player-pointmass)))
+    curr))
+(defun load-world (&optional (force nil))
+  (with-vec (x y z) ((player-position))
+    (sandbox::set-chunk-coordinate-center x y z))
+  (let ((maybe-moved (sandbox::maybe-move-chunk-array)))
+    (when (or force
+	      maybe-moved)
+      (sandbox::load-chunks-around)
+      (sandbox::unload-extra-chunks))))
 
 (defun fist-stuff (pos)
   (let ((look-vec (load-time-value (nsb-cga:vec 0.0 0.0 0.0))))
@@ -273,17 +308,25 @@ gl_FragColor.rgb = color_out;
 	  (when (window::skey-j-p (window::keyval 3))
 	    (toggle *swinging*))
 	  (when *swinging*
-	    (let ((u 32))
+	    (let ((u 80))
 	      (aabbcc::aabb-collect-blocks
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      (load-time-value
+		       #+nil
 		       (aabbcc:make-aabb
 			:minx -1.5
 			:miny -1.5
 			:minz -1.5
 			:maxx  1.5
 			:maxy  1.5
-			:maxz  1.5)))
+			:maxz  1.5)
+		       (aabbcc:make-aabb
+			:minx -0.5
+			:miny -0.5
+			:minz -0.5
+			:maxx  0.5
+			:maxy  0.5
+			:maxz  0.5)))
 		  (x y z contact)
 		(declare (ignorable contact))		     
 		(funcall *big-fist-fun* x y z)))))
@@ -330,7 +373,7 @@ gl_FragColor.rgb = color_out;
     (when 
 	(not-occupied x y z)
       (let ((blockval *blockid*))
-	(sandbox::setblock-with-update
+	(sandbox::plain-setblock
 	 x
 	 y
 	 z
@@ -399,13 +442,28 @@ gl_FragColor.rgb = color_out;
 	      (funcall fun x y z)))))))
 
 (defparameter *big-fist-fun*
-  (nth 0
-       (list 
+  (nth 1
+       (list
+	(lambda (x y z)
+	  (let ((id (world::getblock x y z)))
+	    (when (zerop id)
+	      (sandbox::plain-setblock x y z *blockid* (case *blockid*
+							 (0 15)
+							 (otherwise 0))))))
+	(lambda (x y z)
+	  (let ((id (world::getblock x y z)))
+	    (when (zerop (random 800))
+	      (when (member id '(2 3))
+		(tree x y z)))))
+	(lambda (x y z)
+	  (let ((id (world::getblock x y z)))
+	    (unless (zerop id)
+	      (sandbox::plain-setblock x y z 0 0 15))))
 	#'dirtngrass
 	(lambda (x y z)
 	  (let ((id (world::getblock x y z)))
 	    (unless (zerop id)
-	      (sandbox::setblock-with-update x y z 0 0)))))))
+	      (sandbox::plain-setblock x y z 0 0)))))))
 
 (defun neighbors (x y z)
   (let ((tot 0))
@@ -425,19 +483,19 @@ gl_FragColor.rgb = color_out;
     (unless (zerop blockid)
       (let ((naybs (neighbors x y z)))
 	(when (> 3 naybs)	  
-	  (sandbox::setblock-with-update x y z 0))))))
+	  (sandbox::plain-setblock x y z 0))))))
 (defun bonder2 (x y z)
   (let ((blockid (world:getblock x y z)))
     (when (zerop blockid)
       (let ((naybs (neighbors x y z)))
 	(when (< 1 naybs)	  
-	  (sandbox::setblock-with-update x y z 1))))))
+	  (sandbox::plain-setblock x y z 1))))))
 (defun bonder3 (x y z)
   (let ((blockid (world:getblock x y z)))
     (when (zerop blockid)
       (let ((naybs (neighbors x y z)))
 	(when (< 2 naybs)	  
-	  (sandbox::setblock-with-update x y z 1))))))
+	  (sandbox::plain-setblock x y z 1))))))
 
 (defun remove-empty-chunks ()
   (let ((times 0))
@@ -466,7 +524,7 @@ gl_FragColor.rgb = color_out;
 			      (= x0 2))
 			  (= y0 1)
 			  (zerop (random 2)))
-	       (sandbox::setblock-with-update (+ x x0) (+ yup y0) (+ z z0) 18))))
+	       (sandbox::plain-setblock (+ x x0) (+ yup y0) (+ z z0) 18))))
     (let ((yup (+ y trunk-height 2)))
       (dobox ((x0 -1 2)
 	      (z0 -1 2)
@@ -479,9 +537,9 @@ gl_FragColor.rgb = color_out;
 			  (= x0 1))
 		      #+nil
 		      (zerop (random 2)))
-	       (sandbox::setblock-with-update (+ x x0) (+ yup y0) (+ z z0) 18))))
+	       (sandbox::plain-setblock (+ x x0) (+ yup y0) (+ z z0) 18))))
     (dobox ((y0 y (+ y (+ 3 trunk-height))))
-	   (sandbox::setblock-with-update x y0 z 17))))
+	   (sandbox::plain-setblock x y0 z 17))))
 
 (defparameter *left-fist-fnc*
   #+nil
@@ -502,14 +560,14 @@ gl_FragColor.rgb = color_out;
 		  (bonder3 x y z)))
 	      #'dirtngrass
 	      (lambda (x y z)
-		(sandbox::setblock-with-update
+		(sandbox::plain-setblock
 		 x y z
 		 *blockid*))
 	      (lambda (x y z)
 					;(unless (zerop (world:getblock x y z)))
-		(sandbox::setblock-with-update x y z 0))))))))
+		(sandbox::plain-setblock x y z 0))))))))
   ;;#'tree
   ;;#+nil
   (lambda (x y z)
     (sandbox-sub::blocksound x y z)
-    (sandbox::setblock-with-update x y z 0 0)))
+    (sandbox::plain-setblock x y z 0 15)))

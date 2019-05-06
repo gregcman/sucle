@@ -38,9 +38,10 @@
 (defparameter *sucle-app-function*
   (run-with
    (lambda ()
+     #+nil
      (setf (sandbox-sub::entity-fly? testbed::*ent*) nil
 	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
-     (our-load)
+     ;;(our-load)
      (let ((text-sub::*text-data-what-type* :framebuffer))
        (unwind-protect
 	    (loop
@@ -115,20 +116,22 @@
        do (sketch-sucle::free-resource resource))))
 
 (defun save ()
-  (atest::remove-zeroes)
-  (sandbox::msave "test/"))
-
+  ;;(atest::remove-zeroes)
+  ;;FIXME::don't remove all the chunks?
+  (sandbox::msave))
+#+nil
 (defun our-load ()
-  (sandbox::mload "test/"))
+  (sandbox::mload))
 
-
-(setf sandbox::*some-saves*
-      (merge-pathnames
-       "save/"
-       (asdf:system-source-directory :sucle)
-		       )
-      #+nil
-      (cdr (assoc (machine-instance) 
-		  '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-		    ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-		  :test 'equal)))
+(eval-when (:load-toplevel :execute)
+  (setf sandbox::*world-directory* "test/")
+  (setf sandbox::*some-saves*
+	(merge-pathnames
+	 "save/"
+	 (asdf:system-source-directory :sucle)
+	 )
+	#+nil
+	(cdr (assoc (machine-instance) 
+		    '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
+		      ("nootboke" . #P"/home/terminal256/Documents/saves/"))
+		    :test 'equal))))

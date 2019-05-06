@@ -31,7 +31,7 @@
 (defmethod create-opengl-texture-from-data ((data array))
   (pic-texture data))
 
-(defun create-texture (tex-data width height &optional (format :rgba) (type :unsigned-byte))
+(defun create-texture (tex-data width height &key (format :rgba) (type :unsigned-byte))
   (let ((tex (gl:gen-texture)))
     (gl:bind-texture :texture-2d tex)
     (gl:tex-image-2d :texture-2d 0 :rgba width height 0 format type tex-data)
@@ -72,7 +72,7 @@
 		      (array-total-size array)
 		      :displaced-to array
 		      :element-type (array-element-type array))))
-	      (create-texture (array-flatten thepic) w h type))
+	      (create-texture (array-flatten thepic) w h :format type))
 	    (progn
 	      (incf foured 4)
 	      (let ((array (make-array (* foured h)
@@ -84,7 +84,7 @@
 		    (dotimes (wi byte-width)
 		      (setf (aref array (+ wi base2))
 			    (row-major-aref thepic (+ wi base1))))))
-		(create-texture array w h type))))))))
+		(create-texture array w h :format type))))))))
 
 (export '(apply-tex-params))
 (defun apply-tex-params (tex-parameters)
@@ -450,3 +450,18 @@ gl_FragColor = pixcolor;
 	 (list "out vec4 " *gl-fragcolor-replacement* ";" *newline*)))
      
      (glsl-toolkit:serialize new-ast))))
+
+;;;;
+(defun set-uniform-to-texture (uniform-location texture num)
+  (gl:uniformi uniform-location num)
+  (glhelp::set-active-texture num)
+  (gl:bind-texture :texture-2d texture))
+
+;;FIXME::is a macro really necessary here? To prevent consing?
+(defmacro set-uniforms-to-textures (&rest specs)
+  (cons 'progn
+	(mapcar (lambda (spec number)
+		  (destructuring-bind (location texture) spec
+		    `(set-uniform-to-texture ,location ,texture ,number)))
+		specs
+		(alexandria:iota (length specs)))))

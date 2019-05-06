@@ -25,20 +25,14 @@
 	  (vecto:set-font loader (font-info-size typeface))
 	  (vecto:set-rgba-fill r g b a)
 	  (vecto:translate (- minx) (- miny))
-	  (vecto:draw-string 0 0 text)
+	  (vecto:draw-string 0 0 text)	  
 	  (unflatten-for-image-utility (zpng:image-data (vecto-data))
 				       width height))))))
 
 (defun unflatten-for-image-utility (array width height)
   (let ((type (array-element-type array)))
     (assert (equal type '(unsigned-byte 8)))
-    (let ((new
-	   (make-array
-	    (list height width 4)
-	    :element-type '(unsigned-byte 8))))
-      (dotimes (w width)
-	(dotimes (h height)
-	  (dotimes (i 4)
-	    (setf (aref new h w i)
-		  (aref array (+ (* h 4 width) (* w 4) i))))))
-      new)))
+    (make-array
+     (list height width 4)
+     :displaced-to array
+     :element-type '(unsigned-byte 8))))

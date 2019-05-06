@@ -111,16 +111,14 @@ gl_FragColor = pixdata * value_out;
   (let ((program (getfnc 'flat-texture-shader)))
     (glhelp::use-gl-program program)
     (glhelp:with-uniforms uniform program
-      (gl:uniformi (uniform 'sampler) 0)
-      (glhelp::set-active-texture 0)
+      (glhelp::set-uniforms-to-textures
+       ((uniform 'sampler) texture))
       (gl:uniform-matrix-4fv
        (uniform 'pmv)
        (load-time-value (nsb-cga:identity-matrix))
        nil)
       (gl:uniformfv (uniform 'value)
 		    *pic-tint*))   
-    (gl:bind-texture :texture-2d
-		     texture)
     (text-sub::draw-fullscreen-quad)))
 
 

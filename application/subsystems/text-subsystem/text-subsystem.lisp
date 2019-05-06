@@ -21,21 +21,8 @@
       (:framebuffer
        (glhelp::make-gl-framebuffer w h))
       (:texture-2d
-       (make-instance
-	'glhelp::gl-texture
-	:handle
-	(prog1 (glhelp::create-texture
-		nil
-		w h
-		:rgba
-		:unsigned-byte)
-	  (glhelp:apply-tex-params
-	   (quote ((:texture-min-filter . :nearest
-					)
-		   (:texture-mag-filter . :nearest
-					)
-		   (:texture-wrap-s . :repeat)
-		   (:texture-wrap-t . :repeat))))))))))
+       (glhelp::wrap-opengl-texture
+	(glhelp::create-texture nil w h))))))
 (defun get-text-texture ()
   ;;;;FIXME:: getfnc must go before, because it has side effects.
   ;;;;are side effects and state unavoidable? a property of opengl?
@@ -103,8 +90,7 @@ gl_FragColor.a = opacity * fin.a;
 	       (setf (aref array width height i) value))))
     array))
 (glhelp:deflazy-gl font-texture (font-png)
-  (let ((texture (glhelp::create-opengl-texture-from-data font-png)))
-    (glhelp::wrap-opengl-texture texture)))
+  (glhelp::wrap-opengl-texture (glhelp::create-opengl-texture-from-data font-png)))
 
 (defparameter *trans* (nsb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
 (defun retrans (x y &optional (trans *trans*))
@@ -139,21 +125,10 @@ gl_FragColor.a = opacity * fin.a;
 	 (let ((,program (getfnc 'text-shader)))
 	   (glhelp::use-gl-program ,program)
 	   (glhelp:with-uniforms ,uniform-fun ,program
-	     (progn
-	       (gl:uniformi (,uniform-fun 'indirection) 0)
-	       (glhelp::set-active-texture 0)
-	       (gl:bind-texture :texture-2d
-				(get-indirection-texture)))
-	     (progn
-	       (gl:uniformi (,uniform-fun 'font-texture) 2)
-	       (glhelp::set-active-texture 2)
-	       (gl:bind-texture :texture-2d
-				(glhelp::handle (getfnc 'font-texture))))
-	     (progn
-	       (gl:uniformi (,uniform-fun 'text-data) 1)
-	       (glhelp::set-active-texture 1)
-	       (gl:bind-texture :texture-2d
-				(get-text-texture)))
+	     (glhelp::set-uniforms-to-textures
+	      ((,uniform-fun 'indirection) (get-indirection-texture))
+	      ((,uniform-fun 'font-texture) (glhelp::handle (getfnc 'font-texture)))
+	      ((,uniform-fun 'text-data) (get-text-texture)))
 	     ,@body)))))
 
 (defun char-attribute (bold-p underline-p opaque-p)
@@ -313,22 +288,10 @@ gl_FragColor = value_out;
 		   *indirection-width*
 		   *indirection-height*))
     (:texture-2d
-     (make-instance
-      'glhelp::gl-texture
-      :handle
-      (prog1 (glhelp::create-texture
-	      nil
-	      *indirection-width*
-	      *indirection-height*
-	      :rgba
-	      :unsigned-byte)
-	(glhelp:apply-tex-params
-	 (quote ((:texture-min-filter . :nearest
-				      )
-		 (:texture-mag-filter . :nearest
-				      )
-		 (:texture-wrap-s . :repeat)
-		 (:texture-wrap-t . :repeat)))))))))
+     (glhelp::wrap-opengl-texture
+      (glhelp::create-texture nil
+			      *indirection-width*
+			      *indirection-height*)))))
 (defun get-indirection-texture ()
   (ecase *indirection-type*
     (:framebuffer (glhelp::texture (getfnc 'indirection)))

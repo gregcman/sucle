@@ -10,16 +10,18 @@
 	       #:lparallel
 	       #:bordeaux-threads
 	       #:nsb-cga
-	       #:quads)
+	       #:quads
+	       #:cl-conspack
+	       #:salza2
+	       #:chipz)
   :serial t
   :components
   ((:file "queue")
    (:file "package")
-   (:file "vox") ;;generate a voxel hash structure  
    (:file "world")
    (:file "persist-world") ;;world <-> filesystem
    (:file "block-data") ;;block data
-   (:file "block-light") ;;light propogation
+   ;;(:file "block-light") ;;light propogation
    (:file "block-meshing");;world data -> mesh 
    (:file "change-world")
    ))

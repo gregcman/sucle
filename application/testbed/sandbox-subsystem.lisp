@@ -503,7 +503,8 @@
   ;;handle chunk meshing
   (on-session-change *last-session*
     (clrhash sandbox::*g/chunk-call-list*)
-    (sandbox::update-world-vao 0 0 0))
+    ;;FIXME::update vao according to position, not 0 0 0
+    (sandbox::update-world-vao))
   (sandbox::designatemeshing)
   (render-stuff))
 
@@ -519,7 +520,7 @@
   ;#+nil
   (vector 0.68 0.8 1.0))
   
-(defparameter *fog-ratio* 1.0 ;;0.75
+(defparameter *fog-ratio* 0.75
   )
 
 (defun render-stuff ()
@@ -578,21 +579,22 @@
 	    (gl:uniformfv (uniform :camera-pos)
 			  (camera-matrix:camera-vec-position *camera*))
 	    (%gl:uniform-1f (uniform :foglet)
-			    (/ -1.0 (or 128 (camera-matrix:camera-frustum-far *camera*)) *fog-ratio*))
+			    (/ -1.0
+			       ;;FIXME::16 assumes chunk is a 16x16x16 cube
+			       (* 16 sandbox::*chunk-radius*)
+			       #+nil
+			       (or 128 (camera-matrix:camera-frustum-far *camera*))
+			       *fog-ratio*))
 	    (%gl:uniform-1f (uniform :aratio)
 			    (/ 1.0 *fog-ratio*)))))
       (%gl:uniform-1f (uniform :time)
 		      sandbox::*daytime*)
 
-      (progn
-	(gl:uniformi (uniform :sampler) 0)
-	(glhelp::set-active-texture 0)
-	(gl:bind-texture :texture-2d
-			 (glhelp::handle (getfnc 'terrain))
-			 ))))
+      (glhelp::set-uniforms-to-textures
+       ((uniform :sampler) (glhelp::handle (getfnc 'terrain))))))
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
-
+  (gl:front-face :ccw)
   (sandbox::draw-world))
 
 (defun quadratic-formula (a b c)
@@ -729,6 +731,7 @@
 out float color_out;
 out vec2 texcoord_out;
 out float fogratio_out;
+
 in vec4 position;
 in vec2 texcoord;
 in vec4 blocklight;
@@ -742,9 +745,13 @@ uniform vec3 camera_pos;
 
 void main () {
 gl_Position = projection_model_view * position;
-color_out = dot(max(skylight*time, blocklight),vec4(0.25));
+vec4 light = max(skylight*time, blocklight);
+color_out = dot(light,vec4(0.25));
 texcoord_out = texcoord;
-fogratio_out = min(1.0, aratio+foglet*distance(camera_pos, position.xyz));
+
+float distance = //distance(camera_pos.xyz, position.xyz);
+max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
+fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
 }"
    "
 in vec2 texcoord_out;
