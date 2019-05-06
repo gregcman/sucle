@@ -731,6 +731,7 @@
 out float color_out;
 out vec2 texcoord_out;
 out float fogratio_out;
+
 in vec4 position;
 in vec2 texcoord;
 in vec4 blocklight;
@@ -744,9 +745,13 @@ uniform vec3 camera_pos;
 
 void main () {
 gl_Position = projection_model_view * position;
-color_out = dot(max(skylight*time, blocklight),vec4(0.25));
+vec4 light = max(skylight*time, blocklight);
+color_out = dot(light,vec4(0.25));
 texcoord_out = texcoord;
-fogratio_out = clamp(aratio+foglet*distance(camera_pos, position.xyz), 0.0, 1.0);
+
+float distance = //distance(camera_pos.xyz, position.xyz);
+max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
+fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
 }"
    "
 in vec2 texcoord_out;

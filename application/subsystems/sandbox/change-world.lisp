@@ -282,16 +282,10 @@
 (defun finished-being-loaded (key)
   (remhash key *in-the-process-of-being-loaded*))
 (defun load-chunks-around ()
-  (let ((lparallel:*task-category* :chunk-load))
-    (mapc (lambda (key)
-	    (unless (in-the-process-of-being-loaded-p key)
-	      (lparallel:submit-task
-	       *achannel*
-	       (lambda (key)
-		 (sandbox::chunk-load key)
-		 (list :chunk-load 'finished-being-loaded key))
-	       key)))
-	  (get-chunks-to-load))))
+  (mapc (lambda (key)
+	  (sandbox::chunk-load key)
+	  (finished-being-loaded key))
+	(get-chunks-to-load)))
 (defun get-chunks-to-load ()
   (let ((x0 *chunk-coordinate-center-x*)
 	(y0 *chunk-coordinate-center-y*)
@@ -356,13 +350,7 @@
 
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
-    (let ((lparallel:*task-category* :chunk-save))
-      (lparallel:submit-task
-       *achannel*
-       ;;FIXME::document *achannel*
-       (lambda ()
-	 (chunk-save chunk :path path)
-	 (list :chunk-save 'identity nil))))
+    (chunk-save chunk :path path)
     ;;remove the opengl object
     ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
     ;;FIXME::remove anyway?
@@ -424,3 +412,9 @@
        (conspack::decode conspack)))
     (values)))
 ;;conspack is roughly 4 times faster than plain PRINT and READ?
+
+;;FIXME::thread-safety for:
+;;world::*chunks*
+;;world::*chunk-array*
+;;sandbox::*dirty-chunks*
+;;sandbox::*achannel*
