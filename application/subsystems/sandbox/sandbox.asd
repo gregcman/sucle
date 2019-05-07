@@ -7,16 +7,23 @@
 	       #:scratch-buffer
 	       #:reverse-array-iterator
 	       #:glhelp
-	       #:lparallel
-	       #:bordeaux-threads
 	       #:nsb-cga
 	       #:quads
+	       ;;for serialize
 	       #:cl-conspack
 	       #:salza2
-	       #:chipz)
+	       #:chipz
+	       ;;for multiprocessing
+	       #:lparallel
+	       #:bordeaux-threads
+	       #:cl-cpus
+	       #:uncommon-lisp
+	       #:utility)
   :serial t
   :components
   ((:file "queue")
+   (:file "serialize") ;;generic file loading and stuff
+   (:file "multiprocessing")
    (:file "package")
    (:file "world")
    (:file "persist-world") ;;world <-> filesystem

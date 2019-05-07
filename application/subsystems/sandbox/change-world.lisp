@@ -24,24 +24,10 @@
       (gl:delete-lists value 1)
       (remove-chunk-display-list name))))
 
-(defvar *world-mesh-lparallel-kernel* nil)
-(defmacro with-world-mesh-lparallel-kernel (&body body)
-  `(let ((lparallel:*kernel* *world-mesh-lparallel-kernel*)) ,@body))
-(defparameter *achannel* nil)
-
-(defmacro with-world-meshing-lparallel (&body body)
-  `(let ((*world-mesh-lparallel-kernel* nil))
-     (unwind-protect (progn (setf *world-mesh-lparallel-kernel*
-				  (lparallel:make-kernel 2))
-			    (with-world-mesh-lparallel-kernel
-			      (let ((*achannel*
-				     (lparallel:make-channel)))
-				,@body)))
-       (when *world-mesh-lparallel-kernel*
-	 (lparallel:end-kernel)))))
+(defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 
 (defun call-with-world-meshing-lparallel (fun)
-  (with-world-meshing-lparallel
+  (sandbox.multiprocessing::with-initialize-multiprocessing
     (funcall fun)))
 
 (defun update-world-vao ()
@@ -91,26 +77,23 @@
 (defparameter *total-background-chunk-mesh-jobs* 0)
 (defparameter *max-total-background-chunk-mesh-jobs* 1)
 (defun reset-meshers ()
-  (With-world-mesh-lparallel-kernel
+  (sandbox.multiprocessing::with-kernel
     (lparallel:kill-tasks 'mesh-chunk)
     #+nil
     (progn
       (lparallel:kill-tasks :chunk-load)
       (lparallel:kill-tasks :chunk-save))
-    (reset-in-the-process-of-being-loaded)
     (setf *total-background-chunk-mesh-jobs* 0)))
 ;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
-  (loop
-     (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)
-       (cond (success-p
-	      (destructuring-bind (type function . args) value
-		(apply function args)
-		(when (eq :mesh-chunk type)
-		  ;;FIXME::document this somewhere?
-		  ;;*achannel* becoming a generic command buffer?
-		  (decf *total-background-chunk-mesh-jobs*))))
-	     (t (return)))))
+  (sandbox.multiprocessing::do-queue (job-task *finished-mesh-tasks*)
+   (let ((value (car (sandbox.multiprocessing::job-task-return-values job-task))))
+     (destructuring-bind (type function . args) value
+       (apply function args)
+       (when (eq :mesh-chunk type)
+	 ;;FIXME::document this somewhere?
+	 ;;*achannel* becoming a generic command buffer?
+	 (decf *total-background-chunk-mesh-jobs*)))))
   (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
     (queue::sort-queue
      *dirty-chunks*
@@ -125,19 +108,22 @@
     (loop
        (let ((thechunk (dirty-pop)))
 	 (if thechunk
-	     (when (world::chunk-exists-p thechunk)
+	     (when (and (world::chunk-exists-p thechunk)
+			(not (world::empty-chunk-p (world::get-chunk-at thechunk))))
 	       (incf *total-background-chunk-mesh-jobs*)
 	       (let ((lparallel:*task-category* 'mesh-chunk))
-		 (lparallel:submit-task
-		  *achannel*
+		 (sandbox.multiprocessing::submit 
 		  (lambda (iter space chunk-pos)
 		    (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		    (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
 		      (chunk-shape iter io jo ko)
 		      (%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
-		  (attrib-buffer-iterators)
-		  (make-list 4)
-		  thechunk)))
+		  :args (list
+			 (attrib-buffer-iterators)
+			 (make-list 4)
+			 thechunk)
+		  :callback (lambda (job-task)
+			      (lparallel.queue:push-queue job-task *finished-mesh-tasks*)))))
 	     (return))))))
 
 #+nil
@@ -274,17 +260,9 @@
 		   'unsquared-chunk-distance)))
 	(safe-subseq distance-sorted-chunks difference)))))
 
-(defparameter *in-the-process-of-being-loaded* (make-hash-table :test 'equal))
-(defun reset-in-the-process-of-being-loaded ()
-  (clrhash *in-the-process-of-being-loaded*))
-(defun in-the-process-of-being-loaded-p (key)
-  (gethash key *in-the-process-of-being-loaded*))
-(defun finished-being-loaded (key)
-  (remhash key *in-the-process-of-being-loaded*))
 (defun load-chunks-around ()
   (mapc (lambda (key)
-	  (sandbox::chunk-load key)
-	  (finished-being-loaded key))
+	  (sandbox::chunk-load key))
 	(get-chunks-to-load)))
 (defun get-chunks-to-load ()
   (let ((x0 *chunk-coordinate-center-x*)
@@ -331,22 +309,37 @@
     (t
      ;;when the chunk is not obviously empty
      (when (world::chunk-modified chunk) ;;if it wasn't modified, no point in saving
-       (let ((worth-saving (world::chunk-worth-saving chunk))
-	     (key (world::chunk-key chunk)))
+       (let* ((worth-saving (world::chunk-worth-saving chunk))
+	      (key (world::chunk-key chunk))
+	      ;;FIXME::have multiple unique-task hashes?
+	      (job-key (cons :save-chunk key)))
 	 ;;save the chunk first?
-	 (cond
-	   (worth-saving
-	    ;;write the chunk to disk if its worth saving
-	    (savechunk key path))
-	   (t
-	    ;;otherwise, if there is a preexisting file, destroy it
-	    (let ((chunk-save-file
-		   ;;FIXME::bad api?
-		   (merge-pathnames (convert-object-to-filename (chunk-coordinate-to-filename key))
-				    (world-path))))
-	      (let ((file-exists-p (probe-file chunk-save-file)))
-		(when file-exists-p
-		  (delete-file chunk-save-file)))))))))))
+	 (sandbox.multiprocessing::submit-unique-task
+	  job-key
+	  ((lambda ()
+	     (cond
+	       (worth-saving
+		;;write the chunk to disk if its worth saving
+		(savechunk chunk key path)
+		;;(format t "~%saved chunk ~s" key)
+		)
+	       (t
+		;;otherwise, if there is a preexisting file, destroy it
+		(let ((chunk-save-file
+		       ;;FIXME::bad api?
+		       (merge-pathnames
+			(convert-object-to-filename (chunk-coordinate-to-filename key))
+			(world-path))))
+		  (let ((file-exists-p (probe-file chunk-save-file)))
+		    (when file-exists-p
+		      (delete-file chunk-save-file)))))))
+	   :data job-key
+	   :callback (lambda (job-task)
+		       (declare (ignorable job-task))
+		       (sandbox.multiprocessing::remove-unique-task-key
+			(sandbox.multiprocessing::job-task-data job-task)))
+	   ;;this task, saving and loading, must not be interrupted
+	   :unkillable t)))))))
 
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
@@ -373,13 +366,38 @@
 	    (when (world::chunk-exists-p new-key)
 	      (dirty-push new-key))))))
 
+(defparameter *load-jobs* 0)
 
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
+  #+nil
   (let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
     (unless (eq load-type :empty) ;;FIXME::better api?
-      (dirty-push-around key))))
+      (dirty-push-around key)))
+  ;;(print 34243)
+  (let ((job-key (cons :chunk-load key)))
+    (sandbox.multiprocessing::submit-unique-task
+     job-key
+     ((lambda ()
+	(let ((chunk (loadchunk key path)))
+	  (setf (cdr (sandbox.multiprocessing::job-task-data
+		      sandbox.multiprocessing::*current-job-task*))
+		chunk)))
+      :data (cons job-key "")
+      :callback (lambda (job-task)
+		  (declare (ignorable job-task))
+		  (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
+			 (key (cdr job-key))
+			 (new-chunk (cdr (sandbox.multiprocessing::job-task-data job-task))))
+		    ;;FIXME? locking is not necessary if the callback runs in the
+		    ;;same thread as the code which changes the chunk-array and *chunks* ?
+		    (world::set-chunk-at key new-chunk)
+		    (unless (world::empty-chunk-p new-chunk)
+		      (dirty-push-around key))
+		    (sandbox.multiprocessing::remove-unique-task-key job-key))
+		  (decf *load-jobs*)))
+     (incf *load-jobs*))))
 
 (defun unload-extra-chunks ()
   (let ((to-unload

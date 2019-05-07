@@ -70,10 +70,11 @@
 (defun start ()
   (application::main
    (lambda ()
-     (sandbox::with-world-meshing-lparallel
-       (loop
-	  (application:poll-app)
-	  (per-frame))))
+     (sandbox::call-with-world-meshing-lparallel 
+      (lambda ()
+	(loop
+	   (application:poll-app)
+	   (per-frame)))))
    :width 720
    :height 480
    :title "conceptually simple block game"))
@@ -160,6 +161,9 @@ gl_FragColor.rgb = color_out;
 (defparameter *paused* nil)
 (defparameter *session* nil)
 (defun per-frame ()
+  ;;FIXME::where is the best place to flush the job-tasks?
+  (sandbox.multiprocessing::flush-job-tasks)
+  
   (application::on-session-change *session*
     (load-world t))
   (when (window::skey-j-p (window::keyval #\))
@@ -168,6 +172,8 @@ gl_FragColor.rgb = color_out;
       (window::toggle-mouse-capture)
       (moused))
   (setf *paused* (window::mice-free-p))
+  ;;FIXME::?
+  (setf sandbox.multiprocessing::*paused* *paused*)
   (cond (*paused*
 	 (fps-independent-timestep::tick *ticker* ()))
 	(t

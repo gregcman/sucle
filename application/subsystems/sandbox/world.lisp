@@ -119,6 +119,7 @@
 		:key key
 		:data data
 		:type :normal)))
+#+nil
 (defun make-chunk-from-key-and-data-and-keep (key data)
   (let ((new-chunk
 	 (make-chunk-from-key-and-data key data)))
@@ -347,6 +348,7 @@
 	(chunk-z (floor z (utility:etouq *chunk-size-z*))))
     (values chunk-x chunk-y chunk-z)))
 
+#+nil
 (defun test ()
   (let ((times (expt 10 6)))
     (time (dotimes (x times) (setf (getobj 0 0 0) 0)))
