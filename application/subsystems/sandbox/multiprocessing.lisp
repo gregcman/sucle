@@ -29,7 +29,7 @@
   (loop :named out :do
      (when (zerop (unkillable-count *unkillable*))
        (return-from out))
-     (sleep 0.1)))
+     (bordeaux-threads:thread-yield)))
 ;;FIXME::should the finished-task-queue be a global variable?
 (defparameter *finished-task-queue* (lparallel.queue:make-queue))
 
@@ -155,7 +155,10 @@
 	(lparallel.queue:push-queue/no-lock job-task *finished-task-queue*))))
   job-task)
 
+(defparameter *paused* nil)
+
 (defun job-task-function (job-task fun args)
+  (loop :while *paused* :do (bordeaux-threads:thread-yield))
   (when (init-job-task job-task)
     (handler-case  
 	(progn	  

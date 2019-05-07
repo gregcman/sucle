@@ -172,6 +172,8 @@ gl_FragColor.rgb = color_out;
       (window::toggle-mouse-capture)
       (moused))
   (setf *paused* (window::mice-free-p))
+  ;;FIXME::?
+  (setf sandbox.multiprocessing::*paused* *paused*)
   (cond (*paused*
 	 (fps-independent-timestep::tick *ticker* ()))
 	(t

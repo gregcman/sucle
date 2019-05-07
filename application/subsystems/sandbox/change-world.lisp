@@ -108,7 +108,8 @@
     (loop
        (let ((thechunk (dirty-pop)))
 	 (if thechunk
-	     (when (world::chunk-exists-p thechunk)
+	     (when (and (world::chunk-exists-p thechunk)
+			(not (world::empty-chunk-p (world::get-chunk-at thechunk))))
 	       (incf *total-background-chunk-mesh-jobs*)
 	       (let ((lparallel:*task-category* 'mesh-chunk))
 		 (sandbox.multiprocessing::submit 
