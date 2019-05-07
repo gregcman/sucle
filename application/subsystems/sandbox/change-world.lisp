@@ -24,24 +24,10 @@
       (gl:delete-lists value 1)
       (remove-chunk-display-list name))))
 
-(defvar *world-mesh-lparallel-kernel* nil)
-(defmacro with-world-mesh-lparallel-kernel (&body body)
-  `(let ((lparallel:*kernel* *world-mesh-lparallel-kernel*)) ,@body))
 (defparameter *achannel* nil)
 
-(defmacro with-world-meshing-lparallel (&body body)
-  `(let ((*world-mesh-lparallel-kernel* nil))
-     (unwind-protect (progn (setf *world-mesh-lparallel-kernel*
-				  (lparallel:make-kernel 2))
-			    (with-world-mesh-lparallel-kernel
-			      (let ((*achannel*
-				     (lparallel:make-channel)))
-				,@body)))
-       (when *world-mesh-lparallel-kernel*
-	 (lparallel:end-kernel)))))
-
 (defun call-with-world-meshing-lparallel (fun)
-  (with-world-meshing-lparallel
+  (sandbox.multiprocessing::with-initialize-multiprocessing
     (funcall fun)))
 
 (defun update-world-vao ()
@@ -91,7 +77,7 @@
 (defparameter *total-background-chunk-mesh-jobs* 0)
 (defparameter *max-total-background-chunk-mesh-jobs* 1)
 (defun reset-meshers ()
-  (With-world-mesh-lparallel-kernel
+  (sandbox.multiprocessing::with-kernel
     (lparallel:kill-tasks 'mesh-chunk)
     #+nil
     (progn
@@ -101,16 +87,15 @@
     (setf *total-background-chunk-mesh-jobs* 0)))
 ;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
-  (loop
-     (multiple-value-bind (value success-p) (lparallel:try-receive-result *achannel*)
-       (cond (success-p
-	      (destructuring-bind (type function . args) value
-		(apply function args)
-		(when (eq :mesh-chunk type)
-		  ;;FIXME::document this somewhere?
-		  ;;*achannel* becoming a generic command buffer?
-		  (decf *total-background-chunk-mesh-jobs*))))
-	     (t (return)))))
+  (sandbox.multiprocessing::flush-job-tasks
+   (lambda (job-task)
+     (let ((value (car (sandbox.multiprocessing::job-task-return-values job-task))))
+       (destructuring-bind (type function . args) value
+	 (apply function args)
+	 (when (eq :mesh-chunk type)
+	   ;;FIXME::document this somewhere?
+	   ;;*achannel* becoming a generic command buffer?
+	   (decf *total-background-chunk-mesh-jobs*))))))
   (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
     (queue::sort-queue
      *dirty-chunks*
@@ -128,16 +113,16 @@
 	     (when (world::chunk-exists-p thechunk)
 	       (incf *total-background-chunk-mesh-jobs*)
 	       (let ((lparallel:*task-category* 'mesh-chunk))
-		 (lparallel:submit-task
-		  *achannel*
+		 (sandbox.multiprocessing::submit 
 		  (lambda (iter space chunk-pos)
 		    (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		    (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
 		      (chunk-shape iter io jo ko)
 		      (%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
-		  (attrib-buffer-iterators)
-		  (make-list 4)
-		  thechunk)))
+		  :args (list
+			 (attrib-buffer-iterators)
+			 (make-list 4)
+			 thechunk))))
 	     (return))))))
 
 #+nil

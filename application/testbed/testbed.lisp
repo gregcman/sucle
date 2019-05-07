@@ -70,10 +70,11 @@
 (defun start ()
   (application::main
    (lambda ()
-     (sandbox::with-world-meshing-lparallel
-       (loop
-	  (application:poll-app)
-	  (per-frame))))
+     (sandbox::call-with-world-meshing-lparallel 
+      (lambda ()
+	(loop
+	   (application:poll-app)
+	   (per-frame)))))
    :width 720
    :height 480
    :title "conceptually simple block game"))

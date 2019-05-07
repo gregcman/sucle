@@ -9,13 +9,30 @@
     (ql:quickload :uncommon-lisp)
     (ql:quickload :utility)))
 
+(defparameter *lparallel-kernel* nil)
+(defmacro with-kernel (&body body)
+  `(let ((lparallel:*kernel* *lparallel-kernel*)) ,@body))
 (defparameter *channel* nil)
-(defparameter *finished-task-queue* nil)
+;;FIXME::should the finished-task-queue be a global variable?
+(defparameter *finished-task-queue* (lparallel.queue:make-queue))
+
+(defun set-dynamic-variables ()
+  (setf *lparallel-kernel* (lparallel::make-kernel (cpus:get-number-of-processors)))
+  (with-kernel
+    (setf *channel* (lparallel:make-channel))))
 (defun reset ()
   (lparallel::end-kernel)
-  (setf lparallel::*kernel* (lparallel::make-kernel (cpus:get-number-of-processors)))
-  (setf *channel* (lparallel:make-channel))
-  (setf *finished-task-queue* (lparallel.queue:make-queue)))
+  (set-dynamic-variables)
+  (setf lparallel::*kernel* *lparallel-kernel*))
+
+(defmacro with-initialize-multiprocessing (&body body)
+  `(let ((*lparallel-kernel* nil)
+	 (*channel* nil))
+     (set-dynamic-variables)
+     (with-kernel
+       (unwind-protect (progn ,@body)
+	 (when *lparallel-kernel*
+	   (lparallel:end-kernel))))))
 
 (defparameter *print-errors* t)
 (defmacro debugging (&body body)
