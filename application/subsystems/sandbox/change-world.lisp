@@ -24,7 +24,7 @@
       (gl:delete-lists value 1)
       (remove-chunk-display-list name))))
 
-(defparameter *achannel* nil)
+(defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 
 (defun call-with-world-meshing-lparallel (fun)
   (sandbox.multiprocessing::with-initialize-multiprocessing
@@ -87,15 +87,14 @@
     (setf *total-background-chunk-mesh-jobs* 0)))
 ;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
-  (sandbox.multiprocessing::flush-job-tasks
-   (lambda (job-task)
-     (let ((value (car (sandbox.multiprocessing::job-task-return-values job-task))))
-       (destructuring-bind (type function . args) value
-	 (apply function args)
-	 (when (eq :mesh-chunk type)
-	   ;;FIXME::document this somewhere?
-	   ;;*achannel* becoming a generic command buffer?
-	   (decf *total-background-chunk-mesh-jobs*))))))
+  (sandbox.multiprocessing::do-queue (job-task *finished-mesh-tasks*)
+   (let ((value (car (sandbox.multiprocessing::job-task-return-values job-task))))
+     (destructuring-bind (type function . args) value
+       (apply function args)
+       (when (eq :mesh-chunk type)
+	 ;;FIXME::document this somewhere?
+	 ;;*achannel* becoming a generic command buffer?
+	 (decf *total-background-chunk-mesh-jobs*)))))
   (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
     (queue::sort-queue
      *dirty-chunks*
@@ -122,7 +121,9 @@
 		  :args (list
 			 (attrib-buffer-iterators)
 			 (make-list 4)
-			 thechunk))))
+			 thechunk)
+		  :callback (lambda (job-task)
+			      (lparallel.queue:push-queue job-task *finished-mesh-tasks*)))))
 	     (return))))))
 
 #+nil

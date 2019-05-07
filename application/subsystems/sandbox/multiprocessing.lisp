@@ -169,15 +169,22 @@
 	     ;;(print c)
 	     ))))))
 
+(defmacro do-queue ((var queue) &body body)
+  ;;iterate through the values in the lparallel queue, with
+  ;;var bound to the values of the queue
+  (utility:with-gensyms (loop exist-p)
+    (utility:once-only (queue)
+      `(lparallel.queue:with-locked-queue ,queue
+	 (loop :named ,loop :do
+	    (multiple-value-bind (,var ,exist-p) (lparallel.queue:try-pop-queue/no-lock ,queue)
+	      (unless ,exist-p
+		(return-from ,loop))
+	      ,@body))))))
+
 (defun get-values (&optional (fun 'print))
   (%get-values)
-  (let ((queue *finished-task-queue*))
-    (lparallel.queue:with-locked-queue queue
-      (loop :named loop :do
-	 (multiple-value-bind (value exist-p) (lparallel.queue:try-pop-queue/no-lock queue)
-	   (unless exist-p
-	     (return-from loop))
-	   (funcall fun value))))))
+  (do-queue (value *finished-task-queue*)
+      (funcall fun value)))
 
 (defun flush-job-tasks (&optional fun)
   (get-values (lambda (job-task)

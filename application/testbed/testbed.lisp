@@ -161,6 +161,9 @@ gl_FragColor.rgb = color_out;
 (defparameter *paused* nil)
 (defparameter *session* nil)
 (defun per-frame ()
+  ;;FIXME::where is the best place to flush the job-tasks?
+  (sandbox.multiprocessing::flush-job-tasks)
+  
   (application::on-session-change *session*
     (load-world t))
   (when (window::skey-j-p (window::keyval #\))
