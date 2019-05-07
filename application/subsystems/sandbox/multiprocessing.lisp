@@ -156,19 +156,19 @@
   job-task)
 
 (defparameter *paused* nil)
-
+(defparameter *current-job-task* nil)
 (defun job-task-function (job-task fun args)
   (loop :while *paused* :do (bordeaux-threads:thread-yield))
-  (when (init-job-task job-task)
-    (handler-case  
-	(progn	  
-	  (complete-job-task job-task (multiple-value-list (apply fun args))))
- 
-      (error (c)
-	;;handle regular errors from function
-	(declare (ignorable c))
-	(debugging (print c))
-	(abort-job-task job-task c))))
+  (let ((*current-job-task* job-task))
+    (when (init-job-task job-task)
+      (handler-case  
+	  (progn	  
+	    (complete-job-task job-task (multiple-value-list (apply fun args))))
+	(error (c)
+	  ;;handle regular errors from function
+	  (declare (ignorable c))
+	  (debugging (print c))
+	  (abort-job-task job-task c)))))
   job-task)
 (defmacro submit-body ((&rest rest &key &allow-other-keys) &body body)
   `(submit (lambda () ,@body) ,@rest))

@@ -119,6 +119,7 @@
 		:key key
 		:data data
 		:type :normal)))
+#+nil
 (defun make-chunk-from-key-and-data-and-keep (key data)
   (let ((new-chunk
 	 (make-chunk-from-key-and-data key data)))

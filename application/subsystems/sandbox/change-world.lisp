@@ -380,14 +380,22 @@
     (sandbox.multiprocessing::submit-unique-task
      job-key
      ((lambda ()
-	(let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
-	  (unless (eq load-type :empty) ;;FIXME::better api?
-	    (dirty-push-around key))))
-      :data job-key
+	(let ((chunk (loadchunk key path)))
+	  (setf (cdr (sandbox.multiprocessing::job-task-data
+		      sandbox.multiprocessing::*current-job-task*))
+		chunk)))
+      :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
-		  (sandbox.multiprocessing::remove-unique-task-key
-		   (sandbox.multiprocessing::job-task-data job-task))
+		  (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
+			 (key (cdr job-key))
+			 (new-chunk (cdr (sandbox.multiprocessing::job-task-data job-task))))
+		    ;;FIXME? locking is not necessary if the callback runs in the
+		    ;;same thread as the code which changes the chunk-array and *chunks* ?
+		    (world::set-chunk-at key new-chunk)
+		    (unless (world::empty-chunk-p new-chunk)
+		      (dirty-push-around key))
+		    (sandbox.multiprocessing::remove-unique-task-key job-key))
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))
 

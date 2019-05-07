@@ -32,39 +32,33 @@
      (list
       (world::chunk-data chunk)))))
 
-(defun loadchunk (path filename-position-list)
-  (let ((position (filename-to-chunk-coordinate filename-position-list)))  
-    (let ((data
-	   (sandbox.serialize::retrieve-lisp-objects-from-file
-	    (merge-pathnames (convert-object-to-filename filename-position-list) path))))
-      (case (length data)
-	(0
-	 ;;if data is nil, just load an empty chunk
-	 (world::with-chunk-key-coordinates (x y z) position
-	   (world::set-chunk-at
-	    position
-	    (world::create-chunk x y z :type :empty)))
-	 ;;return :EMPTY to signify that
-	 ;;an empty chunk has been loaded
-	 :empty)
-	#+nil
-	(3 ;;FIXME::does this even work?
-	 (destructuring-bind (blocks light sky) data
-	   (let ((len (length blocks)))
-	     (let ((new (make-array len)))
-	       (world::make-chunk-from-key-and-data-and-keep position new)
-	       (dotimes (i len)
-		 (setf (aref new i)
-		       (dpb (aref sky i) (byte 4 12)
-			    (dpb (aref light i) (byte 4 8) (aref blocks i))))))))
-	 t)
-	(1
-	 (let ((objdata (pop data)))
-	   (when objdata
-	     (world::make-chunk-from-key-and-data-and-keep
-	      position
-	      (coerce objdata '(simple-array t (*))))))
-	 t)))))
+(defun loadchunk (chunk-coordinates &optional (path (world-path)))
+  (let ((data
+	 (sandbox.serialize::retrieve-lisp-objects-from-file
+	  (merge-pathnames (convert-object-to-filename
+			    (chunk-coordinate-to-filename chunk-coordinates))
+			   path))))
+    (case (length data)
+      (0
+       ;;if data is nil, just load an empty chunk
+       (world::with-chunk-key-coordinates (x y z) chunk-coordinates
+	 (world::create-chunk x y z :type :empty)))
+      #+nil
+      (3 ;;FIXME::does this even work?
+       (destructuring-bind (blocks light sky) data
+	 (let ((len (length blocks)))
+	   (let ((new (make-array len)))
+	     (world::make-chunk-from-key-and-data-and-keep position new)
+	     (dotimes (i len)
+	       (setf (aref new i)
+		     (dpb (aref sky i) (byte 4 12)
+			  (dpb (aref light i) (byte 4 8) (aref blocks i))))))))
+       t)
+      (1
+       (destructuring-bind (objdata) data
+	 (world::make-chunk-from-key-and-data
+	  chunk-coordinates
+	  (coerce objdata '(simple-array t (*)))))))))
 
 ;;The world is saved as a directory full of files named (x y z) in block coordinates, with
 ;;x and y swizzled
