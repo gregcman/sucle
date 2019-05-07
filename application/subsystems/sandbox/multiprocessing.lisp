@@ -11,13 +11,31 @@
 
 (defparameter *lparallel-kernel* nil)
 (defmacro with-kernel (&body body)
-  `(let ((lparallel:*kernel* *lparallel-kernel*)) ,@body))
+  `(let ((lparallel:*kernel* *lparallel-kernel*))
+     ,@body))
 (defparameter *channel* nil)
+;;Before ending the kernel, wait until *unkillable* is set to 0
+(struct-to-clos:struct->class 
+ (defstruct unkillable
+   (count 0)
+   (lock (bordeaux-threads:make-recursive-lock))))
+(defparameter *unkillable* (make-unkillable))
+(defmacro with-unkillable ((job-task) &body body)
+  `(let ((unkillable (job-task-unkillable ,job-task)))
+     (when (not (null unkillable))
+       (bordeaux-threads:with-recursive-lock-held ((unkillable-lock unkillable))
+	 ,@body))))
+(defun wait-on-unkillables ()
+  (loop :named out :do
+     (when (zerop (unkillable-count *unkillable*))
+       (return-from out))
+     (sleep 0.1)))
 ;;FIXME::should the finished-task-queue be a global variable?
 (defparameter *finished-task-queue* (lparallel.queue:make-queue))
 
 (defun set-dynamic-variables ()
   (setf *lparallel-kernel* (lparallel::make-kernel (cpus:get-number-of-processors)))
+  (setf *unique-tasks* (make-hash-table :test 'eq))
   (with-kernel
     (setf *channel* (lparallel:make-channel))))
 (defun reset ()
@@ -26,12 +44,12 @@
   (setf lparallel::*kernel* *lparallel-kernel*))
 
 (defmacro with-initialize-multiprocessing (&body body)
-  `(let ((*lparallel-kernel* nil)
-	 (*channel* nil))
+  `(let ((*lparallel-kernel* nil))
      (set-dynamic-variables)
      (with-kernel
        (unwind-protect (progn ,@body)
 	 (when *lparallel-kernel*
+	   (wait-on-unkillables)
 	   (lparallel:end-kernel))))))
 
 (defparameter *print-errors* t)
@@ -42,18 +60,18 @@
 (struct-to-clos:struct->class 
  (defstruct job-task
    ;;the thread it runs in 
-   thread
+   (thread nil)
    ;;status is one of :pending, :started, :complete, :aborted, :killed
    ;;:pending -> created, not run yet
    ;;:running = in the process of running
    ;;:aborted = aborted from the running function
    ;;:killed = killed from a separate thread
    ;;:completed = finished normally
-   status
+   (status nil)
    ;;Turn on the lock with 'with-locked-job-task while modifiying this task's values
    (lock (bordeaux-threads:make-recursive-lock))
    ;;The values captured by the submit-ed function. multiple-values-list
-   return-values
+   (return-values nil)
    ;;return-status is an error object when status is :aborted,
    ;;when status is :killed, it is nil
    ;;otherwise it is t
@@ -63,9 +81,13 @@
    (finished nil)
    ;;Set to either nil, or a function-designator of type (function (job-task))
    ;;Called when read by finished-job-tasks
-   callback
+   (callback nil)
+   ;;do not end the kernel before finishing a task that is unkillable.
+   ;;make sure to finished the task, no matter if it is pending or started,
+   ;;it will be either an 'unkillable' object, or nil
+   (unkillable nil)
    ;;user-defined data
-   data))
+   (data nil)))
 (defmacro with-locked-job-task ((job-task) &body body)
   `(bordeaux-threads:with-recursive-lock-held ((job-task-lock ,job-task))
      ,@body))
@@ -92,13 +114,20 @@
     (setf (job-task-return-values job-task) returned-values)
     (setf (job-task-status job-task) :complete)
     (setf (job-task-thread job-task) nil)
-    (setf (job-task-finished job-task) t)))
+    (setf (job-task-finished job-task) t)
+    (maybe-decrement-unkillable job-task)))
 (defun abort-job-task (job-task error)
   (with-locked-job-task (job-task)
     (setf (job-task-return-status job-task) error)
     (setf (job-task-status job-task) :aborted)
     (setf (job-task-thread job-task) nil)
-    (setf (job-task-finished job-task) t)))
+    (setf (job-task-finished job-task) t)
+    (maybe-decrement-unkillable job-task)))
+
+(defun maybe-decrement-unkillable (job-task)
+  (with-unkillable (job-task) (decf (unkillable-count (job-task-unkillable job-task)))))
+(defun maybe-increment-unkillable (job-task)
+  (with-unkillable (job-task) (incf (unkillable-count (job-task-unkillable job-task)))))
 
 (defun kill-job-task (job-task)
   (with-locked-job-task (job-task)
@@ -112,6 +141,7 @@
 	  (setf (job-task-status job-task) :killed)
 	  (setf (job-task-return-status job-task) nil)
 	  (setf (job-task-finished job-task) t)
+	  (maybe-decrement-unkillable job-task)
 	  ;;FIXME::use bordeaux threads and kill the thread directly or use lparallel:kill-tasks?
 	  ;;(lparallel:kill-tasks job-task)
 	  (when (eq status :running)
@@ -139,8 +169,12 @@
 (defmacro submit-body ((&rest rest &key &allow-other-keys) &body body)
   `(submit (lambda () ,@body) ,@rest))
 
-(defun submit (fun &key callback args data)
-  (let ((new-job-task (make-job-task :status :pending :callback callback :data data)))
+(defun submit (fun &key callback args data unkillable)
+  (let ((new-job-task (make-job-task :status :pending :callback callback :data data
+				     :unkillable (if unkillable
+						     *unkillable*
+						     nil))))
+    (maybe-increment-unkillable new-job-task)
     (lparallel:submit-task
      *channel*
      'job-task-function
@@ -164,6 +198,7 @@
 		    (return-from outer-loop))
 		  (when (typep value 'job-task))
 		  (lparallel.queue:push-queue/no-lock value queue)))
+	   ;;FIXME::allow errors to pass through?
 	   (error (c)
 	     (declare (ignorable c))
 	     ;;(print c)

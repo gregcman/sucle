@@ -320,19 +320,29 @@
        (let ((worth-saving (world::chunk-worth-saving chunk))
 	     (key (world::chunk-key chunk)))
 	 ;;save the chunk first?
-	 (cond
-	   (worth-saving
-	    ;;write the chunk to disk if its worth saving
-	    (savechunk key path))
-	   (t
-	    ;;otherwise, if there is a preexisting file, destroy it
-	    (let ((chunk-save-file
-		   ;;FIXME::bad api?
-		   (merge-pathnames (convert-object-to-filename (chunk-coordinate-to-filename key))
-				    (world-path))))
-	      (let ((file-exists-p (probe-file chunk-save-file)))
-		(when file-exists-p
-		  (delete-file chunk-save-file)))))))))))
+	 (sandbox.multiprocessing::submit-unique-task
+	  key ((lambda ()
+		 (cond
+		   (worth-saving
+		    ;;write the chunk to disk if its worth saving
+		    (savechunk chunk key path))
+		   (t
+		    ;;otherwise, if there is a preexisting file, destroy it
+		    (let ((chunk-save-file
+			   ;;FIXME::bad api?
+			   (merge-pathnames
+			    (convert-object-to-filename (chunk-coordinate-to-filename key))
+			    (world-path))))
+		      (let ((file-exists-p (probe-file chunk-save-file)))
+			(when file-exists-p
+			  (delete-file chunk-save-file)))))))
+	       :data key
+	       :callback (lambda (job-task)
+			   (declare (ignorable job-task))
+			   (sandbox.multiprocessing::remove-unique-task-key
+			    (sandbox.multiprocessing::job-task-data job-task)))
+	       ;;this task, saving and loading, must not be interrupted
+	       :unkillable t)))))))
 
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))

@@ -21,7 +21,7 @@
   (let ((newpath (world-path path)))
     (load-world newpath)))
 
-(defun savechunk (position &optional (path (world-path)))
+(defun savechunk (chunk position &optional (path (world-path)))
   ;;FIXME::undocumented swizzling and multiplication by 16, as well as loadchunk
   (let ((filename (convert-object-to-filename (chunk-coordinate-to-filename position))))
     ;;(format t "~%Saving chunk ~a" filename)
@@ -30,8 +30,7 @@
       filename
       path)
      (list
-      (world::chunk-data
-       (world::obtain-chunk-from-chunk-key position nil))))))
+      (world::chunk-data chunk)))))
 
 (defun loadchunk (path filename-position-list)
   (let ((position (filename-to-chunk-coordinate filename-position-list)))  
