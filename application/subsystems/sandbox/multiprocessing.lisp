@@ -160,10 +160,11 @@
     (handler-case  
 	(progn	  
 	  (complete-job-task job-task (multiple-value-list (apply fun args))))
+ 
       (error (c)
 	;;handle regular errors from function
 	(declare (ignorable c))
-	;;(debugging (print c))
+	(debugging (print c))
 	(abort-job-task job-task c))))
   job-task)
 (defmacro submit-body ((&rest rest &key &allow-other-keys) &body body)
@@ -201,7 +202,7 @@
 	   ;;FIXME::allow errors to pass through?
 	   (error (c)
 	     (declare (ignorable c))
-	     ;;(print c)
+	     (debugging (print c))
 	     ))))))
 
 (defmacro do-queue ((var queue) &body body)
@@ -231,7 +232,7 @@
 
 (defparameter *unique-tasks* (make-hash-table :test 'equal))
 (defparameter *unique-tasks-lock* (bordeaux-threads:make-recursive-lock))
-(defmacro submit-unique-task (key (fun &rest rest &key &allow-other-keys))
+(defmacro submit-unique-task (key (fun &rest rest &key &allow-other-keys) &body body-if)
   ;;fun, callback, args are only evaluated if
   ;;the task is non-existent
   (utility:once-only (key)
@@ -240,9 +241,11 @@
 	 (multiple-value-bind (,value ,existsp) (gethash ,key *unique-tasks*)
 	   (declare (ignorable ,value))
 	   (if (not ,existsp)
-	       (let ((,job-task (submit ,fun ,@rest)))
-		 (setf (gethash ,key *unique-tasks*) ,job-task)
-		 (values ,job-task t))
+	       (progn
+		 ,@body-if
+		 (let ((,job-task (submit ,fun ,@rest)))
+		   (setf (gethash ,key *unique-tasks*) ,job-task)
+		   (values ,job-task t)))
 	       (values nil nil)))))))
 (defun remove-unique-task-key (key)
   (bordeaux-threads:with-recursive-lock-held (*unique-tasks-lock*)

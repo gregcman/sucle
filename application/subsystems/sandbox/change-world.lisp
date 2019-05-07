@@ -83,7 +83,6 @@
     (progn
       (lparallel:kill-tasks :chunk-load)
       (lparallel:kill-tasks :chunk-save))
-    (reset-in-the-process-of-being-loaded)
     (setf *total-background-chunk-mesh-jobs* 0)))
 ;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
@@ -260,17 +259,9 @@
 		   'unsquared-chunk-distance)))
 	(safe-subseq distance-sorted-chunks difference)))))
 
-(defparameter *in-the-process-of-being-loaded* (make-hash-table :test 'equal))
-(defun reset-in-the-process-of-being-loaded ()
-  (clrhash *in-the-process-of-being-loaded*))
-(defun in-the-process-of-being-loaded-p (key)
-  (gethash key *in-the-process-of-being-loaded*))
-(defun finished-being-loaded (key)
-  (remhash key *in-the-process-of-being-loaded*))
 (defun load-chunks-around ()
   (mapc (lambda (key)
-	  (sandbox::chunk-load key)
-	  (finished-being-loaded key))
+	  (sandbox::chunk-load key))
 	(get-chunks-to-load)))
 (defun get-chunks-to-load ()
   (let ((x0 *chunk-coordinate-center-x*)
@@ -374,11 +365,17 @@
 	    (when (world::chunk-exists-p new-key)
 	      (dirty-push new-key))))))
 
+(defparameter *load-jobs* 0)
 
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
-  (let ((job-key (cons :chunk-load key))) 
+  #+nil
+  (let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
+    (unless (eq load-type :empty) ;;FIXME::better api?
+      (dirty-push-around key)))
+  ;;(print 34243)
+  (let ((job-key (cons :chunk-load key)))
     (sandbox.multiprocessing::submit-unique-task
      job-key
      ((lambda ()
@@ -389,7 +386,9 @@
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
 		  (sandbox.multiprocessing::remove-unique-task-key
-		   (sandbox.multiprocessing::job-task-data job-task)))))))
+		   (sandbox.multiprocessing::job-task-data job-task))
+		  (decf *load-jobs*)))
+     (incf *load-jobs*))))
 
 (defun unload-extra-chunks ()
   (let ((to-unload
