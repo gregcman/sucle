@@ -317,32 +317,37 @@
     (t
      ;;when the chunk is not obviously empty
      (when (world::chunk-modified chunk) ;;if it wasn't modified, no point in saving
-       (let ((worth-saving (world::chunk-worth-saving chunk))
-	     (key (world::chunk-key chunk)))
+       (let* ((worth-saving (world::chunk-worth-saving chunk))
+	      (key (world::chunk-key chunk))
+	      ;;FIXME::have multiple unique-task hashes?
+	      (job-key (cons :save-chunk key)))
 	 ;;save the chunk first?
 	 (sandbox.multiprocessing::submit-unique-task
-	  key ((lambda ()
-		 (cond
-		   (worth-saving
-		    ;;write the chunk to disk if its worth saving
-		    (savechunk chunk key path))
-		   (t
-		    ;;otherwise, if there is a preexisting file, destroy it
-		    (let ((chunk-save-file
-			   ;;FIXME::bad api?
-			   (merge-pathnames
-			    (convert-object-to-filename (chunk-coordinate-to-filename key))
-			    (world-path))))
-		      (let ((file-exists-p (probe-file chunk-save-file)))
-			(when file-exists-p
-			  (delete-file chunk-save-file)))))))
-	       :data key
-	       :callback (lambda (job-task)
-			   (declare (ignorable job-task))
-			   (sandbox.multiprocessing::remove-unique-task-key
-			    (sandbox.multiprocessing::job-task-data job-task)))
-	       ;;this task, saving and loading, must not be interrupted
-	       :unkillable t)))))))
+	  job-key
+	  ((lambda ()
+	     (cond
+	       (worth-saving
+		;;write the chunk to disk if its worth saving
+		(savechunk chunk key path)
+		;;(format t "~%saved chunk ~s" key)
+		)
+	       (t
+		;;otherwise, if there is a preexisting file, destroy it
+		(let ((chunk-save-file
+		       ;;FIXME::bad api?
+		       (merge-pathnames
+			(convert-object-to-filename (chunk-coordinate-to-filename key))
+			(world-path))))
+		  (let ((file-exists-p (probe-file chunk-save-file)))
+		    (when file-exists-p
+		      (delete-file chunk-save-file)))))))
+	   :data job-key
+	   :callback (lambda (job-task)
+		       (declare (ignorable job-task))
+		       (sandbox.multiprocessing::remove-unique-task-key
+			(sandbox.multiprocessing::job-task-data job-task)))
+	   ;;this task, saving and loading, must not be interrupted
+	   :unkillable t)))))))
 
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
@@ -373,9 +378,18 @@
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
-  (let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
-    (unless (eq load-type :empty) ;;FIXME::better api?
-      (dirty-push-around key))))
+  (let ((job-key (cons :chunk-load key))) 
+    (sandbox.multiprocessing::submit-unique-task
+     job-key
+     ((lambda ()
+	(let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
+	  (unless (eq load-type :empty) ;;FIXME::better api?
+	    (dirty-push-around key))))
+      :data job-key
+      :callback (lambda (job-task)
+		  (declare (ignorable job-task))
+		  (sandbox.multiprocessing::remove-unique-task-key
+		   (sandbox.multiprocessing::job-task-data job-task)))))))
 
 (defun unload-extra-chunks ()
   (let ((to-unload
