@@ -749,7 +749,9 @@ vec4 light = max(skylight*time, blocklight);
 color_out = dot(light,vec4(0.25));
 texcoord_out = texcoord;
 
-float distance = //distance(camera_pos.xyz, position.xyz);
+float distance = 
+//distance(position.xyz,vec3(0.0));
+//distance(camera_pos.xyz, position.xyz);
 max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
 fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
 }"
@@ -761,7 +763,7 @@ in float fogratio_out;
 uniform vec3 fogcolor;
 
 void main () {
-vec4 pixdata = texture2D(sampler,texcoord_out);
+vec4 pixdata = texture2D(sampler,texcoord_out.xy);
 vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
 if (pixdata.a == 0.0){discard;}
 gl_FragColor.rgb = temp; 
