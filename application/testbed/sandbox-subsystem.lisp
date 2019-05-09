@@ -595,7 +595,19 @@
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
   (gl:front-face :ccw)
-  (sandbox::draw-world))
+  (sandbox::get-chunks-to-draw)
+  (sandbox::render-occlusion-queries)
+  (sandbox::draw-world)
+  #+nil
+  (let ((shader (getfnc 'sandbox::occlusion-shader)))
+    (glhelp::use-gl-program shader)
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms uniform shader
+      (gl:uniform-matrix-4fv 
+       (uniform :pmv)
+       (camera-matrix:camera-matrix-projection-view-player *camera*)
+       nil)))
+ )
 
 (defun quadratic-formula (a b c)
   (let ((two-a (+ a a)))
@@ -789,13 +801,6 @@ gl_FragColor.rgb = temp;
       (draw-box (+ minx x -0) (+  miny y -0) (+  minz z -0)
 		(+ maxx x -0) (+  maxy y -0) (+  maxz z -0)))))
 
-(defmacro vvv (darkness u v x y z)
-  `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
-	  #+nil
-	  (%gl:vertex-attrib-2f 2 ,u ,v)
-	  (%gl:vertex-attrib-3f 3 0.06 0.06 0.06)
-	  (%gl:vertex-attrib-3f 0 ,x ,y ,z)))
-
 (defun draw-box (minx miny minz maxx maxy maxz)
   (let ((h0 0.0)
 	(h1 (/ 1.0 3.0))
@@ -806,38 +811,44 @@ gl_FragColor.rgb = temp;
 	(w2 (/ 2.0 4.0))
 	(w3 (/ 3.0 4.0))
 	(w4 (/ 4.0 4.0)))
-    (gl:with-primitives :quads
-      (vvv 0.0 w2 h3 minx maxy minz)
-      (vvv 0.0 w2 h2 maxx maxy minz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      (vvv 0.0 w1 h3 minx maxy maxz)
+    (macrolet ((vvv (darkness u v x y z)
+	      `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
+		      #+nil
+		      (%gl:vertex-attrib-2f 2 ,u ,v)
+		      (%gl:vertex-attrib-3f 3 0.06 0.06 0.06)
+		      (%gl:vertex-attrib-3f 0 ,x ,y ,z))))
+      (gl:with-primitives :quads
+	(vvv 0.0 w2 h3 minx maxy minz)
+	(vvv 0.0 w2 h2 maxx maxy minz)
+	(vvv 0.0 w1 h2 maxx maxy maxz)
+	(vvv 0.0 w1 h3 minx maxy maxz)
 
-      ;;j-
-      (vvv 0.0 w2 h0 minx miny minz)
-      (vvv 0.0 w1 h0 minx miny maxz)
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w2 h1 maxx miny minz)
+	;;j-
+	(vvv 0.0 w2 h0 minx miny minz)
+	(vvv 0.0 w1 h0 minx miny maxz)
+	(vvv 0.0 w1 h1 maxx miny maxz)
+	(vvv 0.0 w2 h1 maxx miny minz)
 
-      ;;k-
-      (vvv 0.0 w3 h2 minx maxy minz)
-      (vvv 0.0 w3 h1 minx miny minz)
-      (vvv 0.0 w2 h1 maxx miny minz)
-      (vvv 0.0 w2 h2 maxx maxy minz)
+	;;k-
+	(vvv 0.0 w3 h2 minx maxy minz)
+	(vvv 0.0 w3 h1 minx miny minz)
+	(vvv 0.0 w2 h1 maxx miny minz)
+	(vvv 0.0 w2 h2 maxx maxy minz)
 
-      ;;k+
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w0 h1 minx miny maxz)
-      (vvv 0.0 w0 h2 minx maxy maxz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      
-      ;;i-
-      (vvv 0.0 w3 h1 minx miny minz)
-      (vvv 0.0 w3 h2 minx maxy minz)
-      (vvv 0.0 w4 h2 minx maxy maxz)
-      (vvv 0.0 w4 h1 minx miny maxz)
+	;;k+
+	(vvv 0.0 w1 h1 maxx miny maxz)
+	(vvv 0.0 w0 h1 minx miny maxz)
+	(vvv 0.0 w0 h2 minx maxy maxz)
+	(vvv 0.0 w1 h2 maxx maxy maxz)
+	
+	;;i-
+	(vvv 0.0 w3 h1 minx miny minz)
+	(vvv 0.0 w3 h2 minx maxy minz)
+	(vvv 0.0 w4 h2 minx maxy maxz)
+	(vvv 0.0 w4 h1 minx miny maxz)
 
-      ;;i+
-      (vvv 0.0 w2 h1 maxx miny minz)
-      (vvv 0.0 w1 h1 maxx miny maxz)
-      (vvv 0.0 w1 h2 maxx maxy maxz)
-      (vvv 0.0 w2 h2 maxx maxy minz))))
+	;;i+
+	(vvv 0.0 w2 h1 maxx miny minz)
+	(vvv 0.0 w1 h1 maxx miny maxz)
+	(vvv 0.0 w1 h2 maxx maxy maxz)
+	(vvv 0.0 w2 h2 maxx maxy minz)))))

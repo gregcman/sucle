@@ -21,7 +21,10 @@
 	       #:utility
 
 	       ;;for world-generation
-	       #:black-tie)
+	       #:black-tie
+
+	       #:aabbcc ;;for occlusion culling
+	       )
   :serial t
   :components
   ((:file "queue")

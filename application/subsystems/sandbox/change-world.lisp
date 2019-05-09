@@ -1,8 +1,51 @@
 (in-package :sandbox)
+
+;;https://vertostudio.com/gamedev/?p=177
+(struct-to-clos:struct->class
+ (defstruct chunk-gl-representation
+   call-list
+   occlusion-query
+   occluded
+   (occlusion-state :init
+		    ) ;;:hidden, visible, waiting, :init
+   occlusion-box))
+(defparameter *occlusion-culling-p* t)
+(defun set-chunk-gl-representation-visible (value)
+  (setf (chunk-gl-representation-occlusion-state value) :visible)
+  (setf (chunk-gl-representation-occluded value) nil))
+(defun set-chunk-gl-representation-hidden (value)
+  (setf (chunk-gl-representation-occlusion-state value) :hidden)
+  (setf (chunk-gl-representation-occluded value) t))
+(defun render-occlusion-query (value)
+  (let ((query (chunk-gl-representation-occlusion-query value)))
+    (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
+      (when (not (eq occlusion-state :waiting))
+	(setf occlusion-state :waiting)
+	(gl:begin-query :samples-passed query)
+	;;draw occlusion box here, get occlusion information from a box
+	(gl:call-list (chunk-gl-representation-occlusion-box value))
+	(gl:end-query :samples-passed)))))
+
+(defun render-occlusion-queries (&optional (vec *call-lists*))
+  (when *occlusion-culling-p*
+    (gl:color-mask nil nil nil nil)
+    (gl:depth-mask nil)
+    (gl:disable :cull-face)
+    (loop :for value :across vec :do
+       (render-occlusion-query value))
+    (gl:color-mask t t t t)
+    (gl:depth-mask t)))
+
+(defun create-chunk-gl-representation (display-list occlusion-box)
+  (make-chunk-gl-representation
+   :call-list display-list
+   :occlusion-query (car (gl:gen-queries 1))
+   :occlusion-box occlusion-box))
+(defun destroy-chunk-gl-representation (chunk-gl-representation)
+  (gl:delete-lists (chunk-gl-representation-call-list chunk-gl-representation) 1)
+  (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 (defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
-(defun draw-world ()
-  (declare (optimize (speed 3) (safety 0)))
-  ;;(let ((a (get-internal-real-time))))
+(defun get-chunks-to-draw ()
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
     (let* ((foo (+ 1 *chunk-radius*)))
@@ -10,8 +53,48 @@
 	      ;;(declare (ignore key))
 	      (when (> (the fixnum foo) (the fixnum (blocky-chunk-distance key)))
 		(vector-push-extend value vec))))
-    (gl:call-lists vec))
-  ;(print (- (get-internal-real-time) a))
+    vec))
+(defun draw-world (&optional (vec *call-lists*))
+  (declare (optimize (speed 3) (safety 0)))
+  ;;(let ((a (get-internal-real-time))))
+  (loop :for value :across vec :do
+     (let ((display-list (chunk-gl-representation-call-list value))
+	   (query (chunk-gl-representation-occlusion-query value)))
+       (cond ((and *occlusion-culling-p*
+		   (not (eq (chunk-gl-representation-occlusion-state value) :init)))
+	      (let ((available (gl:get-query-object query :query-result-available)))
+		(when available
+		  ;;FIXME::bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
+		  (let ((result (gl:get-query-object query :query-result)))		      
+		    (case result
+		      (0 (set-chunk-gl-representation-hidden value))
+		      (otherwise (set-chunk-gl-representation-visible value)))))))
+	     (t (set-chunk-gl-representation-visible value)))
+       ;;      (gl:call-list (chunk-gl-representation-occlusion-box value))
+       
+       (cond
+	 ((not (chunk-gl-representation-occluded value)) ;;not occluded = visible
+	  (let ((query (chunk-gl-representation-occlusion-query value)))
+	    (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
+	      (cond
+		((and *occlusion-culling-p*
+		      (not (eq occlusion-state :waiting)))
+		 ;;get occlusion information from regular chunk drawing
+		 (setf occlusion-state :waiting)
+		 (gl:begin-query :samples-passed query)
+		 ;;draw occlusion box here
+		 ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
+
+		 (gl:call-list display-list)
+		 (gl:end-query :samples-passed))
+		(t (gl:call-list display-list)))))
+	  ;;(gl:call-list display-list)
+	  )
+	 (t ;;(print "WHAT?")
+	  ;;(gl:call-list display-list)
+	  ))))
+  ;;(gl:call-lists vec)
+  ;;(print (- (get-internal-real-time) a))
   )
 
 (progn
@@ -28,7 +111,7 @@
   ;;FIXME::this calls opengl. Use a queue instead?
   (multiple-value-bind (value existsp) (get-chunk-display-list name)
     (when existsp
-      (gl:delete-lists value 1)
+      (destroy-chunk-gl-representation value)
       (remove-chunk-display-list name))))
 
 (defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
@@ -52,14 +135,108 @@
     (with-vec (a b c) (iter)
       (let ((len (floor (scratch-buffer:iterator-fill-pointer a) 3)))
 	(unless (zerop len)
-	  (set-chunk-display-list
-	   coords
-	   (glhelp:with-gl-list
-	     (gl:with-primitives :quads	     
-	       (scratch-buffer:flush-my-iterator a
-		 (scratch-buffer:flush-my-iterator b
-		   (scratch-buffer:flush-my-iterator c
-		     (mesh-chunk len a b c))))))))))))
+	  (let ((display-list
+		 (glhelp:with-gl-list
+		   (gl:with-primitives :quads	     
+		     (scratch-buffer:flush-my-iterator a
+		       (scratch-buffer:flush-my-iterator b
+			 (scratch-buffer:flush-my-iterator c
+			   (mesh-chunk len a b c)))))))
+		(occlusion-box
+		 (glhelp:with-gl-list
+		   (multiple-value-bind (x y z) (world::unhashfunc coords)
+		     (draw-aabb2 x y z
+				 (load-time-value (aabbcc::make-aabb
+						   :minx 0.0
+						   :miny 0.0
+						   :minz 0.0
+						   :maxx (floatify world::*chunk-size-x*)
+						   :maxy (floatify world::*chunk-size-y*)
+						   :maxz (floatify world::*chunk-size-z*))))))))
+	    (set-chunk-display-list
+	     coords
+	     (create-chunk-gl-representation display-list occlusion-box))))))))
+
+(defun draw-aabb2 (x y z &optional (aabb *fist-aabb*))
+  ;;;;draw the fist hitbox
+  (progn
+    (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
+		 (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
+	aabb
+      (draw-box2 (+ minx x -0) (+  miny y -0) (+  minz z -0)
+		 (+ maxx x -0) (+  maxy y -0) (+  maxz z -0)))))
+
+(defun draw-box2 (minx miny minz maxx maxy maxz)
+  (let ((h0 0.0)
+	(h1 (/ 1.0 3.0))
+	(h2 (/ 2.0 3.0))
+	(h3 (/ 3.0 3.0))
+	(w0 0.0)
+	(w1 (/ 1.0 4.0))
+	(w2 (/ 2.0 4.0))
+	(w3 (/ 3.0 4.0))
+	(w4 (/ 4.0 4.0)))
+    (macrolet ((vvv (darkness u v x y z)
+		 `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
+			 #+nil
+			 (%gl:vertex-attrib-2f 2 ,u ,v)
+			 (%gl:vertex-attrib-4f 2 ,x ,y ,z 1.0)
+			 (%gl:vertex-attrib-2f 8 0.06 0.06)
+			 (%gl:vertex-attrib-4f 1 0.0 0.0 0.0 0.0)
+			 (%gl:vertex-attrib-4f 0 0.0 0.0 0.0 0.0)
+			 )))
+      (gl:with-primitives :quads
+	(vvv 0.0 w2 h3 minx maxy minz)
+	(vvv 0.0 w2 h2 maxx maxy minz)
+	(vvv 0.0 w1 h2 maxx maxy maxz)
+	(vvv 0.0 w1 h3 minx maxy maxz)
+
+	;;j-
+	(vvv 0.0 w2 h0 minx miny minz)
+	(vvv 0.0 w1 h0 minx miny maxz)
+	(vvv 0.0 w1 h1 maxx miny maxz)
+	(vvv 0.0 w2 h1 maxx miny minz)
+
+	;;k-
+	(vvv 0.0 w3 h2 minx maxy minz)
+	(vvv 0.0 w3 h1 minx miny minz)
+	(vvv 0.0 w2 h1 maxx miny minz)
+	(vvv 0.0 w2 h2 maxx maxy minz)
+
+	;;k+
+	(vvv 0.0 w1 h1 maxx miny maxz)
+	(vvv 0.0 w0 h1 minx miny maxz)
+	(vvv 0.0 w0 h2 minx maxy maxz)
+	(vvv 0.0 w1 h2 maxx maxy maxz)
+	
+	;;i-
+	(vvv 0.0 w3 h1 minx miny minz)
+	(vvv 0.0 w3 h2 minx maxy minz)
+	(vvv 0.0 w4 h2 minx maxy maxz)
+	(vvv 0.0 w4 h1 minx miny maxz)
+
+	;;i+
+	(vvv 0.0 w2 h1 maxx miny minz)
+	(vvv 0.0 w1 h1 maxx miny maxz)
+	(vvv 0.0 w1 h2 maxx maxy maxz)
+	(vvv 0.0 w2 h2 maxx maxy minz)))))
+
+(glhelp:deflazy-gl occlusion-shader ()
+  (glhelp::create-opengl-shader
+   "in vec4 position;
+
+uniform mat4 projection_model_view;
+void main () {
+gl_Position = projection_model_view * position;
+
+}"
+   "
+void main () {
+gl_FragColor = vec4(1.0);
+}"
+   '(("position" 2)) 
+   '((:pmv "projection_model_view"))))
+
 
 (defun mesh-chunk (times a b c)
   (declare (type fixnum times))
