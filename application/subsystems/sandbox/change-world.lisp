@@ -30,7 +30,6 @@
   (when *occlusion-culling-p*
     (gl:color-mask nil nil nil nil)
     (gl:depth-mask nil)
-    (gl:disable :cull-face)
     (loop :for value :across vec :do
        (render-occlusion-query value))
     (gl:color-mask t t t t)
@@ -236,6 +235,43 @@ gl_FragColor = vec4(1.0);
 }"
    '(("position" 2)) 
    '((:pmv "projection_model_view"))))
+
+(defun draw-fullscreen-quad ()
+  (gl:call-list
+   (glhelp::handle (application::getfnc 'fullscreen-quad))))
+(glhelp::deflazy-gl fullscreen-quad ()
+  (make-instance
+   'glhelp::gl-list
+   :handle
+   (glhelp::with-gl-list
+     (macrolet ((vvv (darkness u v x y z)
+		  `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
+			  #+nil
+			  (%gl:vertex-attrib-2f 2 ,u ,v)
+			  ;;FIXME::when using %gl:vertex-attrib, the 0 attrib marks the
+			  ;;end.
+			  (%gl:vertex-attrib-4f 0 ,x ,y ,z 1.0)
+			  )))
+       (gl:with-primitives :quads
+	 (vvv 0.0 w2 h3 1.0 1.0 0.99999994)
+	 (vvv 0.0 w2 h2 -1.0 1.0 0.99999994)
+	 (vvv 0.0 w1 h2 -1.0 -1.0 0.99999994)
+	 (vvv 0.0 w1 h3 1.0 -1.0 0.99999994))))))
+(glhelp:deflazy-gl gl-clear-color-buffer ()
+  (glhelp::create-opengl-shader
+   "in vec4 position;
+
+void main () {
+gl_Position = position;
+
+}"
+   "
+uniform vec4 color = vec4(0.6,0.7,0.2,1.0); 
+void main () {
+gl_FragColor = color;
+}"
+   '(("position" 0)) 
+   '((:color "color"))))
 
 
 (defun mesh-chunk (times a b c)

@@ -522,7 +522,7 @@
   
 (defparameter *fog-ratio* 0.75
   )
-
+(defparameter *sky-color-foo* (vector 0.0 0.0 0.0))
 (defun render-stuff ()
   ;;camera setup
   (setf (camera-matrix:camera-aspect-ratio *camera*)
@@ -538,20 +538,37 @@
   ;;setup clipping area
   (glhelp::set-render-area 0 0 window::*width* window::*height*)
 
+  (flet ((fractionalize (x)
+	      (alexandria:clamp x 0.0 1.0)))
+       (map-into *sky-color-foo*
+		 (lambda (x)
+		   (fractionalize (* x sandbox::*daytime*)))
+		 *sky-color*))
   ;;change the sky color according to time
-  (let ((daytime sandbox::*daytime*))
-    (let ((r (* daytime (aref *sky-color* 0)))
-	  (g (* daytime (aref *sky-color* 1)))
-	  (b (* daytime (aref *sky-color* 2))))
-      (gl:clear-color r g b 1.0)))
-  
-  (gl:enable :depth-test)
+  (with-vec (r g b) (*sky-color-foo*)
+    (gl:clear-color r g b 1.0))
+
   (gl:depth-func :less)
   (gl:clear-depth 1.0)
-  (gl:clear
-   :color-buffer-bit
-   :depth-buffer-bit
-   )
+  (if t
+      (progn
+	(let ((shader (getfnc 'sandbox::gl-clear-color-buffer)))
+	  (glhelp::use-gl-program shader)
+	  (glhelp::with-uniforms uniform shader 
+	    (with-vec (x y z) (*sky-color-foo*)
+	      (%gl:uniform-4f (uniform :color) x y z 1.0))))
+	(gl:disable :depth-test)
+	;;(gl:disable :cull-face)
+	(gl:depth-mask nil)
+	(gl:polygon-mode :front-and-back :fill)
+	(sandbox::draw-fullscreen-quad)
+	(gl:depth-mask t)
+	(gl:clear :depth-buffer-bit))
+      (gl:clear
+       :color-buffer-bit
+       :depth-buffer-bit
+       ))
+  (gl:enable :depth-test)
   (gl:enable :cull-face)
   (gl:disable :blend)
 
@@ -567,47 +584,43 @@
        nil))
 
     ;;other cosmetic uniforms
-    (glhelp:with-uniforms uniform shader
-      (flet ((fractionalize (x)
-	       (alexandria:clamp x 0.0 1.0)))
-	(let ((time sandbox::*daytime*))
-	  (let ((x (fractionalize (* (aref *sky-color* 0) time)))
-		(y (fractionalize (* (aref *sky-color* 1) time)))
-		(z (fractionalize (* (aref *sky-color* 2) time))))
-	    (%gl:uniform-3f (uniform :fogcolor)
-			    x y z)
-	    (gl:uniformfv (uniform :camera-pos)
-			  (camera-matrix:camera-vec-position *camera*))
-	    (%gl:uniform-1f (uniform :foglet)
-			    (/ -1.0
-			       ;;FIXME::16 assumes chunk is a 16x16x16 cube
-			       (* 16 sandbox::*chunk-radius*)
-			       #+nil
-			       (or 128 (camera-matrix:camera-frustum-far *camera*))
-			       *fog-ratio*))
-	    (%gl:uniform-1f (uniform :aratio)
-			    (/ 1.0 *fog-ratio*)))))
-      (%gl:uniform-1f (uniform :time)
-		      sandbox::*daytime*)
+    (glhelp:with-uniforms
+     uniform shader
+     (with-vec (x y z) (*sky-color-foo*)
+       (%gl:uniform-3f (uniform :fogcolor)
+		       x y z))
+     (gl:uniformfv (uniform :camera-pos)
+		   (camera-matrix:camera-vec-position *camera*))
+     (%gl:uniform-1f (uniform :foglet)
+		     (/ -1.0
+			;;FIXME::16 assumes chunk is a 16x16x16 cube
+			(* 16 sandbox::*chunk-radius*)
+			#+nil
+			(or 128 (camera-matrix:camera-frustum-far *camera*))
+			*fog-ratio*))
+     (%gl:uniform-1f (uniform :aratio)
+		     (/ 1.0 *fog-ratio*))
+     (%gl:uniform-1f (uniform :time)
+		     sandbox::*daytime*)
 
       (glhelp::set-uniforms-to-textures
-       ((uniform :sampler) (glhelp::handle (getfnc 'terrain))))))
+       ((uniform :sampler)
+	(glhelp::handle (getfnc 'terrain))))))
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
   (gl:front-face :ccw)
   (sandbox::get-chunks-to-draw)
-  (sandbox::render-occlusion-queries)
   (sandbox::draw-world)
-  #+nil
-  (let ((shader (getfnc 'sandbox::occlusion-shader)))
-    (glhelp::use-gl-program shader)
-    ;;uniform crucial for first person 3d
-    (glhelp:with-uniforms uniform shader
-      (gl:uniform-matrix-4fv 
-       (uniform :pmv)
-       (camera-matrix:camera-matrix-projection-view-player *camera*)
-       nil)))
- )
+  (progn
+    (let ((shader (getfnc 'sandbox::occlusion-shader)))
+      (glhelp::use-gl-program shader)
+      ;;uniform crucial for first person 3d
+      (glhelp:with-uniforms uniform shader
+			    (gl:uniform-matrix-4fv 
+			     (uniform :pmv)
+			     (camera-matrix:camera-matrix-projection-view-player *camera*)
+			     nil)))
+    (sandbox::render-occlusion-queries)))
 
 (defun quadratic-formula (a b c)
   (let ((two-a (+ a a)))
