@@ -33,10 +33,11 @@
      (bordeaux-threads:thread-yield)))
 ;;FIXME::should the finished-task-queue be a global variable?
 (defparameter *finished-task-queue* (lparallel.queue:make-queue))
-
+(defparameter *shutting-down-p* nil)
 (defun set-dynamic-variables ()
   (setf *lparallel-kernel* (lparallel::make-kernel (cpus:get-number-of-processors)))
   (setf *unique-tasks* (make-hash-table :test 'eq))
+  (setf *finished-task-queue* (lparallel.queue:make-queue))
   (with-kernel
     (setf *channel* (lparallel:make-channel))))
 (defun reset ()
@@ -46,9 +47,11 @@
 
 (defmacro with-initialize-multiprocessing (&body body)
   `(let ((*lparallel-kernel* nil))
+     (setf *shutting-down-p* nil)
      (set-dynamic-variables)
      (with-kernel
        (unwind-protect (progn ,@body)
+	 (setf *shutting-down-p* t)
 	 (when *lparallel-kernel*
 	   (wait-on-unkillables)
 	   (lparallel:end-kernel))))))
@@ -159,7 +162,7 @@
 (defparameter *paused* nil)
 (defparameter *current-job-task* nil)
 (defun job-task-function (job-task fun args)
-  (loop :while *paused* :do (bordeaux-threads:thread-yield))
+  (loop :while (and *paused* (not *shutting-down-p*)) :do (bordeaux-threads:thread-yield))
   (let ((*current-job-task* job-task))
     (when (init-job-task job-task)
       (handler-case  
