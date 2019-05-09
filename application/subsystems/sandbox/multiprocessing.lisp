@@ -3,6 +3,7 @@
 (in-package #:sandbox.multiprocessing)
 
 (defun quickload ()
+  #+quicklisp
   (progn
     (ql:quickload :lparallel)
     (ql:quickload :cl-cpus)
