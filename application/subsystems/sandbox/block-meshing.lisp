@@ -4,94 +4,18 @@
 (defparameter *mesh-dark* nil)
 (defparameter *mesh-epos* nil)
 
-(defun chunk-shape (iter io jo ko)
-  (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
-    (dobox ((i io (+ 16 io))
-	    (j jo (+ 16 jo))
-	    (k ko (+ 16 ko)))
-	   (let ((blockid (world:getblock i j k)))
-	     (unless (zerop blockid)
-	       (blockshape
-		i j k
-		blockid))))))
-
-(eval-always
-  (defmacro %edge-aux ((i j k)
-		       getfunc
-		       (x0 y0 z0)
-		       (x1 y1 z1)
-		       (x2 y2 z2)
-		       (x3 y3 z3))
-    `((let ((xd (+ ,i ,x0))
-	    (yd (+ ,j ,y0))
-	    (zd (+ ,k ,z0)))
-	(declare (type fixnum xd yd zd))
-	(lightfunc (,getfunc xd yd zd)))
-      (let ((xd (+ ,i ,x1))
-	    (yd (+ ,j ,y1))
-	    (zd (+ ,k ,z1)))
-	(declare (type fixnum xd yd zd))
-	(lightfunc (,getfunc xd yd zd)))
-      (let ((xd (+ ,i ,x2))
-	    (yd (+ ,j ,y2))
-	    (zd (+ ,k ,z2)))
-	(declare (type fixnum xd yd zd))
-	(lightfunc (,getfunc xd yd zd)))
-      (let ((xd (+ ,i ,x3))
-	    (yd (+ ,j ,y3))
-	    (zd (+ ,k ,z3)))
-	(declare (type fixnum xd yd zd))
-	(lightfunc (,getfunc xd yd zd))))))
-(eval-always
-  (progn
-    (defun light-edge-i (i j k)
-      (macroexpand-1
-       `(%edge-aux (,i ,j ,k)
-		   world:getlight
-		   (0 1 1)
-		   (0 0 1)
-		   (0 0 0)
-		   (0 1 0))))
-    (defun light-edge-j (i j k)
-      (macroexpand-1
-       `(%edge-aux (,i ,j ,k)
-		   world:getlight 
-		   (1 0 1)
-		   (0 0 1)
-		   (0 0 0)
-		   (1 0 0))))
-    (defun light-edge-k (i j k)
-      (macroexpand-1
-       `(%edge-aux (,i ,j ,k)
-		   world:getlight
-		   (1 1 0)
-		   (0 1 0)
-		   (0 0 0)
-		   (1 0 0))))
-    (defun skylight-edge-i (i j k)
-      (macroexpand-1
-       `(%edge-aux (,i ,j ,k)
-		   world:skygetlight
-		   (0 1 1)
-		   (0 0 1)
-		   (0 0 0)
-		   (0 1 0))))
-    (defun skylight-edge-j (i j k)
-      (macroexpand-1
-       `(%edge-aux (,i ,j ,k)
-		   world:skygetlight
-		   (1 0 1)
-		   (0 0 1)
-		   (0 0 0)
-		   (1 0 0))))
-    (defun skylight-edge-k (i j k)
-      (macroexpand-1
-       `(%edge-aux (,i ,j ,k)
-		   world:skygetlight
-		   (1 1 0)
-		   (0 1 0)
-		   (0 0 0)
-		   (1 0 0))))))
+(with-unsafe-speed
+  (defun chunk-shape (iter io jo ko)
+    (declare (type world::block-coord io jo ko))
+    (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
+      (dobox ((i io (the world::block-coord (+ 16 io)))
+	      (j jo (the world::block-coord (+ 16 jo)))
+	      (k ko (the world::block-coord (+ 16 ko))))
+	     (let ((blockid (world:getblock i j k)))
+	       (unless (zerop blockid)
+		 (blockshape
+		  i j k
+		  blockid)))))))
 
 (eval-always
   ;;;;total faces touched by a light of distance n
@@ -125,7 +49,7 @@
      1.0)
     )
 
-  (defparameter light-index-table
+  (defparameter *light-index-table*
     (let ((foo-array (make-array 16 :element-type 'single-float)))
       (dotimes (x 16)
 	(setf (aref foo-array x)
@@ -134,7 +58,7 @@
 
 (declaim (inline lightfunc))
 (defun lightfunc (light)
-  (aref (etouq light-index-table) light))
+  (aref (etouq *light-index-table*) light))
 
 (defmacro texface2 (u0 u1 v0 v1 &optional (start 1) (clockwise-winding nil))
   ((lambda (&rest forms)
@@ -161,84 +85,70 @@
 	  (max b2 (* time s2))
 	  (max b3 (* time s3))))))
 
-(defmacro squareface (light-edge-fnc
-		      skylight-edge-fnc
+(defmacro squareface (((x0 y0 z0)
+		       (x1 y1 z1)
+		       (x2 y2 z2)
+		       (x3 y3 z3))
 		      color	      
 		      (i0 j0 k0)		      
 		      (i1 j1 k1)		      
 		      (i2 j2 k2)		      
 		      (i3 j3 k3))
-  (let ((light-edge-code (funcall (symbol-function light-edge-fnc) 'xpos 'ypos 'zpos))
-	(sky-edge-code (funcall (symbol-function skylight-edge-fnc) 'xpos 'ypos 'zpos)))
-    (with-gensyms (actual-color)
-      (let ((dark
-	     (flet ((darkify (x) `(* ,actual-color ,x)))
-	       `(dark ,@(mapcar #'darkify light-edge-code)
-		      ,@(mapcar #'darkify sky-edge-code)))
-	      #+nil
-	      `(dark (dark-fun
-		      ,color
-		      ,@light-edge-code
-		      ,@sky-edge-code))))
-	`(let ((,actual-color ,color))
-	   (let ((xpos (+ i ,i0))
-		 (ypos (+ j ,j0))
-		 (zpos (+ k ,k0)))
-	     (declare (type fixnum xpos ypos zpos))
-	     ,dark)
-	   (let ((xpos (+ i ,i1))
-		 (ypos (+ j ,j1))
-		 (zpos (+ k ,k1)))
-	     (declare (type fixnum xpos ypos zpos ))
-	     ,dark)
-	   (let ((xpos (+ i ,i2))
-		 (ypos (+ j ,j2))
-		 (zpos (+ k ,k2)))
-	     (declare (type fixnum xpos ypos zpos))
-	     ,dark)     
-	   (let ((xpos (+ i ,i3))
-		 (ypos (+ j ,j3))
-		 (zpos (+ k ,k3)))
-	     (declare (type fixnum xpos ypos zpos ))
-	     ,dark))))))
+  `(flet ((add-edge (i0 j0 k0)
+	    (let ((xpos (+ i i0))
+		  (ypos (+ j j0))
+		  (zpos (+ k k0)))
+	      (declare (type world::block-coord xpos ypos zpos))
+	      ,(with-gensyms (actual-color)
+		 (flet ((%edge-aux (getfunc q0 q1 q2 q3 &rest body)
+			  `(flet ((value (i j k)
+				    (let ((xd (+ i xpos))
+					  (yd (+ j ypos))
+					  (zd (+ k zpos)))
+				      (declare (type world::block-coord xd yd zd))
+				      (* ,actual-color (lightfunc (,getfunc xd yd zd))))))
+			     (let ((,q0 (value ,x0 ,y0 ,z0))
+				   (,q1 (value ,x1 ,y1 ,z1))
+				   (,q2 (value ,x2 ,y2 ,z2))
+				   (,q3 (value ,x3 ,y3 ,z3)))
+			       ,@body))))
+		   `(let ((,actual-color ,color))
+		      (declare (type single-float ,actual-color))
+		      ,(%edge-aux
+			'world::getlight 'q0 'q1 'q2 'q3 
+			(%edge-aux
+			 'world::skygetlight 'q4 'q5 'q6 'q7
+			 ;;Write block light and sky light values
+			 `(dark q0 q1 q2 q3 q4 q5 q6 q7)
+			 #+nil
+			 ;;Write block light and sky light values precomputed into one float,
+			 ;;as opposed to calculating light in the vertex shader
+			 `(dark (dark-fun ,actual-color q0 q1 q2 q3 q4 q5 q6 q7))))))))))
+     (add-edge ,i0 ,j0 ,k0)
+     (add-edge ,i1 ,j1 ,k1)
+     (add-edge ,i2 ,j2 ,k2)
+     (add-edge ,i3 ,j3 ,k3)))
 
 (defmacro posface ((x0 y0 z0) 
 		   (x1 y1 z1)		      
 		   (x2 y2 z2)		     
 		   (x3 y3 z3)) 
-  `(progn
-     (let ((xp (+ i ,x0))
-	   (yp (+ j ,y0))
-	   (zp (+ k ,z0)))
-       (declare (type fixnum xp yp zp))
-       (epos (floatify xp)
-	     (floatify yp)
-	     (floatify zp)))
-     (let ((xp (+ i ,x1))
-	   (yp (+ j ,y1))
-	   (zp (+ k ,z1)))
-       (declare (type fixnum xp yp zp))
-       (epos (floatify xp)
-	     (floatify yp)
-	     (floatify zp)))
-     (let ((xp (+ i ,x2))
-	   (yp (+ j ,y2))
-	   (zp (+ k ,z2)))
-       (declare (type fixnum xp yp zp))
-       (epos (floatify xp)
-	     (floatify yp)
-	     (floatify zp))) 
-     (let ((xp (+ i ,x3))
-	   (yp (+ j ,y3))
-	   (zp (+ k ,z3)))
-       (declare (type fixnum xp yp zp))
-       (epos (floatify xp)
-	     (floatify yp)
-	     (floatify zp)))))
+  `(flet ((add (x y z)
+	    (let ((xp (+ i x))
+		  (yp (+ j y))
+		  (zp (+ k z)))
+	      (declare (type world::block-coord xp yp zp))
+	      (epos (floatify xp)
+		    (floatify yp)
+		    (floatify zp)))))
+     (add ,x0 ,y0 ,z0)
+     (add ,x1 ,y1 ,z1)
+     (add ,x2 ,y2 ,z2)
+     (add ,x3 ,y3 ,z3)))
 
 (defmacro face-header (name &body body)
   `(defun ,name (i j k u0 v0 u1 v1)
-     (declare (type fixnum i j k)
+     (declare (type world::block-coord i j k)
 	      (type single-float u0 v0 u1 v1))
      (bind-iterator-out
       (epos single-float) *mesh-epos*
@@ -251,96 +161,106 @@
 (eval-always
   (defun simple-float-array (&rest args)
     (make-array (length args) :initial-contents args :element-type 'single-float))
-  (defparameter *blockface-color*
-    
+  (defparameter *blockface-color*  
     (simple-float-array 0.6 0.6 0.5 1.0 0.8 0.8)
-					;(simple-float-array 0.55 0.95 0.2 1.0 0.45 0.85)
-					;#+nil
+    ;;(simple-float-array 0.55 0.95 0.2 1.0 0.45 0.85)
+    ;;#+nil
     ;;(simple-float-array 1.0 1.0 1.0 1.0 1.0 1.0)
     ))
 
-(#+(not (or sbcl ecl))
-   progn ;;ccl
-   #+(or sbcl ecl)
-   with-unsafe-speed
-   (face-header side-i  
-     (posface (0 0 0)
-	      (0 0 1)
-	      (0 1 1)
-	      (0 1 0))
-     (texface2 u0 u1 v0 v1 3 nil)
-     (squareface light-edge-i
-		 skylight-edge-i
-		 (etouq (aref *blockface-color* 0))
-		 (-1 -1 -1)
-		 (-1 -1 00)
-		 (-1 00 00)
-		 (-1 00 -1)))
-   (face-header side+i  
-     (posface (1 0 0)
-	      (1 1 0)
-	      (1 1 1)
-	      (1 0 1))
-     (texface2 u0 u1 v0 v1 4 nil)
-     (squareface light-edge-i
-		 skylight-edge-i
-		 (etouq (aref *blockface-color* 1))
-		 (1 -1 -1)
-		 (1 00 -1)
-		 (1 00 00)
-		 (1 -1 00)))
-   (face-header side-j
-     (posface (0 0 0)
-	      (1 0 0)
-	      (1 0 1)
-	      (0 0 1))
-     (texface2 u0 u1 v0 v1 3 nil) 
-     (squareface light-edge-j
-		 skylight-edge-j		
-		 (etouq (aref *blockface-color* 2))
-		 (-1 -1 -1)		   
-		 (00 -1 -1)		  
-		 (00 -1 00)		   
-		 (-1 -1 00)))
-   (face-header side+j 
-     (posface (0 1 0)
-	      (0 1 1)
-	      (1 1 1)
-	      (1 1 0))
-     (texface2 u0 u1 v0 v1 3 nil)
-     (squareface light-edge-j
-		 skylight-edge-j
-		 (etouq (aref *blockface-color* 3))
-		 (-1 1 -1)
-		 (-1 1 00)
-		 (00 1 00)
-		 (00 1 -1)))
-   (face-header side-k 
-     (posface (0 0 0)
-	      (0 1 0)
-	      (1 1 0)
-	      (1 0 0))
-     (texface2 u0 u1 v0 v1 4 nil)
-     (squareface light-edge-k
-		 skylight-edge-k
-		 (etouq (aref *blockface-color* 4))
-		 (-1 -1 -1)
-		 (-1 00 -1)
-		 (00 00 -1)
-		 (00 -1 -1)))
-   (face-header side+k
-     (posface (0 0 1)
-	      (1 0 1)
-	      (1 1 1)
-	      (0 1 1))
-     (texface2 u0 u1 v0 v1 3 nil)
-     (squareface light-edge-k
-		 skylight-edge-k
-		 (etouq (aref *blockface-color* 5))
-		 (-1 -1 1)
-		 (00 -1 1)    
-		 (00 00 1)    
-		 (-1 00 1))))
+(etouq
+  (let
+    ((light-edge-i
+	'((0 1 1)
+	  (0 0 1)
+	  (0 0 0)
+	  (0 1 0)))
+     (light-edge-j   
+       '((1 0 1)
+	 (0 0 1)
+	 (0 0 0)
+	 (1 0 0)))
+     (light-edge-k
+       '((1 1 0)
+	 (0 1 0)
+	 (0 0 0)
+	 (1 0 0))))
+    `(#+(not (or sbcl ecl))
+	progn ;;ccl
+	#+(or sbcl ecl)
+	with-unsafe-speed
+	(face-header side-i  
+	  (posface (0 0 0)
+		   (0 0 1)
+		   (0 1 1)
+		   (0 1 0))
+	  (texface2 u0 u1 v0 v1 3 nil)
+	  (squareface ,light-edge-i
+		      (etouq (aref *blockface-color* 0))
+		      (-1 -1 -1)
+		      (-1 -1 00)
+		      (-1 00 00)
+		      (-1 00 -1)))
+	(face-header side+i  
+	  (posface (1 0 0)
+		   (1 1 0)
+		   (1 1 1)
+		   (1 0 1))
+	  (texface2 u0 u1 v0 v1 4 nil)
+	  (squareface ,light-edge-i
+		      (etouq (aref *blockface-color* 1))
+		      (1 -1 -1)
+		      (1 00 -1)
+		      (1 00 00)
+		      (1 -1 00)))
+	(face-header side-j
+	  (posface (0 0 0)
+		   (1 0 0)
+		   (1 0 1)
+		   (0 0 1))
+	  (texface2 u0 u1 v0 v1 3 nil) 
+	  (squareface ,light-edge-j
+		      (etouq (aref *blockface-color* 2))
+		      (-1 -1 -1)		   
+		      (00 -1 -1)		  
+		      (00 -1 00)		   
+		      (-1 -1 00)))
+	(face-header side+j 
+	  (posface (0 1 0)
+		   (0 1 1)
+		   (1 1 1)
+		   (1 1 0))
+	  (texface2 u0 u1 v0 v1 3 nil)
+	  (squareface ,light-edge-j
+		      (etouq (aref *blockface-color* 3))
+		      (-1 1 -1)
+		      (-1 1 00)
+		      (00 1 00)
+		      (00 1 -1)))
+	(face-header side-k 
+	  (posface (0 0 0)
+		   (0 1 0)
+		   (1 1 0)
+		   (1 0 0))
+	  (texface2 u0 u1 v0 v1 4 nil)
+	  (squareface ,light-edge-k
+		      (etouq (aref *blockface-color* 4))
+		      (-1 -1 -1)
+		      (-1 00 -1)
+		      (00 00 -1)
+		      (00 -1 -1)))
+	(face-header side+k
+	  (posface (0 0 1)
+		   (1 0 1)
+		   (1 1 1)
+		   (0 1 1))
+	  (texface2 u0 u1 v0 v1 3 nil)
+	  (squareface ,light-edge-k
+		      (etouq (aref *blockface-color* 5))
+		      (-1 -1 1)
+		      (00 -1 1)    
+		      (00 00 1)    
+		      (-1 00 1))))))
 
 (defun blockshape (i j k blockid)
   (case blockid
@@ -369,8 +289,8 @@
 (with-declaim-inline (block-hash)
   (defun block-hash (i j k)
     (locally (declare (optimize (speed 3) (safety 0))
-		      (type fixnum i j k))
-      (let ((hash (mod (the fixnum (* 2654435761 (the fixnum (+ i j k))))
+		      (type world::block-coord i j k))
+      (let ((hash (mod (the world::block-coord (* 2654435761 (the world::block-coord (+ i j k))))
 		       (ash 1 32))))
 	(values (logtest hash #b0100)
 		(logtest hash #b1000))))))

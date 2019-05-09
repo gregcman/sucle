@@ -57,7 +57,8 @@
      (17 "log" 20 0 T T) 
      
      ;;artificial
-     (20 "glass" 49 0 T NIL)
+     ;;make glass 7 light?
+     (20 "glass" 49 7 T NIL)
      (5 "planks" 4 0 T T) 
      
      (89 "lamp" 105 15 T T)))

@@ -555,12 +555,17 @@ gl_FragColor.rgb = color_out;
 			(vz *z*)
 	       (blockid *blockid*)
 	       (aabb sandbox-sub::*fist-aabb*))
-  (aabbcc::aabb-collect-blocks (px py pz (- vx px) (- vy py) (- vz pz)
-				   aabb)
+  (aabbcc::aabb-collect-blocks ((+ 0.5 px)
+				(+ 0.5 py)
+				(+ 0.5 pz)
+				(- vx px)
+				(- vy py)
+				(- vz pz)
+				aabb)
       (x y z dummy)
-    (declare (ignorable dummy))
+    (declare (ignore dummy))
     (when (b= (nick :air) (b@ x y z))
-      (sandbox::plain-setblock x y z blockid 0))))
+      (sandbox::plain-setblock x y z blockid))))
 
 (defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
 		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
@@ -614,6 +619,7 @@ gl_FragColor.rgb = color_out;
 	  *x*
 	  *y*
 	  *z*
-	  (nick :planks))))
+	  (nick :glass;:planks
+		))))
 
 (setf *middle-fist-fnc* 'line-to-player-feet)
