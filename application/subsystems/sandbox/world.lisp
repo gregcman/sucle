@@ -419,7 +419,7 @@
        (dpb light (byte 4 8) blockid)))
 
 (eval-when (:load-toplevel :execute)
-  (world::reset-empty-chunk-value (blockify 2 0 15)))
+  (world::reset-empty-chunk-value (blockify 0 0 15)))
 
 (defmethod lispobj-dispatch ((obj character))
   (blockify (char-code obj) 0 0))
