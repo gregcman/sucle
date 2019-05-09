@@ -313,7 +313,10 @@
 			      (add-chunk chunk-x chunk-y chunk-z))))))
       acc)))
 
+(defparameter *persist* nil)
 (defun chunk-save (chunk &key (path (world-path)))
+  (when (not *persist*)
+    (return-from chunk-save))
   (cond
     ((world::empty-chunk-p chunk)
      ;;when the chunk is obviously empty
@@ -353,10 +356,9 @@
 	   ;;this task, saving and loading, must not be interrupted
 	   :unkillable t)))))))
 
-(defparameter *persist* nil)
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
-    (when *persist* (chunk-save chunk :path path))
+    (chunk-save chunk :path path)
     ;;remove the opengl object
     ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
     ;;FIXME::remove anyway?
@@ -443,7 +445,7 @@
     (multiple-value-bind (x y z) (world::unhashfunc key)
       (declare (type fixnum x y z))
       ;;(print (list x y z))
-      (when (>= y 0)
+      (when (>= y -1)
 	(dobox ((x0 x (the fixnum (+ x 16)))
 		(y0 y (the fixnum (+ y 16)))
 		(z0 z (the fixnum (+ z 16))))
