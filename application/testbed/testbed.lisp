@@ -300,6 +300,32 @@ gl_FragColor.rgb = color_out;
       (sandbox::load-chunks-around)
       (sandbox::unload-extra-chunks))))
 
+(defparameter *big-fist-reach* 32)
+(defparameter *big-fist-aabb*
+  (load-time-value
+   #+nil
+   (aabbcc:make-aabb
+    :minx -1.5
+    :miny -1.5
+    :minz -1.5
+    :maxx  1.5
+    :maxy  1.5
+    :maxz  1.5)
+   #+nil
+   (aabbcc:make-aabb
+    :minx -0.5
+    :miny -0.5
+    :minz -0.5
+    :maxx  0.5
+    :maxy  0.5
+    :maxz  0.5)
+   (aabbcc:make-aabb
+    :minx -8.0
+    :miny -8.0
+    :minz -8.0
+    :maxx  8.0
+    :maxy  8.0
+    :maxz  8.0)))
 (defun fist-stuff (pos)
   (let ((look-vec (load-time-value (nsb-cga:vec 0.0 0.0 0.0))))
     (nsb-cga:%vec* look-vec (camera-matrix:camera-vec-forward sandbox-sub::*camera*) -1.0)
@@ -314,31 +340,21 @@ gl_FragColor.rgb = color_out;
 	  (when (window::skey-j-p (window::keyval 3))
 	    (toggle *swinging*))
 	  (when *swinging*
-	    (let ((u 80))
+	    (let ((u *big-fist-reach*))
 	      (aabbcc::aabb-collect-blocks
 		  (px py pz (* u vx) (* u vy) (* u vz)
-		      (load-time-value
-		       #+nil
-		       (aabbcc:make-aabb
-			:minx -1.5
-			:miny -1.5
-			:minz -1.5
-			:maxx  1.5
-			:maxy  1.5
-			:maxz  1.5)
-		       (aabbcc:make-aabb
-			:minx -0.5
-			:miny -0.5
-			:minz -0.5
-			:maxx  0.5
-			:maxy  0.5
-			:maxz  0.5)))
+		      *big-fist-aabb*)
 		  (x y z contact)
-		(declare (ignorable contact))		     
-		(funcall *big-fist-fun* x y z)))))
+		(declare (ignorable contact))
+		(let ((*x* x)
+		      (*y* y)
+		      (*z* z))
+		  (funcall *big-fist-fun* x y z))))))
 	(let ((fist *fist*))
 	  (let ((left-p (window::skey-j-p (window::mouseval :left)))
-		(right-p (window::skey-j-p (window::mouseval :right))))
+		(right-p (window::skey-j-p (window::mouseval :right)))
+		(middle-p (window::skey-j-p (window::mouseval :middle)))
+		(4-p (window::skey-j-p (window::mouseval :4))))
 	    #+nil
 	    (when (or left-p right-p))
 	    (sandbox-sub::standard-fist
@@ -351,10 +367,28 @@ gl_FragColor.rgb = color_out;
 	      (when fist?
 		(when left-p
 		  (with-vec (a b c) (selected-block)
-		    (funcall *left-fist-fnc* a b c)))
+		    (let ((*x* a)
+			  (*y* b)
+			  (*z* c))
+		      (funcall *left-fist-fnc* a b c))))
 		(when right-p
 		  (with-vec (a b c) (normal-block)
-		    (funcall *right-fist-fnc* a b c)))))))))))
+		    (let ((*x* a)
+			  (*y* b)
+			  (*z* c))
+		      (funcall *right-fist-fnc* a b c))))
+		(when middle-p
+		  (with-vec (a b c) (selected-block)
+		    (let ((*x* a)
+			  (*y* b)
+			  (*z* c))
+		      (funcall *middle-fist-fnc* a b c))))
+		(when 4-p
+		  (with-vec (a b c) (selected-block)
+		    (let ((*x* a)
+			  (*y* b)
+			  (*z* c))
+		      (funcall *4-fist-fnc* a b c))))))))))))
 
 ;;;detect more entities
 ;;;detect block types?
@@ -375,10 +409,12 @@ gl_FragColor.rgb = color_out;
 (defparameter *big-fist-fun* (constantly nil))
 (defparameter *left-fist-fnc* 'destroy-block-at)
 (defparameter *right-fist-fnc* 'place-block-at)
+(defparameter *middle-fist-fnc* 'place-block-at)
+(defparameter *4-fist-fnc* 'tree)
 
 (defun destroy-block-at (x y z)
   ;;(sandbox-sub::blocksound x y z)
-  (sandbox::plain-setblock x y z 0 15))
+  (sandbox::plain-setblock x y z (block-data::blockid :air) 15))
 
 (defparameter *blockid* 1)
 
@@ -391,4 +427,193 @@ gl_FragColor.rgb = color_out;
      blockval
      (aref block-data:*lightvalue* blockval))
     ;;(sandbox-sub::blocksound x y z)
-      ))
+    ))
+
+(defparameter *x* 0)
+(defparameter *y* 0)
+(defparameter *z* 0)
+
+(defmacro with-xyz (&body body)
+  `(let ((*x* *x*)
+	 (*y* *y*)
+	 (*z* *z*))
+     ,@body))
+
+(progn
+  (defun b@ (&optional (x *x*) (y *y*) (z *z*))
+    (world::getblock x y z))
+  (defun (setf b@) (value &optional (x *x*) (y *y*) (z *z*))
+    (sandbox::plain-setblock x y z value)))
+
+(defun b= (b0 b1)
+  (eql b0 b1))
+
+(defmacro nick (nickname)
+  `(block-data::blockid ,nickname))
+
+;;convert dirt, stone, and grass into their 'correct' forms given air:
+;;grass, dirt, dirt, stone
+(defun correct-earth (&rest rest)
+  (declare (ignore rest))
+  (let ((b0 (b@)))
+    (when (or (b= (nick :stone) b0)
+	      (b= (nick :grass) b0)
+	      (b= (nick :dirt) b0))
+      (let ((b1 (with-xyz
+		  (incf *y* 1)
+		  (b@))))
+	(if (b= (nick :air) b1)
+	    (setf (b@) (nick :grass))
+	    (let ((b2 (with-xyz
+			(incf *y* 2)
+			(b@))))
+	      (if (b= (nick :air) b2)
+		  (setf (b@) (nick :dirt))
+		  (let ((b3 (with-xyz
+			      (incf *y* 3)
+			      (b@))))
+		    (if (b= (nick :air) b3)
+			(setf (b@) (nick :dirt))
+			(let (#+nil
+			      (b3 (with-xyz
+				    (incf *y* 4)
+				    (b@))))
+			  (setf (b@) (nick :stone))))))))))))
+
+(defun correct-earth (&rest rest)
+  (declare (ignore rest))
+  (let ((b0 (b@)))
+    (when (b= (nick :air) b0)
+      (setf (b@) (nick :lamp)))))
+(defun correct-earth (&rest rest)
+  (declare (ignore rest))
+  (let ((b0 (b@)))
+    (when (b= (nick :air) b0)
+      (when 
+	;;#+nil
+	(<= 3 (neighbors))
+	(setf (b@) (nick :sandstone))))))
+
+(defun neighbors (&aux (count 0))
+  (dobox ((x (+ -1 *x*) (+ 2 *x*))
+	  (y (+ -1 *y*) (+ 2 *y*))
+	  (z (+ -1 *z*) (+ 2 *z*)))
+	 (unless (or (= x 0))
+	   (b= (b@ x y z) (nick :air))
+	   (incf count)))
+  count)
+
+(defun player-feet ()
+  (let ((miny
+	 (aabbcc::aabb-miny
+	  (sandbox-sub::entity-aabb *ent*))))
+    (with-vec (x y z) ((testbed::player-position))
+      (values (floor x)
+	      (1- (floor (+ miny y)))
+	      (floor z)))))
+
+(defun neighbors (&aux (count 0))
+  (flet ((countw ()
+	   (unless (b= (b@) (nick :air))
+	     (incf count))))
+    (progn
+      (with-xyz
+	(incf *x*)
+	(countw))
+      (with-xyz
+	(decf *x*)
+	(countw)))
+    (progn
+      (with-xyz
+	(incf *y*)
+	(countw))
+      (with-xyz
+	(decf *y*)
+	(countw)))
+    (progn
+      (with-xyz
+	(incf *z*)
+	(countw))
+      (with-xyz
+	(decf *z*)
+	(countw))))
+  count)
+
+(setf *big-fist-fun* 'correct-earth)
+(defun player-feet-at (&rest rest)
+  (declare (ignorable rest))
+  (multiple-value-bind (x y z) (player-feet)
+    ;;(print (list x y z))
+    (dobox ((x (+ x -1) (+ x 2))
+	    (z (+ z -1) (+ z 2)))
+	   (setf (b@ x y z) (nick :grass)))))
+(setf *middle-fist-fnc* 'player-feet-at)
+
+(defun line (px py pz &optional
+			(vx *x*)
+			(vy *y*)
+			(vz *z*)
+	       (blockid *blockid*)
+	       (aabb sandbox-sub::*fist-aabb*))
+  (aabbcc::aabb-collect-blocks (px py pz (- vx px) (- vy py) (- vz pz)
+				   aabb)
+      (x y z dummy)
+    (declare (ignorable dummy))
+    (when (b= (nick :air) (b@ x y z))
+      (sandbox::plain-setblock x y z blockid 0))))
+
+(defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
+		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
+  (aabbcc::make-aabb
+   :minx minx
+   :maxx maxx
+   :miny miny
+   :maxy maxy
+   :minz minz
+   :maxz maxz))
+
+(defun degree-to-rad (&optional (n (random 360)))
+  (* n (load-time-value (floatify (/ pi 180)))))
+(defun rotate-normal (&optional
+			(x (degree-to-rad))
+			(y (degree-to-rad))
+			(z (degree-to-rad)))
+  (sb-cga:transform-point
+   (sb-cga::vec 1.0 0.0 0.0)
+   (sb-cga::rotate* x y z)))
+(defun vec-values (&optional (vec (sb-cga::vec 1.0 2.0 3.0)))
+  (with-vec (x y z) (vec)
+    (values x y z)))
+(defun tree (&optional (x *x*) (y *y*) (z *z*) (minfactor 6.0))
+  (labels ((rec (place minfactor)
+	     (when (>= minfactor 0)
+	       (dotimes (x (random 5))
+		 (let ((random-direction (sb-cga::vec* (rotate-normal) (expt 1.5 minfactor))))
+		   (let ((new (sb-cga::vec+ place random-direction)))
+		     (multiple-value-call
+			 'line
+		       (vec-values place)
+		       (vec-values new)
+		       (if (>= 4 minfactor)
+			   (nick :leaves)
+			   (nick :log))
+		       (create-aabb (* 0.1 minfactor)))
+		     (rec new (1- minfactor))))))))
+    (rec (multiple-value-call 'sb-cga::vec (floatify2 x y z))
+	 minfactor)))
+(defun floatify2 (&rest values)
+  (apply 'values (mapcar 'floatify values)))
+
+(defun line-to-player-feet (&rest rest)
+  (declare (ignorable rest))
+  (multiple-value-bind (x y z) (player-feet)
+    ;;(print (list x y z))
+    (line x
+	  y
+	  z
+	  *x*
+	  *y*
+	  *z*
+	  (nick :planks))))
+
+(setf *middle-fist-fnc* 'line-to-player-feet)

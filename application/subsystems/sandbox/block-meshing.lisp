@@ -345,7 +345,7 @@
 (defun blockshape (i j k blockid)
   (case blockid
     (24 (rendersandstone blockid i j k))
-    (17 (renderlog blockid i j k))
+    ;;(17 (renderlog blockid i j k))
     (2 (rendergrass blockid i j k))
     (t (renderstandardblock blockid i j k))))
 
@@ -366,9 +366,26 @@
 (eval-always
   (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
 
+(with-declaim-inline (block-hash)
+  (defun block-hash (i j k)
+    (locally (declare (optimize (speed 3) (safety 0))
+		      (type fixnum i j k))
+      (let ((hash (mod (the fixnum (* 2654435761 (the fixnum (+ i j k))))
+		       (ash 1 32))))
+	(values (logtest hash #b0100)
+		(logtest hash #b1000))))))
+(defmacro flipuv (&optional (i 'i) (j 'j) (k 'k) (u1 'u1) (u0 'u0) (v1 'v1) (v0 'v0))
+  (with-gensyms (u v)
+    `(locally (declare (inline block-hash))
+       (multiple-value-bind (,u ,v) (block-hash ,i ,j ,k)
+	 (when ,u
+	   (rotatef ,u1 ,u0))
+	 (when ,v
+	   (rotatef ,v1 ,v0))))))
 (defun renderstandardblock (id i j k)
   (let ((texid (aref block-data:*blockIndexInTexture* id)))
     (with-texture-translator2 (u0 u1 v0 v1) texid
+      (flipuv)
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
 	  (side-j i j k u0 v0 u1 v1)))
@@ -391,10 +408,12 @@
 (defun rendergrass (id i j k)
   (let ((texid (aref block-data:*blockIndexInTexture* id)))
     (with-texture-translator2 (u0 u1 v0 v1) 2
+      (flipuv)
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
 	  (side-j i j k u0 v0 u1 v1))))
     (with-texture-translator2 (u0 u1 v0 v1) texid
+      (flipuv)
       (let ((adj-id (world:getblock i (1+ j) k)))
 	(when (show-sidep id adj-id)
 	  (side+j i j k u0 v0 u1 v1))))

@@ -381,6 +381,8 @@
 (defun chunk-worth-saving (chunk)
   ;;a chunk is not worth saving if all the values are the empty value
   ;;FIXME::optimize?
+  ;;FIXME::what about terrain generation? if a chunk is generated with terrain,
+  ;;then erased with the *empty-space* value, it will be reloaded.
   (let ((empty-space *empty-space*))
     (not (every (lambda (x) (eql x empty-space))
 		(chunk-data chunk)))))

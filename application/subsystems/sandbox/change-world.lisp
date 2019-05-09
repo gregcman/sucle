@@ -5,12 +5,10 @@
   ;;(let ((a (get-internal-real-time))))
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
-    (let* ((foo *chunk-radius*)
-	   (bar (* foo foo)))
-      (declare (type fixnum bar foo))
+    (let* ((foo (+ 1 *chunk-radius*)))
       (dohash (key value) *g/chunk-call-list*
 	      ;;(declare (ignore key))
-	      (when (> (the fixnum bar) (the fixnum (unsquared-chunk-distance key)))
+	      (when (> (the fixnum foo) (the fixnum (blocky-chunk-distance key)))
 		(vector-push-extend value vec))))
     (gl:call-lists vec))
   ;(print (- (get-internal-real-time) a))
@@ -290,7 +288,7 @@
 		   (incf chunk-count)
 		   ;;do something
 		   (let ((key (world::create-chunk-key x y z)))
-		     (unless (world::chunk-exists-p key)
+		     (when (not (chunk-exists-at-and-not-empty key))
 		       ;;The chunk does not exist, therefore the *empty-chunk* was returned
 		       (push key acc)
 		       ;;(print (list x y z))
@@ -313,7 +311,7 @@
 			      (add-chunk chunk-x chunk-y chunk-z))))))
       acc)))
 
-(defparameter *persist* nil)
+(defparameter *persist* t)
 (defun chunk-save (chunk &key (path (world-path)))
   (when (not *persist*)
     (return-from chunk-save))
@@ -384,6 +382,10 @@
 
 (defparameter *load-jobs* 0)
 
+(defun chunk-exists-at-and-not-empty (key)
+  (and (world::chunk-exists-p key)
+       (not (world::empty-chunk-p (world::get-chunk-at key)))))
+
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
@@ -396,16 +398,16 @@
     (sandbox.multiprocessing::submit-unique-task
      job-key
      ((lambda ()
-	(let ((chunk (loadchunk key path)))
-	  (setf (cdr (sandbox.multiprocessing::job-task-data
-		      sandbox.multiprocessing::*current-job-task*))
-		chunk)))
+	(setf (cdr (sandbox.multiprocessing::job-task-data
+		    sandbox.multiprocessing::*current-job-task*))
+	      (cond ((chunk-exists-at-and-not-empty key)
+		     :skipping)
+		    (t (loadchunk key path)))))
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
 		  (cond
-		    ((and (world::chunk-exists-p key)
-			  (not (world::empty-chunk-p (world::get-chunk-at key))))
+		    ((chunk-exists-at-and-not-empty key)
 		     (format t "~%WTF? ~a chunk already exists" key))
 		    (t (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
 			      (key (cdr job-key))
@@ -413,17 +415,22 @@
 			       (cdr (sandbox.multiprocessing::job-task-data job-task))))
 			 ;;FIXME? locking is not necessary if the callback runs in the
 			 ;;same thread as the code which changes the chunk-array and *chunks* ?
-			 
-			 (progn
-			   (apply #'world::remove-chunk-from-chunk-array key)
-			   (world::set-chunk-at key chunk))
-			 ;;(format t "~%making chunk ~a" key)
+			 (cond
+			   ((eq chunk :skipping)
+			    (format t "~%chunk skipped loading, "))
+			   (t
+			    (progn
+			      (apply #'world::remove-chunk-from-chunk-array key)
+			      (world::set-chunk-at key chunk))
+			    ;;(format t "~%making chunk ~a" key)
 
-			   ;;(world::set-chunk-at key new-chunk)
+			    ;;(world::set-chunk-at key new-chunk)
 
-			 (if (world::empty-chunk-p chunk)
-			     (background-generation key)
-			     (dirty-push-around key))
+			    (cond
+			      ((world::empty-chunk-p chunk)
+			       ;;(background-generation key)
+			       )
+			      (t (dirty-push-around key)))))
 			 )))
 		  (sandbox.multiprocessing::remove-unique-task-key job-key)
 		  (decf *load-jobs*)))
