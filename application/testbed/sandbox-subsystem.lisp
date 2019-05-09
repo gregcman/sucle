@@ -502,7 +502,7 @@
 (defun per-frame ()
   ;;handle chunk meshing
   (on-session-change *last-session*
-    (clrhash sandbox::*g/chunk-call-list*)
+    (sandbox::reset-chunk-display-list)
     ;;FIXME::update vao according to position, not 0 0 0
     (sandbox::update-world-vao))
   (sandbox::designatemeshing)

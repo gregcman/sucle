@@ -81,7 +81,9 @@
 (defun reset-empty-chunk-value (&optional (empty-space nil))
   (setf *empty-space* empty-space)
   (setf *empty-chunk-data* (make-chunk-data :initial-element *empty-space*))
-  (setf *empty-chunk* (create-chunk 0 0 0 :data *empty-chunk-data* :type :empty)))
+  (setf *empty-chunk* (create-chunk 0 0 0 :data
+				    *empty-chunk-data*
+				    :type :empty)))
 
 (defun empty-chunk-p (chunk)
   (or (eq chunk *empty-chunk*)
@@ -172,11 +174,12 @@
     (dotimes (i (array-total-size array))
       (setf (row-major-aref array i) value))))
 
-(utility:with-unsafe-speed
- ;;progn
+(;;utility:with-unsafe-speed
+ progn
   (
-   utility::with-declaim-inline
-   ;;progn
+   ;;utility::with-declaim-inline
+   progn
+    #+nil
    (obtain-chunk reference-inside-chunk get-chunk
 		 get-chunk-from-chunk-array
 		 (setf reference-inside-chunk)
@@ -211,15 +214,20 @@
 	      (progn
 		;;FIXME::load chunks here, unload chunks here?
 		(if force-load
-		    (let ((new-chunk (load-chunk chunk-x chunk-y chunk-z)))
-		      (set-chunk-at key new-chunk)
-		      (values new-chunk t))
-		    (values
-		     *empty-chunk*
-		     nil)))))))
+		    (progn
+		      (print "NOPeE3")
+		      (let ((new-chunk (load-chunk chunk-x chunk-y chunk-z)))
+			(set-chunk-at key new-chunk)
+			(values new-chunk t)))
+		    (progn
+		      ;(print "NOPE2")
+		      (values
+		       *empty-chunk*
+		       nil))))))))
 
     (defun load-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
       ;;FIXME::actually load chunks
+      (print "NOPE")
       (create-chunk chunk-x chunk-y chunk-z))
     
     (defun create-chunk-array ()
@@ -270,10 +278,9 @@
 			       (chunk-coordinates-match-p possible-chunk chunk-x chunk-y chunk-z))
 			  ;;The chunk is not nil, and the coordinates line up
 			  possible-chunk
-			  (when force-load
-			    (let ((next-possible-chunk (get-chunk chunk-x chunk-y chunk-z force-load)))
-			      (setf (aref data data-x data-y data-z) next-possible-chunk)
-			      next-possible-chunk))))))))))))
+			  (let ((next-possible-chunk (get-chunk chunk-x chunk-y chunk-z force-load)))
+			    (setf (aref data data-x data-y data-z) next-possible-chunk)
+			    next-possible-chunk)))))))))))
     (defun remove-chunk-from-chunk-array (&optional 
 					 (chunk-x 0) (chunk-y 0) (chunk-z 0)
 					    (chunk-array *chunk-array*))
@@ -303,8 +310,7 @@
 
     (defun obtain-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0) (force-load nil))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
-      (let ((chunk (or (get-chunk-from-chunk-array chunk-x chunk-y chunk-z force-load)
-		       (get-chunk chunk-x chunk-y chunk-z force-load))))
+      (let ((chunk (get-chunk-from-chunk-array chunk-x chunk-y chunk-z force-load)))
 	#+nil
 	(unless (typep chunk 'chunk)
 	  (error "not a chunk ~s" chunk))
@@ -413,7 +419,7 @@
        (dpb light (byte 4 8) blockid)))
 
 (eval-when (:load-toplevel :execute)
-  (world::reset-empty-chunk-value (blockify 0 0 15)))
+  (world::reset-empty-chunk-value (blockify 2 0 15)))
 
 (defmethod lispobj-dispatch ((obj character))
   (blockify (char-code obj) 0 0))
@@ -440,7 +446,7 @@
 	  (kmask (mod k 16)))
       (labels ((add (x y z)
 		 (let ((chunk (world::obtain-chunk-from-block-coordinates x y z)))
-		   (unless (world::empty-chunk-p chunk)
+		   (unless nil;;(world::empty-chunk-p chunk)
 		     (dirty-push (world::chunk-key chunk)))))
 	       (i-permute ()
 		 (case imask

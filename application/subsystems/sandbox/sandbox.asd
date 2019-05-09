@@ -18,7 +18,10 @@
 	       #:bordeaux-threads
 	       #:cl-cpus
 	       #:uncommon-lisp
-	       #:utility)
+	       #:utility
+
+	       ;;for world-generation
+	       #:black-tie)
   :serial t
   :components
   ((:file "queue")

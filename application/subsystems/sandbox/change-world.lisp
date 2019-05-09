@@ -1,11 +1,18 @@
 (in-package :sandbox)
-
+(defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
 (defun draw-world ()
   (declare (optimize (speed 3) (safety 0)))
-  ;(let ((a (get-internal-real-time))))
-  (dohash (key value) *g/chunk-call-list*
-	  (declare (ignore key))
-	  (gl:call-list value))
+  ;;(let ((a (get-internal-real-time))))
+  (let ((vec *call-lists*))
+    (setf (fill-pointer vec) 0)
+    (let* ((foo *chunk-radius*)
+	   (bar (* foo foo)))
+      (declare (type fixnum bar foo))
+      (dohash (key value) *g/chunk-call-list*
+	      ;;(declare (ignore key))
+	      (when (> (the fixnum bar) (the fixnum (unsquared-chunk-distance key)))
+		(vector-push-extend value vec))))
+    (gl:call-lists vec))
   ;(print (- (get-internal-real-time) a))
   )
 
@@ -16,7 +23,9 @@
   (defun set-chunk-display-list (name list-num)
     (setf (gethash name *g/chunk-call-list*) list-num))
   (defun remove-chunk-display-list (name)
-    (remhash name *g/chunk-call-list*)))
+    (remhash name *g/chunk-call-list*))
+  (defun reset-chunk-display-list ()
+    (clrhash *g/chunk-call-list*)))
 (defun remove-chunk-model (name)
   ;;FIXME::this calls opengl. Use a queue instead?
   (multiple-value-bind (value existsp) (get-chunk-display-list name)
@@ -87,13 +96,15 @@
 ;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
   (sandbox.multiprocessing::do-queue (job-task *finished-mesh-tasks*)
-   (let ((value (car (sandbox.multiprocessing::job-task-return-values job-task))))
-     (destructuring-bind (type function . args) value
-       (apply function args)
-       (when (eq :mesh-chunk type)
-	 ;;FIXME::document this somewhere?
-	 ;;*achannel* becoming a generic command buffer?
-	 (decf *total-background-chunk-mesh-jobs*)))))
+    (let ((value (car (sandbox.multiprocessing::job-task-return-values job-task))))
+      (cond (value
+	     (destructuring-bind (type function . args) value
+	       (apply function args)
+	       (when (eq :mesh-chunk type)
+		 ;;FIXME::document this somewhere?
+		 ;;*achannel* becoming a generic command buffer?
+		 (decf *total-background-chunk-mesh-jobs*))))
+	    (t (print value)))))
   (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
     (queue::sort-queue
      *dirty-chunks*
@@ -109,7 +120,8 @@
        (let ((thechunk (dirty-pop)))
 	 (if thechunk
 	     (when (and (world::chunk-exists-p thechunk)
-			(not (world::empty-chunk-p (world::get-chunk-at thechunk))))
+			;;(not (world::empty-chunk-p (world::get-chunk-at thechunk)))
+			)
 	       (incf *total-background-chunk-mesh-jobs*)
 	       (let ((lparallel:*task-category* 'mesh-chunk))
 		 (sandbox.multiprocessing::submit 
@@ -341,16 +353,18 @@
 	   ;;this task, saving and loading, must not be interrupted
 	   :unkillable t)))))))
 
+(defparameter *persist* nil)
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
-    (chunk-save chunk :path path)
+    (when *persist* (chunk-save chunk :path path))
     ;;remove the opengl object
     ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
     ;;FIXME::remove anyway?
     (remove-chunk-model key)
     ;;remove from the chunk-array
-    (world::with-chunk-key-coordinates (x y z) key
-				       (world::remove-chunk-from-chunk-array x y z))
+    (world::with-chunk-key-coordinates (x y z)
+	key
+      (world::remove-chunk-from-chunk-array x y z))
     ;;remove from the global table
     (world::remove-chunk-at key)))
 
@@ -387,17 +401,66 @@
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
-		  (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
-			 (key (cdr job-key))
-			 (new-chunk (cdr (sandbox.multiprocessing::job-task-data job-task))))
-		    ;;FIXME? locking is not necessary if the callback runs in the
-		    ;;same thread as the code which changes the chunk-array and *chunks* ?
-		    (world::set-chunk-at key new-chunk)
-		    (unless (world::empty-chunk-p new-chunk)
-		      (dirty-push-around key))
-		    (sandbox.multiprocessing::remove-unique-task-key job-key))
+		  (cond
+		    ((and (world::chunk-exists-p key)
+			  (not (world::empty-chunk-p (world::get-chunk-at key))))
+		     (format t "~%WTF? ~a chunk already exists" key))
+		    (t (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
+			      (key (cdr job-key))
+			      (chunk
+			       (cdr (sandbox.multiprocessing::job-task-data job-task))))
+			 ;;FIXME? locking is not necessary if the callback runs in the
+			 ;;same thread as the code which changes the chunk-array and *chunks* ?
+			 
+			 (progn
+			   (apply #'world::remove-chunk-from-chunk-array key)
+			   (world::set-chunk-at key chunk))
+			 ;;(format t "~%making chunk ~a" key)
+
+			   ;;(world::set-chunk-at key new-chunk)
+
+			 (if (world::empty-chunk-p chunk)
+			     (background-generation key)
+			     (dirty-push-around key))
+			 )))
+		  (sandbox.multiprocessing::remove-unique-task-key job-key)
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))
+
+(defun background-generation (key)
+  (let ((job-key (cons :world-gen key)))
+    (sandbox.multiprocessing::submit-unique-task
+     job-key
+     ((lambda ()
+	(generate-for-new-chunk key))
+      :callback (lambda (job-task)
+		  (declare (ignore job-task))
+		  (dirty-push-around key)
+		  (sandbox.multiprocessing::remove-unique-task-key job-key))))))
+
+(utility:with-unsafe-speed
+  (defun generate-for-new-chunk (key)
+    (multiple-value-bind (x y z) (world::unhashfunc key)
+      (declare (type fixnum x y z))
+      ;;(print (list x y z))
+      (when (>= y 0)
+	(dobox ((x0 x (the fixnum (+ x 16)))
+		(y0 y (the fixnum (+ y 16)))
+		(z0 z (the fixnum (+ z 16))))
+	       (let ((block (let ((threshold 0.3))
+			      (if (> threshold (black-tie::perlin-noise-single-float
+						(* x0 0.05)
+						(* y0 0.05)
+						(* z0 0.05)))
+				  0
+				  1))))
+		 (setf (world::getobj x0 y0 z0)
+		       (world::blockify block
+					(case block
+					  (0 15)
+					  (1 0))
+					0))))))))
+
 
 (defun unload-extra-chunks ()
   (let ((to-unload
