@@ -217,20 +217,26 @@
   ;;(next) getting the new values, or returning if there are none
   (utility:with-gensyms (var loop exist-p)
     (utility:once-only (queue)
-      `(lparallel.queue:with-locked-queue ,queue	 
-	 (block ,loop
-	   (flet ((,next ()
+      `(block ,loop
+	 (flet ((,next ()
+		  (lparallel.queue:with-locked-queue ,queue	 
 		    (multiple-value-bind (,var ,exist-p)
 			(lparallel.queue:try-pop-queue/no-lock ,queue)
 		      (unless ,exist-p
 			(return-from ,loop))
-		      ,var)))	     
-	     ,@body))))))
+		      ,var))))	     
+	   ,@body)))))
+(defmacro do-queue ((var queue) &body body)
+  (utility:with-gensyms (next)
+    `(do-queue-iterator (,next ,queue)
+       (loop
+	  (let ((,var (,next)))
+	    ,@body)))))
 
 (defun get-values (&optional (fun 'print))
   (%get-values)
-  (do-queue-iterator (value *finished-task-queue*)
-    (funcall fun (value))))
+  (do-queue (value *finished-task-queue*)
+    (funcall fun value)))
 
 (defun flush-job-tasks (&optional fun)
   (get-values (lambda (job-task)
