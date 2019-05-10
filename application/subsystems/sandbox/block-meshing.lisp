@@ -7,14 +7,13 @@
 (with-unsafe-speed
   (defun chunk-shape (iter io jo ko)
     (declare (type world::block-coord io jo ko))
-    (time
-     (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
-       ;;(draw-dispatch (world::getobj io jo ko) io jo ko)
-       ;;#+nil
-       (dobox ((i io (the world::block-coord (+ 16 io)))
-	       (j jo (the world::block-coord (+ 16 jo)))
-	       (k ko (the world::block-coord (+ 16 ko))))
-	      (draw-dispatch (world::getobj i j k) i j k))))))
+    (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
+      ;;(draw-dispatch (world::getobj io jo ko) io jo ko)
+      ;;#+nil
+      (dobox ((i io (the world::block-coord (+ 16 io)))
+	      (j jo (the world::block-coord (+ 16 jo)))
+	      (k ko (the world::block-coord (+ 16 ko))))
+	     (draw-dispatch (world::getobj i j k) i j k)))))
 
 ;;FIXME::is using CLOS to dispatch on the block a good way to organize?
 ;; is it efficient?

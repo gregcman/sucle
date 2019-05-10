@@ -332,43 +332,46 @@ decreases when finished.")
 		  (t (print value)))))))
     ;;and set the meshes pending after reading the queue
     (setf *meshes-pending-for-gl* (lparallel.queue:queue-count *finished-mesh-tasks*)))
-  (when (and
-	 ;;So there are not too many background jobs
-	 (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
-	 ;;So memory is not entirely eaten up
-	 (> *max-meshes-pending-for-gl* *meshes-pending-for-gl*))
-    (queue::sort-queue
-     *dirty-chunks*
-     (lambda (list)
-       (sort list
-	     ;;remove chunks from the queue that are too far away, don't try to mesh them
-	     #+nil ;;WRONG!!FIXME::separate world loading code from opengl
-	     (delete-if (lambda (x)
-			  (>= (blocky-chunk-distance x) *chunk-render-radius*))
-			list)
-	     '< :key 'unsquared-chunk-distance)))
-    (loop :named submit-mesh-tasks :do
-       (let ((thechunk (dirty-pop)))
-	 (if thechunk
-	     (when (and (world::chunk-exists-p thechunk)
-			;;(not (world::empty-chunk-p (world::get-chunk-at thechunk)))
-			)
-	       (incf *total-background-chunk-mesh-jobs*)
-	       (let ((lparallel:*task-category* 'mesh-chunk))
-		 (sandbox.multiprocessing::submit 
-		  (lambda (iter space chunk-pos)
-		    (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
-		    (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
-		      (chunk-shape iter io jo ko)
-		      (%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
-		  :args (list
-			 (attrib-buffer-iterators)
-			 (make-list 4)
-			 thechunk)
-		  :callback (lambda (job-task)
-			      (lparallel.queue:push-queue job-task *finished-mesh-tasks*)
-			      (decf *total-background-chunk-mesh-jobs*)))))
-	     (return-from submit-mesh-tasks))))))
+  (flet ((too-much ()
+	   (or
+	    ;;So there are not too many background jobs
+	    (<= *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
+	    ;;So memory is not entirely eaten up
+	    (<= *max-meshes-pending-for-gl* *meshes-pending-for-gl*))))
+    (when (not (too-much))
+      (queue::sort-queue
+       *dirty-chunks*
+       (lambda (list)
+	 (sort list
+	       ;;remove chunks from the queue that are too far away, don't try to mesh them
+	       #+nil ;;WRONG!!FIXME::separate world loading code from opengl
+	       (delete-if (lambda (x)
+			    (>= (blocky-chunk-distance x) *chunk-render-radius*))
+			  list)
+	       '< :key 'unsquared-chunk-distance)))
+      (loop :named submit-mesh-tasks
+	 :while (not (too-much)) :do
+	 (let ((thechunk (dirty-pop)))
+	   (if thechunk
+	       (when (and (world::chunk-exists-p thechunk)
+			  ;;(not (world::empty-chunk-p (world::get-chunk-at thechunk)))
+			  )
+		 (incf *total-background-chunk-mesh-jobs*)
+		 (let ((lparallel:*task-category* 'mesh-chunk))
+		   (sandbox.multiprocessing::submit 
+		    (lambda (iter space chunk-pos)
+		      (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
+		      (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
+			(chunk-shape iter io jo ko)
+			(%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
+		    :args (list
+			   (attrib-buffer-iterators)
+			   (make-list 4)
+			   thechunk)
+		    :callback (lambda (job-task)
+				(lparallel.queue:push-queue job-task *finished-mesh-tasks*)
+				(decf *total-background-chunk-mesh-jobs*)))))
+	       (return-from submit-mesh-tasks)))))))
 
 #+nil
 (defun setblock-with-update (i j k blockid &optional
@@ -653,7 +656,7 @@ decreases when finished.")
 		       )
 		      (t
 		       (cond
-			 ((not (space-for-new-chunk-p key))
+			 ((and (not (world::empty-chunk-p chunk)) (not (space-for-new-chunk-p key)))
 			  (format t "~%OMG? ~a chunk already exists" key))
 			 (t 
 			  (progn

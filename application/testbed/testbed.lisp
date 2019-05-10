@@ -178,6 +178,16 @@ gl_FragColor.rgb = color_out;
   (cond (*paused*
 	 (fps-independent-timestep::tick *ticker* ()))
 	(t
+	 ;;Polling
+	 ;;Physics
+	 ;;Rendering Chunks
+	 ;;Rendering Other stuff
+	 ;;Meshing
+	 ;;Waiting on vsync
+	 ;;Back to polling
+	 
+	 ;;Physics and Polling should be close together to prevent lag
+	 
 	 ;;physics
 	 (stuff)
 	 ;;render chunks and such
@@ -189,7 +199,8 @@ gl_FragColor.rgb = color_out;
 	 (sandbox-sub::render-stuff)
 	 ;;selected block and crosshairs
 	 (render?)
-	 (gl:flush)
+	 ;;FIXME::what is glFlush good for?
+	 ;;(gl:flush)
 	 (sandbox::designatemeshing)))
   #+nil
   (progn
