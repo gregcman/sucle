@@ -158,6 +158,7 @@ gl_FragColor.rgb = color_out;
      :color-buffer-bit
      )))
 
+(defparameter *last-session* nil)
 (defparameter *paused* nil)
 (defparameter *session* nil)
 (defun per-frame ()
@@ -177,9 +178,19 @@ gl_FragColor.rgb = color_out;
   (cond (*paused*
 	 (fps-independent-timestep::tick *ticker* ()))
 	(t
-	 (sandbox-sub::per-frame)
+	 ;;physics
+	 (stuff)
+	 ;;render chunks and such
+	 ;;handle chunk meshing
+	 (application::on-session-change *last-session*
+	   (sandbox::reset-chunk-display-list)
+	   ;;FIXME::update vao according to position, not 0 0 0
+	   (sandbox::update-world-vao))
+	 (sandbox-sub::render-stuff)
+	 ;;selected block and crosshairs
 	 (render?)
-	 (stuff)))
+	 (gl:flush)
+	 (sandbox::designatemeshing)))
   #+nil
   (progn
     (particle-al-listener (sandbox-sub::entity-particle *ent*))
@@ -326,6 +337,9 @@ gl_FragColor.rgb = color_out;
     :maxx  8.0
     :maxy  8.0
     :maxz  8.0)))
+(defparameter *x* 0)
+(defparameter *y* 0)
+(defparameter *z* 0)
 (defun fist-stuff (pos)
   (let ((look-vec (load-time-value (nsb-cga:vec 0.0 0.0 0.0))))
     (nsb-cga:%vec* look-vec (camera-matrix:camera-vec-forward sandbox-sub::*camera*) -1.0)
@@ -429,9 +443,6 @@ gl_FragColor.rgb = color_out;
     ;;(sandbox-sub::blocksound x y z)
     ))
 
-(defparameter *x* 0)
-(defparameter *y* 0)
-(defparameter *z* 0)
 
 (defmacro with-xyz (&body body)
   `(let ((*x* *x*)

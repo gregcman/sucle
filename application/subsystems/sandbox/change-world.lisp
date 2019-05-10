@@ -294,8 +294,15 @@ gl_FragColor = color;
   (map-into (make-array 3 :element-type t :initial-element nil)
 	    (function scratch-buffer:my-iterator)))
 (defparameter *chunk-render-radius* 6)
-(defparameter *total-background-chunk-mesh-jobs* 0)
+(defparameter *total-background-chunk-mesh-jobs* 0
+  "track the number of subprocesses which are actively meshing. Increases when meshing,
+decreases when finished.")
+(defparameter *meshes-pending-for-gl* 0
+  "How many lisp-side meshes are waiting to be sent to the GPU?")
+(defparameter *max-meshes-pending-for-gl* 4)
 (defparameter *max-total-background-chunk-mesh-jobs* 1)
+(defparameter *max-gl-meshing-iterations-per-frame* 2)
+
 (defun reset-meshers ()
   (sandbox.multiprocessing::with-kernel
     (lparallel:kill-tasks 'mesh-chunk)
@@ -306,17 +313,30 @@ gl_FragColor = color;
     (setf *total-background-chunk-mesh-jobs* 0)))
 ;;We limit the amount of chunks that can be sent to the mesh queue
 (defun designatemeshing ()
-  (sandbox.multiprocessing::do-queue (job-task *finished-mesh-tasks*)
-    (let ((value (car (sandbox.multiprocessing::job-task-return-values job-task))))
-      (cond (value
-	     (destructuring-bind (type function . args) value
-	       (apply function args)
-	       (when (eq :mesh-chunk type)
-		 ;;FIXME::document this somewhere?
-		 ;;*achannel* becoming a generic command buffer?
-		 (decf *total-background-chunk-mesh-jobs*))))
-	    (t (print value)))))
-  (when (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
+  ;;set the meshes pending before
+  (setf *meshes-pending-for-gl* (lparallel.queue:queue-count *finished-mesh-tasks*))
+  (when (plusp *meshes-pending-for-gl*)
+    (let ((count 0))
+      (block stop-meshing
+	(sandbox.multiprocessing::do-queue-iterator (job-task *finished-mesh-tasks*)
+	  (when (> count *max-gl-meshing-iterations-per-frame*)
+	    (return-from stop-meshing))
+	  (incf count)
+	  (let ((value (car (sandbox.multiprocessing::job-task-return-values (job-task)))))
+	    (cond (value
+		   (destructuring-bind (type function . args) value
+		     ;;FIXME::document this somewhere?
+		     ;;*achannel* becoming a generic command buffer?
+		     (assert (eq :mesh-chunk type))
+		     (apply function args)))
+		  (t (print value)))))))
+    ;;and set the meshes pending after reading the queue
+    (setf *meshes-pending-for-gl* (lparallel.queue:queue-count *finished-mesh-tasks*)))
+  (when (and
+	 ;;So there are not too many background jobs
+	 (> *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
+	 ;;So memory is not entirely eaten up
+	 (> *max-meshes-pending-for-gl* *meshes-pending-for-gl*))
     (queue::sort-queue
      *dirty-chunks*
      (lambda (list)
@@ -327,7 +347,7 @@ gl_FragColor = color;
 			  (>= (blocky-chunk-distance x) *chunk-render-radius*))
 			list)
 	     '< :key 'unsquared-chunk-distance)))
-    (loop
+    (loop :named submit-mesh-tasks :do
        (let ((thechunk (dirty-pop)))
 	 (if thechunk
 	     (when (and (world::chunk-exists-p thechunk)
@@ -346,8 +366,9 @@ gl_FragColor = color;
 			 (make-list 4)
 			 thechunk)
 		  :callback (lambda (job-task)
-			      (lparallel.queue:push-queue job-task *finished-mesh-tasks*)))))
-	     (return))))))
+			      (lparallel.queue:push-queue job-task *finished-mesh-tasks*)
+			      (decf *total-background-chunk-mesh-jobs*)))))
+	     (return-from submit-mesh-tasks))))))
 
 #+nil
 (defun setblock-with-update (i j k blockid &optional
@@ -501,7 +522,7 @@ gl_FragColor = color;
 		   (incf chunk-count)
 		   ;;do something
 		   (let ((key (world::create-chunk-key x y z)))
-		     (when (not (chunk-exists-at-and-not-empty key))
+		     (when (space-for-new-chunk-p key)
 		       ;;The chunk does not exist, therefore the *empty-chunk* was returned
 		       (push key acc)
 		       ;;(print (list x y z))
@@ -569,17 +590,18 @@ gl_FragColor = color;
 
 (defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
-    (chunk-save chunk :path path)
-    ;;remove the opengl object
-    ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
-    ;;FIXME::remove anyway?
-    (remove-chunk-model key)
-    ;;remove from the chunk-array
-    (world::with-chunk-key-coordinates (x y z)
-	key
-      (world::remove-chunk-from-chunk-array x y z))
-    ;;remove from the global table
-    (world::remove-chunk-at key)))
+    (when chunk
+      (chunk-save chunk :path path)
+      ;;remove the opengl object
+      ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
+      ;;FIXME::remove anyway?
+      (remove-chunk-model key)
+      ;;remove from the chunk-array
+      (world::with-chunk-key-coordinates (x y z)
+	  key
+	(world::remove-chunk-from-chunk-array x y z))
+      ;;remove from the global table
+      (world::remove-chunk-at key))))
 
 (defun dirty-push-around (key)
   ;;FIXME::although this is correct, it
@@ -595,9 +617,8 @@ gl_FragColor = color;
 
 (defparameter *load-jobs* 0)
 
-(defun chunk-exists-at-and-not-empty (key)
-  (and (world::chunk-exists-p key)
-       (not (world::empty-chunk-p (world::get-chunk-at key)))))
+(defun space-for-new-chunk-p (key)
+  (world::empty-chunk-p (world::get-chunk-at key)))
 
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
@@ -613,38 +634,40 @@ gl_FragColor = color;
      ((lambda ()
 	(setf (cdr (sandbox.multiprocessing::job-task-data
 		    sandbox.multiprocessing::*current-job-task*))
-	      (cond ((chunk-exists-at-and-not-empty key)
+	      (cond ((not (space-for-new-chunk-p key))
+		     (format t "~%WTF? ~a chunk already exists" key)
 		     :skipping)
 		    (t (loadchunk key path)))))
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
-		  (cond
-		    ((chunk-exists-at-and-not-empty key)
-		     (format t "~%WTF? ~a chunk already exists" key))
-		    (t (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
-			      (key (cdr job-key))
-			      (chunk
-			       (cdr (sandbox.multiprocessing::job-task-data job-task))))
-			 ;;FIXME? locking is not necessary if the callback runs in the
-			 ;;same thread as the code which changes the chunk-array and *chunks* ?
-			 (cond
-			   ((eq chunk :skipping)
-			    (format t "~%chunk skipped loading, "))
-			   (t
-			    (progn
-			      (apply #'world::remove-chunk-from-chunk-array key)
-			      (world::set-chunk-at key chunk))
-			    ;;(format t "~%making chunk ~a" key)
+		  (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
+			 (key (cdr job-key))
+			 (chunk
+			  (cdr (sandbox.multiprocessing::job-task-data job-task))))
+		    ;;FIXME? locking is not necessary if the callback runs in the
+		    ;;same thread as the code which changes the chunk-array and *chunks* ?
+		    (cond
+		      ((eq chunk :skipping)
+		       ;;(format t "~%chunk skipped loading, ")
+		       )
+		      (t
+		       (cond
+			 ((not (space-for-new-chunk-p key))
+			  (format t "~%OMG? ~a chunk already exists" key))
+			 (t 
+			  (progn
+			    (apply #'world::remove-chunk-from-chunk-array key)
+			    (world::set-chunk-at key chunk))
+			  ;;(format t "~%making chunk ~a" key)
 
-			    ;;(world::set-chunk-at key new-chunk)
+			  ;;(world::set-chunk-at key new-chunk)
 
-			    (cond
-			      ((world::empty-chunk-p chunk)
-			       ;;(background-generation key)
-			       )
-			      (t (dirty-push-around key)))))
-			 )))
+			  (cond
+			    ((world::empty-chunk-p chunk)
+			     ;;(background-generation key)
+			     )
+			    (t (dirty-push-around key))))))))
 		  (sandbox.multiprocessing::remove-unique-task-key job-key)
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))

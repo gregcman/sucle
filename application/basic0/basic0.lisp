@@ -43,6 +43,7 @@
 	   (sandbox-sub::entity-gravity? testbed::*ent*) t)
      ;;(our-load)
      (let ((text-sub::*text-data-what-type* :framebuffer))
+       (window::set-vsync t)
        (unwind-protect
 	    (loop
 	       (application:poll-app)

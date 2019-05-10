@@ -86,7 +86,8 @@
 				    :type :empty)))
 
 (defun empty-chunk-p (chunk)
-  (or (eq chunk *empty-chunk*)
+  (or (null chunk)
+      (eq chunk *empty-chunk*)
       (eq (chunk-type chunk) :empty)))
 (defun make-chunk-data (&rest rest &key (initial-element *empty-space*))
   (apply 'make-array
@@ -400,20 +401,22 @@
   (let ((value (getobj i j k)))
     (value-dispatch value)))
 
-(defmacro suite (bits position get)
+(defmacro suite (bits position get get-ldb)
   (let* ((bytespec `(byte ,bits ,position))
 	 (access `(ldb ,bytespec
 		       (num-getobj i j k))))
     `(progn
+       (defun ,get-ldb (value)
+	 (ldb ,bytespec value))
        (defun (setf ,get) (new i j k)
 	 (setf ,access new))
        (defun ,get (i j k)
 	 ,access))))
 
 (progn
-  (suite 8 0 getblock)
-  (suite 4 8 getlight)
-  (suite 4 12 skygetlight))
+  (suite 8 0 getblock getblock-extract)
+  (suite 4 8 getlight getlight-extract)
+  (suite 4 12 skygetlight skygetlight-extract))
 
 ;;FIXME::move this to a better place?
 (defun blockify (blockid light sky)

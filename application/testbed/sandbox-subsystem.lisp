@@ -498,16 +498,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defparameter *last-session* nil)
-(defun per-frame ()
-  ;;handle chunk meshing
-  (on-session-change *last-session*
-    (sandbox::reset-chunk-display-list)
-    ;;FIXME::update vao according to position, not 0 0 0
-    (sandbox::update-world-vao))
-  (sandbox::designatemeshing)
-  (render-stuff))
-
 (defparameter *fov* (* (floatify pi) (/ 85 180)))
 
 (defparameter *camera* (camera-matrix:make-camera

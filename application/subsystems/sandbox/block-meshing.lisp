@@ -7,15 +7,33 @@
 (with-unsafe-speed
   (defun chunk-shape (iter io jo ko)
     (declare (type world::block-coord io jo ko))
-    (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
-      (dobox ((i io (the world::block-coord (+ 16 io)))
-	      (j jo (the world::block-coord (+ 16 jo)))
-	      (k ko (the world::block-coord (+ 16 ko))))
-	     (let ((blockid (world:getblock i j k)))
-	       (unless (zerop blockid)
-		 (blockshape
-		  i j k
-		  blockid)))))))
+    (time
+     (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
+       ;;(draw-dispatch (world::getobj io jo ko) io jo ko)
+       ;;#+nil
+       (dobox ((i io (the world::block-coord (+ 16 io)))
+	       (j jo (the world::block-coord (+ 16 jo)))
+	       (k ko (the world::block-coord (+ 16 ko))))
+	      (draw-dispatch (world::getobj i j k) i j k))))))
+
+;;FIXME::is using CLOS to dispatch on the block a good way to organize?
+;; is it efficient?
+(defmethod draw-dispatch ((bits-block-data fixnum) i j k)
+  (blockshape (world::getblock-extract bits-block-data) i j k))
+
+(defmethod blockshape ((blockid (eql 0)) i j k)
+  ;;if its air, don't render anything
+  )
+(defmethod blockshape ((blockid (eql 24)) i j k)
+  (rendersandstone blockid i j k))
+(defmethod blockshape ((blockid (eql 2)) i j k)
+  (rendergrass blockid i j k))
+(defmethod blockshape ((blockid (eql 17)) i j k)
+  (renderstandardblock blockid i j k)
+  ;;(renderlog blockid i j k)
+  )
+(defmethod blockshape ((blockid t) i j k)
+  (renderstandardblock blockid i j k))
 
 (eval-always
   ;;;;total faces touched by a light of distance n
@@ -261,13 +279,6 @@
 		      (00 -1 1)    
 		      (00 00 1)    
 		      (-1 00 1))))))
-
-(defun blockshape (i j k blockid)
-  (case blockid
-    (24 (rendersandstone blockid i j k))
-    ;;(17 (renderlog blockid i j k))
-    (2 (rendergrass blockid i j k))
-    (t (renderstandardblock blockid i j k))))
 
 ;;;if the block is air, the side gets rendered. if the block is transparent
 ;;;and the same type ex: texture between glass - there is no texture - if they are
