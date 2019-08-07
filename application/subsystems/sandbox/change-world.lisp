@@ -53,8 +53,10 @@
 	      (when (> (the fixnum foo) (the fixnum (blocky-chunk-distance key)))
 		(vector-push-extend value vec))))
     vec))
-(defun draw-world (&optional (vec *call-lists*))
-  (declare (optimize (speed 3) (safety 0)))
+(defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
+						  (count-actually-drawn 0))
+  (declare (optimize (speed 3) (safety 0))
+	   (type fixnum count-actually-drawn count-occluded-by-query))
   ;;(let ((a (get-internal-real-time))))
   (loop :for value :across vec :do
      (let ((display-list (chunk-gl-representation-call-list value))
@@ -73,6 +75,7 @@
        
        (cond
 	 ((not (chunk-gl-representation-occluded value)) ;;not occluded = visible
+	  (incf count-actually-drawn)
 	  (let ((query (chunk-gl-representation-occlusion-query value)))
 	    (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
 	      (cond
@@ -90,8 +93,12 @@
 	  ;;(gl:call-list display-list)
 	  )
 	 (t ;;(print "WHAT?")
+	  (incf count-occluded-by-query)
 	  ;;(gl:call-list display-list)
 	  ))))
+  (values
+   count-actually-drawn
+   count-occluded-by-query)
   ;;(gl:call-lists vec)
   ;;(print (- (get-internal-real-time) a))
   )
@@ -354,7 +361,7 @@ decreases when finished.")
 	 (let ((thechunk (dirty-pop)))
 	   (if thechunk
 	       (when (and (world::chunk-exists-p thechunk)
-			  ;;(not (world::empty-chunk-p (world::get-chunk-at thechunk)))
+			  (not (world::empty-chunk-p (world::get-chunk-at thechunk)))
 			  )
 		 (incf *total-background-chunk-mesh-jobs*)
 		 (let ((lparallel:*task-category* 'mesh-chunk))
@@ -424,7 +431,7 @@ decreases when finished.")
     (setf *chunk-coordinate-center-y* chunk-y)
     (setf *chunk-coordinate-center-z* chunk-z)))
 
-(defparameter *reposition-chunk-array-threshold* 1)
+(defparameter *reposition-chunk-array-threshold* 2)
 (defun maybe-move-chunk-array ()
   ;;center the chunk array around the player, but don't always, only if above a certain
   ;;threshold
@@ -638,7 +645,7 @@ decreases when finished.")
 	(setf (cdr (sandbox.multiprocessing::job-task-data
 		    sandbox.multiprocessing::*current-job-task*))
 	      (cond ((not (space-for-new-chunk-p key))
-		     (format t "~%WTF? ~a chunk already exists" key)
+		     ;;(format t "~%WTF? ~a chunk already exists" key)
 		     :skipping)
 		    (t (loadchunk key path)))))
       :data (cons job-key "")
@@ -674,41 +681,6 @@ decreases when finished.")
 		  (sandbox.multiprocessing::remove-unique-task-key job-key)
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))
-
-(defun background-generation (key)
-  (let ((job-key (cons :world-gen key)))
-    (sandbox.multiprocessing::submit-unique-task
-     job-key
-     ((lambda ()
-	(generate-for-new-chunk key))
-      :callback (lambda (job-task)
-		  (declare (ignore job-task))
-		  (dirty-push-around key)
-		  (sandbox.multiprocessing::remove-unique-task-key job-key))))))
-
-(utility:with-unsafe-speed
-  (defun generate-for-new-chunk (key)
-    (multiple-value-bind (x y z) (world::unhashfunc key)
-      (declare (type fixnum x y z))
-      ;;(print (list x y z))
-      (when (>= y -1)
-	(dobox ((x0 x (the fixnum (+ x 16)))
-		(y0 y (the fixnum (+ y 16)))
-		(z0 z (the fixnum (+ z 16))))
-	       (let ((block (let ((threshold 0.3))
-			      (if (> threshold (black-tie::perlin-noise-single-float
-						(* x0 0.05)
-						(* y0 0.05)
-						(* z0 0.05)))
-				  0
-				  1))))
-		 (setf (world::getobj x0 y0 z0)
-		       (world::blockify block
-					(case block
-					  (0 15)
-					  (1 0))
-					0))))))))
-
 
 (defun unload-extra-chunks ()
   (let ((to-unload

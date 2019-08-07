@@ -125,14 +125,20 @@
   (sandbox::mload))
 
 (eval-when (:load-toplevel :execute)
-  (setf sandbox::*world-directory* "test/")
-  (setf sandbox::*some-saves*
-	(merge-pathnames
-	 "save/"
-	 (asdf:system-source-directory :sucle)
-	 )
+  (setf sandbox::*world-directory*
+	"first/"
 	#+nil
-	(cdr (assoc (machine-instance) 
-		    '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-		      ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-		    :test 'equal))))
+	"test/")
+  (progn
+    (setf sandbox::*some-saves*
+	  (cdr (assoc (machine-instance) 
+		      '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
+			("nootboke" . #P"/home/terminal256/Documents/saves/"))
+		      :test 'equal))))
+  #+nil
+  (progn
+    (setf sandbox::*some-saves*
+	  (merge-pathnames
+	   "save/"
+	   (asdf:system-source-directory :sucle)
+	   ))))

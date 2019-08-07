@@ -52,6 +52,17 @@
     (expt x gamma-value))
   
   (defun light-gen (x &optional (max 15))
+    ;;Ripped from minecraft beta WorldProvider.java
+    #+nil
+    (let* ((f 0.05)
+	   (i x)
+	   (f1 (- 1.0 (/ i 15.0))))
+      (+ (* (/ (- 1.0 f1)
+	       (+ (* f1 3.0) 1.0))
+	    (- 1.0 f))
+	 f))
+    
+    ;;#+nil
     (let ((umm (/ 1.0 (light-gen-aux-fun max max))))
       (*
        (light-gen-aux-fun x max)

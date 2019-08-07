@@ -20,9 +20,6 @@
 	       #:uncommon-lisp
 	       #:utility
 
-	       ;;for world-generation
-	       #:black-tie
-
 	       #:aabbcc ;;for occlusion culling
 	       )
   :serial t

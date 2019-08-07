@@ -11,7 +11,10 @@
 	       #:aabbcc
 	       #:control
 	       #:camera-matrix
-	       #:alexandria)
+	       #:alexandria
+  
+	       ;;for world-generation
+	       #:black-tie)
   :serial t
   :components 
   ((:file "sandbox-subsystem")

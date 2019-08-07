@@ -120,8 +120,8 @@
   (when window:*status*
     (quit))
   (window::update-control-state2)
-  (window:update-display)
   (flush-refreshes)
+  (window:update-display)
   (window:poll)
   (window::update-control-state))
 

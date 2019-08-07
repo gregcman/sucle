@@ -379,7 +379,8 @@ gl_FragColor.rgb = color_out;
 	  (let ((left-p (window::skey-j-p (window::mouseval :left)))
 		(right-p (window::skey-j-p (window::mouseval :right)))
 		(middle-p (window::skey-j-p (window::mouseval :middle)))
-		(4-p (window::skey-j-p (window::mouseval :4))))
+		(4-p (window::skey-j-p (window::mouseval :4)))
+		(5-p (window::skey-j-p (window::mouseval :5))))
 	    #+nil
 	    (when (or left-p right-p))
 	    (sandbox-sub::standard-fist
@@ -413,7 +414,13 @@ gl_FragColor.rgb = color_out;
 		    (let ((*x* a)
 			  (*y* b)
 			  (*z* c))
-		      (funcall *4-fist-fnc* a b c))))))))))))
+		      (funcall *4-fist-fnc* a b c))))
+		(when 5-p
+		  (with-vec (a b c) (selected-block)
+		    (let ((*x* a)
+			  (*y* b)
+			  (*z* c))
+		      (funcall *5-fist-fnc* a b c))))))))))))
 
 ;;;detect more entities
 ;;;detect block types?
@@ -436,6 +443,7 @@ gl_FragColor.rgb = color_out;
 (defparameter *right-fist-fnc* 'place-block-at)
 (defparameter *middle-fist-fnc* 'place-block-at)
 (defparameter *4-fist-fnc* 'tree)
+(defparameter *5-fist-fnc* '5fun)
 
 (defun destroy-block-at (x y z)
   ;;(sandbox-sub::blocksound x y z)
@@ -645,3 +653,92 @@ gl_FragColor.rgb = color_out;
 		))))
 
 (setf *middle-fist-fnc* 'line-to-player-feet)
+
+
+(defun get-chunk (x y z)
+  (multiple-value-bind (x y z) (world::chunk-coordinates-from-block-coordinates x y z)
+    ;;FIXME::use actual chunk dimensions, not magic number 16
+    (values (* x 16)
+	    (* y 16)
+	    (* z 16))))
+(defun background-generation (key)
+  (let ((job-key (cons :world-gen key)))
+    (sandbox.multiprocessing::submit-unique-task
+     job-key
+     ((lambda ()
+	(generate-for-new-chunk key))
+      :callback (lambda (job-task)
+		  (declare (ignore job-task))
+		  (sandbox::dirty-push-around key)
+		  (sandbox.multiprocessing::remove-unique-task-key job-key))))))
+
+(utility:with-unsafe-speed
+  (defun generate-for-new-chunk (key)
+    (multiple-value-bind (x y z) (world::unhashfunc key)
+      (declare (type fixnum x y z))
+      ;;(print (list x y z))
+      (when (>= y -1)
+	(dobox ((x0 x (the fixnum (+ x 16)))
+		(y0 y (the fixnum (+ y 16)))
+		(z0 z (the fixnum (+ z 16))))
+	       (let ((block (let ((threshold (/ y 512.0)))
+			      (if (> threshold (black-tie::perlin-noise-single-float
+						(* x0 0.05)
+						(+ (* 1.0 (sin y0)) (* y0 0.05))
+						(* z0 0.05)))
+				  0
+				  1))))
+		 (setf (world::getobj x0 y0 z0)
+		       (world::blockify block
+					(case block
+					  (0 15)
+					  (1 0))
+					0))))))))
+
+(defun 5fun (x y z)
+  (multiple-value-bind (x y z) (get-chunk x y z)
+    (dobox ((0x (- x 16) (+ x 32) :inc 16)
+	    (0y (- y 16) (+ y 32) :inc 16)
+	    (0z (- z 16) (+ z 32) :inc 16))
+	   (background-generation (multiple-value-call
+				      'world::create-chunk-key
+				    (world::chunk-coordinates-from-block-coordinates 
+				     0x
+				     0y
+				     0z))))))
+
+(defun 5fun (x y z)
+  (loop :repeat 10 :do
+     (let ((newx x)
+	   (newy y)
+	   (newz z))
+       (progn
+	 (let ((random (random 3))
+	       (random2 (- (* 2 (random 2)) 1)))
+	   (case random
+	     (0 (incf newx (* random2 3)))
+	     (1 (incf newy (* random2 3)))
+	     (2 (incf newz (* random2 3)))))
+	 (line
+	  x y z
+	  newx newy newz
+	  (nick :gravel))
+	 (setf x newx
+	       y newy
+	       z newz)))))
+
+(defun 5fun (x y z)
+  ;;put a layer of grass on things
+  (around (lambda (x y z)
+	    (when (and (b= (nick :air) (b@ x y z))
+		       (not (b= (nick :air) (b@ x (1- y) z)))
+		       (not (b= (nick :grass) (b@ x (1- y) z))))
+	      (setf (b@ x y z) (nick :grass))))
+	  x y z))
+
+(defun around (fun x y z)
+  (let ((radius 5))
+    (dobox ((0x (- x radius) (+ x radius 1))
+	    (0y (- y radius) (+ y radius 1))
+	    (0z (- z radius) (+ z radius 1)))
+	   (funcall fun 0x 0y 0z))))

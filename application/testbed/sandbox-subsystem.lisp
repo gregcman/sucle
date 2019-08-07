@@ -600,7 +600,15 @@
   ;;render chunks
   (gl:front-face :ccw)
   (sandbox::get-chunks-to-draw)
-  (sandbox::draw-world)
+  (multiple-value-bind (shown hidden) (sandbox::draw-world)
+    ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
+    #+nil
+    (let ((total
+	   (hash-table-count sandbox::*g/chunk-call-list*)
+	    #+nil
+	    (+ hidden shown)))
+      (unless (zerop total)
+	(format t "~%~s" (* 100.0 (/ shown total 1.0))))))
   (progn
     (let ((shader (getfnc 'sandbox::occlusion-shader)))
       (glhelp::use-gl-program shader)
@@ -642,7 +650,11 @@
 (progn
   (defun color-grasses (terrain)
     (flet ((color ()
-	     (multiple-value-call #'foliage-color (oct-24-2018))
+	     (multiple-value-call #'foliage-color
+	       (values 255 0)
+	       #+nil
+	       (oct-24-2018)
+	       )
 	     
 	     ;;;does not distribute evenly. it picks a slice, then a height on the slice.
 	     ;;;points on small slices have a greater chance of being picked than
@@ -674,7 +686,7 @@
 			  (terrain (error "no image"))
 			  (height 256)
 			  (texheight 16))
-    ;#+nil
+    ;;#+nil
     (setf xpos (* 2 xpos)
 	  ypos (* 2 ypos)
 	  height (* 2 height)
@@ -695,7 +707,7 @@
 			 (- vx3 vx2)
 			 (- vy1 vy3))))
 	(py-yv3 (- py vy3))
-	(px-xv3 (- px vx3)))
+e	(px-xv3 (- px vx3)))
     (let* ((w1 (/
 		(+
 		 (*

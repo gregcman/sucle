@@ -370,6 +370,7 @@
     (values (* (utility:etouq *chunk-size-x*) x)
 	    (* (utility:etouq *chunk-size-y*) y)
 	    (* (utility:etouq *chunk-size-z*) z))))
+
 #+nil
 (defun chunkhashfunc (x y z)
   (create-chunk-key x y z))
