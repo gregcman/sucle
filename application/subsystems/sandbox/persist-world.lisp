@@ -43,17 +43,15 @@
        ;;if data is nil, just load an empty chunk
        (world::with-chunk-key-coordinates (x y z) chunk-coordinates
 	 (world::create-chunk x y z :type :empty)))
-      #+nil
+
       (3 ;;FIXME::does this even work?
        (destructuring-bind (blocks light sky) data
 	 (let ((len (length blocks)))
 	   (let ((new (make-array len)))
-	     (world::make-chunk-from-key-and-data-and-keep position new)
 	     (dotimes (i len)
 	       (setf (aref new i)
-		     (dpb (aref sky i) (byte 4 12)
-			  (dpb (aref light i) (byte 4 8) (aref blocks i))))))))
-       t)
+		     (world::blockify (aref blocks i)  (aref light i) (aref sky i))))
+	     (world::make-chunk-from-key-and-data chunk-coordinates new)))))
       (1
        (destructuring-bind (objdata) data
 	 (world::make-chunk-from-key-and-data
