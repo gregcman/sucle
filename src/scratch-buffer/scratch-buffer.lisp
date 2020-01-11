@@ -4,8 +4,12 @@
    my-iterator
    free-my-iterator-memory
    flush-my-iterator
+   flush-my-iterator*
    iterator-fill-pointer
-   bind))
+   bind-in 
+   bind-in*
+   bind-out
+   bind-out*))
 
 (in-package #:scratch-buffer)
 (defparameter *scratch-space* nil)
@@ -62,7 +66,7 @@
   (setf (p-array iterator) nil
 	(p-index iterator) 0))
 
-(defmacro flush-my-iterator (a &body body)
+(defmacro flush-my-iterator ((a) &body body)
   (let ((var (gensym)))
     `(let ((,var ,a)) 
        (reset-my-iterator ,var)
@@ -75,7 +79,21 @@
       (incf len (array-total-size item)))
     len))
 
-(defmacro bind ((iterator name) &body body)
+(defmacro bind-in ((iterator name) &body body)
   `(bind-iterator-in
     (,name single-float) ,iterator
     ,@body))
+
+(defmacro bind-out ((iterator name) &body body)
+  `(bind-iterator-out
+    (,name single-float) ,iterator
+    ,@body))
+
+(defmacro bind-in* ((&rest forms) &body body)
+  `(utility:nest ,@(mapcar (lambda (x) `(bind-in ,x)) forms) (progn ,@body)))
+
+(defmacro bind-out* ((&rest forms) &body body)
+  `(utility:nest ,@(mapcar (lambda (x) `(bind-out ,x)) forms) (progn ,@body)))
+
+(defmacro flush-my-iterator* ((&rest forms) &body body)
+  `(utility:nest ,@(mapcar (lambda (x) `(flush-my-iterator ,x)) forms) (progn ,@body)))

@@ -138,3 +138,14 @@
     (vao (draw-vertex-array gl-thing))
     (gl-list (glhelp::draw-display-list (glhelp::handle gl-thing))))
   )
+
+(defun slow-delete (gl-thing)
+  ;;;dispatch on either display-list or vao
+  (declare (optimize (speed 3) (safety 0)))
+  (typecase gl-thing
+    (+gluint+ (gl:delete-lists gl-thing 1))
+    (vao (gl-delete* gl-thing))
+    (gl-list (gl:delete-lists (glhelp::handle gl-thing) 1)))
+  )
+
+

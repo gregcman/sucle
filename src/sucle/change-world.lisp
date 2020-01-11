@@ -136,6 +136,7 @@
 	      'unsquared-chunk-distance)))
 
 (defparameter *chunk-query-buffer-size* 8)
+(defvar *iterator*)
 (defun update-chunk-mesh (coords iter)
   (when coords
     (remove-chunk-model coords)
@@ -145,26 +146,41 @@
 	  (let ((display-list
 		 (glhelp:with-gl-list
 		   (gl:with-primitives :quads	     
-		     (scratch-buffer:flush-my-iterator a
-		       (scratch-buffer:flush-my-iterator b
-			 (scratch-buffer:flush-my-iterator c
-			   (mesh-chunk len a b c)))))))
+		     (scratch-buffer:flush-my-iterator* ((a) (b) (c))
+		       (mesh-chunk len a b c)))))
 		(occlusion-box
 		 (glhelp:with-gl-list
 		   (multiple-value-bind (x y z) (world::unhashfunc coords)
-		     (draw-aabb2 x y z
-				 (load-time-value
-				  (let ((foo *chunk-query-buffer-size*))
-				    (aabbcc::make-aabb
-				     :minx (- 0.0 foo)
-				     :miny (- 0.0 foo)
-				     :minz (- 0.0 foo)
-				     :maxx (+ (floatify world::*chunk-size-x*) foo)
-				     :maxy (+ (floatify world::*chunk-size-y*) foo)
-				     :maxz (+ (floatify world::*chunk-size-z*) foo)))))))))
+		     (let ((*iterator* (scratch-buffer:my-iterator)))
+		       (let ((len
+			      (draw-aabb2 x y z
+					  (load-time-value
+					   (let ((foo *chunk-query-buffer-size*))
+					     (aabbcc::make-aabb
+					      :minx (- 0.0 foo)
+					      :miny (- 0.0 foo)
+					      :minz (- 0.0 foo)
+					      :maxx (+ (floatify world::*chunk-size-x*) foo)
+					      :maxy (+ (floatify world::*chunk-size-y*) foo)
+					      :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
+			 (gl:with-primitives :quads	     
+			   (scratch-buffer:flush-my-iterator* ((*iterator*))
+			     (mesh-box len *iterator*)))))))))
 	    (set-chunk-display-list
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
+
+(defun mesh-box (times a)
+  (declare (type fixnum times))
+  (declare (optimize (speed 3) (safety 0)))
+  (scratch-buffer:bind-in* ((a xyz)) 
+    (dotimes (x times)
+      (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
+      ;;;why???
+      (%gl:vertex-attrib-2f 8 0.06 0.06)
+      (%gl:vertex-attrib-4f 1 0.0 0.0 0.0 0.0)
+      (%gl:vertex-attrib-4f 0 0.0 0.0 0.0 0.0);;;zero always comes last?
+      )))
 
 (defun draw-aabb2 (x y z &optional (aabb *fist-aabb*))
   ;;;;draw the fist hitbox
@@ -176,59 +192,49 @@
 		 (+ maxx x -0) (+  maxy y -0) (+  maxz z -0)))))
 
 (defun draw-box2 (minx miny minz maxx maxy maxz)
-  (let ((h0 0.0)
-	(h1 (/ 1.0 3.0))
-	(h2 (/ 2.0 3.0))
-	(h3 (/ 3.0 3.0))
-	(w0 0.0)
-	(w1 (/ 1.0 4.0))
-	(w2 (/ 2.0 4.0))
-	(w3 (/ 3.0 4.0))
-	(w4 (/ 4.0 4.0)))
-    (macrolet ((vvv (darkness u v x y z)
-		 `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
-			 #+nil
-			 (%gl:vertex-attrib-2f 2 ,u ,v)
-			 (%gl:vertex-attrib-4f 2 ,x ,y ,z 1.0)
-			 (%gl:vertex-attrib-2f 8 0.06 0.06)
-			 (%gl:vertex-attrib-4f 1 0.0 0.0 0.0 0.0)
-			 (%gl:vertex-attrib-4f 0 0.0 0.0 0.0 0.0)
-			 )))
-      (gl:with-primitives :quads
-	(vvv 0.0 w2 h3 minx maxy minz)
-	(vvv 0.0 w2 h2 maxx maxy minz)
-	(vvv 0.0 w1 h2 maxx maxy maxz)
-	(vvv 0.0 w1 h3 minx maxy maxz)
+  (macrolet ((vvv (x y z)
+	       `(progn
+		  (fun ,x)
+		  (fun ,y)
+		  (fun ,z))
+	       ))
+    (scratch-buffer:bind-out* ((*iterator* fun))
+      (vvv minx maxy minz)
+      (vvv maxx maxy minz)
+      (vvv maxx maxy maxz)
+      (vvv minx maxy maxz)
 
-	;;j-
-	(vvv 0.0 w2 h0 minx miny minz)
-	(vvv 0.0 w1 h0 minx miny maxz)
-	(vvv 0.0 w1 h1 maxx miny maxz)
-	(vvv 0.0 w2 h1 maxx miny minz)
+      ;;j-
+      (vvv minx miny minz)
+      (vvv minx miny maxz)
+      (vvv maxx miny maxz)
+      (vvv maxx miny minz)
 
-	;;k-
-	(vvv 0.0 w3 h2 minx maxy minz)
-	(vvv 0.0 w3 h1 minx miny minz)
-	(vvv 0.0 w2 h1 maxx miny minz)
-	(vvv 0.0 w2 h2 maxx maxy minz)
+      ;;k-
+      (vvv minx maxy minz)
+      (vvv minx miny minz)
+      (vvv maxx miny minz)
+      (vvv maxx maxy minz)
 
-	;;k+
-	(vvv 0.0 w1 h1 maxx miny maxz)
-	(vvv 0.0 w0 h1 minx miny maxz)
-	(vvv 0.0 w0 h2 minx maxy maxz)
-	(vvv 0.0 w1 h2 maxx maxy maxz)
-	
-	;;i-
-	(vvv 0.0 w3 h1 minx miny minz)
-	(vvv 0.0 w3 h2 minx maxy minz)
-	(vvv 0.0 w4 h2 minx maxy maxz)
-	(vvv 0.0 w4 h1 minx miny maxz)
+      ;;k+
+      (vvv maxx miny maxz)
+      (vvv minx miny maxz)
+      (vvv minx maxy maxz)
+      (vvv maxx maxy maxz)
+      
+      ;;i-
+      (vvv minx miny minz)
+      (vvv minx maxy minz)
+      (vvv minx maxy maxz)
+      (vvv minx miny maxz)
 
-	;;i+
-	(vvv 0.0 w2 h1 maxx miny minz)
-	(vvv 0.0 w1 h1 maxx miny maxz)
-	(vvv 0.0 w1 h2 maxx maxy maxz)
-	(vvv 0.0 w2 h2 maxx maxy minz)))))
+      ;;i+
+      (vvv maxx miny minz)
+      (vvv maxx miny maxz)
+      (vvv maxx maxy maxz)
+      (vvv maxx maxy minz))
+
+    (values (* 6 4))))
 
 (glhelp:deflazy-gl occlusion-shader ()
   (glhelp::create-opengl-shader
@@ -250,15 +256,15 @@ gl_FragColor = vec4(1.0);
 (defun mesh-chunk (times a b c)
   (declare (type fixnum times))
   (declare (optimize (speed 3) (safety 0)))
-  (scratch-buffer:bind (a xyz)
-    (scratch-buffer:bind (b uv)
-      (scratch-buffer:bind (c dark)
-	(dotimes (x times)
-	  (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
-	  (%gl:vertex-attrib-2f 8 (uv) (uv))
-	  (%gl:vertex-attrib-4f 1 (dark) (dark) (dark) (dark))
-	  (%gl:vertex-attrib-4f 0 (dark) (dark) (dark) (dark));;;zero always comes last?
-	  )))))
+  (scratch-buffer:bind-in* ((a xyz)
+			    (b uv)
+			    (c dark)) 
+    (dotimes (x times)
+      (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
+      (%gl:vertex-attrib-2f 8 (uv) (uv))
+      (%gl:vertex-attrib-4f 1 (dark) (dark) (dark) (dark))
+      (%gl:vertex-attrib-4f 0 (dark) (dark) (dark) (dark));;;zero always comes last?
+      )))
 
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)

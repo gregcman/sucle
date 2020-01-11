@@ -137,11 +137,27 @@ gl_FragColor.rgb = color_out;
   (gl:polygon-mode :front-and-back :line)
   (gl:line-width 2)
   ;;FIXME::render the fist again
-  #+nil
   (when (sandbox-sub::fister-exists *fist*)
     (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
       (with-vec (a b c) (selected-block)
-	(sandbox-sub::draw-aabb a b c *block-aabb2*))))
+	(let ((sandbox::*iterator* (scratch-buffer:my-iterator)))
+	  (let ((times (sandbox::draw-aabb2 a b c *block-aabb2*)))
+	    (let ((box
+		   (glhelp:with-gl-list
+		     (gl:with-primitives :lines	     
+		       (scratch-buffer:flush-my-iterator* ((sandbox::*iterator*))
+			 ;;;mesh-fist-box
+			 (locally
+			     (declare (type fixnum times)
+				      (optimize (speed 3) (safety 0)))
+			   (scratch-buffer:bind-in* ((sandbox::*iterator* xyz)) 
+			     (dotimes (x times)
+			       (%gl:vertex-attrib-3f 3 0.06 0.06 0.06)
+			       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))))))
+	      (glhelp::slow-draw box)
+	      (glhelp::slow-delete box)
+	      )))
+	)))
   #+nil
   (sandbox-sub::draw-aabb
    (* 16.0 sandbox::*chunk-coordinate-center-x*)

@@ -178,13 +178,10 @@
   `(defun ,name (i j k u0 v0 u1 v1)
      (declare (type world::block-coord i j k)
 	      (type single-float u0 v0 u1 v1))
-     (bind-iterator-out
-      (epos single-float) *mesh-epos*
-      (bind-iterator-out
-       (etex single-float) *mesh-etex*
-       (bind-iterator-out
-	(dark single-float) *mesh-dark*	
-	,@body)))))
+     (scratch-buffer:bind-out* ((*mesh-epos* epos)
+				(*mesh-etex* etex)
+				(*mesh-dark* dark)) 
+      ,@body)))
 
 (eval-always
   (defun simple-float-array (&rest args)
