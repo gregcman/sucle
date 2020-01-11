@@ -1,5 +1,5 @@
 (defpackage #:fps-independent-timestep
-  (:use #:cl #:utility #:clock)
+  (:use #:cl)
   (:export
    #:tick
    #:set-fps
@@ -11,6 +11,34 @@
 ;;;;3. this will run forms are the desired FPS 
 
 (in-package :fps-independent-timestep)
+
+;;;;<CLOCK>
+(deftype seconds ()
+  ;;FIXME::arbitrary amount
+  '(unsigned-byte 40))
+(deftype nanosecond ()
+  `(integer 0 ,(1- (expt 10 9))))
+(defun microseconds ()
+  (declare (optimize (speed 3) (safety 0)))
+  #+(or allegro cmu sbcl abcl ccl (and lispworks (or linux darwin)))
+  (let ((zeroed-seconds (load-time-value (local-time:timestamp-to-unix (local-time:now)))))
+    (declare (type seconds zeroed-seconds))
+    (multiple-value-bind (sec nsec) (local-time::%get-current-time)
+      (declare (type nanosecond nsec)
+	       (type seconds sec))
+      (+ (* 1000000 (- sec zeroed-seconds))
+	 (floor nsec 1000))))
+  #-(or allegro cmu sbcl abcl ccl (and lispworks (or linux darwin)))   
+  (* (get-internal-real-time)
+     (load-time-value
+      (progn
+	;;throw error if internal-time-units-per-second is less than 1000
+	(when (> 1000 internal-time-units-per-second)
+	  (error "no suitable clock found"))
+	
+	(round (/ 1000000 internal-time-units-per-second))))))
+;;;;</CLOCK>
+
 
 (defstruct (ticker (:constructor %make-ticker))
   (ticks 0 :type fixnum)
@@ -26,8 +54,8 @@
 		:bailout bailout))
 
 (defmacro run-iterations (ticker &body body)
-  (with-gensyms (accumulator ticks times)
-    (once-only (ticker)
+  (alexandria:with-gensyms (accumulator ticks times)
+    (alexandria:once-only (ticker)
       `(let ((,accumulator (ticker-accumulator ,ticker))
 	     (,ticks (ticker-ticks ,ticker))
 	     (,times 0))
@@ -61,8 +89,8 @@
   (make-ticker (floor 1000000 60) most-positive-fixnum))
 
 (defmacro %tick (ticker (&optional (time '(microseconds))) &body body)
-  (once-only (ticker time)
-    (with-gensyms (times)
+  (alexandria:once-only (ticker time)
+    (alexandria:with-gensyms (times)
       `(progn
 	 (update-time ,ticker ,time)
 	 (let ((,times
