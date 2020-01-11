@@ -89,7 +89,7 @@
 
 		 (glhelp::slow-draw display-list)
 		 (gl:end-query :samples-passed))
-		(t (gl:call-list display-list)))))
+		(t (glhelp::slow-draw display-list)))))
 	  ;;(gl:call-list display-list)
 	  )
 	 (t ;;(print "WHAT?")
@@ -246,59 +246,19 @@ gl_FragColor = vec4(1.0);
    '(("position" 2)) 
    '((:pmv "projection_model_view"))))
 
-(defun draw-fullscreen-quad ()
-  (gl:call-list
-   (glhelp::handle (application::getfnc 'fullscreen-quad))))
-(glhelp::deflazy-gl fullscreen-quad ()
-  (make-instance
-   'glhelp::gl-list
-   :handle
-   (glhelp::with-gl-list
-     (macrolet ((vvv (darkness u v x y z)
-		  `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
-			  #+nil
-			  (%gl:vertex-attrib-2f 2 ,u ,v)
-			  ;;FIXME::when using %gl:vertex-attrib, the 0 attrib marks the
-			  ;;end.
-			  (%gl:vertex-attrib-4f 0 ,x ,y ,z 1.0)
-			  )))
-       (gl:with-primitives :quads
-	 (vvv 0.0 w2 h3 1.0 1.0 0.99999994)
-	 (vvv 0.0 w2 h2 -1.0 1.0 0.99999994)
-	 (vvv 0.0 w1 h2 -1.0 -1.0 0.99999994)
-	 (vvv 0.0 w1 h3 1.0 -1.0 0.99999994))))))
-(glhelp:deflazy-gl gl-clear-color-buffer ()
-  (glhelp::create-opengl-shader
-   "in vec4 position;
-
-void main () {
-gl_Position = position;
-
-}"
-   "
-uniform vec4 color = vec4(0.6,0.7,0.2,1.0); 
-void main () {
-gl_FragColor = color;
-}"
-   '(("position" 0)) 
-   '((:color "color"))))
-
 
 (defun mesh-chunk (times a b c)
   (declare (type fixnum times))
   (declare (optimize (speed 3) (safety 0)))
-  (bind-iterator-in
-   (xyz single-float) a
-   (bind-iterator-in
-    (uv single-float) b
-    (bind-iterator-in
-     (dark single-float) c
-     (dotimes (x times)
-       (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
-       (%gl:vertex-attrib-2f 8 (uv) (uv))
-       (%gl:vertex-attrib-4f 1 (dark) (dark) (dark) (dark))
-       (%gl:vertex-attrib-4f 0 (dark) (dark) (dark) (dark));;;zero always comes last?
-       )))))
+  (scratch-buffer:bind (a xyz)
+    (scratch-buffer:bind (b uv)
+      (scratch-buffer:bind (c dark)
+	(dotimes (x times)
+	  (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
+	  (%gl:vertex-attrib-2f 8 (uv) (uv))
+	  (%gl:vertex-attrib-4f 1 (dark) (dark) (dark) (dark))
+	  (%gl:vertex-attrib-4f 0 (dark) (dark) (dark) (dark));;;zero always comes last?
+	  )))))
 
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)

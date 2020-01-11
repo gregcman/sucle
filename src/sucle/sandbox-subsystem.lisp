@@ -540,24 +540,27 @@
 
   (gl:depth-func :less)
   (gl:clear-depth 1.0)
-  (if t
-      (progn
-	(let ((shader (getfnc 'sandbox::gl-clear-color-buffer)))
-	  (glhelp::use-gl-program shader)
-	  (glhelp::with-uniforms uniform shader 
-	    (with-vec (x y z) (*sky-color-foo*)
-	      (%gl:uniform-4f (uniform :color) x y z 1.0))))
-	(gl:disable :depth-test)
-	;;(gl:disable :cull-face)
-	(gl:depth-mask nil)
-	(gl:polygon-mode :front-and-back :fill)
-	(sandbox::draw-fullscreen-quad)
-	(gl:depth-mask t)
-	(gl:clear :depth-buffer-bit))
-      (gl:clear
+  (cond
+    ;;optimization to see if drawing a fullscreen quad is faster than a gl:clear
+    #+nil
+    (nil 
+     (let ((shader (getfnc 'sandbox::gl-clear-color-buffer)))
+       (glhelp::use-gl-program shader)
+       (glhelp::with-uniforms uniform shader 
+	 (with-vec (x y z) (*sky-color-foo*)
+	   (%gl:uniform-4f (uniform :color) x y z 1.0))))
+     (gl:disable :depth-test)
+     ;;(gl:disable :cull-face)
+
+     (gl:depth-mask nil)
+     (gl:polygon-mode :front-and-back :fill)
+     (sandbox::draw-fullscreen-quad)
+     (gl:depth-mask t)
+     (gl:clear :depth-buffer-bit))
+    (t (gl:clear
        :color-buffer-bit
        :depth-buffer-bit
-       ))
+       )))
   (gl:enable :depth-test)
   (gl:enable :cull-face)
   (gl:disable :blend)
@@ -619,6 +622,47 @@
 			     (camera-matrix:camera-matrix-projection-view-player *camera*)
 			     nil)))
     (sandbox::render-occlusion-queries)))
+
+#+nil
+(defun draw-fullscreen-quad ()
+  (gl:call-list
+   (glhelp::handle (application::getfnc 'fullscreen-quad))))
+#+nil
+(glhelp::deflazy-gl fullscreen-quad ()
+  (make-instance
+   'glhelp::gl-list
+   :handle
+   (glhelp::with-gl-list
+     (macrolet ((vvv (darkness u v x y z)
+		  `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
+			  #+nil
+			  (%gl:vertex-attrib-2f 2 ,u ,v)
+			  ;;FIXME::when using %gl:vertex-attrib, the 0 attrib marks the
+			  ;;end.
+			  (%gl:vertex-attrib-4f 0 ,x ,y ,z 1.0)
+			  )))
+       (gl:with-primitives :quads
+	 (vvv 0.0 w2 h3 1.0 1.0 0.99999994)
+	 (vvv 0.0 w2 h2 -1.0 1.0 0.99999994)
+	 (vvv 0.0 w1 h2 -1.0 -1.0 0.99999994)
+	 (vvv 0.0 w1 h3 1.0 -1.0 0.99999994))))))
+#+nil
+(glhelp:deflazy-gl gl-clear-color-buffer ()
+  (glhelp::create-opengl-shader
+   "in vec4 position;
+
+void main () {
+gl_Position = position;
+
+}"
+   "
+uniform vec4 color = vec4(0.6,0.7,0.2,1.0); 
+void main () {
+gl_FragColor = color;
+}"
+   '(("position" 0)) 
+   '((:color "color"))))
+
 
 (defun quadratic-formula (a b c)
   (let ((two-a (+ a a)))

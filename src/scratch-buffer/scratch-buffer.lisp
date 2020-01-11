@@ -4,7 +4,8 @@
    my-iterator
    free-my-iterator-memory
    flush-my-iterator
-   iterator-fill-pointer))
+   iterator-fill-pointer
+   bind))
 
 (in-package #:scratch-buffer)
 (defparameter *scratch-space* nil)
@@ -73,3 +74,8 @@
     (dolist (item (cdr (car (p-data iterator))))
       (incf len (array-total-size item)))
     len))
+
+(defmacro bind ((iterator name) &body body)
+  `(bind-iterator-in
+    (,name single-float) ,iterator
+    ,@body))

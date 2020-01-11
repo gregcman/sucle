@@ -422,17 +422,15 @@ gl_FragColor = pixcolor;
 	    (flet ((add (n)
 		     (setf (aref buffer count) n)
 		     (incf count)))
-	      (bind-iterator-in
-	       (xyz single-float) a
-	       (bind-iterator-in
-		(tex single-float) b
-		(dotimes (x len)
-		  (add (tex))
-		  (add (tex))
-		  (add (xyz))
-		  (add (xyz))
-		  (add (xyz))
-		  (add 1.0))))))))
+	      (scratch-buffer:bind (a xyz)
+		(scratch-buffer:bind (b tex)
+		  (dotimes (x len)
+		    (add (tex))
+		    (add (tex))
+		    (add (xyz))
+		    (add (xyz))
+		    (add (xyz))
+		    (add 1.0))))))))
       (let ((count 0))
 	(flet ((getn ()
 		 (prog1 (aref buffer count)
