@@ -56,7 +56,6 @@
    
    ;;<TESTBED>
    (:file "sandbox-subsystem")
-   (:file "testbed")
    ;;</TESTBED>
    
    (:file "sucle")))
