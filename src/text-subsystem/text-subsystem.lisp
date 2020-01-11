@@ -1,8 +1,7 @@
 (defpackage #:text-sub
   (:use #:cl
 	#:application
-	#:utility
-	#:reverse-array-iterator-user))
+	#:utility))
 (in-package #:text-sub)
 
 ;;FIXME:: 256 by 256 size limit for texture

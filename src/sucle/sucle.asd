@@ -12,9 +12,7 @@
 	       ;;<TESTBED>
 	       ;;<SANDBOX>
 	       #:cl-opengl
-	       ;;#:utility
 	       #:scratch-buffer
-	       ;;#:reverse-array
 	       #:glhelp
 	       #:nsb-cga
 	       #:quads
@@ -28,10 +26,8 @@
 	       ;;</SANDBOX>
 	      
 	       #:image-utility
-	       ;;#:reverse-array
 	       #:uncommon-lisp
 	       #:fps-independent-timestep
-	       ;;#:aabbcc
 	       #:control
 	       #:camera-matrix
 	       #:alexandria
