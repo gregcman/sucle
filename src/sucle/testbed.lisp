@@ -102,7 +102,7 @@ gl_FragColor.rgb = color_out;
      ("color" 3))
    '((:pmv "projection_model_view"))))
 (defparameter *block-aabb2*
-  (let* ((offset 0.001)
+  (let* ((offset 0.1)
 	 (small (- 0.0 offset))
 	 (large (+ 1.0 offset)))
     (aabbcc:make-aabb
@@ -147,12 +147,14 @@ gl_FragColor.rgb = color_out;
 	    ;;mesh-fist-box
 	    (let ((box
 		   (glhelp:with-gl-list
-		     (gl:with-primitives :lines	     
+		     (gl:with-primitives :quads
 		       (scratch-buffer:flush-my-iterator* ((sandbox::*iterator*))
 			 (scratch-buffer:bind-in* ((sandbox::*iterator* xyz)) 
 			   (dotimes (x times)
-			     (%gl:vertex-attrib-3f 3 0.06 0.06 0.06)
-			     (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))))))
+			     (let ((n 0.06))
+			       (glhelp:vertex-attrib-f*
+				   ((3 n n n)
+				    (0 (xyz) (xyz) (xyz))))))))))))
 	      (glhelp::slow-draw box)
 	      (glhelp::slow-delete box)
 	      )))

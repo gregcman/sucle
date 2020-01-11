@@ -169,13 +169,13 @@
 			   (scratch-buffer:flush-my-iterator* ((*iterator*))	       
 			     (scratch-buffer:bind-in* ((*iterator* xyz)) 
 			       (dotimes (x times)
-				 (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
-				 ;;why???
-				 (%gl:vertex-attrib-2f 8 0.06 0.06)
-				 (%gl:vertex-attrib-4f 1 0.0 0.0 0.0 0.0)
-				 (%gl:vertex-attrib-4f 0 0.0 0.0 0.0 0.0)
-				 ;;zero always comes last?
-				 ))))))))))
+				 (glhelp:vertex-attrib-f*
+				     ((2 (xyz) (xyz) (xyz))
+				      ;;why???
+				      (8 0.06 0.06)
+				      (1 0.0 0.0 0.0 0.0)
+				      ;;zero always comes last?
+				      (0 0.0 0.0 0.0 0.0)))))))))))))
 	    (set-chunk-display-list
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))

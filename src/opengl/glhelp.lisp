@@ -253,11 +253,10 @@
 (defun fill-vertex-array-object (vertex-array vertex-buffer index-buffer verts indices layout)  
   (gl:bind-buffer :array-buffer vertex-buffer)
   (let ((len (length verts)))
-    (let ((arr (gl:alloc-gl-array :float len)))
+    (gl:with-gl-array (arr :float :count len)
       (dotimes (i len)
 	(setf (gl:glaref arr i) (aref verts i)))
-      (gl:buffer-data :array-buffer :static-draw arr)
-      (gl:free-gl-array arr)))
+      (gl:buffer-data :array-buffer :static-draw arr)))
   ;; 0 is always reserved as an unbound object.
   (gl:bind-buffer :array-buffer 0)
 
@@ -265,11 +264,10 @@
   ;; same way as an array buffer.
   (gl:bind-buffer :element-array-buffer index-buffer)
   (let ((len (length indices)))
-    (let ((arr (gl:alloc-gl-array :unsigned-int len)))
+    (gl:with-gl-array (arr :unsigned-int :count len)
       (dotimes (i len)
 	(setf (gl:glaref arr i) (aref indices i)))
-      (gl:buffer-data :element-array-buffer :static-draw arr)
-      (gl:free-gl-array arr)))
+      (gl:buffer-data :element-array-buffer :static-draw arr)))
   (gl:bind-buffer :element-array-buffer 0)
 
   ;; Vertex array objects manage which vertex attributes are
@@ -298,7 +296,7 @@
   ;; VAO.
   (gl:draw-elements
    type
-   (gl:make-null-gl-array :unsigned-int)
+   (load-time-value (gl:make-null-gl-array :unsigned-int))
    :count
    length
    :offset 0))
@@ -465,3 +463,16 @@ gl_FragColor = pixcolor;
 		    `(set-uniform-to-texture ,location ,texture ,number)))
 		specs
 		(alexandria:iota (length specs)))))
+
+(defmacro vertex-attrib-f (index &rest forms)
+  (ecase (length forms)
+    (1 `(%gl:vertex-attrib-1f ,index ,@forms))
+    (2 `(%gl:vertex-attrib-2f ,index ,@forms))
+    (3 `(%gl:vertex-attrib-3f ,index ,@forms))
+    (4 `(%gl:vertex-attrib-4f ,index ,@forms))))
+
+;;FIXME::make sure 0 comes last, because that completes each vertex?
+(defmacro vertex-attrib-f* ((&rest forms))
+  `(progn ,@(mapcar (lambda (x) `(vertex-attrib-f ,@x)) forms)))
+
+(export '(vertex-attrib-f vertex-attrib-f*))

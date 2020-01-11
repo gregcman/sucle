@@ -89,6 +89,7 @@
     (,name single-float) ,iterator
     ,@body))
 
+;;FIXME::refactor out for * type macros?
 (defmacro bind-in* ((&rest forms) &body body)
   `(utility:nest ,@(mapcar (lambda (x) `(bind-in ,x)) forms) (locally ,@body)))
 

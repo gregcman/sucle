@@ -425,14 +425,9 @@ gl_FragColor = pixcolor;
 	     (gl:with-primitives
 		 :quads
 	       (dotimes (x len)
-		 (%gl:vertex-attrib-2f 2
-				       (tex)
-				       (tex))
-		 (%gl:vertex-attrib-4f 0
-				       (xyz)
-				       (xyz)
-				       (xyz)
-				       1.0)))))
+		 (glhelp:vertex-attrib-f*
+		     ((2 (tex) (tex))
+		      (0 (xyz) (xyz) (xyz) 1.0)))))))
 	  (:vertex-array-object
 	   (let ((buffer (make-array (* len (+ 2 3 1)))))
 	     (let ((count 0))
