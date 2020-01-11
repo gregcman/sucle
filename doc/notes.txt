@@ -12,3 +12,8 @@ sucle is:
 -- super mario maker
 
 it should be simple voxels, but like walking around in a dream.
+
+TODO:
+consolidate
+- lem-opengl impl + ncurses-clone into sucle
+- mesh to either display lists or vaos -> a number is a display list, an object is a vao

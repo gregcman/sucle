@@ -87,7 +87,7 @@
 		 ;;draw occlusion box here
 		 ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
 
-		 (gl:call-list display-list)
+		 (glhelp::slow-draw display-list)
 		 (gl:end-query :samples-passed))
 		(t (gl:call-list display-list)))))
 	  ;;(gl:call-list display-list)

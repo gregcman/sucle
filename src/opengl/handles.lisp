@@ -128,8 +128,13 @@
    (render-type vao)))
 
 ;;;;
-(defgeneric slow-draw (gl-thing)) ;;;dispatch on either display-list or vao
-(defmethod slow-draw ((thing vao)) 
-  (draw-vertex-array thing))
-(defmethod slow-draw ((thing gl-list)) 
-  (glhelp::draw-display-list (glhelp::handle thing)))
+(deftype +gluint+ () '(unsigned-byte 32))
+(declaim (inline slow-draw))
+(defun slow-draw (gl-thing)
+  ;;;dispatch on either display-list or vao
+  (declare (optimize (speed 3) (safety 0)))
+  (typecase gl-thing
+    (+gluint+ (glhelp::draw-display-list gl-thing))
+    (vao (draw-vertex-array gl-thing))
+    (gl-list (glhelp::draw-display-list (glhelp::handle gl-thing))))
+  )

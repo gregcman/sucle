@@ -76,7 +76,6 @@ gl_FragColor.a = opacity * fin.a;
      (color-font-info-data . "color_font_info_atlas")
      (font-texture . "font_texture"))))
 
-(defvar *this-directory* (asdf:system-source-directory :text-subsystem))
 (deflazy font-png ()
   (let ((array
 	 (image-utility::load-image-from-file
@@ -440,21 +439,18 @@ gl_FragColor = pixcolor;
 		   (incf count))))
 	  (ecase glhelp::*slow-draw-type*
 	    (:display-list
-	     (make-instance
-	      'glhelp::gl-list
-	      :handle
-	      (glhelp:with-gl-list
+	     (glhelp:with-gl-list
 	       (gl:with-primitives
-		:quads
-		(dotimes (x len)
-		  (%gl:vertex-attrib-2f 2
-					(getn)
-					(getn))
-		  (%gl:vertex-attrib-4f 0
-					(getn)
-					(getn)
-					(getn)
-					(getn)))))))
+		   :quads
+		 (dotimes (x len)
+		   (%gl:vertex-attrib-2f 2
+					 (getn)
+					 (getn))
+		   (%gl:vertex-attrib-4f 0
+					 (getn)
+					 (getn)
+					 (getn)
+					 (getn))))))
 	    (:vertex-array-object
 	     (glhelp::make-vertex-array
 	      buffer
@@ -468,7 +464,7 @@ gl_FragColor = pixcolor;
   ;;0->3 quad
   ;;0 1 2 triangle
   ;;0 2 3 triangle
-  (let ((array (make-array (* 6 n))))
+  (let ((array (make-array (* 6 n) :element-type '(unsigned-byte 32))))
     (dotimes (i n)
       (let ((base (* i 6))
 	    (quad-base (* i 4)))
