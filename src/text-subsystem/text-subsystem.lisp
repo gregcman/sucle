@@ -443,30 +443,11 @@ gl_FragColor = pixcolor;
 		   (add 1.0))))
 	     (glhelp::make-vertex-array
 	      buffer
-	      (quads-triangles-index-buffer len)
+	      (glhelp:quads-triangles-index-buffer len)
 	      (glhelp::simple-vertex-array-layout
 	       '((2 2)
 		 (0 4)))
 	      :triangles))))))))
-
-(defun quads-triangles-index-buffer (n)
-  ;;0->3 quad
-  ;;0 1 2 triangle
-  ;;0 2 3 triangle
-  (let ((array (make-array (* 6 n) :element-type '(unsigned-byte 32))))
-    (dotimes (i n)
-      (let ((base (* i 6))
-	    (quad-base (* i 4)))
-	(flet ((foo (a b)
-		 (setf (aref array (+ base a))
-		       (+ quad-base b))))
-	  (foo 0 0)
-	  (foo 1 1)
-	  (foo 2 2)
-	  (foo 3 0)
-	  (foo 4 2)
-	  (foo 5 3))))
-    array))
 
 (defun draw-fullscreen-quad ()
   (glhelp::slow-draw (getfnc 'text-sub::fullscreen-quad)))

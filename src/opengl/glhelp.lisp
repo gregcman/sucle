@@ -222,7 +222,12 @@
 	(index 0))
     (dolist (item spec)
       (destructuring-bind (attribute-index size) item
-	(push (list attribute-index size index) acc)
+	(push (make-instance
+	       'va-section
+	       :attr attribute-index
+	       :size size
+	       :start index)
+	      acc)
 	(incf index size)))
     (make-vertex-array-layout
      :total-size total-size
@@ -234,12 +239,33 @@
    attributes ;;(attr size start)
    ))
 
+(struct-to-clos:struct->class
+ (defstruct va-section
+   attr
+   size
+   start))
+
+(set-pprint-dispatch
+ 'vertex-array-layout
+ (lambda (stream object)
+   (format stream "[~%size: ~a ~%attr: ~a~%]"
+	   (vertex-array-layout-total-size object)
+	   (vertex-array-layout-attributes object))))
+
+(set-pprint-dispatch
+ 'va-section
+ (lambda (stream object)
+   (format stream "[attr: ~a size: ~a start: ~a]"
+	   (va-section-attr object)
+	   (va-section-size object)
+	   (va-section-start object))))
+
 (defun gl-vertex-attributes (vertex-array-layout)
   (let ((float-size (glhelp::sizeof :float))
 	(total-size (vertex-array-layout-total-size vertex-array-layout))
 	(attributes (vertex-array-layout-attributes vertex-array-layout)))
     (dolist (spec attributes)
-      (destructuring-bind (attr size start) spec
+      (with-slots (attr size start) spec
 	(gl:enable-vertex-attrib-array attr)
 	(gl:vertex-attrib-pointer
 	 attr size
@@ -250,26 +276,7 @@
 	 (* float-size total-size)
 	 (* float-size start))))))
 
-(defun fill-vertex-array-object (vertex-array vertex-buffer index-buffer verts indices layout)  
-  (gl:bind-buffer :array-buffer vertex-buffer)
-  (let ((len (length verts)))
-    (gl:with-gl-array (arr :float :count len)
-      (dotimes (i len)
-	(setf (gl:glaref arr i) (aref verts i)))
-      (gl:buffer-data :array-buffer :static-draw arr)))
-  ;; 0 is always reserved as an unbound object.
-  (gl:bind-buffer :array-buffer 0)
-
-  ;; An element array buffer stores vertex indices. We fill it in the
-  ;; same way as an array buffer.
-  (gl:bind-buffer :element-array-buffer index-buffer)
-  (let ((len (length indices)))
-    (gl:with-gl-array (arr :unsigned-int :count len)
-      (dotimes (i len)
-	(setf (gl:glaref arr i) (aref indices i)))
-      (gl:buffer-data :element-array-buffer :static-draw arr)))
-  (gl:bind-buffer :element-array-buffer 0)
-
+(defun associate-vbos-with-vao (vertex-array vertex-buffer index-buffer layout)
   ;; Vertex array objects manage which vertex attributes are
   ;; associated with which data buffers. 
   (gl:bind-vertex-array vertex-array)
@@ -476,3 +483,25 @@ gl_FragColor = pixcolor;
   `(progn ,@(mapcar (lambda (x) `(vertex-attrib-f ,@x)) forms)))
 
 (export '(vertex-attrib-f vertex-attrib-f*))
+
+(defun quads-triangles-index-buffer (n)
+  "Convert N quads into an element buffer of triangles"
+  ;;0->3 quad
+  ;;0 1 2 triangle
+  ;;0 2 3 triangle
+  (let ((array (make-array (* 6 n) :element-type '(unsigned-byte 32))))
+    (dotimes (i n)
+      (let ((base (* i 6))
+	    (quad-base (* i 4)))
+	(flet ((foo (a b)
+		 (setf (aref array (+ base a))
+		       (+ quad-base b))))
+	  (foo 0 0)
+	  (foo 1 1)
+	  (foo 2 2)
+	  (foo 3 0)
+	  (foo 4 2)
+	  (foo 5 3))))
+    array))
+
+(export 'quads-triangles-index-buffer)

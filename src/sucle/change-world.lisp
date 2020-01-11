@@ -180,7 +180,59 @@
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
 
+(defparameter *quad-to-triangle-index-buffer-quad-count*
+  ;;the number of quads in a 16x16x16 chunk if each block has 6 faces showing.
+  ;;around 100k of memory, with 32 bit unsigned ints.
+  (* 16 16 16 6))
+(glhelp:deflazy-gl
+ shared-quad-to-triangle-index-buffer ()
+ (let ((index-buffer (gl:gen-buffer))
+       (indices (glhelp:quads-triangles-index-buffer *quad-to-triangle-index-buffer-quad-count*)))
+   (gl:bind-buffer :element-array-buffer index-buffer)
+   (let ((len (length indices)))
+     (gl:with-gl-array (arr :unsigned-int :count len)
+       (dotimes (i len)
+	 (setf (gl:glaref arr i) (aref indices i)))
+       (gl:buffer-data :element-array-buffer :static-draw arr)))
+   (gl:bind-buffer :element-array-buffer 0)
+   index-buffer))
 
+(defparameter *test-code*
+  '((2 (xyz) (xyz) (xyz))
+    ;;why???
+    (8 0.06 0.06)
+    (1 0.0 0.0 0.0 0.0)
+    ;;zero always comes last?
+    (0 0.0 0.0 0.0 0.0)))
+
+(defun convert56 (&optional (test *test-code*))
+  (let* ((data 
+	  (mapcar (lambda (n)
+		    (destructuring-bind (index &rest forms) n
+		      (list index (length forms))))
+		  test))
+	 (layout
+	  (glhelp::simple-vertex-array-layout data))
+	 (forms (apply 'concatenate 'list (mapcar 'rest test))))
+
+    (let ((len (glhelp::vertex-array-layout-total-size layout)))
+      (values
+       data
+       forms
+       layout
+       `(lambda (times)
+	  (let ((vertex-buffer (gl:gen-buffer)))
+	    (let ((array-count (* ,len times)))
+	      (gl:with-gl-array (arr :float :count array-count)
+		(let ((index 0))
+		  (flet ((add (n)
+			   (setf (gl:glaref arr index)
+				 n)
+			   (incf index)))
+		    (dotimes (i times)
+		      ,@(mapcar (lambda (form) `(add ,form)) forms))))
+		(glhelp::bind-to-array-buffer (vertex-buffer)
+		  (gl:buffer-data :array-buffer :static-draw arr))))))))))
 
 (defun draw-aabb (x y z &optional (aabb *fist-aabb*))
   (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)

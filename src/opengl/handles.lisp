@@ -91,35 +91,97 @@
 (defclass vao (gl-object)
   ((vbuff :accessor vertex-buffer)
    (ibuff :accessor index-buffer)
+
+   ;;control whether the vertex buffer or index buffer are cleaned up
+   ;;upon removal of the vao.
+   (v-delete-p :accessor v-delete-p :initform t)
+   (i-delete-p :accessor i-delete-p :initform t)
+   
    (va :accessor vertex-array)
    (indices :accessor indices :initform 0)
    (render-type :accessor render-type :initform :triangles)))
 (defmethod gl-delete* ((obj vao))
   (gl:delete-vertex-arrays (list (vertex-array obj)))
-  (gl:delete-buffers (list (vertex-buffer obj) (index-buffer obj))))
 
-(defun make-vertex-array (vertbuf indexbuf layout type)
-  (let ((value (glhelp::allocate-vertex-array)))
-    (glhelp::fill-vertex-array-object
-     (glhelp::vertex-array value)
-     (glhelp::vertex-buffer value)
-     (glhelp::index-buffer value)
-     vertbuf
-     indexbuf
-     layout)
-    (setf (glhelp::indices value)
-	  (length indexbuf)
-	  (glhelp::render-type value)
-	  type)
+  ;;share the index buffer because it is repetitive in the case of converting from quads
+  ;;to triangles
+  (when (v-delete-p obj)
+    (gl:delete-buffers (list (vertex-buffer obj))))
+  (when (i-delete-p obj)
+    (gl:delete-buffers (list (index-buffer obj)))))
+
+(defmacro bind-to-array-buffer ((vertex-buffer) &body body)
+  `(progn
+     (gl:bind-buffer :array-buffer ,vertex-buffer)
+     (multiple-value-prog1
+	 (locally ,@body)
+       ;; 0 is always reserved as an unbound object.
+       (gl:bind-buffer :array-buffer 0))))
+(defmacro bind-to-element-array-buffer ((index-buffer) &body body)
+  `(progn
+     (gl:bind-buffer :element-array-buffer ,index-buffer)
+     (multiple-value-prog1
+	 (locally ,@body)
+       ;; 0 is always reserved as an unbound object.
+       (gl:bind-buffer :element-array-buffer 0))))
+
+(defun use-array-buffer (vertex-buffer array &optional (type :static-draw))
+  (bind-to-array-buffer (vertex-buffer)
+    (gl:buffer-data :array-buffer type array)))
+(defun use-element-array-buffer (index-buffer array &optional (type :static-draw))
+  (bind-to-element-array-buffer (index-buffer)
+    (gl:buffer-data :element-array-buffer type array)))
+
+(defun make-vertex-array (verts indices layout type)
+  (let* ((value (glhelp::allocate-vertex-array))
+	 (vertex-array (glhelp::vertex-array value))
+	 (vertex-buffer (glhelp::vertex-buffer value))
+	 (index-buffer (glhelp::index-buffer value)))
+    
+    (let ((len (length verts)))
+      (gl:with-gl-array (arr :float :count len)
+	(dotimes (i len)
+	  (setf (gl:glaref arr i) (aref verts i)))
+	(use-array-buffer vertex-buffer arr)))
+    
+    ;; An element array buffer stores vertex indices. We fill it in the
+    ;; same way as an array buffer.
+    (let ((len (length indices)))
+      (gl:with-gl-array (arr :unsigned-int :count len)
+	(dotimes (i len)
+	  (setf (gl:glaref arr i) (aref indices i)))
+	(use-array-buffer index-buffer arr)))
+    
+    (associate-vbos-with-vao vertex-array vertex-buffer index-buffer layout)
+    (setf (glhelp::indices value) (length indices))
+    (setf (glhelp::render-type value) type)
     value))
 
+(defun assemble-vao (gl-vertbuf gl-indexbuf layout length type)
+  "assume that we have a gl-buffer for the vertices and indices, 
+we know the layout, the length, and the type (points, triangles, etc...)
+just put together a new vao"
+  (let ((vao (make-instance 'vao))
+	(vertex-array (gl:gen-vertex-array)))
+
+    (setf (index-buffer vao) gl-indexbuf)
+    (setf (vertex-buffer vao) gl-indexbuf)
+    (setf (indices vao) length)
+    (setf (render-type vao) type)
+    (setf (vertex-array vao) vertex-array)
+    (associate-vbos-with-vao vertex-array gl-vertbuf gl-indexbuf layout)
+    
+    vao))
+
 (defun allocate-vertex-array ()
-  (let ((w (make-instance 'vao)))
-    (let ((buffers (gl:gen-buffers 2)))
-      (setf (vertex-buffer w) (elt buffers 0)
-	    (index-buffer w) (elt buffers 1)))
-    (setf (vertex-array w) (gl:gen-vertex-array))
-    w))
+  (let ((vao (make-instance 'vao)))
+    (setf (vertex-buffer vao)
+	  (gl:gen-buffer))
+    (setf (index-buffer vao)
+	  (gl:gen-buffer))
+    (setf (vertex-array vao)
+	  (gl:gen-vertex-array))
+    vao))
 
 (defun draw-vertex-array (vao)
   (%draw-vertex-array

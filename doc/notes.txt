@@ -17,3 +17,6 @@ TODO:
 consolidate
 - lem-opengl impl + ncurses-clone into sucle
 - mesh to either display lists or vaos -> a number is a display list, an object is a vao
+
+TODO:
+remove all '::'? so all packages export correctly?
