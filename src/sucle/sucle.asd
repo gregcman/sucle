@@ -14,7 +14,7 @@
 	       #:cl-opengl
 	       ;;#:utility
 	       #:scratch-buffer
-	       #:reverse-array
+	       ;;#:reverse-array
 	       #:glhelp
 	       #:nsb-cga
 	       #:quads
