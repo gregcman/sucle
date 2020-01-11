@@ -23,10 +23,15 @@
 (export 'quads-triangles-index-buffer)
 ;;FIXME::rename from gl-list to display-list?
 (defmacro create-gl-list-from-specs ((type times) form)
-  `(glhelp:with-gl-list
-     (gl:with-primitives ,type
-       (loop :repeat ,times :do 
-	  (glhelp:vertex-attrib-f* ,form)))))
+  (utility:with-gensyms (fixed-times fixed-type)
+    ;;FIXME:: the prefix "fix" is unrelated for fixed-type,fixed-times vs fixnum
+    `(let ((,fixed-type ,type)
+	   (,fixed-times ,times))
+       (declare (type fixnum ,fixed-times))
+       (glhelp:with-gl-list
+	 (gl:with-primitives ,fixed-type
+	   (loop :repeat ,fixed-times :do 
+	      (glhelp:vertex-attrib-f* ,form)))))))
 
 (export 'create-gl-list-from-specs)
 
@@ -87,14 +92,18 @@
 		 (,times ,times-form)
 		 (,vertex-buffer (gl:gen-buffer))
 		 (,array-count (* ,len ,times)))
-	    (gl:with-gl-array (,arr :float :count ,array-count)
+	    (declare (type fixnum ,times ,array-count))
+	    (cffi:with-foreign-object (,arr :float ,array-count)
 	      (let ((,index 0))
+		(declare (type fixnum ,index))
 		(flet ((,add (n)
-			 (setf (gl:glaref ,arr ,index) n)
+			 (setf (cffi:mem-aref ,arr :float ,index) n)
 			 (incf ,index)))
 		  (loop :repeat ,times :do
-		    ,@(mapcar (lambda (form) `(,add ,form)) forms))))
-	      (glhelp::use-array-buffer ,vertex-buffer ,arr))
+		     ,@(mapcar (lambda (form) `(,add ,form)) forms))))
+	      (let ((glarray (gl::make-gl-array-from-pointer ,arr :float ,array-count)))
+		(glhelp::use-array-buffer ,vertex-buffer glarray)))
+	
 	    (let
 		((vao
 		  (multiple-value-bind (fixed-type index-buffer fixed-times)
