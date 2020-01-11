@@ -303,7 +303,7 @@
 
 (eval-always
   (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
-
+#+nil
 (with-declaim-inline (block-hash)
   (defun block-hash (i j k)
     (locally (declare (optimize (speed 3) (safety 0))
@@ -315,7 +315,7 @@
 (defmacro flipuv (&optional (i 'i) (j 'j) (k 'k) (u1 'u1) (u0 'u0) (v1 'v1) (v0 'v0))
   (with-gensyms (u v)
     `(locally (declare (inline block-hash))
-       (multiple-value-bind (,u ,v) (block-hash ,i ,j ,k)
+       (multiple-value-bind (,u ,v) (values t nil) ;;(block-hash ,i ,j ,k)
 	 (when ,u
 	   (rotatef ,u1 ,u0))
 	 (when ,v
