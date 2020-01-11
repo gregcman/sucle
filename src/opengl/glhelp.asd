@@ -9,7 +9,4 @@
 	       #:glsl-toolkit)
   :serial t
   :components
-  ((:file "glhelp")
-   (:file "handles")
-   (:file "other")
-   (:file "more")))
+  ((:file "opengl-helper")))
