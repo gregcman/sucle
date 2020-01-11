@@ -260,6 +260,19 @@
 	   (va-section-size object)
 	   (va-section-start object))))
 
+(defmethod make-load-form ((obj va-section) &optional env)
+  `(make-instance
+    'va-section
+    :start ',(va-section-start obj)
+    :size ',(va-section-size obj)
+    :attr ',(va-section-attr obj)))
+(defmethod make-load-form ((obj vertex-array-layout) &optional env)
+  `(make-instance
+    'vertex-array-layout
+    :attributes ',(vertex-array-layout-attributes obj)
+    :total-size ',(vertex-array-layout-total-size obj))
+  )
+
 (defun gl-vertex-attributes (vertex-array-layout)
   (let ((float-size (glhelp::sizeof :float))
 	(total-size (vertex-array-layout-total-size vertex-array-layout))
@@ -300,7 +313,7 @@
   ;; This call actually does the rendering. The vertex data comes from
   ;; the currently-bound VAO. If the input array is null, the indices
   ;; will be taken from the element array buffer bound in the current
-  ;; VAO.
+  ;; VAO. 
   (gl:draw-elements
    type
    (load-time-value (gl:make-null-gl-array :unsigned-int))

@@ -58,13 +58,13 @@
        (glhelp::use-element-array-buffer index-buffer arr)))
    index-buffer))
 
-(defun get-fixed-type-and-index-buffer-for-type (type)
+(defun get-fixed-type-and-index-buffer-for-type (type times)
   ;;convert quads to tris for new opengl.
   (case type
     (:quads
-     (values :triangles (deflazy:getfnc 'shared-quad-to-triangle-index-buffer)))
+     (values :triangles (deflazy:getfnc 'shared-quad-to-triangle-index-buffer) (* 1.5 times)))
     (otherwise
-     (values type (deflazy:getfnc 'shared-plain-index-buffer)))))
+     (values type (deflazy:getfnc 'shared-plain-index-buffer) times))))
 
 (defmacro create-vao-from-specs ((type-form times-form) form)
   (let* ((data 
@@ -77,6 +77,7 @@
 	 (forms (apply 'concatenate 'list (mapcar 'rest form))))
 
     (let ((len (glhelp::vertex-array-layout-total-size layout)))
+      (assert (= len (length forms)))
       (values
        ;;data
        ;;forms
@@ -89,21 +90,21 @@
 	    (gl:with-gl-array (,arr :float :count ,array-count)
 	      (let ((,index 0))
 		(flet ((,add (n)
-			 (setf (gl:glaref ,arr index) n)
+			 (setf (gl:glaref ,arr ,index) n)
 			 (incf ,index)))
 		  (loop :repeat ,times :do
 		    ,@(mapcar (lambda (form) `(,add ,form)) forms))))
 	      (glhelp::use-array-buffer ,vertex-buffer ,arr))
 	    (let
 		((vao
-		  (multiple-value-bind (fixed-type index-buffer)
-		      (get-fixed-type-and-index-buffer-for-type ,type)		  
+		  (multiple-value-bind (fixed-type index-buffer fixed-times)
+		      (get-fixed-type-and-index-buffer-for-type ,type ,times)		  
 		    (glhelp::assemble-vao
 		     ,vertex-buffer
 		     index-buffer
-		     ,layout
+		     ',layout
 		     ;;FIXME:: is it the total count of primitives, or points?
-		     ,times
+		     fixed-times
 		     fixed-type))))
 	      (setf (glhelp::i-delete-p vao) nil)
 	      (values vao))))))))

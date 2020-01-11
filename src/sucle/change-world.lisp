@@ -9,7 +9,7 @@
    (occlusion-state :init
 		    ) ;;:hidden, visible, waiting, :init
    occlusion-box))
-(defparameter *occlusion-culling-p* t)
+(defparameter *occlusion-culling-p* nil)
 (defun set-chunk-gl-representation-visible (value)
   (setf (chunk-gl-representation-occlusion-state value) :visible)
   (setf (chunk-gl-representation-occluded value) nil))
@@ -23,7 +23,7 @@
 	(setf occlusion-state :waiting)
 	(gl:begin-query :samples-passed query)
 	;;draw occlusion box here, get occlusion information from a box
-	(gl:call-list (chunk-gl-representation-occlusion-box value))
+	(glhelp:slow-draw (chunk-gl-representation-occlusion-box value))
 	(gl:end-query :samples-passed)))))
 
 (defun render-occlusion-queries (&optional (vec *call-lists*))
@@ -41,7 +41,7 @@
    :occlusion-query (car (gl:gen-queries 1))
    :occlusion-box occlusion-box))
 (defun destroy-chunk-gl-representation (chunk-gl-representation)
-  (gl:delete-lists (chunk-gl-representation-call-list chunk-gl-representation) 1)
+  (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 (defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
 (defun get-chunks-to-draw ()
@@ -55,8 +55,10 @@
     vec))
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
 						  (count-actually-drawn 0))
+  #+nil
   (declare (optimize (speed 3) (safety 0))
 	   (type fixnum count-actually-drawn count-occluded-by-query))
+  (declare (optimize (debug 3) (safety 3)))
   ;;(let ((a (get-internal-real-time))))
   (loop :for value :across vec :do
      (let ((display-list (chunk-gl-representation-call-list value))
@@ -86,10 +88,10 @@
 		 (gl:begin-query :samples-passed query)
 		 ;;draw occlusion box here
 		 ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
-
 		 (glhelp::slow-draw display-list)
 		 (gl:end-query :samples-passed))
-		(t (glhelp::slow-draw display-list)))))
+		(t
+		 (glhelp::slow-draw display-list)))))
 	  ;;(gl:call-list display-list)
 	  )
 	 (t ;;(print "WHAT?")
@@ -115,6 +117,7 @@
     (clrhash *g/chunk-call-list*)))
 (defun remove-chunk-model (name)
   ;;FIXME::this calls opengl. Use a queue instead?
+  (format t "~%removing: ~a" name)
   (multiple-value-bind (value existsp) (get-chunk-display-list name)
     (when existsp
       (destroy-chunk-gl-representation value)
@@ -143,23 +146,20 @@
     (with-vec (a b c) (iter)
       (let ((len (floor (scratch-buffer:iterator-fill-pointer a) 3)))
 	(unless (zerop len)
-	  (let ((display-list
-		 (locally
-		     (declare (type fixnum len)
-			      (optimize (speed 3) (safety 0)))
-		   
-		   (scratch-buffer:flush-my-iterator* ((a) (b) (c))
-		     (scratch-buffer:bind-in* ((a xyz)
-					       (b uv)
-					       (c dark))
-		       (glhelp:create-gl-list-from-specs
-			(:quads len)
-			((2 (xyz) (xyz) (xyz))
-			 (8 (uv) (uv))
-			 (1 (dark) (dark) (dark) (dark))
+	  (let ((display-list		   
+		  (scratch-buffer:flush-my-iterator* ((a) (b) (c))
+		    (scratch-buffer:bind-in* ((a xyz)
+					      (b uv)
+					      (c dark))
+		      (glhelp:create-vao-or-display-list-from-specs
+		       ;;glhelp:create-gl-list-from-specs
+		       (:quads len)
+		       ((2 (xyz) (xyz) (xyz))
+			(8 (uv) (uv))
+			(1 (dark) (dark) (dark) (dark))
 			   ;;;zero always comes last?
-			 (0 (dark) (dark) (dark) (dark))
-			 ))))))
+			(0 (dark) (dark) (dark) (dark))
+			)))))
 		(occlusion-box	 
 		 (multiple-value-bind (x y z) (world::unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))
@@ -174,8 +174,6 @@
 					    :maxx (+ (floatify world::*chunk-size-x*) foo)
 					    :maxy (+ (floatify world::*chunk-size-y*) foo)
 					    :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
-			(declare (type fixnum times)
-				 (optimize (speed 3) (safety 0)))
 			(scratch-buffer:flush-my-iterator* ((*iterator*))	       
 			  (scratch-buffer:bind-in* ((*iterator* xyz))
 			    (glhelp:create-gl-list-from-specs

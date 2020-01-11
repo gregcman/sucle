@@ -100,15 +100,17 @@
    (va :accessor vertex-array)
    (indices :accessor indices :initform 0)
    (render-type :accessor render-type :initform :triangles)))
-(defmethod gl-delete* ((obj vao))
-  (gl:delete-vertex-arrays (list (vertex-array obj)))
+(defun delete-vao (vao)
+  (gl:delete-vertex-arrays (list (vertex-array vao)))
 
   ;;share the index buffer because it is repetitive in the case of converting from quads
   ;;to triangles
-  (when (v-delete-p obj)
-    (gl:delete-buffers (list (vertex-buffer obj))))
-  (when (i-delete-p obj)
-    (gl:delete-buffers (list (index-buffer obj)))))
+  (when (v-delete-p vao)
+    (gl:delete-buffers (list (vertex-buffer vao))))
+  (when (i-delete-p vao)
+    (gl:delete-buffers (list (index-buffer vao)))))
+(defmethod gl-delete* ((obj vao))
+  (delete-vao obj))
 
 (defmacro bind-to-array-buffer ((vertex-buffer) &body body)
   `(progn
@@ -194,7 +196,7 @@ just put together a new vao"
 (declaim (inline slow-draw))
 (defun slow-draw (gl-thing)
   ;;;dispatch on either display-list or vao
-  (declare (optimize (speed 3) (safety 0)))
+  ;;(declare (optimize (speed 3) (safety 0)))
   (typecase gl-thing
     (+gluint+ (glhelp::draw-display-list gl-thing))
     (vao (draw-vertex-array gl-thing))
@@ -203,11 +205,11 @@ just put together a new vao"
 
 (defun slow-delete (gl-thing)
   ;;;dispatch on either display-list or vao
-  (declare (optimize (speed 3) (safety 0)))
+  ;;(declare (optimize (speed 3) (safety 0)))
   (typecase gl-thing
     (+gluint+ (gl:delete-lists gl-thing 1))
-    (vao (gl-delete* gl-thing))
+    (vao (delete-vao gl-thing))
     (gl-list (gl:delete-lists (glhelp::handle gl-thing) 1)))
   )
-
+(export '(slow-draw slow-delete))
 
