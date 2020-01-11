@@ -5,10 +5,7 @@
   :depends-on (#:application
 	       #:utility
 	       #:testbed
-	       #:fast-text-grid-sprites
-	       #:vecto-stuff
-	       #:cartesian-graphing
-	       #:sketch-sucle-examples)
+	       #:text-subsystem)
   :serial t
   :components 
   ((:file "basic0")))
