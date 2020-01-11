@@ -8,4 +8,4 @@
 	       #:text-subsystem)
   :serial t
   :components 
-  ((:file "basic0")))
+  ((:file "sucle")))
