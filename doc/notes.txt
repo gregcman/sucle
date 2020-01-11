@@ -23,3 +23,10 @@ remove all '::'? so all packages export correctly?
 
 TODO:
 put all of glhelp in one file?
+
+TODO:
+- logger
+- documentation generation
+- web prescence, http, server
+- update testbed, change-world, text-subsystem to use glhelp:create-vao-or-display-list-from-specs,
+compress even further with scratch-buffer:flush-my-iterator and scratch-buffer:bind-in*

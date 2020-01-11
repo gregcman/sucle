@@ -33,8 +33,8 @@
 
 (defparameter *quad-to-triangle-index-buffer-quad-count*
   ;;the number of quads in a 16x16x16 chunk if each block has 6 faces showing.
-  ;;around 100k of memory, with 32 bit unsigned ints.
-  (* 16 16 16 6))
+  ;;around 300k of memory, with 32 bit unsigned ints.
+  (* 16 16 16 6 3))
 (deflazy-gl
  shared-quad-to-triangle-index-buffer ()
  (let ((index-buffer (gl:gen-buffer))
@@ -46,7 +46,7 @@
        (glhelp::use-element-array-buffer index-buffer arr)))
    index-buffer))
 (defparameter *plain-index-buffer-count*
-	      (* 16 16 16 6))
+	      (* 16 16 16 6 3))
 (deflazy-gl
  shared-plain-index-buffer ()
  (let ((index-buffer (gl:gen-buffer))
@@ -62,7 +62,7 @@
   ;;convert quads to tris for new opengl.
   (case type
     (:quads
-     (values :triangles (deflazy:getfnc 'shared-quad-to-triangle-index-buffer) (* 1.5 times)))
+     (values :triangles (deflazy:getfnc 'shared-quad-to-triangle-index-buffer) (* 6/4 times)))
     (otherwise
      (values type (deflazy:getfnc 'shared-plain-index-buffer) times))))
 

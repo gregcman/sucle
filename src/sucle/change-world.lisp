@@ -9,7 +9,7 @@
    (occlusion-state :init
 		    ) ;;:hidden, visible, waiting, :init
    occlusion-box))
-(defparameter *occlusion-culling-p* nil)
+(defparameter *occlusion-culling-p* t)
 (defun set-chunk-gl-representation-visible (value)
   (setf (chunk-gl-representation-occlusion-state value) :visible)
   (setf (chunk-gl-representation-occluded value) nil))
@@ -117,7 +117,6 @@
     (clrhash *g/chunk-call-list*)))
 (defun remove-chunk-model (name)
   ;;FIXME::this calls opengl. Use a queue instead?
-  (format t "~%removing: ~a" name)
   (multiple-value-bind (value existsp) (get-chunk-display-list name)
     (when existsp
       (destroy-chunk-gl-representation value)
@@ -151,15 +150,16 @@
 		    (scratch-buffer:bind-in* ((a xyz)
 					      (b uv)
 					      (c dark))
-		      (glhelp:create-vao-or-display-list-from-specs
-		       ;;glhelp:create-gl-list-from-specs
-		       (:quads len)
-		       ((2 (xyz) (xyz) (xyz))
-			(8 (uv) (uv))
-			(1 (dark) (dark) (dark) (dark))
+		      (utility:with-unsafe-speed
+			(glhelp:create-vao-or-display-list-from-specs
+			 ;;glhelp:create-gl-list-from-specs
+			 (:quads len)
+			 ((2 (xyz) (xyz) (xyz))
+			  (8 (uv) (uv))
+			  (1 (dark) (dark) (dark) (dark))
 			   ;;;zero always comes last?
-			(0 (dark) (dark) (dark) (dark))
-			)))))
+			  (0 (dark) (dark) (dark) (dark))
+			  ))))))
 		(occlusion-box	 
 		 (multiple-value-bind (x y z) (world::unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))

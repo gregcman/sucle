@@ -167,7 +167,7 @@ just put together a new vao"
 	(vertex-array (gl:gen-vertex-array)))
 
     (setf (index-buffer vao) gl-indexbuf)
-    (setf (vertex-buffer vao) gl-indexbuf)
+    (setf (vertex-buffer vao) gl-vertbuf)
     (setf (indices vao) length)
     (setf (render-type vao) type)
     (setf (vertex-array vao) vertex-array)
@@ -196,7 +196,7 @@ just put together a new vao"
 (declaim (inline slow-draw))
 (defun slow-draw (gl-thing)
   ;;;dispatch on either display-list or vao
-  ;;(declare (optimize (speed 3) (safety 0)))
+  (declare (optimize (speed 3) (safety 0)))
   (typecase gl-thing
     (+gluint+ (glhelp::draw-display-list gl-thing))
     (vao (draw-vertex-array gl-thing))
@@ -205,7 +205,7 @@ just put together a new vao"
 
 (defun slow-delete (gl-thing)
   ;;;dispatch on either display-list or vao
-  ;;(declare (optimize (speed 3) (safety 0)))
+  (declare (optimize (speed 3) (safety 0)))
   (typecase gl-thing
     (+gluint+ (gl:delete-lists gl-thing 1))
     (vao (delete-vao gl-thing))
