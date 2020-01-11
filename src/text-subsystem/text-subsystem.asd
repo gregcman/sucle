@@ -6,8 +6,10 @@
   (#:deflazy
    #:utility
    #:image-utility
-    #:quads
-    #:application)
+   #:quads
+   #:application
+   #:sucle-temp
+   )
   :serial t
   :components 
   ((:file "text-subsystem"))) 

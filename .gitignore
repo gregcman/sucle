@@ -47,5 +47,6 @@ flycheck_*.el
 ~*
 
 # ignore temp files
-/temp/temp/*
+/temp/files/save/*
+
 

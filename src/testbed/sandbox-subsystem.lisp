@@ -697,8 +697,6 @@
 	      (map-into vecinto (lambda (a b) (truncate (* a b) height)) vecinto other))
 	    (getapixel (- (- height 1) y) x terrain) color))))
 
-(defvar *ourdir* (asdf:system-source-directory :testbed))
-
 (defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
   (let ((denominator (+ (*
 			 (- vy2 vy3)
@@ -743,7 +741,7 @@ e	(px-xv3 (- px vx3)))
 
 (deflazy terrain-png ()
   (image-utility::load-image-from-file
-   (utility:rebase-path #P"terrain.png" *ourdir*)))
+   (sucle-temp:path #P"res/terrain.png")))
 
 (deflazy modified-terrain-png (terrain-png)
   (color-grasses

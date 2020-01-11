@@ -14,7 +14,10 @@
 	       #:alexandria
   
 	       ;;for world-generation
-	       #:black-tie)
+	       #:black-tie
+
+	       ;;for the terrain picture
+	       #:sucle-temp)
   :serial t
   :components 
   ((:file "sandbox-subsystem")

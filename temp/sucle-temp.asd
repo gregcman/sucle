@@ -1,8 +1,8 @@
 (asdf:defsystem #:sucle-temp
   :author "terminal625"
   :license "MIT"
-  :description "a stub asdf system for temp files"
+  :description "provide a place for assets,temp, and confid files for sucle"
   :depends-on ()
   :serial t
   :components 
-  ())
+  ((:file "sucle-temp")))

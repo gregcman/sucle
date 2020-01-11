@@ -1,0 +1,7 @@
+Provide a location for:
+resources
+temporary files
+assets
+
+things that are not lisp code
+"files/" contains everything.
