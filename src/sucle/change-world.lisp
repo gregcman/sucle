@@ -148,34 +148,32 @@
 		   (gl:with-primitives :quads	     
 		     (scratch-buffer:flush-my-iterator* ((a) (b) (c))
 		       (mesh-chunk len a b c)))))
-		(occlusion-box
-		 (glhelp:with-gl-list
-		   (multiple-value-bind (x y z) (world::unhashfunc coords)
-		     (let ((*iterator* (scratch-buffer:my-iterator)))
-		       (let ((times
-			      (draw-aabb x y z
-					 (load-time-value
-					  (let ((foo *chunk-query-buffer-size*))
-					    (aabbcc::make-aabb
-					     :minx (- 0.0 foo)
-					     :miny (- 0.0 foo)
-					     :minz (- 0.0 foo)
-					     :maxx (+ (floatify world::*chunk-size-x*) foo)
-					     :maxy (+ (floatify world::*chunk-size-y*) foo)
-					     :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
-			 (declare (type fixnum times)
-				  (optimize (speed 3) (safety 0)))
-			 (gl:with-primitives :quads	     
-			   (scratch-buffer:flush-my-iterator* ((*iterator*))	       
-			     (scratch-buffer:bind-in* ((*iterator* xyz)) 
-			       (dotimes (x times)
-				 (glhelp:vertex-attrib-f*
-				     ((2 (xyz) (xyz) (xyz))
-				      ;;why???
-				      (8 0.06 0.06)
-				      (1 0.0 0.0 0.0 0.0)
-				      ;;zero always comes last?
-				      (0 0.0 0.0 0.0 0.0)))))))))))))
+		(occlusion-box	 
+		  (multiple-value-bind (x y z) (world::unhashfunc coords)
+		    (let ((*iterator* (scratch-buffer:my-iterator)))
+		      (let ((times
+			     (draw-aabb x y z
+					(load-time-value
+					 (let ((foo *chunk-query-buffer-size*))
+					   (aabbcc::make-aabb
+					    :minx (- 0.0 foo)
+					    :miny (- 0.0 foo)
+					    :minz (- 0.0 foo)
+					    :maxx (+ (floatify world::*chunk-size-x*) foo)
+					    :maxy (+ (floatify world::*chunk-size-y*) foo)
+					    :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
+			(declare (type fixnum times)
+				 (optimize (speed 3) (safety 0)))
+			(scratch-buffer:flush-my-iterator* ((*iterator*))	       
+			  (scratch-buffer:bind-in* ((*iterator* xyz))
+			    (glhelp:create-gl-list-from-specs
+			     (:quads times)
+			     ((2 (xyz) (xyz) (xyz))
+			      ;;why???
+			      (8 0.06 0.06)
+			      (1 0.0 0.0 0.0 0.0)
+			      ;;zero always comes last?
+			      (0 0.0 0.0 0.0 0.0))))))))))
 	    (set-chunk-display-list
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
@@ -188,13 +186,23 @@
  shared-quad-to-triangle-index-buffer ()
  (let ((index-buffer (gl:gen-buffer))
        (indices (glhelp:quads-triangles-index-buffer *quad-to-triangle-index-buffer-quad-count*)))
-   (gl:bind-buffer :element-array-buffer index-buffer)
    (let ((len (length indices)))
      (gl:with-gl-array (arr :unsigned-int :count len)
        (dotimes (i len)
 	 (setf (gl:glaref arr i) (aref indices i)))
-       (gl:buffer-data :element-array-buffer :static-draw arr)))
-   (gl:bind-buffer :element-array-buffer 0)
+       (glhelp::use-element-array-buffer index-buffer arr)))
+   index-buffer))
+(defparameter *plain-index-buffer-count*
+	      (* 16 16 16 6))
+(glhelp:deflazy-gl
+ shared-plain-index-buffer ()
+ (let ((index-buffer (gl:gen-buffer))
+       (indices (glhelp:quads-triangles-index-buffer *plain-index-buffer-count*)))
+   (let ((len (length indices)))
+     (gl:with-gl-array (arr :unsigned-int :count len)
+       (dotimes (i len)
+	 (setf (gl:glaref arr i) i))
+       (glhelp::use-element-array-buffer index-buffer arr)))
    index-buffer))
 
 (defparameter *test-code*
@@ -204,6 +212,14 @@
     (1 0.0 0.0 0.0 0.0)
     ;;zero always comes last?
     (0 0.0 0.0 0.0 0.0)))
+
+(defun get-fixed-type-and-index-buffer-for-type (type)
+  ;;convert quads to tris for new opengl.
+  (case type
+    (:quads
+     (values :triangles (application:getfnc 'shared-quad-to-triangle-index-buffer)))
+    (otherwise
+     (values type (application:getfnc 'shared-plain-index-buffer)))))
 
 (defun convert56 (&optional (test *test-code*))
   (let* ((data 
@@ -220,7 +236,7 @@
        data
        forms
        layout
-       `(lambda (times)
+       `(lambda (times type)
 	  (let ((vertex-buffer (gl:gen-buffer)))
 	    (let ((array-count (* ,len times)))
 	      (gl:with-gl-array (arr :float :count array-count)
@@ -231,8 +247,21 @@
 			   (incf index)))
 		    (dotimes (i times)
 		      ,@(mapcar (lambda (form) `(add ,form)) forms))))
-		(glhelp::bind-to-array-buffer (vertex-buffer)
-		  (gl:buffer-data :array-buffer :static-draw arr))))))))))
+		(glhelp::use-array-buffer vertex-buffer arr))
+	      (let
+		  ((vao
+		    (multiple-value-bind (fixed-type index-buffer)
+			(get-fixed-type-and-index-buffer-for-type type)
+		      
+			(glhelp::assemble-vao
+			 vertex-buffer
+			 index-buffer
+			 ,layout
+			 ;;FIXME:: is it the total count of primitives, or points?
+			 times
+			 fixed-type))))
+		(setf (glhelp::i-delete-p vao) nil)
+		vao))))))))
 
 (defun draw-aabb (x y z &optional (aabb *fist-aabb*))
   (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)

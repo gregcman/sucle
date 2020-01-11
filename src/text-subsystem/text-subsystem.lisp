@@ -421,13 +421,10 @@ gl_FragColor = pixcolor;
 				(b tex))
 	(ecase glhelp::*slow-draw-type*
 	  (:display-list
-	   (glhelp:with-gl-list
-	     (gl:with-primitives
-		 :quads
-	       (dotimes (x len)
-		 (glhelp:vertex-attrib-f*
-		     ((2 (tex) (tex))
-		      (0 (xyz) (xyz) (xyz) 1.0)))))))
+	   (glhelp:create-gl-list-from-specs
+	    (:quads len)
+	    ((2 (tex) (tex))
+	     (0 (xyz) (xyz) (xyz) 1.0))))
 	  (:vertex-array-object
 	   (let ((buffer (make-array (* len (+ 2 3 1)))))
 	     (let ((count 0))

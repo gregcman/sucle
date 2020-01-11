@@ -146,10 +146,10 @@ gl_FragColor.rgb = color_out;
 		     (optimize (speed 3) (safety 0)))
 	    ;;mesh-fist-box
 	    (let ((box
-		   (glhelp:with-gl-list
-		     (gl:with-primitives :quads
-		       (scratch-buffer:flush-my-iterator* ((sandbox::*iterator*))
-			 (scratch-buffer:bind-in* ((sandbox::*iterator* xyz)) 
+		   (scratch-buffer:flush-my-iterator* ((sandbox::*iterator*))
+		     (scratch-buffer:bind-in* ((sandbox::*iterator* xyz))
+		       (glhelp:with-gl-list
+			 (gl:with-primitives :quads			   
 			   (dotimes (x times)
 			     (let ((n 0.06))
 			       (glhelp:vertex-attrib-f*
