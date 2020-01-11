@@ -145,21 +145,21 @@
     (with-vec (a b c) (iter)
       (let ((len (floor (scratch-buffer:iterator-fill-pointer a) 3)))
 	(unless (zerop len)
-	  (let ((display-list		   
-		  (scratch-buffer:flush-my-iterator* ((a) (b) (c))
-		    (scratch-buffer:bind-in* ((a xyz)
-					      (b uv)
-					      (c dark))
-		      (utility:with-unsafe-speed
-			(glhelp:create-vao-or-display-list-from-specs
-			 ;;glhelp:create-gl-list-from-specs
-			 (:quads len)
-			 ((2 (xyz) (xyz) (xyz))
-			  (8 (uv) (uv))
-			  (1 (dark) (dark) (dark) (dark))
+	  (let ((display-list
+		 (utility:with-unsafe-speed
+		   (scratch-buffer:flush-my-iterator* ((a) (b) (c))
+		     (scratch-buffer:bind-in* ((a xyz)
+					       (b uv)
+					       (c dark))
+		       (glhelp:create-vao-or-display-list-from-specs
+			;;glhelp:create-gl-list-from-specs
+			(:quads len)
+			((2 (xyz) (xyz) (xyz))
+			 (8 (uv) (uv))
+			 (1 (dark) (dark) (dark) (dark))
 			   ;;;zero always comes last?
-			  (0 (dark) (dark) (dark) (dark))
-			  ))))))
+			 (0 (dark) (dark) (dark) (dark))
+			 ))))))
 		(occlusion-box	 
 		 (multiple-value-bind (x y z) (world::unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))
@@ -176,7 +176,7 @@
 					    :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
 			(scratch-buffer:flush-my-iterator* ((*iterator*))	       
 			  (scratch-buffer:bind-in* ((*iterator* xyz))
-			    (glhelp:create-gl-list-from-specs
+			    (glhelp:create-vao-or-display-list-from-specs
 			     (:quads times)
 			     ((2 (xyz) (xyz) (xyz))
 			      ;;why???

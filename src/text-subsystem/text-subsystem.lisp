@@ -404,47 +404,20 @@ gl_FragColor = pixcolor;
 (glhelp:deflazy-gl fullscreen-quad ()
   (let ((a (scratch-buffer:my-iterator))
 	(b (scratch-buffer:my-iterator))
-	(len 0))
-    (bind-iterator-out
-     (pos single-float) a
-     (bind-iterator-out
-      (tex single-float) b
+	(len 4))
+    (scratch-buffer:bind-out* ((a pos)
+			       (b tex))
       (etouq (cons 'pos (axis-aligned-quads:quadk+ 0.5 '(-1.0 1.0 -1.0 1.0))))
       (etouq
-       (cons 'tex
-	     (axis-aligned-quads:duaq 1 nil '(0.0 1.0 0.0 1.0)))))
-     (incf len 4)
-     )
-    
+	(cons 'tex
+	      (axis-aligned-quads:duaq 1 nil '(0.0 1.0 0.0 1.0)))))
     (scratch-buffer:flush-my-iterator* ((a) (b))
       (scratch-buffer:bind-in* ((a xyz)
 				(b tex))
-	(ecase glhelp::*slow-draw-type*
-	  (:display-list
-	   (glhelp:create-gl-list-from-specs
+	(glhelp:create-vao-or-display-list-from-specs
 	    (:quads len)
 	    ((2 (tex) (tex))
-	     (0 (xyz) (xyz) (xyz) 1.0))))
-	  (:vertex-array-object
-	   (let ((buffer (make-array (* len (+ 2 3 1)))))
-	     (let ((count 0))
-	       (flet ((add (n)
-			(setf (aref buffer count) n)
-			(incf count)))
-		 (dotimes (x len)
-		   (add (tex))
-		   (add (tex))
-		   (add (xyz))
-		   (add (xyz))
-		   (add (xyz))
-		   (add 1.0))))
-	     (glhelp::make-vertex-array
-	      buffer
-	      (glhelp:quads-triangles-index-buffer len)
-	      (glhelp::simple-vertex-array-layout
-	       '((2 2)
-		 (0 4)))
-	      :triangles))))))))
+	     (0 (xyz) (xyz) (xyz) 1.0)))))))
 
 (defun draw-fullscreen-quad ()
   (glhelp::slow-draw (getfnc 'text-sub::fullscreen-quad)))
