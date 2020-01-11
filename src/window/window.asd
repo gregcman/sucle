@@ -10,5 +10,4 @@
   :serial t
   :components  
   ((:file "package")
-   (:file "glfw3")
-   (:file "input-array"))) 
+   (:file "glfw3"))) 
