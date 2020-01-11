@@ -1,0 +1,14 @@
+sucle is not a minecraft clone.
+sucle is not an unreal engine clone.
+sucle does not seek to rival emacs.
+
+sucle is not for data visualization, such as d3.js
+sucle is not for looking at memes.
+
+sucle is:
+- simple
+- jump around in an infinite block world inspired by:
+-- himno
+-- super mario maker
+
+it should be simple voxels, but like walking around in a dream.
