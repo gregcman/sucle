@@ -135,6 +135,7 @@
 	(sort (alexandria:hash-table-keys world::*chunks*) #'< :key
 	      'unsquared-chunk-distance)))
 
+(defparameter *chunk-query-buffer-size* 8)
 (defun update-chunk-mesh (coords iter)
   (when coords
     (remove-chunk-model coords)
@@ -152,13 +153,15 @@
 		 (glhelp:with-gl-list
 		   (multiple-value-bind (x y z) (world::unhashfunc coords)
 		     (draw-aabb2 x y z
-				 (load-time-value (aabbcc::make-aabb
-						   :minx 0.0
-						   :miny 0.0
-						   :minz 0.0
-						   :maxx (floatify world::*chunk-size-x*)
-						   :maxy (floatify world::*chunk-size-y*)
-						   :maxz (floatify world::*chunk-size-z*))))))))
+				 (load-time-value
+				  (let ((foo *chunk-query-buffer-size*))
+				    (aabbcc::make-aabb
+				     :minx (- 0.0 foo)
+				     :miny (- 0.0 foo)
+				     :minz (- 0.0 foo)
+				     :maxx (+ (floatify world::*chunk-size-x*) foo)
+				     :maxy (+ (floatify world::*chunk-size-y*) foo)
+				     :maxz (+ (floatify world::*chunk-size-z*) foo)))))))))
 	    (set-chunk-display-list
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
