@@ -849,6 +849,7 @@ gl_FragColor.rgb = temp;
      (:sampler "sampler")
      (:time "time"))))
 
+#+nil
 (defun draw-aabb (x y z &optional (aabb *fist-aabb*))
   ;;;;draw the fist hitbox
   (progn
@@ -858,6 +859,7 @@ gl_FragColor.rgb = temp;
       (draw-box (+ minx x -0) (+  miny y -0) (+  minz z -0)
 		(+ maxx x -0) (+  maxy y -0) (+  maxz z -0)))))
 
+#+nil
 (defun draw-box (minx miny minz maxx maxy maxz)
   (let ((h0 0.0)
 	(h1 (/ 1.0 3.0))

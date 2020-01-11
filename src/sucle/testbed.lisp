@@ -136,6 +136,8 @@ gl_FragColor.rgb = color_out;
   (gl:disable :cull-face)
   (gl:polygon-mode :front-and-back :line)
   (gl:line-width 2)
+  ;;FIXME::render the fist again
+  #+nil
   (when (sandbox-sub::fister-exists *fist*)
     (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
       (with-vec (a b c) (selected-block)
