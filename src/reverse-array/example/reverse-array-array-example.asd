@@ -3,7 +3,7 @@
   :license "MIT"
   :description "example use case for the reverse-array-array"
   :depends-on
-  (#:reverse-array-array)
+  (#:reverse-array)
   :serial t
   :components    
   ((:file "reverse-array-array-example")))

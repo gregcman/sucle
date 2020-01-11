@@ -4,7 +4,7 @@
   :description "Draw coordinates like OpenGL immediate, even if unsupported"
   :depends-on (#:utility
 	       #:cl-opengl
-	       #:reverse-array-iterator
+	       #:reverse-array
 	       #:scratch-buffer)
   :components 
   ((:file "opengl-immediate"))) 

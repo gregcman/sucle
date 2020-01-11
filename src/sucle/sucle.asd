@@ -14,7 +14,7 @@
 	       #:cl-opengl
 	       ;;#:utility
 	       #:scratch-buffer
-	       #:reverse-array-iterator
+	       #:reverse-array
 	       #:glhelp
 	       #:nsb-cga
 	       #:quads
@@ -28,7 +28,7 @@
 	       ;;</SANDBOX>
 	      
 	       #:image-utility
-	       #:reverse-array-iterator
+	       ;;#:reverse-array
 	       #:uncommon-lisp
 	       #:fps-independent-timestep
 	       ;;#:aabbcc
