@@ -193,7 +193,7 @@ gl_FragColor.rgb = color_out;
   ;;FIXME::?
   (setf sucle-mp::*paused* *paused*)
   (cond (*paused*
-	 (fps-independent-timestep::tick *ticker* ()))
+	 (fps:tick))
 	(t
 	 ;;Polling
 	 ;;Physics
@@ -228,10 +228,6 @@ gl_FragColor.rgb = color_out;
 (defparameter *mouse-multiplier* 0.002617)
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 ;;;
-(defparameter *ticker*
-  (fps-independent-timestep:make-ticker
-   (floor 1000000 60)
-   most-positive-fixnum))
 
 (defparameter *ent* (sandbox-sub::gentity))
 (defparameter *fist* (sandbox-sub::gen-fister))
@@ -288,7 +284,7 @@ gl_FragColor.rgb = color_out;
 	(otherwise (easef sandbox-sub::*fov* *start-fov* 0.1)))
       (fist-stuff pos)
       (multiple-value-bind (fraction times)
-	  (fps-independent-timestep::tick *ticker* ()
+	  (fps:tick
 	    (incf *ticks*)
 	    (setf sandbox::*daytime*
 		  (floatify		     

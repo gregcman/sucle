@@ -40,6 +40,7 @@
      ;;(our-load)
      (let ((text-sub::*text-data-what-type* :framebuffer))
        (window::set-vsync t)
+       (fps:set-fps 60)
        (unwind-protect
 	    (loop
 	       (application:poll-app)
