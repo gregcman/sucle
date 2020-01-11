@@ -70,8 +70,8 @@
   (let ((var (gensym)))
     `(let ((,var ,a)) 
        (reset-my-iterator ,var)
-       ,@body
-       (free-my-iterator-memory ,var))))
+       (multiple-value-prog1 (locally ,@body)
+	 (free-my-iterator-memory ,var)))))
  
 (defun iterator-fill-pointer (iterator)
   (let ((len (- (p-index iterator))))
@@ -90,10 +90,10 @@
     ,@body))
 
 (defmacro bind-in* ((&rest forms) &body body)
-  `(utility:nest ,@(mapcar (lambda (x) `(bind-in ,x)) forms) (progn ,@body)))
+  `(utility:nest ,@(mapcar (lambda (x) `(bind-in ,x)) forms) (locally ,@body)))
 
 (defmacro bind-out* ((&rest forms) &body body)
-  `(utility:nest ,@(mapcar (lambda (x) `(bind-out ,x)) forms) (progn ,@body)))
+  `(utility:nest ,@(mapcar (lambda (x) `(bind-out ,x)) forms) (locally ,@body)))
 
 (defmacro flush-my-iterator* ((&rest forms) &body body)
-  `(utility:nest ,@(mapcar (lambda (x) `(flush-my-iterator ,x)) forms) (progn ,@body)))
+  `(utility:nest ,@(mapcar (lambda (x) `(flush-my-iterator ,x)) forms) (locally ,@body)))

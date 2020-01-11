@@ -415,40 +415,37 @@ gl_FragColor = pixcolor;
 	     (axis-aligned-quads:duaq 1 nil '(0.0 1.0 0.0 1.0)))))
      (incf len 4)
      )
-    (let ((buffer (make-array (* len (+ 2 3 1)))))
-      (scratch-buffer:flush-my-iterator* ((a) (b))
-	(let ((count 0))
-	  (flet ((add (n)
-		   (setf (aref buffer count) n)
-		   (incf count)))
-	    (scratch-buffer:bind-in* ((a xyz)
-				      (b tex))
-	      (dotimes (x len)
-		(add (tex))
-		(add (tex))
-		(add (xyz))
-		(add (xyz))
-		(add (xyz))
-		(add 1.0))))))
-      (let ((count 0))
-	(flet ((getn ()
-		 (prog1 (aref buffer count)
-		   (incf count))))
-	  (ecase glhelp::*slow-draw-type*
-	    (:display-list
-	     (glhelp:with-gl-list
-	       (gl:with-primitives
-		   :quads
+    
+    (scratch-buffer:flush-my-iterator* ((a) (b))
+      (scratch-buffer:bind-in* ((a xyz)
+				(b tex))
+	(ecase glhelp::*slow-draw-type*
+	  (:display-list
+	   (glhelp:with-gl-list
+	     (gl:with-primitives
+		 :quads
+	       (dotimes (x len)
+		 (%gl:vertex-attrib-2f 2
+				       (tex)
+				       (tex))
+		 (%gl:vertex-attrib-4f 0
+				       (xyz)
+				       (xyz)
+				       (xyz)
+				       1.0)))))
+	  (:vertex-array-object
+	   (let ((buffer (make-array (* len (+ 2 3 1)))))
+	     (let ((count 0))
+	       (flet ((add (n)
+			(setf (aref buffer count) n)
+			(incf count)))
 		 (dotimes (x len)
-		   (%gl:vertex-attrib-2f 2
-					 (getn)
-					 (getn))
-		   (%gl:vertex-attrib-4f 0
-					 (getn)
-					 (getn)
-					 (getn)
-					 (getn))))))
-	    (:vertex-array-object
+		   (add (tex))
+		   (add (tex))
+		   (add (xyz))
+		   (add (xyz))
+		   (add (xyz))
+		   (add 1.0))))
 	     (glhelp::make-vertex-array
 	      buffer
 	      (quads-triangles-index-buffer len)
