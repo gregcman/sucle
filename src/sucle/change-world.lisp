@@ -123,7 +123,7 @@
 (defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 
 (defun call-with-world-meshing-lparallel (fun)
-  (sandbox.multiprocessing::with-initialize-multiprocessing
+  (sucle-mp::with-initialize-multiprocessing
     (funcall fun)))
 
 (defun update-world-vao ()
@@ -314,7 +314,7 @@ decreases when finished.")
 (defparameter *max-gl-meshing-iterations-per-frame* 2)
 
 (defun reset-meshers ()
-  (sandbox.multiprocessing::with-kernel
+  (sucle-mp::with-kernel
     (lparallel:kill-tasks 'mesh-chunk)
     #+nil
     (progn
@@ -328,11 +328,11 @@ decreases when finished.")
   (when (plusp *meshes-pending-for-gl*)
     (let ((count 0))
       (block stop-meshing
-	(sandbox.multiprocessing::do-queue-iterator (job-task *finished-mesh-tasks*)
+	(sucle-mp::do-queue-iterator (job-task *finished-mesh-tasks*)
 	  (when (> count *max-gl-meshing-iterations-per-frame*)
 	    (return-from stop-meshing))
 	  (incf count)
-	  (let ((value (car (sandbox.multiprocessing::job-task-return-values (job-task)))))
+	  (let ((value (car (sucle-mp::job-task-return-values (job-task)))))
 	    (cond (value
 		   (destructuring-bind (type function . args) value
 		     ;;FIXME::document this somewhere?
@@ -368,7 +368,7 @@ decreases when finished.")
 			  )
 		 (incf *total-background-chunk-mesh-jobs*)
 		 (let ((lparallel:*task-category* 'mesh-chunk))
-		   (sandbox.multiprocessing::submit 
+		   (sucle-mp::submit 
 		    (lambda (iter space chunk-pos)
 		      (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		      (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
@@ -574,7 +574,7 @@ decreases when finished.")
 	      ;;FIXME::have multiple unique-task hashes?
 	      (job-key (cons :save-chunk key)))
 	 ;;save the chunk first?
-	 (sandbox.multiprocessing::submit-unique-task
+	 (sucle-mp::submit-unique-task
 	  job-key
 	  ((lambda ()
 	     (cond
@@ -596,8 +596,8 @@ decreases when finished.")
 	   :data job-key
 	   :callback (lambda (job-task)
 		       (declare (ignorable job-task))
-		       (sandbox.multiprocessing::remove-unique-task-key
-			(sandbox.multiprocessing::job-task-data job-task)))
+		       (sucle-mp::remove-unique-task-key
+			(sucle-mp::job-task-data job-task)))
 	   ;;this task, saving and loading, must not be interrupted
 	   :unkillable t)))))))
 
@@ -642,11 +642,11 @@ decreases when finished.")
       (dirty-push-around key)))
   ;;(print 34243)
   (let ((job-key (cons :chunk-load key)))
-    (sandbox.multiprocessing::submit-unique-task
+    (sucle-mp::submit-unique-task
      job-key
      ((lambda ()
-	(setf (cdr (sandbox.multiprocessing::job-task-data
-		    sandbox.multiprocessing::*current-job-task*))
+	(setf (cdr (sucle-mp::job-task-data
+		    sucle-mp::*current-job-task*))
 	      (cond ((not (space-for-new-chunk-p key))
 		     ;;(format t "~%WTF? ~a chunk already exists" key)
 		     :skipping)
@@ -654,10 +654,10 @@ decreases when finished.")
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
-		  (let* ((job-key (car (sandbox.multiprocessing::job-task-data job-task)))
+		  (let* ((job-key (car (sucle-mp::job-task-data job-task)))
 			 (key (cdr job-key))
 			 (chunk
-			  (cdr (sandbox.multiprocessing::job-task-data job-task))))
+			  (cdr (sucle-mp::job-task-data job-task))))
 		    ;;FIXME? locking is not necessary if the callback runs in the
 		    ;;same thread as the code which changes the chunk-array and *chunks* ?
 		    (cond
@@ -681,7 +681,7 @@ decreases when finished.")
 			     ;;(background-generation key)
 			     )
 			    (t (dirty-push-around key))))))))
-		  (sandbox.multiprocessing::remove-unique-task-key job-key)
+		  (sucle-mp::remove-unique-task-key job-key)
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))
 

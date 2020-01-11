@@ -163,7 +163,7 @@ gl_FragColor.rgb = color_out;
 (defparameter *session* nil)
 (defun per-frame ()
   ;;FIXME::where is the best place to flush the job-tasks?
-  (sandbox.multiprocessing::flush-job-tasks)
+  (sucle-mp::flush-job-tasks)
   
   (application::on-session-change *session*
     (load-world t))
@@ -174,7 +174,7 @@ gl_FragColor.rgb = color_out;
       (moused))
   (setf *paused* (window::mice-free-p))
   ;;FIXME::?
-  (setf sandbox.multiprocessing::*paused* *paused*)
+  (setf sucle-mp::*paused* *paused*)
   (cond (*paused*
 	 (fps-independent-timestep::tick *ticker* ()))
 	(t
@@ -663,14 +663,14 @@ gl_FragColor.rgb = color_out;
 	    (* z 16))))
 (defun background-generation (key)
   (let ((job-key (cons :world-gen key)))
-    (sandbox.multiprocessing::submit-unique-task
+    (sucle-mp::submit-unique-task
      job-key
      ((lambda ()
 	(generate-for-new-chunk key))
       :callback (lambda (job-task)
 		  (declare (ignore job-task))
 		  (sandbox::dirty-push-around key)
-		  (sandbox.multiprocessing::remove-unique-task-key job-key))))))
+		  (sucle-mp::remove-unique-task-key job-key))))))
 
 (utility:with-unsafe-speed
   (defun generate-for-new-chunk (key)

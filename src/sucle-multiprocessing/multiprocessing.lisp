@@ -1,6 +1,7 @@
-(defpackage #:sandbox.multiprocessing
-  (:use :cl))
-(in-package #:sandbox.multiprocessing)
+(defpackage #:sucle-multiprocessing
+  (:use :cl)
+  (:nicknames :sucle-mp))
+(in-package #:sucle-mp)
 
 (defun quickload ()
   #+quicklisp

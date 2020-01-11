@@ -12,22 +12,16 @@
 	       ;;<TESTBED>
 	       ;;<SANDBOX>
 	       #:cl-opengl
-	       #:utility
+	       ;;#:utility
 	       #:scratch-buffer
 	       #:reverse-array-iterator
 	       #:glhelp
 	       #:nsb-cga
 	       #:quads
-	       ;;for serialize
-	       #:cl-conspack
-	       #:salza2
-	       #:chipz
-	       ;;for multiprocessing
-	       #:lparallel
-	       #:bordeaux-threads
-	       #:cl-cpus
-	       #:uncommon-lisp
-	       #:utility
+
+	       
+	       #:sucle-serialize
+	       #:sucle-multiprocessing
 
 	       #:aabbcc ;;for occlusion culling
 	       
@@ -37,7 +31,7 @@
 	       #:reverse-array-iterator
 	       #:uncommon-lisp
 	       #:fps-independent-timestep
-	       #:aabbcc
+	       ;;#:aabbcc
 	       #:control
 	       #:camera-matrix
 	       #:alexandria
@@ -55,8 +49,6 @@
   (
    ;;<SANDBOX>
    (:file "queue")
-   (:file "serialize") ;;generic file loading and stuff
-   (:file "multiprocessing")
    (:file "package")
    (:file "world")
    (:file "persist-world") ;;world <-> filesystem

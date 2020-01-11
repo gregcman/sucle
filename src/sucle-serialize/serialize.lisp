@@ -1,6 +1,6 @@
-(defpackage #:sandbox.serialize
+(defpackage #:sucle-serialize
   (:use :cl))
-(in-package #:sandbox.serialize)
+(in-package #:sucle-serialize)
 
 ;;;Store a list of lisp objects as multiple lisp objects printed by
 ;;;the lisp printer in order

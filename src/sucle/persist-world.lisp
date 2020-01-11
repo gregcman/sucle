@@ -25,7 +25,7 @@
   ;;FIXME::undocumented swizzling and multiplication by 16, as well as loadchunk
   (let ((filename (convert-object-to-filename (chunk-coordinate-to-filename position))))
     ;;(format t "~%Saving chunk ~a" filename)
-    (sandbox.serialize::store-lisp-objects-to-file
+    (sucle-serialize::store-lisp-objects-to-file
      (merge-pathnames
       filename
       path)
@@ -34,7 +34,7 @@
 
 (defun loadchunk (chunk-coordinates &optional (path (world-path)))
   (let ((data
-	 (sandbox.serialize::retrieve-lisp-objects-from-file
+	 (sucle-serialize::retrieve-lisp-objects-from-file
 	  (merge-pathnames (convert-object-to-filename
 			    (chunk-coordinate-to-filename chunk-coordinates))
 			   path))))
