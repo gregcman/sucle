@@ -144,13 +144,25 @@
       (let ((len (floor (scratch-buffer:iterator-fill-pointer a) 3)))
 	(unless (zerop len)
 	  (let ((display-list
-		 (glhelp:with-gl-list
-		   (gl:with-primitives :quads	     
-		     (scratch-buffer:flush-my-iterator* ((a) (b) (c))
-		       (mesh-chunk len a b c)))))
+		 (locally
+		     (declare (type fixnum len)
+			      (optimize (speed 3) (safety 0)))
+		   
+		   (scratch-buffer:flush-my-iterator* ((a) (b) (c))
+		     (scratch-buffer:bind-in* ((a xyz)
+					       (b uv)
+					       (c dark))
+		       (glhelp:create-gl-list-from-specs
+			(:quads len)
+			((2 (xyz) (xyz) (xyz))
+			 (8 (uv) (uv))
+			 (1 (dark) (dark) (dark) (dark))
+			   ;;;zero always comes last?
+			 (0 (dark) (dark) (dark) (dark))
+			 ))))))
 		(occlusion-box	 
-		  (multiple-value-bind (x y z) (world::unhashfunc coords)
-		    (let ((*iterator* (scratch-buffer:my-iterator)))
+		 (multiple-value-bind (x y z) (world::unhashfunc coords)
+		   (let ((*iterator* (scratch-buffer:my-iterator)))
 		      (let ((times
 			     (draw-aabb x y z
 					(load-time-value
@@ -178,90 +190,6 @@
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
 
-(defparameter *quad-to-triangle-index-buffer-quad-count*
-  ;;the number of quads in a 16x16x16 chunk if each block has 6 faces showing.
-  ;;around 100k of memory, with 32 bit unsigned ints.
-  (* 16 16 16 6))
-(glhelp:deflazy-gl
- shared-quad-to-triangle-index-buffer ()
- (let ((index-buffer (gl:gen-buffer))
-       (indices (glhelp:quads-triangles-index-buffer *quad-to-triangle-index-buffer-quad-count*)))
-   (let ((len (length indices)))
-     (gl:with-gl-array (arr :unsigned-int :count len)
-       (dotimes (i len)
-	 (setf (gl:glaref arr i) (aref indices i)))
-       (glhelp::use-element-array-buffer index-buffer arr)))
-   index-buffer))
-(defparameter *plain-index-buffer-count*
-	      (* 16 16 16 6))
-(glhelp:deflazy-gl
- shared-plain-index-buffer ()
- (let ((index-buffer (gl:gen-buffer))
-       (indices (glhelp:quads-triangles-index-buffer *plain-index-buffer-count*)))
-   (let ((len (length indices)))
-     (gl:with-gl-array (arr :unsigned-int :count len)
-       (dotimes (i len)
-	 (setf (gl:glaref arr i) i))
-       (glhelp::use-element-array-buffer index-buffer arr)))
-   index-buffer))
-
-(defparameter *test-code*
-  '((2 (xyz) (xyz) (xyz))
-    ;;why???
-    (8 0.06 0.06)
-    (1 0.0 0.0 0.0 0.0)
-    ;;zero always comes last?
-    (0 0.0 0.0 0.0 0.0)))
-
-(defun get-fixed-type-and-index-buffer-for-type (type)
-  ;;convert quads to tris for new opengl.
-  (case type
-    (:quads
-     (values :triangles (application:getfnc 'shared-quad-to-triangle-index-buffer)))
-    (otherwise
-     (values type (application:getfnc 'shared-plain-index-buffer)))))
-
-(defun convert56 (&optional (test *test-code*))
-  (let* ((data 
-	  (mapcar (lambda (n)
-		    (destructuring-bind (index &rest forms) n
-		      (list index (length forms))))
-		  test))
-	 (layout
-	  (glhelp::simple-vertex-array-layout data))
-	 (forms (apply 'concatenate 'list (mapcar 'rest test))))
-
-    (let ((len (glhelp::vertex-array-layout-total-size layout)))
-      (values
-       data
-       forms
-       layout
-       `(lambda (times type)
-	  (let ((vertex-buffer (gl:gen-buffer)))
-	    (let ((array-count (* ,len times)))
-	      (gl:with-gl-array (arr :float :count array-count)
-		(let ((index 0))
-		  (flet ((add (n)
-			   (setf (gl:glaref arr index)
-				 n)
-			   (incf index)))
-		    (dotimes (i times)
-		      ,@(mapcar (lambda (form) `(add ,form)) forms))))
-		(glhelp::use-array-buffer vertex-buffer arr))
-	      (let
-		  ((vao
-		    (multiple-value-bind (fixed-type index-buffer)
-			(get-fixed-type-and-index-buffer-for-type type)
-		      
-			(glhelp::assemble-vao
-			 vertex-buffer
-			 index-buffer
-			 ,layout
-			 ;;FIXME:: is it the total count of primitives, or points?
-			 times
-			 fixed-type))))
-		(setf (glhelp::i-delete-p vao) nil)
-		vao))))))))
 
 (defun draw-aabb (x y z &optional (aabb *fist-aabb*))
   (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
@@ -331,20 +259,6 @@ gl_FragColor = vec4(1.0);
 }"
    '(("position" 2)) 
    '((:pmv "projection_model_view"))))
-
-
-(defun mesh-chunk (times a b c)
-  (declare (type fixnum times))
-  (declare (optimize (speed 3) (safety 0)))
-  (scratch-buffer:bind-in* ((a xyz)
-			    (b uv)
-			    (c dark)) 
-    (dotimes (x times)
-      (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
-      (%gl:vertex-attrib-2f 8 (uv) (uv))
-      (%gl:vertex-attrib-4f 1 (dark) (dark) (dark) (dark))
-      (%gl:vertex-attrib-4f 0 (dark) (dark) (dark) (dark));;;zero always comes last?
-      )))
 
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)

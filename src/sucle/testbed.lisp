@@ -148,13 +148,12 @@ gl_FragColor.rgb = color_out;
 	    (let ((box
 		   (scratch-buffer:flush-my-iterator* ((sandbox::*iterator*))
 		     (scratch-buffer:bind-in* ((sandbox::*iterator* xyz))
-		       (glhelp:with-gl-list
-			 (gl:with-primitives :quads			   
-			   (dotimes (x times)
-			     (let ((n 0.06))
-			       (glhelp:vertex-attrib-f*
-				   ((3 n n n)
-				    (0 (xyz) (xyz) (xyz))))))))))))
+		       (let ((n 0.06))			 
+			 (glhelp:create-gl-list-from-specs
+			  (:quads times)
+			  ((3 n n n)
+			   (0 (xyz) (xyz) (xyz)))))
+		       ))))
 	      (glhelp::slow-draw box)
 	      (glhelp::slow-delete box)
 	      )))

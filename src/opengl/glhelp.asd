@@ -11,4 +11,5 @@
   :components
   ((:file "glhelp")
    (:file "handles")
-   (:file "other")))
+   (:file "other")
+   (:file "more")))
