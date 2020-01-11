@@ -141,19 +141,18 @@ gl_FragColor.rgb = color_out;
     (let ((selected-block (sandbox-sub::fister-selected-block testbed::*fist*)))
       (with-vec (a b c) (selected-block)
 	(let ((sandbox::*iterator* (scratch-buffer:my-iterator)))
-	  (let ((times (sandbox::draw-aabb2 a b c *block-aabb2*)))
+	  (let ((times (sandbox::draw-aabb a b c *block-aabb2*)))
+	    (declare (type fixnum times)
+		     (optimize (speed 3) (safety 0)))
+	    ;;mesh-fist-box
 	    (let ((box
 		   (glhelp:with-gl-list
 		     (gl:with-primitives :lines	     
 		       (scratch-buffer:flush-my-iterator* ((sandbox::*iterator*))
-			 ;;;mesh-fist-box
-			 (locally
-			     (declare (type fixnum times)
-				      (optimize (speed 3) (safety 0)))
-			   (scratch-buffer:bind-in* ((sandbox::*iterator* xyz)) 
-			     (dotimes (x times)
-			       (%gl:vertex-attrib-3f 3 0.06 0.06 0.06)
-			       (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz))))))))))
+			 (scratch-buffer:bind-in* ((sandbox::*iterator* xyz)) 
+			   (dotimes (x times)
+			     (%gl:vertex-attrib-3f 3 0.06 0.06 0.06)
+			     (%gl:vertex-attrib-3f 0 (xyz) (xyz) (xyz)))))))))
 	      (glhelp::slow-draw box)
 	      (glhelp::slow-delete box)
 	      )))

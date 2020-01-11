@@ -152,46 +152,45 @@
 		 (glhelp:with-gl-list
 		   (multiple-value-bind (x y z) (world::unhashfunc coords)
 		     (let ((*iterator* (scratch-buffer:my-iterator)))
-		       (let ((len
-			      (draw-aabb2 x y z
-					  (load-time-value
-					   (let ((foo *chunk-query-buffer-size*))
-					     (aabbcc::make-aabb
-					      :minx (- 0.0 foo)
-					      :miny (- 0.0 foo)
-					      :minz (- 0.0 foo)
-					      :maxx (+ (floatify world::*chunk-size-x*) foo)
-					      :maxy (+ (floatify world::*chunk-size-y*) foo)
-					      :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
+		       (let ((times
+			      (draw-aabb x y z
+					 (load-time-value
+					  (let ((foo *chunk-query-buffer-size*))
+					    (aabbcc::make-aabb
+					     :minx (- 0.0 foo)
+					     :miny (- 0.0 foo)
+					     :minz (- 0.0 foo)
+					     :maxx (+ (floatify world::*chunk-size-x*) foo)
+					     :maxy (+ (floatify world::*chunk-size-y*) foo)
+					     :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
+			 (declare (type fixnum times)
+				  (optimize (speed 3) (safety 0)))
 			 (gl:with-primitives :quads	     
-			   (scratch-buffer:flush-my-iterator* ((*iterator*))
-			     (mesh-box len *iterator*)))))))))
+			   (scratch-buffer:flush-my-iterator* ((*iterator*))	       
+			     (scratch-buffer:bind-in* ((*iterator* xyz)) 
+			       (dotimes (x times)
+				 (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
+				 ;;why???
+				 (%gl:vertex-attrib-2f 8 0.06 0.06)
+				 (%gl:vertex-attrib-4f 1 0.0 0.0 0.0 0.0)
+				 (%gl:vertex-attrib-4f 0 0.0 0.0 0.0 0.0)
+				 ;;zero always comes last?
+				 ))))))))))
 	    (set-chunk-display-list
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
 
-(defun mesh-box (times a)
-  (declare (type fixnum times))
-  (declare (optimize (speed 3) (safety 0)))
-  (scratch-buffer:bind-in* ((a xyz)) 
-    (dotimes (x times)
-      (%gl:vertex-attrib-3f 2 (xyz) (xyz) (xyz))
-      ;;;why???
-      (%gl:vertex-attrib-2f 8 0.06 0.06)
-      (%gl:vertex-attrib-4f 1 0.0 0.0 0.0 0.0)
-      (%gl:vertex-attrib-4f 0 0.0 0.0 0.0 0.0);;;zero always comes last?
-      )))
 
-(defun draw-aabb2 (x y z &optional (aabb *fist-aabb*))
-  ;;;;draw the fist hitbox
-  (progn
-    (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
-		 (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
-	aabb
-      (draw-box2 (+ minx x -0) (+  miny y -0) (+  minz z -0)
-		 (+ maxx x -0) (+  maxy y -0) (+  maxz z -0)))))
 
-(defun draw-box2 (minx miny minz maxx maxy maxz)
+(defun draw-aabb (x y z &optional (aabb *fist-aabb*))
+  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
+	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
+      aabb
+    (draw-box
+     (+ minx x -0) (+  miny y -0) (+  minz z -0)
+     (+ maxx x -0) (+  maxy y -0) (+  maxz z -0))))
+
+(defun draw-box (minx miny minz maxx maxy maxz)
   (macrolet ((vvv (x y z)
 	       `(progn
 		  (fun ,x)
