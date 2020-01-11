@@ -15,3 +15,12 @@ highly optimized iterator for writing to the reverse-array-array"
    (:file "reverse-array-array")
    (:file "iterator")))
 
+(asdf:defsystem #:reverse-array-array-example
+  :author "terminal625"
+  :license "MIT"
+  :description "example use case for the reverse-array-array"
+  :depends-on
+  (#:reverse-array)
+  :serial t
+  :components    
+  ((:file "example")))
