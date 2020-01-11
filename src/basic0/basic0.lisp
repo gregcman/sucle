@@ -83,8 +83,8 @@
   (progn
     (setf sandbox::*some-saves*
 	  (merge-pathnames
-	   "save/"
-	   (asdf:system-source-directory :sucle)
+	   "temp/save/"
+	   (asdf:system-source-directory :sucle-temp)
 	   ))))
 
 (defun load-world-again (name)
