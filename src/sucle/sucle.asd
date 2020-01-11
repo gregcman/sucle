@@ -54,8 +54,4 @@
    (:file "change-world")
    ;;</SANDBOX>
    
-   ;;<TESTBED>
-   (:file "sandbox-subsystem")
-   ;;</TESTBED>
-   
    (:file "sucle")))
