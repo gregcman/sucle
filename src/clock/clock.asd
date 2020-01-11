@@ -2,6 +2,6 @@
   :author "terminal625"
   :license "MIT"
   :description "a millisecond or microsecond timer"
-  :depends-on (#:utility)
+  :depends-on (#:local-time)
   :components 
   ((:file "clock")))
