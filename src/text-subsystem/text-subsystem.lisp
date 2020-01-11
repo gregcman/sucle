@@ -411,13 +411,12 @@ gl_FragColor = pixcolor;
       (etouq
 	(cons 'tex
 	      (axis-aligned-quads:duaq 1 nil '(0.0 1.0 0.0 1.0)))))
-    (scratch-buffer:flush-my-iterator* ((a) (b))
-      (scratch-buffer:bind-in* ((a xyz)
-				(b tex))
-	(glhelp:create-vao-or-display-list-from-specs
-	    (:quads len)
-	    ((2 (tex) (tex))
-	     (0 (xyz) (xyz) (xyz) 1.0)))))))
+    (scratch-buffer:flush-bind-in* ((a xyz)
+				    (b tex))
+      (glhelp:create-vao-or-display-list-from-specs
+       (:quads len)
+       ((2 (tex) (tex))
+	(0 (xyz) (xyz) (xyz) 1.0))))))
 
 (defun draw-fullscreen-quad ()
   (glhelp::slow-draw (getfnc 'text-sub::fullscreen-quad)))

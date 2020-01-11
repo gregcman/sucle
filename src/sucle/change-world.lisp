@@ -147,19 +147,19 @@
 	(unless (zerop len)
 	  (let ((display-list
 		 (utility:with-unsafe-speed
-		   (scratch-buffer:flush-my-iterator* ((a) (b) (c))
-		     (scratch-buffer:bind-in* ((a xyz)
-					       (b uv)
-					       (c dark))
-		       (glhelp:create-vao-or-display-list-from-specs
-			;;glhelp:create-gl-list-from-specs
-			(:quads len)
-			((2 (xyz) (xyz) (xyz))
-			 (8 (uv) (uv))
-			 (1 (dark) (dark) (dark) (dark))
+		   (scratch-buffer:flush-bind-in*
+		       ((a xyz)
+			(b uv)
+			(c dark))
+		     (glhelp:create-vao-or-display-list-from-specs
+		      ;;glhelp:create-gl-list-from-specs
+		      (:quads len)
+		      ((2 (xyz) (xyz) (xyz))
+		       (8 (uv) (uv))
+		       (1 (dark) (dark) (dark) (dark))
 			   ;;;zero always comes last?
-			 (0 (dark) (dark) (dark) (dark))
-			 ))))))
+		       (0 (dark) (dark) (dark) (dark))
+		       )))))
 		(occlusion-box	 
 		 (multiple-value-bind (x y z) (world::unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))
@@ -174,16 +174,16 @@
 					    :maxx (+ (floatify world::*chunk-size-x*) foo)
 					    :maxy (+ (floatify world::*chunk-size-y*) foo)
 					    :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
-			(scratch-buffer:flush-my-iterator* ((*iterator*))	       
-			  (scratch-buffer:bind-in* ((*iterator* xyz))
-			    (glhelp:create-vao-or-display-list-from-specs
-			     (:quads times)
-			     ((2 (xyz) (xyz) (xyz))
-			      ;;why???
-			      (8 0.06 0.06)
-			      (1 0.0 0.0 0.0 0.0)
-			      ;;zero always comes last?
-			      (0 0.0 0.0 0.0 0.0))))))))))
+			(scratch-buffer:flush-bind-in*
+			 ((*iterator* xyz))
+			 (glhelp:create-vao-or-display-list-from-specs
+			  (:quads times)
+			  ((2 (xyz) (xyz) (xyz))
+			   ;;why???
+			   (8 0.06 0.06)
+			   (1 0.0 0.0 0.0 0.0)
+			   ;;zero always comes last?
+			   (0 0.0 0.0 0.0 0.0)))))))))
 	    (set-chunk-display-list
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))

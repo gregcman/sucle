@@ -9,7 +9,9 @@
    bind-in 
    bind-in*
    bind-out
-   bind-out*))
+   bind-out*
+   flush-bind-in
+   flush-bind-in*))
 
 (in-package #:scratch-buffer)
 (defparameter *scratch-space* nil)
@@ -89,12 +91,17 @@
     (,name single-float) ,iterator
     ,@body))
 
+(defmacro start-nest (name1)
+  `(defmacro ,(utility:symbolicate2 (list name1 "*")) ((&rest forms) &body body)
+     `(utility:nest ,@(mapcar (lambda (x) `(,',name1 ,x)) forms)
+		    (locally ,@body))))
+
 ;;FIXME::refactor out for * type macros?
-(defmacro bind-in* ((&rest forms) &body body)
-  `(utility:nest ,@(mapcar (lambda (x) `(bind-in ,x)) forms) (locally ,@body)))
+(start-nest bind-in)
+(start-nest bind-out)
+(start-nest flush-bind-in)
+(start-nest flush-my-iterator)
 
-(defmacro bind-out* ((&rest forms) &body body)
-  `(utility:nest ,@(mapcar (lambda (x) `(bind-out ,x)) forms) (locally ,@body)))
-
-(defmacro flush-my-iterator* ((&rest forms) &body body)
-  `(utility:nest ,@(mapcar (lambda (x) `(flush-my-iterator ,x)) forms) (locally ,@body)))
+(defmacro flush-bind-in ((iterator name) &body body)
+  (utility:once-only (iterator)
+    `(flush-my-iterator (,iterator) (bind-in (,iterator ,name) ,@body))))

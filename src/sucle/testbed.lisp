@@ -147,13 +147,12 @@ gl_FragColor.rgb = color_out;
 	    ;;mesh-fist-box
 	    (let ((box
 		   (let ((n 0.06))			 
-		     (scratch-buffer:flush-my-iterator* ((sandbox::*iterator*))
-		       (scratch-buffer:bind-in* ((sandbox::*iterator* xyz))			 
-			 (glhelp:create-vao-or-display-list-from-specs
-			  (:quads times)
-			  ((3 n n n)
-			   (0 (xyz) (xyz) (xyz))))
-			 )))))
+		     (scratch-buffer:flush-bind-in* ((sandbox::*iterator* xyz))			 
+		       (glhelp:create-vao-or-display-list-from-specs
+			(:quads times)
+			((3 n n n)
+			 (0 (xyz) (xyz) (xyz))))
+		       ))))
 	      (glhelp::slow-draw box)
 	      (glhelp::slow-delete box)
 	      )))
