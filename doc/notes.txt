@@ -42,3 +42,7 @@ TODO:
 
 TODO:
 - runtime dependencies of glfw-bodge blob
+
+TODO:
+- separate out opengl state changes and batch events. The chunk manager needs to have knowledge
+of opengl in order to clean up old meshes.

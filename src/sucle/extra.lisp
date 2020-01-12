@@ -13,7 +13,7 @@
 
 (progn
   (defun b@ (&optional (x *x*) (y *y*) (z *z*))
-    (world::getblock x y z))
+    (world:getblock x y z))
   (defun (setf b@) (value &optional (x *x*) (y *y*) (z *z*))
     (sandbox::plain-setblock x y z value)))
 
@@ -186,7 +186,7 @@
 	  (nick :glass;:planks
 		))))
 (defun get-chunk (x y z)
-  (multiple-value-bind (x y z) (world::chunk-coordinates-from-block-coordinates x y z)
+  (multiple-value-bind (x y z) (voxel-chunks::chunk-coordinates-from-block-coordinates x y z)
     ;;FIXME::use actual chunk dimensions, not magic number 16
     (values (* x 16)
 	    (* y 16)
@@ -204,7 +204,7 @@
 
 (utility:with-unsafe-speed
   (defun generate-for-new-chunk (key)
-    (multiple-value-bind (x y z) (world::unhashfunc key)
+    (multiple-value-bind (x y z) (voxel-chunks::unhashfunc key)
       (declare (type fixnum x y z))
       ;;(print (list x y z))
       (when (>= y -1)
@@ -218,12 +218,12 @@
 						(* z0 0.05)))
 				  0
 				  1))))
-		 (setf (world::getobj x0 y0 z0)
-		       (world::blockify block
-					(case block
-					  (0 15)
-					  (1 0))
-					0))))))))
+		 (setf (voxel-chunks:getobj x0 y0 z0)
+		       (world:blockify block
+				       (case block
+					 (0 15)
+					 (1 0))
+				       0))))))))
 
 (defun 5fun (x y z)
   (multiple-value-bind (x y z) (get-chunk x y z)
@@ -231,8 +231,8 @@
 	    (0y (- y 16) (+ y 32) :inc 16)
 	    (0z (- z 16) (+ z 32) :inc 16))
 	   (background-generation (multiple-value-call
-				      'world::create-chunk-key
-				    (world::chunk-coordinates-from-block-coordinates 
+				      'voxel-chunks::create-chunk-key
+				    (voxel-chunks::chunk-coordinates-from-block-coordinates 
 				     0x
 				     0y
 				     0z))))))

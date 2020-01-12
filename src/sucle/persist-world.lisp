@@ -30,7 +30,7 @@
       filename
       path)
      (list
-      (world::chunk-data chunk)))))
+      (voxel-chunks::chunk-data chunk)))))
 
 (defun loadchunk (chunk-coordinates &optional (path (world-path)))
   (let ((data
@@ -41,8 +41,8 @@
     (case (length data)
       (0
        ;;if data is nil, just load an empty chunk
-       (world::with-chunk-key-coordinates (x y z) chunk-coordinates
-	 (world::create-chunk x y z :type :empty)))
+       (voxel-chunks::with-chunk-key-coordinates (x y z) chunk-coordinates
+	 (voxel-chunks::create-chunk x y z :type :empty)))
 
       (3 ;;FIXME::does this even work?
        (destructuring-bind (blocks light sky) data
@@ -50,11 +50,11 @@
 	   (let ((new (make-array len)))
 	     (dotimes (i len)
 	       (setf (aref new i)
-		     (world::blockify (aref blocks i)  (aref light i) (aref sky i))))
-	     (world::make-chunk-from-key-and-data chunk-coordinates new)))))
+		     (world:blockify (aref blocks i)  (aref light i) (aref sky i))))
+	     (voxel-chunks::make-chunk-from-key-and-data chunk-coordinates new)))))
       (1
        (destructuring-bind (objdata) data
-	 (world::make-chunk-from-key-and-data
+	 (voxel-chunks::make-chunk-from-key-and-data
 	  chunk-coordinates
 	  (coerce objdata '(simple-array t (*)))))))))
 
@@ -72,13 +72,13 @@
     position))
 
 (defun chunk-coordinate-to-filename (chunk-coordinate)
-  (let ((position-list (multiple-value-list (world:unhashfunc chunk-coordinate))))
+  (let ((position-list (multiple-value-list (voxel-chunks:unhashfunc chunk-coordinate))))
     (rotatef (second position-list)
 	     (third position-list))
     position-list))
 
 (defun save-world (&optional (path (world-path)))
-  (loop :for chunk :being :the :hash-values :of  world::*chunks* :do
+  (loop :for chunk :being :the :hash-values :of  voxel-chunks::*chunks* :do
      (chunk-save chunk :path path)))
 
 #+nil

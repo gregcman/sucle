@@ -40,9 +40,9 @@
   (apply 'create-aabb
 	 (mapcar 'floatify
 		 (list
-		  world::*chunk-size-x*
-		  world::*chunk-size-y*
-		  world::*chunk-size-z*
+		  voxel-chunks::*chunk-size-x*
+		  voxel-chunks::*chunk-size-y*
+		  voxel-chunks::*chunk-size-z*
 		  0.0
 		  0.0
 		  0.0))))
@@ -398,7 +398,37 @@
     (when (or force
 	      maybe-moved)
       (sandbox::load-chunks-around)
-      (sandbox::unload-extra-chunks))))
+      (unload-extra-chunks))))
+
+(defun chunk-unload (key &key (path (sandbox::world-path)))
+  (let ((chunk (voxel-chunks::obtain-chunk-from-chunk-key key nil)))
+    (when chunk
+      (sandbox::chunk-save chunk :path path)
+      ;;remove the opengl object
+      ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
+      ;;FIXME::remove anyway?
+      (remove-chunk-model key)
+      ;;remove from the chunk-array
+      (voxel-chunks::with-chunk-key-coordinates (x y z)
+	  key
+	(voxel-chunks::remove-chunk-from-chunk-array x y z))
+      ;;remove from the global table
+      (voxel-chunks::remove-chunk-at key))))
+
+
+(defun unload-extra-chunks ()
+  (let ((to-unload
+	 ;;FIXME::get a timer library? metering?
+	 (;;time
+	  progn
+	  (progn ;;(print "getting unloadable chunks")
+		 (sandbox::get-unloadable-chunks)))))
+    ;;(print (length to-unload))
+    (;;time
+     progn
+     (progn ;;(print "unloading the chunks")
+	    (dolist (chunk to-unload)
+	      (chunk-unload chunk))))))
 
 (defparameter *big-fist-reach* 32)
 

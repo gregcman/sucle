@@ -10,19 +10,19 @@
 
 (with-unsafe-speed
   (defun mesh-chunk (iter io jo ko)
-    (declare (type world::block-coord io jo ko))
+    (declare (type voxel-chunks::block-coord io jo ko))
     (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
-      ;;(draw-dispatch (world::getobj io jo ko) io jo ko)
+      ;;(draw-dispatch (voxel-chunks::getobj io jo ko) io jo ko)
       ;;#+nil
-      (dobox ((i io (the world::block-coord (+ 16 io)))
-	      (j jo (the world::block-coord (+ 16 jo)))
-	      (k ko (the world::block-coord (+ 16 ko))))
-	     (draw-dispatch (world::getobj i j k) i j k)))))
+      (dobox ((i io (the voxel-chunks::block-coord (+ 16 io)))
+	      (j jo (the voxel-chunks::block-coord (+ 16 jo)))
+	      (k ko (the voxel-chunks::block-coord (+ 16 ko))))
+	     (draw-dispatch (voxel-chunks:getobj i j k) i j k)))))
 
 ;;FIXME::is using CLOS to dispatch on the block a good way to organize?
 ;; is it efficient?
 (defmethod draw-dispatch ((bits-block-data fixnum) i j k)
-  (blockshape (world::getblock-extract bits-block-data) i j k))
+  (blockshape (world:getblock-extract bits-block-data) i j k))
 
 (defmethod blockshape ((blockid (eql 0)) i j k)
   ;;if its air, don't render anything
@@ -129,14 +129,14 @@
 	    (let ((xpos (+ i i0))
 		  (ypos (+ j j0))
 		  (zpos (+ k k0)))
-	      (declare (type world::block-coord xpos ypos zpos))
+	      (declare (type voxel-chunks::block-coord xpos ypos zpos))
 	      ,(with-gensyms (actual-color)
 		 (flet ((%edge-aux (getfunc q0 q1 q2 q3 &rest body)
 			  `(flet ((value (i j k)
 				    (let ((xd (+ i xpos))
 					  (yd (+ j ypos))
 					  (zd (+ k zpos)))
-				      (declare (type world::block-coord xd yd zd))
+				      (declare (type voxel-chunks::block-coord xd yd zd))
 				      (* ,actual-color (lightfunc (,getfunc xd yd zd))))))
 			     (let ((,q0 (value ,x0 ,y0 ,z0))
 				   (,q1 (value ,x1 ,y1 ,z1))
@@ -146,9 +146,9 @@
 		   `(let ((,actual-color ,color))
 		      (declare (type single-float ,actual-color))
 		      ,(%edge-aux
-			'world::getlight 'q0 'q1 'q2 'q3 
+			'world:getlight 'q0 'q1 'q2 'q3 
 			(%edge-aux
-			 'world::skygetlight 'q4 'q5 'q6 'q7
+			 'world:skygetlight 'q4 'q5 'q6 'q7
 			 ;;Write block light and sky light values
 			 `(dark q0 q1 q2 q3 q4 q5 q6 q7)
 			 #+nil
@@ -168,7 +168,7 @@
 	    (let ((xp (+ i x))
 		  (yp (+ j y))
 		  (zp (+ k z)))
-	      (declare (type world::block-coord xp yp zp))
+	      (declare (type voxel-chunks::block-coord xp yp zp))
 	      (epos (floatify xp)
 		    (floatify yp)
 		    (floatify zp)))))
@@ -179,7 +179,7 @@
 
 (defmacro face-header (name &body body)
   `(defun ,name (i j k u0 v0 u1 v1)
-     (declare (type world::block-coord i j k)
+     (declare (type voxel-chunks::block-coord i j k)
 	      (type single-float u0 v0 u1 v1))
      (scratch-buffer:bind-out* ((*mesh-epos* epos)
 				(*mesh-etex* etex)
@@ -310,8 +310,8 @@
 (with-declaim-inline (block-hash)
   (defun block-hash (i j k)
     (locally (declare (optimize (speed 3) (safety 0))
-		      (type world::block-coord i j k))
-      (let ((hash (mod (the world::block-coord (* 2654435761 (the world::block-coord (+ i j k))))
+		      (type voxel-chunks::block-coord i j k))
+      (let ((hash (mod (the voxel-chunks::block-coord (* 2654435761 (the voxel-chunks::block-coord (+ i j k))))
 		       (ash 1 32))))
 	(values (logtest hash #b0100)
 		(logtest hash #b1000))))))

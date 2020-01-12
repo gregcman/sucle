@@ -559,7 +559,7 @@ gl_FragColor.rgb = color_out;
   (loop :for key :being :the :hash-keys :of *g/chunk-call-list* :do
      (remove-chunk-model key))
   (mapc #'sandbox::dirty-push
-	(sort (alexandria:hash-table-keys world::*chunks*) #'< :key
+	(sort (alexandria:hash-table-keys voxel-chunks::*chunks*) #'< :key
 	      'sandbox::unsquared-chunk-distance)))
 
 (defparameter *chunk-query-buffer-size* 8)
@@ -586,7 +586,7 @@ gl_FragColor.rgb = color_out;
 		       (0 (dark) (dark) (dark) (dark))
 		       )))))
 		(occlusion-box	 
-		 (multiple-value-bind (x y z) (world::unhashfunc coords)
+		 (multiple-value-bind (x y z) (voxel-chunks:unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))
 		      (let ((times
 			     (draw-aabb x y z
@@ -596,9 +596,9 @@ gl_FragColor.rgb = color_out;
 					    :minx (- 0.0 foo)
 					    :miny (- 0.0 foo)
 					    :minz (- 0.0 foo)
-					    :maxx (+ (floatify world::*chunk-size-x*) foo)
-					    :maxy (+ (floatify world::*chunk-size-y*) foo)
-					    :maxz (+ (floatify world::*chunk-size-z*) foo)))))))
+					    :maxx (+ (floatify voxel-chunks::*chunk-size-x*) foo)
+					    :maxy (+ (floatify voxel-chunks::*chunk-size-y*) foo)
+					    :maxz (+ (floatify voxel-chunks::*chunk-size-z*) foo)))))))
 			(scratch-buffer:flush-bind-in*
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
@@ -747,15 +747,15 @@ decreases when finished.")
 	 :while (not (too-much)) :do
 	 (let ((thechunk (sandbox::dirty-pop)))
 	   (if thechunk
-	       (when (and (world::chunk-exists-p thechunk)
-			  (not (world::empty-chunk-p (world::get-chunk-at thechunk)))
+	       (when (and (voxel-chunks::chunk-exists-p thechunk)
+			  (not (voxel-chunks::empty-chunk-p (voxel-chunks::get-chunk-at thechunk)))
 			  )
 		 (incf *total-background-chunk-mesh-jobs*)
 		 (let ((lparallel:*task-category* 'mesh-chunk))
 		   (sucle-mp::submit 
 		    (lambda (iter space chunk-pos)
 		      (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
-		      (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
+		      (multiple-value-bind (io jo ko) (voxel-chunks:unhashfunc chunk-pos)
 			(mesher:mesh-chunk iter io jo ko)
 			(%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
 		    :args (list

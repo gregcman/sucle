@@ -13,9 +13,9 @@
 	  (jmask (mod j 16))
 	  (kmask (mod k 16)))
       (labels ((add (x y z)
-		 (let ((chunk (world::obtain-chunk-from-block-coordinates x y z)))
-		   (unless nil;;(world::empty-chunk-p chunk)
-		     (dirty-push (world::chunk-key chunk)))))
+		 (let ((chunk (voxel-chunks::obtain-chunk-from-block-coordinates x y z)))
+		   (unless nil;;(voxel-chunks::empty-chunk-p chunk)
+		     (dirty-push (voxel-chunks::chunk-key chunk)))))
 	       (i-permute ()
 		 (case imask
 		   (0 (j-permute (1- i)))
@@ -82,7 +82,7 @@
 (defparameter *chunk-coordinate-center-z* 0)
 (defun set-chunk-coordinate-center (player-x player-y player-z)
   (multiple-value-bind (chunk-x chunk-y chunk-z)
-      (world::chunk-coordinates-from-block-coordinates
+      (voxel-chunks::chunk-coordinates-from-block-coordinates
        (floor player-x)
        (floor player-y)
        (floor player-z))
@@ -97,17 +97,17 @@
   ;;FIXME::is this expensive to recompute every frame or does it matter?
   ;;maybe put it in the chunk array object?
   ;;return t if it was moved, nil otherwise
-  (let ((half-x-size (utility:etouq (floor world::*chunk-array-default-size-x* 2)))
-	(half-y-size (utility:etouq (floor world::*chunk-array-default-size-y* 2)))
-	(half-z-size (utility:etouq (floor world::*chunk-array-default-size-z* 2))))
+  (let ((half-x-size (utility:etouq (floor voxel-chunks::*chunk-array-default-size-x* 2)))
+	(half-y-size (utility:etouq (floor voxel-chunks::*chunk-array-default-size-y* 2)))
+	(half-z-size (utility:etouq (floor voxel-chunks::*chunk-array-default-size-z* 2))))
     (let ((center-x (+ 
-		     (world::chunk-array-x-min world::*chunk-array*)
+		     (voxel-chunks::chunk-array-x-min voxel-chunks::*chunk-array*)
 		     half-x-size))
 	  (center-y (+ 
-		     (world::chunk-array-y-min world::*chunk-array*)
+		     (voxel-chunks::chunk-array-y-min voxel-chunks::*chunk-array*)
 		     half-y-size))
 	  (center-z (+ 
-		     (world::chunk-array-z-min world::*chunk-array*)
+		     (voxel-chunks::chunk-array-z-min voxel-chunks::*chunk-array*)
 		     half-z-size)))
       ;;FIXME::hard-coded threshold for repositioning the chunk array? 4 chunks?
       #+nil
@@ -122,7 +122,7 @@
 		  (<= threshold (abs (- chunk-y center-y)))
 		  (<= threshold (abs (- chunk-z center-z))))
 	  ;;(format t "moving chunk array")
-	  (world::reposition-chunk-array (- chunk-x half-x-size)
+	  (voxel-chunks::reposition-chunk-array (- chunk-x half-x-size)
 					 (- chunk-y half-y-size)
 					 (- chunk-z half-z-size))
 	  (values t))))))
@@ -136,7 +136,7 @@
 (defun chunk-memory-usage (&optional (chunks *maximum-allowed-chunks*))
   ;;in megabytes
   (/ (* 8 #|8 bytes per word in 64bit sbcl|# chunks
-	(* world::*chunk-size-x* world::*chunk-size-y* world::*chunk-size-z*))
+	(* voxel-chunks::*chunk-size-x* voxel-chunks::*chunk-size-y* voxel-chunks::*chunk-size-z*))
      1024 1024 1.0 #|1.0 for converting to float|#))
 (defparameter *threshold* (* 8 8))
 ;;threshold so that when too many chunks exist, over compensate, so not unloading every time
@@ -144,7 +144,7 @@
   (let ((x0 *chunk-coordinate-center-x*)
 	(y0 *chunk-coordinate-center-y*)
 	(z0 *chunk-coordinate-center-z*))
-    (world::with-chunk-key-coordinates
+    (voxel-chunks::with-chunk-key-coordinates
      (x1 y1 z1) position-key
      (let ((dx (- x1 x0))
 	   (dy (- y1 y0))
@@ -155,7 +155,7 @@
   (let ((x0 *chunk-coordinate-center-x*)
 	(y0 *chunk-coordinate-center-y*)
 	(z0 *chunk-coordinate-center-z*))
-    (world::with-chunk-key-coordinates
+    (voxel-chunks::with-chunk-key-coordinates
      (x1 y1 z1) position-key
      (let ((dx (- x1 x0))
 	   (dy (- y1 y0))
@@ -165,11 +165,11 @@
 	    (abs dz))))))
 (defun get-unloadable-chunks ()
   ;;FIXME::optimize?
-  (let ((difference (- (- (world::total-loaded-chunks) *maximum-allowed-chunks*)
+  (let ((difference (- (- (voxel-chunks::total-loaded-chunks) *maximum-allowed-chunks*)
 		       *threshold*)))
     (when (plusp difference)
       (let ((distance-sorted-chunks	     
-	     (sort (alexandria:hash-table-keys world::*chunks*) #'> :key
+	     (sort (alexandria:hash-table-keys voxel-chunks::*chunks*) #'> :key
 		   'unsquared-chunk-distance)))
 	(safe-subseq distance-sorted-chunks difference)))))
 
@@ -182,7 +182,7 @@
 	(y0 *chunk-coordinate-center-y*)
 	(z0 *chunk-coordinate-center-z*))
     (declare (optimize (speed 3) (safety 0))
-	     (type world::chunk-coord x0 y0 z0))
+	     (type voxel-chunks::chunk-coord x0 y0 z0))
     (let ((acc nil))
       (block out
 	(let ((chunk-count 0))
@@ -190,7 +190,7 @@
 	  (flet ((add-chunk (x y z)
 		   (incf chunk-count)
 		   ;;do something
-		   (let ((key (world::create-chunk-key x y z)))
+		   (let ((key (voxel-chunks::create-chunk-key x y z)))
 		     (when (space-for-new-chunk-p key)
 		       ;;The chunk does not exist, therefore the *empty-chunk* was returned
 		       (push key acc)
@@ -204,13 +204,13 @@
 		     (return-from out))
 		   ))
 	    (let ((size *chunk-radius*))
-	      (declare (type world::chunk-coord size))
-	      (utility::dobox ((chunk-x (the world::chunk-coord (- x0 size))
-					(the world::chunk-coord (+ x0 size)))
-			       (chunk-y (the world::chunk-coord (- y0 size))
-					(the world::chunk-coord (+ y0 size)))
-			       (chunk-z (the world::chunk-coord (- z0 size))
-					(the world::chunk-coord (+ z0 size))))
+	      (declare (type voxel-chunks::chunk-coord size))
+	      (utility::dobox ((chunk-x (the voxel-chunks::chunk-coord (- x0 size))
+					(the voxel-chunks::chunk-coord (+ x0 size)))
+			       (chunk-y (the voxel-chunks::chunk-coord (- y0 size))
+					(the voxel-chunks::chunk-coord (+ y0 size)))
+			       (chunk-z (the voxel-chunks::chunk-coord (- z0 size))
+					(the voxel-chunks::chunk-coord (+ z0 size))))
 			      (add-chunk chunk-x chunk-y chunk-z))))))
       acc)))
 
@@ -219,14 +219,14 @@
   (when (not *persist*)
     (return-from chunk-save))
   (cond
-    ((world::empty-chunk-p chunk)
+    ((voxel-chunks::empty-chunk-p chunk)
      ;;when the chunk is obviously empty
      )
     (t
      ;;when the chunk is not obviously empty
-     (when (world::chunk-modified chunk) ;;if it wasn't modified, no point in saving
-       (let* ((worth-saving (world::chunk-worth-saving chunk))
-	      (key (world::chunk-key chunk))
+     (when (voxel-chunks::chunk-modified chunk) ;;if it wasn't modified, no point in saving
+       (let* ((worth-saving (voxel-chunks::chunk-worth-saving chunk))
+	      (key (voxel-chunks::chunk-key chunk))
 	      ;;FIXME::have multiple unique-task hashes?
 	      (job-key (cons :save-chunk key)))
 	 ;;save the chunk first?
@@ -257,37 +257,22 @@
 	   ;;this task, saving and loading, must not be interrupted
 	   :unkillable t)))))))
 
-(defun chunk-unload (key &key (path (world-path)))
-  (let ((chunk (world::obtain-chunk-from-chunk-key key nil)))
-    (when chunk
-      (chunk-save chunk :path path)
-      ;;remove the opengl object
-      ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
-      ;;FIXME::remove anyway?
-      (remove-chunk-model key)
-      ;;remove from the chunk-array
-      (world::with-chunk-key-coordinates (x y z)
-	  key
-	(world::remove-chunk-from-chunk-array x y z))
-      ;;remove from the global table
-      (world::remove-chunk-at key))))
-
 (defun dirty-push-around (key)
   ;;FIXME::although this is correct, it
   ;;lags behind player movement?
-  (world::with-chunk-key-coordinates
+  (voxel-chunks::with-chunk-key-coordinates
    (x y z) key
    (dobox ((x0 (1- x) (+ x 2))
 	   (y0 (1- y) (+ y 2))
 	   (z0 (1- z) (+ z 2)))
-	  (let ((new-key (world::create-chunk-key x0 y0 z0)))
-	    (when (world::chunk-exists-p new-key)
+	  (let ((new-key (voxel-chunks::create-chunk-key x0 y0 z0)))
+	    (when (voxel-chunks::chunk-exists-p new-key)
 	      (dirty-push new-key))))))
 
 (defparameter *load-jobs* 0)
 
 (defun space-for-new-chunk-p (key)
-  (world::empty-chunk-p (world::get-chunk-at key)))
+  (voxel-chunks::empty-chunk-p (voxel-chunks::get-chunk-at key)))
 
 (defun chunk-load (key &optional (path (world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
@@ -322,18 +307,18 @@
 		       )
 		      (t
 		       (cond
-			 ((and (not (world::empty-chunk-p chunk)) (not (space-for-new-chunk-p key)))
+			 ((and (not (voxel-chunks::empty-chunk-p chunk)) (not (space-for-new-chunk-p key)))
 			  (format t "~%OMG? ~a chunk already exists" key))
 			 (t 
 			  (progn
-			    (apply #'world::remove-chunk-from-chunk-array key)
-			    (world::set-chunk-at key chunk))
+			    (apply #'voxel-chunks::remove-chunk-from-chunk-array key)
+			    (voxel-chunks::set-chunk-at key chunk))
 			  ;;(format t "~%making chunk ~a" key)
 
-			  ;;(world::set-chunk-at key new-chunk)
+			  ;;(voxel-chunks::set-chunk-at key new-chunk)
 
 			  (cond
-			    ((world::empty-chunk-p chunk)
+			    ((voxel-chunks::empty-chunk-p chunk)
 			     ;;(background-generation key)
 			     )
 			    (t (dirty-push-around key))))))))
@@ -341,23 +326,10 @@
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))
 
-(defun unload-extra-chunks ()
-  (let ((to-unload
-	 ;;FIXME::get a timer library? metering?
-	 (;;time
-	  progn
-	  (progn ;;(print "getting unloadable chunks")
-		 (get-unloadable-chunks)))))
-    ;;(print (length to-unload))
-    (;;time
-     progn
-     (progn ;;(print "unloading the chunks")
-	    (dolist (chunk to-unload)
-	      (chunk-unload chunk))))))
 
 (defun test34 ()
   ;;(with-output-to-string (print ))
-  (let* ((data (world::chunk-data (world::get-chunk 1 1 1 nil)))
+  (let* ((data (voxel-chunks::chunk-data (voxel-chunks::get-chunk 1 1 1 nil)))
 	 (str (with-output-to-string (str)
 		(with-standard-io-syntax
 		  (print data str))))
@@ -374,7 +346,7 @@
 ;;conspack is roughly 4 times faster than plain PRINT and READ?
 
 ;;FIXME::thread-safety for:
-;;world::*chunks*
-;;world::*chunk-array*
+;;voxel-chunks::*chunks*
+;;voxel-chunks::*chunk-array*
 ;;sandbox::*dirty-chunks*
 ;;sandbox::*achannel*
