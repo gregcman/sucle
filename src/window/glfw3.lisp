@@ -1,5 +1,55 @@
 (in-package #:window)
 
+;;load order for the glfw3 binary:
+;;1. Local filesystem
+;;2. Fetch glfw-blob from asdf
+;;3. Fetch glfw-blob from quicklisp, if quicklisp exists
+;;4. Throw an error
+;;;;Load the glfw3 library
+(defparameter *glfw-library-loaded* nil)
+(defun load-the-glfw-library ()
+  (unless *glfw-library-loaded*
+    (flet ((pexit (type)
+	     (setf *glfw-library-loaded* type)
+	     (return-from load-the-glfw-library t)))
+      (or
+       (block try-load-local
+	 ;;this section ripped from cl-glfw3
+	 (cffi:define-foreign-library (glfw)
+	   (:darwin (:or
+		     ;; homebrew naming
+		     "libglfw3.1.dylib" "libglfw3.dylib"
+		     ;; cmake build naming
+		     "libglfw.3.1.dylib" "libglfw.3.dylib"))
+	   (:unix (:or "libglfw.so.3.1" "libglfw.so.3"))
+	   (:windows "glfw3.dll")
+	   (t (:or (:default "libglfw3") (:default "libglfw"))))
+	 
+	 (handler-case (progn (cffi:use-foreign-library glfw)
+			      (pexit "Local"))
+	   (cffi:load-foreign-library-error (c)
+	     ;;the library does not exist
+	     (declare (ignorable c))
+	     (return-from try-load-local nil))))
+       
+       #+(and
+	  (or darwin linux windows)
+	  (or x86 x86-64))
+       (block try-load-glfw-blob
+	 (cond
+	   ;;try finding it in asdf
+	   ((asdf:find-system :glfw-blob nil)
+	    (asdf:load-system :glfw-blob)
+	    (values (pexit "glfw-blob through asdf")))
+	   #+quicklisp
+	   (t
+	    (ql:quickload :glfw-blob)
+	    (values (pexit "glfw-blob through quicklisp")))
+	   (t nil)))
+
+       (error "no suitable library found for glfw!!!!")))))
+
+
 ;;;;************************************************************************;;;;
 ;;;;<ENUM>
 ;;;glfw enums to positions
@@ -470,6 +520,7 @@ for the current implementation."
 				  :height 1
 				  :resizable nil)))
   (with-float-traps-saved-and-masked
+    (load-the-glfw-library)
     (glfw:with-init ()
       (init)
       (glfw:with-window-hints

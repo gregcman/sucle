@@ -4,7 +4,8 @@
   :description "glfw3 opengl context creation, windowing and input"
  
   :depends-on (#:bodge-glfw
-	       #:glfw-blob
+	       #:cffi
+	       #:trivial-features
 	       #:utility
 	       #:alexandria)
   :serial t
