@@ -93,6 +93,23 @@
      (let ((text-sub::*text-data-what-type* :framebuffer))
        (window::set-vsync t)
        (fps:set-fps 60)
+       (progn
+	 (setf world:*world-directory*
+	       ;;"first/"
+	       ;;#+nil
+	       "test/"
+	       )
+	 #+nil
+	 (progn
+	   (setf world:*some-saves*
+		 (cdr (assoc (machine-instance) 
+			     '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
+			       ("nootboke" . #P"/home/terminal256/Documents/saves/"))
+			     :test 'equal))))
+	 ;;#+nil
+	 (progn
+	   (setf world:*some-saves*
+		 (sucle-temp:path "save/"))))
        (unwind-protect
 	    (loop
 	       (application:poll-app)
@@ -109,7 +126,10 @@
 		 (toggle *app*))
 	       (when (window:skey-j-p (window::keyval #\j))
 		 (toggle *sandbox*)))
-	 (save))))))
+	 (progn
+	   ;;(atest::remove-zeroes)
+	   ;;FIXME::don't remove all the chunks?
+	   (sandbox::msave)))))))
 
 ;;;;
 
@@ -126,37 +146,11 @@
    :height 480
    :title "conceptually simple block game"))
 
-
-(defun save ()
-  ;;(atest::remove-zeroes)
-  ;;FIXME::don't remove all the chunks?
-  (sandbox::msave))
-#+nil
-(defun our-load ()
-  (sandbox::mload))
-
-(eval-when (:load-toplevel :execute)
-  (setf sandbox::*world-directory*
-	;;"first/"
-	;;#+nil
-	"test/"
-	)
-  #+nil
-  (progn
-    (setf sandbox::*some-saves*
-	  (cdr (assoc (machine-instance) 
-		      '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-			("nootboke" . #P"/home/terminal256/Documents/saves/"))
-		      :test 'equal))))
-  ;;#+nil
-  (progn
-    (setf sandbox::*some-saves*
-	  (sucle-temp:path "save/"))))
-
 (defun load-world-again (name)
   (setf sandbox::*persist* nil)
-  (setf sandbox::*world-directory* name)
+  (setf world:*world-directory* name)
   (load-world t))
+
 ;;;;************************************************************************;;;;
 
 
@@ -400,7 +394,7 @@
       (sandbox::load-chunks-around)
       (unload-extra-chunks))))
 
-(defun chunk-unload (key &key (path (sandbox::world-path)))
+(defun chunk-unload (key &key (path (world:world-path)))
   (let ((chunk (voxel-chunks::obtain-chunk-from-chunk-key key nil)))
     (when chunk
       (sandbox::chunk-save chunk :path path)

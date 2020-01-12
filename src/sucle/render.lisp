@@ -82,7 +82,8 @@
   (gl:front-face :ccw)
   (get-chunks-to-draw)
   ;#+nil
-  (multiple-value-bind (shown hidden) (draw-world)
+  (progn;;multiple-value-bind (shown hidden)
+      (draw-world)
     ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
     #+nil
     (let ((total
@@ -231,7 +232,7 @@ gl_FragColor = color;
 			 (- vx3 vx2)
 			 (- vy1 vy3))))
 	(py-yv3 (- py vy3))
-e	(px-xv3 (- px vx3)))
+	(px-xv3 (- px vx3)))
     (let* ((w1 (/
 		(+
 		 (*

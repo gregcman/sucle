@@ -24,19 +24,6 @@
 (defmethod draw-dispatch ((bits-block-data fixnum) i j k)
   (blockshape (world:getblock-extract bits-block-data) i j k))
 
-(defmethod blockshape ((blockid (eql 0)) i j k)
-  ;;if its air, don't render anything
-  )
-(defmethod blockshape ((blockid (eql 24)) i j k)
-  (rendersandstone blockid i j k))
-(defmethod blockshape ((blockid (eql 2)) i j k)
-  (rendergrass blockid i j k))
-(defmethod blockshape ((blockid (eql 17)) i j k)
-  (renderstandardblock blockid i j k)
-  ;;(renderlog blockid i j k)
-  )
-(defmethod blockshape ((blockid t) i j k)
-  (renderstandardblock blockid i j k))
 
 (eval-always
   ;;;;total faces touched by a light of distance n
@@ -290,14 +277,6 @@
 		      (00 00 1)    
 		      (-1 00 1))))))
 
-;;;if the block is air, the side gets rendered. if the block is transparent
-;;;and the same type ex: texture between glass - there is no texture - if they are
-;;;different - water and glass -it shows
-(defun show-sidep (blockid other-blockid)
-  (or (zerop other-blockid)
-      (and (/= blockid other-blockid)
-	   (not (aref block-data:*opaquecubelooukup* other-blockid)))))
-
 (defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
   (let ((id (gensym)))
     `(let ((,id (* 4 ,num-form)))
@@ -306,6 +285,10 @@
 
 (eval-always
   (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
+
+
+;;;;block data below
+
 #+nil
 (with-declaim-inline (block-hash)
   (defun block-hash (i j k)
@@ -323,6 +306,29 @@
 	   (rotatef ,u1 ,u0))
 	 (when ,v
 	   (rotatef ,v1 ,v0))))))
+
+;;;if the block is air, the side gets rendered. if the block is transparent
+;;;and the same type ex: texture between glass - there is no texture - if they are
+;;;different - water and glass -it shows
+(defun show-sidep (blockid other-blockid)
+  (or (zerop other-blockid)
+      (and (/= blockid other-blockid)
+	   (not (aref block-data:*opaquecubelooukup* other-blockid)))))
+
+(defgeneric blockshape (blockid i j k))
+(defmethod blockshape ((blockid (eql 0)) i j k)
+  ;;if its air, don't render anything
+  )
+(defmethod blockshape ((blockid (eql 24)) i j k)
+  (rendersandstone blockid i j k))
+(defmethod blockshape ((blockid (eql 2)) i j k)
+  (rendergrass blockid i j k))
+(defmethod blockshape ((blockid (eql 17)) i j k)
+  (renderstandardblock blockid i j k)
+  ;;(renderlog blockid i j k)
+  )
+(defmethod blockshape ((blockid t) i j k)
+  (renderstandardblock blockid i j k))
 (defun renderstandardblock (id i j k)
   (let ((texid (aref block-data:*blockIndexInTexture* id)))
     (with-texture-translator2 (u0 u1 v0 v1) texid

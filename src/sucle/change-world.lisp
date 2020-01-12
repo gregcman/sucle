@@ -1,3 +1,5 @@
+(defpackage #:sandbox
+  (:use #:cl #:utility))
 (in-package :sandbox)
 ;;;;keeping track of the changes to the world
 (progn
@@ -215,7 +217,7 @@
       acc)))
 
 (defparameter *persist* t)
-(defun chunk-save (chunk &key (path (world-path)))
+(defun chunk-save (chunk &key (path (world:world-path)))
   (when (not *persist*)
     (return-from chunk-save))
   (cond
@@ -236,7 +238,7 @@
 	     (cond
 	       (worth-saving
 		;;write the chunk to disk if its worth saving
-		(savechunk chunk key path)
+		(world:savechunk chunk key path)
 		;;(format t "~%saved chunk ~s" key)
 		)
 	       (t
@@ -244,8 +246,8 @@
 		(let ((chunk-save-file
 		       ;;FIXME::bad api?
 		       (merge-pathnames
-			(convert-object-to-filename (chunk-coordinate-to-filename key))
-			(world-path))))
+			(world:convert-object-to-filename (world:chunk-coordinate-to-filename key))
+			(world:world-path))))
 		  (let ((file-exists-p (probe-file chunk-save-file)))
 		    (when file-exists-p
 		      (delete-file chunk-save-file)))))))
@@ -274,7 +276,7 @@
 (defun space-for-new-chunk-p (key)
   (voxel-chunks::empty-chunk-p (voxel-chunks::get-chunk-at key)))
 
-(defun chunk-load (key &optional (path (world-path)))
+(defun chunk-load (key &optional (path (world:world-path)))
   ;;FIXME::using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
   #+nil
@@ -291,7 +293,7 @@
 	      (cond ((not (space-for-new-chunk-p key))
 		     ;;(format t "~%WTF? ~a chunk already exists" key)
 		     :skipping)
-		    (t (loadchunk key path)))))
+		    (t (world:loadchunk key path)))))
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
@@ -350,3 +352,19 @@
 ;;voxel-chunks::*chunk-array*
 ;;sandbox::*dirty-chunks*
 ;;sandbox::*achannel*
+
+   ;;#:msave
+   ;;#:save-world
+
+(defun msave (&optional (path world:*world-directory*))
+  (let ((newpath (world:world-path path)))
+    (ensure-directories-exist newpath)
+    (save-world newpath)))
+(defun save-world (&optional (path (world:world-path)))
+  (loop :for chunk :being :the :hash-values :of  voxel-chunks::*chunks* :do
+     (chunk-save chunk :path path)))
+
+#+nil
+(defun mload (&optional (path *world-directory*))
+  (let ((newpath (world-path path)))
+    (load-world newpath)))

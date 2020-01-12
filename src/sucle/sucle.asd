@@ -45,11 +45,9 @@
   (
    ;;<SANDBOX>
    (:file "queue")
-   (:file "package")
    (:file "voxel-chunks")
-   (:file "world")
-   (:file "persist-world") ;;world <-> filesystem
    ;;(:file "block-light") ;;light propogation
+   (:file "world")
    (:file "mesher");;world data -> mesh 
    (:file "change-world")
    ;;</SANDBOX>
