@@ -123,4 +123,4 @@ click for video:
 * do not know what Minecraft is
 
 # How To Install:
-https://github.com/pupcraft/sucle/blob/master/INSTALL.md
+https://github.com/gmasching/sucle/blob/master/INSTALL.md
