@@ -49,7 +49,6 @@
    ;;(:file "block-light") ;;light propogation
    (:file "world")
    (:file "mesher");;world data -> mesh 
-   (:file "change-world")
    ;;</SANDBOX>
    (:file "sucle-package")
    (:file "extra")

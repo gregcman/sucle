@@ -145,7 +145,7 @@
    :width 720
    :height 480
    :title "conceptually simple block game"))
-
+#+nil
 (defun load-world-again (name)
   (setf sandbox::*persist* nil)
   (setf world:*world-directory* name)

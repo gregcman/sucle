@@ -46,3 +46,6 @@ TODO:
 TODO:
 - separate out opengl state changes and batch events. The chunk manager needs to have knowledge
 of opengl in order to clean up old meshes.
+
+TODO:
+- sucle.lisp, change-world.lisp, and world.lisp all contain code for saving and loading the world. 
