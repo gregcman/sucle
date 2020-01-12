@@ -259,8 +259,13 @@
      (update-camera *camera*)
      (draw-to-default-area)
      ;;this also clears the depth and color buffer.
-     (render-sky)
-     (use-chunk-shader *camera*)
+     (apply #'render-sky (the-sky-color))
+     (use-chunk-shader
+      :camera *camera*
+      :sky-color *sky-color-foo*
+      :time-of-day sandbox::*daytime*
+      :fog-ratio *fog-ratio*
+      )
      (render-chunks)
      (use-occlusion-shader *camera*)
      (render-chunk-occlusion-queries)
@@ -271,6 +276,17 @@
      ;;FIXME::what is glFlush good for?
      ;;(gl:flush)
      (sandbox::designatemeshing))))
+
+(defparameter *sky-color*
+  '(
+    ;;0.0 0.0 0.0 1.0
+    0.68 0.8 1.0))
+(defparameter *sky-color-foo* '(0.0 0.0 0.0))
+(defun the-sky-color ()
+  (map-into *sky-color-foo*
+	    (lambda (x)
+	    (alexandria:clamp (* x sandbox::*daytime*) 0.0 1.0))
+	  *sky-color*))
 
 ;;;
 (defparameter *mouse-multiplier* 0.002617)

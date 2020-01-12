@@ -8,19 +8,8 @@
   ;;setup clipping area
   (glhelp::set-render-area 0 0 window::*width* window::*height*))
 
-
-(defparameter *sky-color*
-  '(
-    ;;0.0 0.0 0.0 1.0
-    0.68 0.8 1.0 1.0))
-(defparameter *sky-color-foo* '(0.0 0.0 0.0 0.0))
-(defun the-sky-color ()
-  (map-into *sky-color-foo*
-	    (lambda (x)
-	    (alexandria:clamp (* x sandbox::*daytime*) 0.0 1.0))
-	  *sky-color*))
-(defun render-sky ()
-  (apply 'gl:clear-color (the-sky-color))
+(defun render-sky (x y z)
+  (gl:clear-color x y z 1.0)
   ;;change the sky color according to time
   (gl:depth-func :less)
   (gl:clear-depth 1.0)
@@ -46,7 +35,10 @@
 	:depth-buffer-bit
 	))))
 
-(defun use-chunk-shader (&optional (camera *camera*))
+(defun use-chunk-shader (&key (camera *camera*)
+			   (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
+			   (fog-ratio 0.01)
+			   (time-of-day (random 1.0)))
   ;;set up shader
   (let ((shader (getfnc 'blockshader)))
     (glhelp::use-gl-program shader)
@@ -61,7 +53,7 @@
     ;;other cosmetic uniforms
     (glhelp:with-uniforms
 	uniform shader
-      (destructuring-bind (r g b . rest) *sky-color-foo*
+      (destructuring-bind (r g b &rest rest) sky-color
 	(declare (ignorable rest))
 	(%gl:uniform-3f (uniform :fogcolor) r g b))
       (gl:uniformfv (uniform :camera-pos)
@@ -72,11 +64,11 @@
 			 (* 16 sandbox::*chunk-radius*)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
-			 *fog-ratio*))
+			 fog-ratio))
       (%gl:uniform-1f (uniform :aratio)
-		      (/ 1.0 *fog-ratio*))
+		      (/ 1.0 fog-ratio))
       (%gl:uniform-1f (uniform :time)
-		      sandbox::*daytime*)
+		      time-of-day)
 
       (glhelp::set-uniforms-to-textures
        ((uniform :sampler)
