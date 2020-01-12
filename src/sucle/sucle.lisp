@@ -201,6 +201,20 @@
   result)
 
 ;;;;
+(defparameter *fov* (* (floatify pi) (/ 85 180)))
+(defparameter *camera*
+  (camera-matrix:make-camera
+   :frustum-far (* 256.0)
+   :frustum-near (/ 1.0 8.0)))
+(defparameter *fog-ratio* 0.75)
+
+(defun update-camera (&optional (camera *camera*))
+  (setf (camera-matrix:camera-aspect-ratio camera)
+	(/ (floatify window::*width*)
+	   (floatify window::*height*)))
+  (setf (camera-matrix:camera-fov camera) *fov*)
+  (setf (camera-matrix:camera-frustum-far camera) (* 1024.0 256.0))
+  (camera-matrix:update-matrices camera))
 
 (defparameter *last-session* nil)
 (defparameter *paused* nil)
@@ -241,7 +255,12 @@
        (sandbox::reset-chunk-display-list)
        ;;FIXME::update vao according to position, not 0 0 0
        (sandbox::update-world-vao))
-     (render-stuff)
+     ;;update the camera
+     (update-camera *camera*)
+     (draw-to-default-area)
+     ;;this also clears the depth and color buffer.
+     (render-sky)
+     (render-chunks)
      ;;selected block and crosshairs
      (use-solidshader *camera*)
      (render-fist *fist*)

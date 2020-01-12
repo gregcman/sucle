@@ -1,46 +1,28 @@
 (in-package :sucle)
 ;;;;************************************************************************;;;;
 ;;;;<RENDER>
-(defparameter *fov* (* (floatify pi) (/ 85 180)))
 
-(defparameter *camera* (camera-matrix:make-camera
-			:frustum-far (* 256.0)
-			:frustum-near (/ 1.0 8.0)))
-
-(defparameter *sky-color*
-  #+nil
-  (vector 0.0 0.0 0.0)
-  ;#+nil
-  (vector 0.68 0.8 1.0))
-  
-(defparameter *fog-ratio* 0.75
-  )
-(defparameter *sky-color-foo* (vector 0.0 0.0 0.0))
-(defun render-stuff ()
-  ;;camera setup
-  (setf (camera-matrix:camera-aspect-ratio *camera*)
-	(/ (floatify window::*width*)
-	   (floatify window::*height*)))
-  (setf (camera-matrix:camera-fov *camera*) *fov*)
-  (setf (camera-matrix:camera-frustum-far *camera*) (* 1024.0 256.0))
-  (camera-matrix:update-matrices *camera*)
-
+(defun draw-to-default-area ()
   ;;draw to default framebuffer
   (glhelp::bind-default-framebuffer)
-
   ;;setup clipping area
-  (glhelp::set-render-area 0 0 window::*width* window::*height*)
+  (glhelp::set-render-area 0 0 window::*width* window::*height*))
 
-  (flet ((fractionalize (x)
-	      (alexandria:clamp x 0.0 1.0)))
-       (map-into *sky-color-foo*
-		 (lambda (x)
-		   (fractionalize (* x sandbox::*daytime*)))
-		 *sky-color*))
+
+(defparameter *sky-color*
+  '(
+    ;;0.0 0.0 0.0 1.0
+    0.68 0.8 1.0 1.0))
+(defparameter *sky-color-foo* '(0.0 0.0 0.0 0.0))
+(defun the-sky-color ()
+  (map-into *sky-color-foo*
+	    (lambda (x)
+	    (alexandria:clamp (* x sandbox::*daytime*) 0.0 1.0))
+	  *sky-color*))
+
+(defun render-sky ()
+  (apply 'gl:clear-color (the-sky-color))
   ;;change the sky color according to time
-  (with-vec (r g b) (*sky-color-foo*)
-    (gl:clear-color r g b 1.0))
-
   (gl:depth-func :less)
   (gl:clear-depth 1.0)
   (cond
@@ -61,9 +43,11 @@
      (gl:depth-mask t)
      (gl:clear :depth-buffer-bit))
     (t (gl:clear
-       :color-buffer-bit
-       :depth-buffer-bit
-       )))
+	:color-buffer-bit
+	:depth-buffer-bit
+	))))
+
+(defun render-chunks ()
   (gl:enable :depth-test)
   (gl:enable :cull-face)
   (gl:disable :blend)
@@ -81,10 +65,10 @@
 
     ;;other cosmetic uniforms
     (glhelp:with-uniforms
-     uniform shader
-     (with-vec (x y z) (*sky-color-foo*)
-       (%gl:uniform-3f (uniform :fogcolor)
-		       x y z))
+	uniform shader
+      (destructuring-bind (r g b . rest) *sky-color-foo*
+	(declare (ignorable rest))
+	(%gl:uniform-3f (uniform :fogcolor) r g b))
      (gl:uniformfv (uniform :camera-pos)
 		   (camera-matrix:camera-vec-position *camera*))
      (%gl:uniform-1f (uniform :foglet)
@@ -106,6 +90,7 @@
   ;;render chunks
   (gl:front-face :ccw)
   (sandbox::get-chunks-to-draw)
+  ;#+nil
   (multiple-value-bind (shown hidden) (sandbox::draw-world)
     ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
     #+nil
@@ -120,10 +105,10 @@
       (glhelp::use-gl-program shader)
       ;;uniform crucial for first person 3d
       (glhelp:with-uniforms uniform shader
-			    (gl:uniform-matrix-4fv 
-			     (uniform :pmv)
-			     (camera-matrix:camera-matrix-projection-view-player *camera*)
-			     nil)))
+	(gl:uniform-matrix-4fv 
+	 (uniform :pmv)
+	 (camera-matrix:camera-matrix-projection-view-player *camera*)
+	 nil)))
     (sandbox::render-occlusion-queries)))
 
 #+nil
