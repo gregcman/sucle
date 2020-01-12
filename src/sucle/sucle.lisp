@@ -19,7 +19,7 @@
 
 (defparameter *slab-aabb*
   ;;;;slab
-  (create-aabb 1.0 0.5 1.0 0.0 0.0 0.0))
+  (create-aabb 1.0  #+nil 0.5 1.0 1.0 0.0 0.0 0.0))
 
 ;;;;FIXME::The point of this is to reduce the amount of bits to store the hitbox.
 ;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
@@ -170,8 +170,12 @@
 (progn
   (defparameter *tmouse-x* 0.0d0)
   (defparameter *tmouse-y* 0.0d0)
+  (defparameter *prev-tmouse-x* 0.0d0)
+  (defparameter *prev-tmouse-y* 0.0d0)
   (defparameter *lerp-mouse-x* 0.0d0)
   (defparameter *lerp-mouse-y* 0.0d0)
+  (defparameter *lerp-mouse-x0* 0.0d0)
+  (defparameter *lerp-mouse-y0* 0.0d0)
   (defun update-moused (clamp &optional (smoothing-factor 1.0))
     (multiple-value-bind (dx dy) (moused)
       (let ((x (+ *tmouse-x* dx))
@@ -181,10 +185,23 @@
 	(let ((negative (- clamp)))
 	  (when (< y negative)
 	    (setf y negative)))
+	(setf *prev-tmouse-x* *tmouse-x*)
+	(setf *prev-tmouse-y* *tmouse-y*)
 	(setf *tmouse-x* x)
 	(setf *tmouse-y* y)
-	(setf *lerp-mouse-x* (alexandria:lerp smoothing-factor *lerp-mouse-x* x))
-	(setf *lerp-mouse-y* (alexandria:lerp smoothing-factor *lerp-mouse-y* y))))))
+	(setf *lerp-mouse-x0* (alexandria:lerp smoothing-factor
+					      *prev-tmouse-x*;;*lerp-mouse-x*
+					      *tmouse-x*))
+	(setf *lerp-mouse-y0* (alexandria:lerp smoothing-factor
+					      *prev-tmouse-y*;;*lerp-mouse-y*
+					      *tmouse-y*))
+	(let ((smoothing-factor2 0.9))
+	  (setf *lerp-mouse-x* (alexandria:lerp smoothing-factor2
+						*lerp-mouse-x*
+						*lerp-mouse-x0*))
+	  (setf *lerp-mouse-y* (alexandria:lerp smoothing-factor2
+						*lerp-mouse-y*
+						*lerp-mouse-y0*)))))))
 
 (defun unit-pitch-yaw (result pitch yaw)
   (let ((cos-pitch (cos pitch)))
@@ -244,6 +261,12 @@
      
      ;;physics
      (stuff)
+     (when (window:mice-locked-p)
+       (when (window::skey-j-p (window::keyval #\P))
+	 (update-world-vao)))
+
+     ;;load or unload chunks around the player who may have moved
+     (load-world)
      ;;render chunks and such
      ;;handle chunk meshing
      (application::on-session-change *last-session*
@@ -326,8 +349,6 @@
       (when (window:mice-locked-p)
 	(when (window::skey-j-p (window::keyval #\V))
 	  (toggle noclip))
-	(when (window::skey-j-p (window::keyval #\P))
-	  (update-world-vao))
 	(when (window::skey-j-p (window::keyval #\F))
 	  (toggle fly)
 	  (toggle gravity)))
@@ -341,45 +362,70 @@
       (case is-sneaking
 	(1 (easef *fov* *target-fov* 0.1))
 	(otherwise (easef *fov* *start-fov* 0.1)))
-      (fist-stuff pos)
-      (multiple-value-bind (fraction times)
-	  (fps:tick
-	    (incf *ticks*)
-	    (setf *time-of-day*
-		  (floatify		     
-		   1.0;;0.8
-		   #+nil
-		   (let ((seconds (or 60 840)))
-		     (/ (+ 1 (sin
-			     (/ *ticks*
-				;;60
-				seconds)))
-			2))))
-	    (physentity *ent*))
-	(declare (ignorable times))
-	(let ((neck (entity-neck *ent*)))
-	  (when (window:mice-locked-p)
-	    (update-moused *mouse-multiplier-aux* 0.5
-			   )
-	    (setf (necking-yaw neck)
-		  (floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
-		  (necking-pitch neck)
-		  (floatify (* *lerp-mouse-y* *mouse-multiplier*))))
-	  (unit-pitch-yaw (camera-matrix:camera-vec-forward *camera*)
-			  (necking-pitch neck)
-			  (necking-yaw neck))
-	  (let ((curr (pointmass-position player-pointmass))
-		(prev (pointmass-position-old player-pointmass))
-		(camera *camera*))
-	    (load-world)
-	    (let ((vec (camera-matrix:camera-vec-position camera))
-		  (cev (camera-matrix:camera-vec-noitisop camera)))
-	      (nsb-cga:%vec-lerp vec prev curr fraction)
-	      #+nil
-	      (when (and (not fly)
-			 (eql 0 is-sneaking))
-		(nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))
-	      (nsb-cga:%vec* cev vec -1.0))))))))
+      (fist-stuff pos))
+    (multiple-value-bind (fraction times)
+	(fps:tick
+	  (incf *ticks*)
+	  (set-time-of-day)
+	  (physentity *ent*))
+      (declare (ignorable times))
+      (let ((curr (pointmass-position player-pointmass))
+	    (prev (pointmass-position-old player-pointmass))
+	    (camera *camera*))
+	(let ((vec (camera-matrix:camera-vec-position camera))
+	      (cev (camera-matrix:camera-vec-noitisop camera)))
+	  (nsb-cga:%vec-lerp vec prev curr fraction)
+	  #+nil
+	  ;;;;FIXME::where to put? go lower when crouching.
+	  (when (and (not (entity-fly? *ent*))
+		     (eql 0 (entity-sneak? *ent*)))
+	    (nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))
+	  (nsb-cga:%vec* cev vec -1.0)))
+      
+      (let ((neck (entity-neck *ent*)))
+	(when (window:mice-locked-p)
+	  (update-moused *mouse-multiplier-aux*
+			 ;;fraction
+			 ;;(mouse-lerp-factor)
+			 ;;FIXME::correct formula?
+
+			 (/ (+ fraction times)
+			    (+ times 1)))
+	  (setf (necking-yaw neck)
+		(floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
+		(necking-pitch neck)
+		(floatify (* *lerp-mouse-y* *mouse-multiplier*))))
+	(unit-pitch-yaw (camera-matrix:camera-vec-forward *camera*)
+			(necking-pitch neck)
+			(necking-yaw neck))))))
+
+(defun mouse-lerp-factor ()
+  0.5
+  #+nil
+  ;;smooth when looking slowly, jittery when looking fast
+  (let ((distance
+	 (let ((a (floatify (- *tmouse-x* *lerp-mouse-x*)))
+	       (b (floatify (- *tmouse-y* *lerp-mouse-y*))))
+	   (sqrt
+	    (+ (* a a)
+	       (* b b))))))
+    (min 1.0     
+	 (/
+	  distance
+	  
+	  150.0))))
+
+(defun set-time-of-day ()
+  (setf *time-of-day*
+	(floatify		     
+	 1.0;;0.8
+	 #+nil
+	 (let ((seconds (or 60 840)))
+	   (/ (+ 1 (sin
+		    (/ *ticks*
+		       ;;60
+		       seconds)))
+	      2)))) )
 
 (defun player-position ()
   (let* ((player-pointmass (entity-particle *ent*))
