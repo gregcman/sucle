@@ -1,62 +1,42 @@
 (asdf:defsystem #:sucle
   :author "terminal625"
   :license "MIT"
-  :description "Cube Demo Game, physics part,The voxel backend for testbed"
-  :depends-on (
-	       ;;;sucle
-	       #:application
-	       #:utility
-	       #:text-subsystem
-
-
-	       ;;<TESTBED>
-	       ;;<SANDBOX>
-	       #:cl-opengl
-	       #:scratch-buffer
-	       #:glhelp
-	       #:nsb-cga
-	       #:quads
-
-	       
-	       #:sucle-serialize
-	       #:sucle-multiprocessing
-
-	       #:aabbcc ;;for occlusion culling
-	       
-	       ;;</SANDBOX>
-	      
-	       #:image-utility
-	       #:uncommon-lisp
-	       #:fps-independent-timestep
-	       #:control
-	       #:camera-matrix
-	       #:alexandria
-	       
-	       ;;for world-generation
-	       #:black-tie
-
-	       ;;for the terrain picture
-	       #:sucle-temp
-	       ;;</TESTBED>
-
-	       )
+  :description "Cube Demo Game"
+  :depends-on
+  (
+   #:application
+   #:alexandria  
+   #:utility 
+   #:sucle-temp ;;for the terrain picture 
+   #:text-subsystem
+   #:cl-opengl
+   #:glhelp
+   #:scratch-buffer
+   #:nsb-cga
+   #:camera-matrix
+   #:quads
+   #:sucle-serialize
+   #:sucle-multiprocessing
+   #:aabbcc ;;for occlusion culling 
+   #:image-utility
+   #:uncommon-lisp
+   #:fps-independent-timestep
+   #:control
+   #:alexandria  
+   ;;for world-generation
+   #:black-tie
+   )
   :serial t
   :components 
   (
-   ;;<SANDBOX>
    (:file "queue")
+   (:file "voxel-chunks")
    (:file "package")
-   (:file "world")
-   (:file "persist-world") ;;world <-> filesystem
-   (:file "block-data") ;;block data
    ;;(:file "block-light") ;;light propogation
-   (:file "block-meshing");;world data -> mesh 
-   (:file "change-world")
-   ;;</SANDBOX>
-   
-   ;;<TESTBED>
-   (:file "sandbox-subsystem")
-   (:file "testbed")
-   ;;</TESTBED>
-   
-   (:file "sucle")))
+   (:file "mesher")
+   (:file "block-data")
+   (:file "world")
+   (:file "extra")
+   (:file "physics")
+   (:file "sucle")
+   (:file "render")))

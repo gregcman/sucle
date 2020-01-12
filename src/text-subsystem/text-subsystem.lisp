@@ -89,7 +89,7 @@ gl_FragColor.a = opacity * fin.a;
 (glhelp:deflazy-gl font-texture (font-png)
   (glhelp::wrap-opengl-texture (glhelp::create-opengl-texture-from-data font-png)))
 
-(defparameter *trans* (nsb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
+(defparameter *trans* (sb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
 (defun retrans (x y &optional (trans *trans*))
   (setf (aref trans 12) (/ x 128.0)
 	(aref trans 13) (/ y 128.0))
@@ -315,7 +315,7 @@ gl_FragColor = value_out;
 	 (glhelp:with-uniforms uniform refract
 	   (gl:uniform-matrix-4fv
 	    (uniform :pmv)
-	    (load-time-value (nsb-cga:identity-matrix))
+	    (load-time-value (sb-cga:identity-matrix))
 	    nil)
 	   (gl:uniformf (uniform 'size)
 			(/ w *block-width*)

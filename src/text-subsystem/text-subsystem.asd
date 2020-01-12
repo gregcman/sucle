@@ -9,7 +9,7 @@
    #:quads
    #:application
    #:sucle-temp
-   )
+   #:sb-cga)
   :serial t
   :components 
   ((:file "text-subsystem"))) 

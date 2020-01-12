@@ -1,38 +1,34 @@
-(in-package :sandbox)
+(defpackage #:mesher
+  (:use :cl :utility)
+  (:export
+   :mesh-chunk
+   :block-shape
+   :draw-dispatch
+   :with-texture-translator2)
+  (:export
+   :side-i
+   :side+i
+   :side-j
+   :side+j
+   :side-k
+   :side+k))
+(in-package :mesher)
 
 (defparameter *mesh-etex* nil)
 (defparameter *mesh-dark* nil)
 (defparameter *mesh-epos* nil)
 
+(defgeneric draw-dispatch (obj i j k))
 (with-unsafe-speed
-  (defun chunk-shape (iter io jo ko)
-    (declare (type world::block-coord io jo ko))
+  (defun mesh-chunk (iter io jo ko)
+    (declare (type voxel-chunks::block-coord io jo ko))
     (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
-      ;;(draw-dispatch (world::getobj io jo ko) io jo ko)
+      ;;(draw-dispatch (voxel-chunks::getobj io jo ko) io jo ko)
       ;;#+nil
-      (dobox ((i io (the world::block-coord (+ 16 io)))
-	      (j jo (the world::block-coord (+ 16 jo)))
-	      (k ko (the world::block-coord (+ 16 ko))))
-	     (draw-dispatch (world::getobj i j k) i j k)))))
-
-;;FIXME::is using CLOS to dispatch on the block a good way to organize?
-;; is it efficient?
-(defmethod draw-dispatch ((bits-block-data fixnum) i j k)
-  (blockshape (world::getblock-extract bits-block-data) i j k))
-
-(defmethod blockshape ((blockid (eql 0)) i j k)
-  ;;if its air, don't render anything
-  )
-(defmethod blockshape ((blockid (eql 24)) i j k)
-  (rendersandstone blockid i j k))
-(defmethod blockshape ((blockid (eql 2)) i j k)
-  (rendergrass blockid i j k))
-(defmethod blockshape ((blockid (eql 17)) i j k)
-  (renderstandardblock blockid i j k)
-  ;;(renderlog blockid i j k)
-  )
-(defmethod blockshape ((blockid t) i j k)
-  (renderstandardblock blockid i j k))
+      (dobox ((i io (the voxel-chunks::block-coord (+ 16 io)))
+	      (j jo (the voxel-chunks::block-coord (+ 16 jo)))
+	      (k ko (the voxel-chunks::block-coord (+ 16 ko))))
+	     (draw-dispatch (voxel-chunks:getobj i j k) i j k)))))
 
 (eval-always
   ;;;;total faces touched by a light of distance n
@@ -102,7 +98,6 @@
      clockwise-winding
      (list u0 u1 v0 v1)))))
 
-(defparameter *daytime* 1.0)
 #+nil
 (defun dark-fun (darkness b0 b1 b2 b3 s0 s1 s2 s3)
   (let ((time *daytime*))
@@ -126,14 +121,14 @@
 	    (let ((xpos (+ i i0))
 		  (ypos (+ j j0))
 		  (zpos (+ k k0)))
-	      (declare (type world::block-coord xpos ypos zpos))
+	      (declare (type voxel-chunks::block-coord xpos ypos zpos))
 	      ,(with-gensyms (actual-color)
 		 (flet ((%edge-aux (getfunc q0 q1 q2 q3 &rest body)
 			  `(flet ((value (i j k)
 				    (let ((xd (+ i xpos))
 					  (yd (+ j ypos))
 					  (zd (+ k zpos)))
-				      (declare (type world::block-coord xd yd zd))
+				      (declare (type voxel-chunks::block-coord xd yd zd))
 				      (* ,actual-color (lightfunc (,getfunc xd yd zd))))))
 			     (let ((,q0 (value ,x0 ,y0 ,z0))
 				   (,q1 (value ,x1 ,y1 ,z1))
@@ -143,9 +138,9 @@
 		   `(let ((,actual-color ,color))
 		      (declare (type single-float ,actual-color))
 		      ,(%edge-aux
-			'world::getlight 'q0 'q1 'q2 'q3 
+			'world:getlight 'q0 'q1 'q2 'q3 
 			(%edge-aux
-			 'world::skygetlight 'q4 'q5 'q6 'q7
+			 'world:skygetlight 'q4 'q5 'q6 'q7
 			 ;;Write block light and sky light values
 			 `(dark q0 q1 q2 q3 q4 q5 q6 q7)
 			 #+nil
@@ -165,7 +160,7 @@
 	    (let ((xp (+ i x))
 		  (yp (+ j y))
 		  (zp (+ k z)))
-	      (declare (type world::block-coord xp yp zp))
+	      (declare (type voxel-chunks::block-coord xp yp zp))
 	      (epos (floatify xp)
 		    (floatify yp)
 		    (floatify zp)))))
@@ -176,7 +171,7 @@
 
 (defmacro face-header (name &body body)
   `(defun ,name (i j k u0 v0 u1 v1)
-     (declare (type world::block-coord i j k)
+     (declare (type voxel-chunks::block-coord i j k)
 	      (type single-float u0 v0 u1 v1))
      (scratch-buffer:bind-out* ((*mesh-epos* epos)
 				(*mesh-etex* etex)
@@ -287,14 +282,6 @@
 		      (00 00 1)    
 		      (-1 00 1))))))
 
-;;;if the block is air, the side gets rendered. if the block is transparent
-;;;and the same type ex: texture between glass - there is no texture - if they are
-;;;different - water and glass -it shows
-(defun show-sidep (blockid other-blockid)
-  (or (zerop other-blockid)
-      (and (/= blockid other-blockid)
-	   (not (aref block-data:*opaquecubelooukup* other-blockid)))))
-
 (defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
   (let ((id (gensym)))
     `(let ((,id (* 4 ,num-form)))
@@ -303,114 +290,3 @@
 
 (eval-always
   (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
-
-(with-declaim-inline (block-hash)
-  (defun block-hash (i j k)
-    (locally (declare (optimize (speed 3) (safety 0))
-		      (type world::block-coord i j k))
-      (let ((hash (mod (the world::block-coord (* 2654435761 (the world::block-coord (+ i j k))))
-		       (ash 1 32))))
-	(values (logtest hash #b0100)
-		(logtest hash #b1000))))))
-(defmacro flipuv (&optional (i 'i) (j 'j) (k 'k) (u1 'u1) (u0 'u0) (v1 'v1) (v0 'v0))
-  (with-gensyms (u v)
-    `(locally (declare (inline block-hash))
-       (multiple-value-bind (,u ,v) (block-hash ,i ,j ,k)
-	 (when ,u
-	   (rotatef ,u1 ,u0))
-	 (when ,v
-	   (rotatef ,v1 ,v0))))))
-(defun renderstandardblock (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
-    (with-texture-translator2 (u0 u1 v0 v1) texid
-      (flipuv)
-      (let ((adj-id (world:getblock i (1- j) k)))
-	(when (show-sidep id adj-id)
-	  (side-j i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i (1+ j) k)))
-	(when (show-sidep id adj-id)
-	  (side+j i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1- i) j k)))
-	(when (show-sidep id adj-id)
-	  (side-i i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1+ i) j k)))
-	(when (show-sidep id adj-id)
-	  (side+i i j k u0 v0 u1 v1)))    
-      (let ((adj-id (world:getblock i j (1- k))))
-	(when (show-sidep id adj-id)
-	  (side-k i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i j (1+ k))))
-	(when (show-sidep id adj-id)
-	  (side+k i j k u0 v0 u1 v1))))))
-
-(defun rendergrass (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
-    (with-texture-translator2 (u0 u1 v0 v1) 2
-      (flipuv)
-      (let ((adj-id (world:getblock i (1- j) k)))
-	(when (show-sidep id adj-id)
-	  (side-j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) texid
-      (flipuv)
-      (let ((adj-id (world:getblock i (1+ j) k)))
-	(when (show-sidep id adj-id)
-	  (side+j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) 3
-      (let ((adj-id (world:getblock (1- i) j k)))
-	(when (show-sidep id adj-id)
-	  (side-i i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1+ i) j k)))
-	(when (show-sidep id adj-id)
-	  (side+i i j k u0 v0 u1 v1)))    
-      (let ((adj-id (world:getblock i j (1- k))))
-	(when (show-sidep id adj-id)
-	  (side-k i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i j (1+ k))))
-	(when (show-sidep id adj-id)
-	  (side+k i j k u0 v0 u1 v1))))))
-
-(defun rendersandstone (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
-    (with-texture-translator2 (u0 u1 v0 v1) texid
-      (let ((adj-id (world:getblock i (1- j) k)))
-	(when (show-sidep id adj-id)
-	  (side-j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) (- 208 32)
-      (let ((adj-id (world:getblock i (1+ j) k)))
-	(when (show-sidep id adj-id)
-	  (side+j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) (- 208 16)
-      (let ((adj-id (world:getblock (1- i) j k)))
-	(when (show-sidep id adj-id)
-	  (side-i i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1+ i) j k)))
-	(when (show-sidep id adj-id)
-	  (side+i i j k u0 v0 u1 v1)))    
-      (let ((adj-id (world:getblock i j (1- k))))
-	(when (show-sidep id adj-id)
-	  (side-k i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i j (1+ k))))
-	(when (show-sidep id adj-id)
-	  (side+k i j k u0 v0 u1 v1))))))
-(defun renderlog (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
-    (with-texture-translator2 (u0 u1 v0 v1) 21
-      (let ((adj-id (world:getblock i (1- j) k)))
-	(when (show-sidep id adj-id)
-	  (side-j i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i (1+ j) k)))
-	(when (show-sidep id adj-id)
-	  (side+j i j k u0 v0 u1 v1))))
-    (with-texture-translator2 (u0 u1 v0 v1) texid
-      (let ((adj-id (world:getblock (1- i) j k)))
-	(when (show-sidep id adj-id)
-	  (side-i i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1+ i) j k)))
-	(when (show-sidep id adj-id)
-	  (side+i i j k u0 v0 u1 v1)))    
-      (let ((adj-id (world:getblock i j (1- k))))
-	(when (show-sidep id adj-id)
-	  (side-k i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i j (1+ k))))
-	(when (show-sidep id adj-id)
-	  (side+k i j k u0 v0 u1 v1))))))

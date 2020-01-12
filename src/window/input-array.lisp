@@ -1,5 +1,6 @@
-(in-package :window) 
-
+(in-package :window)
+;;;;************************************************************************;;;;
+;;;;<INPUT ARRAY>
 (deftype mouse-keyboard-input-array ()
   `(simple-bit-vector 128))
 (progn
@@ -71,3 +72,5 @@
 (defmacro character-key-p (x)
   `(= 1
       (sbit (etouq *character-keys*) ,x)))
+;;;;</INPUT ARRAY>
+;;;;************************************************************************;;;;
