@@ -225,6 +225,7 @@
 					 (1 0))
 				       0))))))))
 
+#+nil
 (defun 5fun (x y z)
   (multiple-value-bind (x y z) (get-chunk x y z)
     (dobox ((0x (- x 16) (+ x 32) :inc 16)
@@ -236,7 +237,7 @@
 				     0x
 				     0y
 				     0z))))))
-
+#+nil
 (defun 5fun (x y z)
   (loop :repeat 10 :do
      (let ((newx x)
