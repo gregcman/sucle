@@ -15,7 +15,7 @@
   (defun b@ (&optional (x *x*) (y *y*) (z *z*))
     (world:getblock x y z))
   (defun (setf b@) (value &optional (x *x*) (y *y*) (z *z*))
-    (sandbox::plain-setblock x y z value)))
+    (world::plain-setblock x y z value)))
 
 (defun b= (b0 b1)
   (eql b0 b1))
@@ -137,7 +137,7 @@
       (x y z dummy)
     (declare (ignore dummy))
     (when (b= (nick :air) (b@ x y z))
-      (sandbox::plain-setblock x y z blockid))))
+      (world::plain-setblock x y z blockid))))
 
 (defun degree-to-rad (&optional (n (random 360)))
   (* n (load-time-value (floatify (/ pi 180)))))
@@ -199,7 +199,7 @@
 	(generate-for-new-chunk key))
       :callback (lambda (job-task)
 		  (declare (ignore job-task))
-		  (sandbox::dirty-push-around key)
+		  (world::dirty-push-around key)
 		  (sucle-mp::remove-unique-task-key job-key))))))
 
 (utility:with-unsafe-speed

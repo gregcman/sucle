@@ -27,5 +27,3 @@
 (defpackage #:block-data
   (:use #:cl
 	#:utility))
-(defpackage #:sandbox
-  (:use #:cl #:utility))

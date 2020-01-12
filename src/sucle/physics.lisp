@@ -78,7 +78,7 @@
 	(when (aref block-data:*iscollidable*
 		    blockid)
 	  (when *dirtying2*
-	    (sandbox::plain-setblock x y z (1+ (random 5)) 0))
+	    (world::plain-setblock x y z (1+ (random 5)) 0))
 	  (let ((blockaabb (block-to-block-aabb blockid)))
 	    (#+nil
 	     let
@@ -113,7 +113,7 @@
       (let ((blockid (world:getblock mx my mz)))
 	(when (aref block-data:*iscollidable* blockid)
 	  (when *dirtying*
-	    (sandbox::plain-setblock mx my mz (1+ (random 5)) 0))
+	    (world::plain-setblock mx my mz (1+ (random 5)) 0))
 	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
 					    (block-to-block-aabb blockid))))))
     acc))

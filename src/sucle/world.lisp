@@ -370,7 +370,6 @@
 ;;;;</PERSIST-WORLD>
 ;;;;************************************************************************;;;;
 ;;;;<CHANGE-WORLD?>
-(in-package :sandbox)
 ;;;;keeping track of the changes to the world
 ;;;; *DIRTY-CHUNKS* contains chunks that need to be remeshed or have their
 ;;;; meshes removed.
@@ -549,7 +548,7 @@
 
 (defun load-chunks-around ()
   (mapc (lambda (key)
-	  (sandbox::chunk-load key))
+	  (world::chunk-load key))
 	(get-chunks-to-load)))
 (defun get-chunks-to-load ()
   (let ((x0 *chunk-coordinate-center-x*)
@@ -613,7 +612,7 @@
   (let ((chunk (voxel-chunks::obtain-chunk-from-chunk-key key nil)))
     (cond
       (chunk
-       (sandbox::chunk-save chunk :path path)
+       (world::chunk-save chunk :path path)
        (dirty-push key)
        ;;remove from the chunk-array
        (voxel-chunks::with-chunk-key-coordinates (x y z)
@@ -758,8 +757,8 @@
 ;;FIXME::thread-safety for:
 ;;voxel-chunks::*chunks*
 ;;voxel-chunks::*chunk-array*
-;;sandbox::*dirty-chunks*
-;;sandbox::*achannel*
+;;world::*dirty-chunks*
+;;world::*achannel*
 
    ;;#:msave
    ;;#:save-world

@@ -54,10 +54,6 @@
    8.0))
 ;;;;</BOXES?>
 
-(defparameter *app* nil)
-(defparameter *sandbox* t)
-
-
 (defparameter *with-functions*
   #+nil
   (list
@@ -113,23 +109,11 @@
        (unwind-protect
 	    (loop
 	       (application:poll-app)
-	       (when *sandbox*
-		 (per-frame))
-	       ;;#+nil
-	       (when *app*
-		 (progn
-		   #+nil
-		   (when (window:skey-j-p (window::keyval #\e))
-		     (window::toggle-mouse-capture))))
-	       ;;#+nil
-	       (when (window:skey-j-p (window::keyval #\h))
-		 (toggle *app*))
-	       (when (window:skey-j-p (window::keyval #\j))
-		 (toggle *sandbox*)))
+	       (per-frame))
 	 (progn
 	   ;;(atest::remove-zeroes)
 	   ;;FIXME::don't remove all the chunks?
-	   (sandbox::msave)))))))
+	   (world::msave)))))))
 
 ;;;;
 
@@ -137,7 +121,7 @@
 (defun start ()
   (application::main
    (lambda ()
-     (sandbox::call-with-world-meshing-lparallel 
+     (world::call-with-world-meshing-lparallel 
       (lambda ()
 	(loop
 	   (application:poll-app)
@@ -147,7 +131,7 @@
    :title "conceptually simple block game"))
 #+nil
 (defun load-world-again (name)
-  (setf sandbox::*persist* nil)
+  (setf world::*persist* nil)
   (setf world:*world-directory* name)
   (load-world t))
 
@@ -237,10 +221,10 @@
 
   ;;set the chunk center aroun the player
   (with-vec (x y z) ((player-position))
-    (sandbox::set-chunk-coordinate-center x y z))
+    (world::set-chunk-coordinate-center x y z))
   
   (application::on-session-change *session*
-    (sandbox::load-world t))
+    (world::load-world t))
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
@@ -270,7 +254,7 @@
 	 (update-world-vao)))
 
      ;;load or unload chunks around the player who may have moved
-     (sandbox::load-world)
+     (world::load-world)
      ;;render chunks and such
      ;;handle chunk meshing
      (application::on-session-change *last-session*
@@ -532,13 +516,13 @@
 
 (defun destroy-block-at (x y z)
   ;;(blocksound x y z)
-  (sandbox::plain-setblock x y z (block-data::blockid :air) 15))
+  (world::plain-setblock x y z (block-data::blockid :air) 15))
 
 (defparameter *blockid* 1)
 
 (defun place-block-at (x y z &optional (blockval *blockid*))
   (when (not-occupied x y z)
-    (sandbox::plain-setblock
+    (world::plain-setblock
      x
      y
      z
