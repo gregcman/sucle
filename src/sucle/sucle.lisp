@@ -259,7 +259,6 @@
      ;;handle chunk meshing
      (application::on-session-change *last-session*
        (reset-chunk-display-list)
-       ;;FIXME::update vao according to position, not 0 0 0
        (update-world-vao))
      ;;update the camera
      (update-camera *camera*)
@@ -279,8 +278,7 @@
      (use-solidshader *camera*)
      (render-fist *fist*)
      (render-crosshairs)
-     ;;FIXME::what is glFlush good for?
-     ;;(gl:flush)
+
      (complete-render-tasks)
      (dispatch-mesher-to-dirty-chunks))))
 
