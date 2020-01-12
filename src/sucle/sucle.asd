@@ -53,5 +53,8 @@
    (:file "block-meshing");;world data -> mesh 
    (:file "change-world")
    ;;</SANDBOX>
-   (:file "more")
-   (:file "sucle")))
+   (:file "sucle-package")
+   (:file "extra")
+   (:file "physics")
+   (:file "sucle")
+   (:file "render")))
