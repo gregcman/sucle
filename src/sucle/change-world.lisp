@@ -189,22 +189,23 @@
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
 
 
-(defun draw-aabb (x y z &optional (aabb *fist-aabb*))
+(defun draw-aabb (x y z aabb &optional (iterator *iterator*))
   (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
 	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
       aabb
     (draw-box
      (+ minx x -0) (+  miny y -0) (+  minz z -0)
-     (+ maxx x -0) (+  maxy y -0) (+  maxz z -0))))
+     (+ maxx x -0) (+  maxy y -0) (+  maxz z -0)
+     iterator)))
 
-(defun draw-box (minx miny minz maxx maxy maxz)
+(defun draw-box (minx miny minz maxx maxy maxz &optional (iterator *iterator*))
   (macrolet ((vvv (x y z)
 	       `(progn
 		  (fun ,x)
 		  (fun ,y)
 		  (fun ,z))
 	       ))
-    (scratch-buffer:bind-out* ((*iterator* fun))
+    (scratch-buffer:bind-out* ((iterator fun))
       (vvv minx maxy minz)
       (vvv maxx maxy minz)
       (vvv maxx maxy maxz)

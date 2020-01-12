@@ -19,7 +19,6 @@
 	    (lambda (x)
 	    (alexandria:clamp (* x sandbox::*daytime*) 0.0 1.0))
 	  *sky-color*))
-
 (defun render-sky ()
   (apply 'gl:clear-color (the-sky-color))
   ;;change the sky color according to time
@@ -47,11 +46,7 @@
 	:depth-buffer-bit
 	))))
 
-(defun render-chunks ()
-  (gl:enable :depth-test)
-  (gl:enable :cull-face)
-  (gl:disable :blend)
-
+(defun use-chunk-shader (&optional (camera *camera*))
   ;;set up shader
   (let ((shader (getfnc 'blockshader)))
     (glhelp::use-gl-program shader)
@@ -60,7 +55,7 @@
     (glhelp:with-uniforms uniform shader
       (gl:uniform-matrix-4fv 
        (uniform :pmv)
-       (camera-matrix:camera-matrix-projection-view-player *camera*)
+       (camera-matrix:camera-matrix-projection-view-player camera)
        nil))
 
     ;;other cosmetic uniforms
@@ -69,23 +64,27 @@
       (destructuring-bind (r g b . rest) *sky-color-foo*
 	(declare (ignorable rest))
 	(%gl:uniform-3f (uniform :fogcolor) r g b))
-     (gl:uniformfv (uniform :camera-pos)
-		   (camera-matrix:camera-vec-position *camera*))
-     (%gl:uniform-1f (uniform :foglet)
-		     (/ -1.0
-			;;FIXME::16 assumes chunk is a 16x16x16 cube
-			(* 16 sandbox::*chunk-radius*)
-			#+nil
-			(or 128 (camera-matrix:camera-frustum-far *camera*))
-			*fog-ratio*))
-     (%gl:uniform-1f (uniform :aratio)
-		     (/ 1.0 *fog-ratio*))
-     (%gl:uniform-1f (uniform :time)
-		     sandbox::*daytime*)
+      (gl:uniformfv (uniform :camera-pos)
+		    (camera-matrix:camera-vec-position camera))
+      (%gl:uniform-1f (uniform :foglet)
+		      (/ -1.0
+			 ;;FIXME::16 assumes chunk is a 16x16x16 cube
+			 (* 16 sandbox::*chunk-radius*)
+			 #+nil
+			 (or 128 (camera-matrix:camera-frustum-far *camera*))
+			 *fog-ratio*))
+      (%gl:uniform-1f (uniform :aratio)
+		      (/ 1.0 *fog-ratio*))
+      (%gl:uniform-1f (uniform :time)
+		      sandbox::*daytime*)
 
       (glhelp::set-uniforms-to-textures
        ((uniform :sampler)
-	(glhelp::handle (getfnc 'terrain))))))
+	(glhelp::handle (getfnc 'terrain)))))))
+(defun render-chunks ()  
+  (gl:enable :depth-test)
+  (gl:enable :cull-face)
+  (gl:disable :blend)
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
   (gl:front-face :ccw)
@@ -99,17 +98,20 @@
 	    #+nil
 	    (+ hidden shown)))
       (unless (zerop total)
-	(format t "~%~s" (* 100.0 (/ shown total 1.0))))))
-  (progn
-    (let ((shader (getfnc 'sandbox::occlusion-shader)))
-      (glhelp::use-gl-program shader)
-      ;;uniform crucial for first person 3d
-      (glhelp:with-uniforms uniform shader
-	(gl:uniform-matrix-4fv 
-	 (uniform :pmv)
-	 (camera-matrix:camera-matrix-projection-view-player *camera*)
-	 nil)))
-    (sandbox::render-occlusion-queries)))
+	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
+
+(defun use-occlusion-shader (&optional (camera *camera*))
+  (let ((shader (getfnc 'sandbox::occlusion-shader)))
+    (glhelp::use-gl-program shader)
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms uniform shader
+      (gl:uniform-matrix-4fv 
+       (uniform :pmv)
+       (camera-matrix:camera-matrix-projection-view-player camera)
+       nil))))
+;;FIXME::better way to do this? bring render-occlusion-queries here?
+(defun render-chunk-occlusion-queries ()
+  (sandbox::render-occlusion-queries))
 
 #+nil
 (defun draw-fullscreen-quad ()
@@ -376,15 +378,15 @@ gl_FragColor.rgb = color_out;
   (when (fister-exists fist)
     (let ((selected-block (fister-selected-block fist)))
       (with-vec (a b c) (selected-block)
-	(let ((sandbox::*iterator* (scratch-buffer:my-iterator)))
-	  (let ((times (sandbox::draw-aabb a b c *selected-block-aabb*)))
+	(let ((iterator (scratch-buffer:my-iterator)))
+	  (let ((times (sandbox::draw-aabb a b c *selected-block-aabb* iterator)))
 	    (declare (type fixnum times)
 		     (optimize (speed 3) (safety 0)))
 	    ;;mesh-fist-box
 	    (let ((box
 		   (let ((n 0.06))
 		     ;;FIXME::why use this *iterator*?
-		     (scratch-buffer:flush-bind-in* ((sandbox::*iterator* xyz))		    
+		     (scratch-buffer:flush-bind-in* ((iterator xyz))		    
 		       (glhelp:create-vao-or-display-list-from-specs
 			(:quads times)
 			((3 n n n)
@@ -424,7 +426,7 @@ gl_FragColor.rgb = color_out;
        (uniform :pmv)
        ;;(nsb-cga::identity-matrix)
        
-       (camera-matrix:camera-matrix-projection-view-player *camera*)
+       (camera-matrix:camera-matrix-projection-view-player camera)
        nil))))
 
 

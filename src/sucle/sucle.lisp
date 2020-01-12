@@ -260,7 +260,10 @@
      (draw-to-default-area)
      ;;this also clears the depth and color buffer.
      (render-sky)
+     (use-chunk-shader *camera*)
      (render-chunks)
+     (use-occlusion-shader *camera*)
+     (render-chunk-occlusion-queries)
      ;;selected block and crosshairs
      (use-solidshader *camera*)
      (render-fist *fist*)
