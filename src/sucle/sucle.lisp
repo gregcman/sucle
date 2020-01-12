@@ -3,8 +3,69 @@
   (:export #:start))
 (in-package :sucle)
 
+;;;;************************************************************************;;;;
+;;;;<BOXES?>
+(defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
+		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
+  (aabbcc::make-aabb
+   :minx minx
+   :maxx maxx
+   :miny miny
+   :maxy maxy
+   :minz minz
+   :maxz maxz))
+
+(defparameter *block-aabb*
+  ;;;;1x1x1 cube
+  (create-aabb 1.0 1.0 1.0 0.0 0.0 0.0))
+
+(defparameter *slab-aabb*
+  ;;;;slab
+  (create-aabb 1.0 0.5 1.0 0.0 0.0 0.0))
+
+;;;;FIXME::The point of this is to reduce the amount of bits to store the hitbox.
+;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
+;;;;get chopped off or something, thus leading to strange clipping.
+;;;;This effectively reduces the precision, giving leeway for math operations.
+;;;;My prediction could be wrong though.
+(defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
+  (* n (round (/ x n))))
+(defparameter *player-aabb*
+  (apply #'create-aabb
+	 (mapcar 'round-to-nearest	 
+		 '(0.3 0.12 0.3 -0.3 -1.5 -0.3))))
+
+;;;a very small cubic fist
+(defparameter *fist-aabb* (create-aabb 0.00005))
+
+(defparameter *block-aabb2*
+  (let* ((offset 0.1)
+	 (small (- 0.0 offset))
+	 (large (+ 1.0 offset)))
+    (create-aabb large large large small small small)))
+(defparameter *chunk-aabb*
+  (apply 'create-aabb
+	 (mapcar 'floatify
+		 (list
+		  world::*chunk-size-x*
+		  world::*chunk-size-y*
+		  world::*chunk-size-z*
+		  0.0
+		  0.0
+		  0.0))))
+
+(defparameter *big-fist-aabb*
+  (create-aabb
+   ;;0.5
+   ;;1.5
+   8.0))
+;;;;</BOXES?>
+;;;;************************************************************************;;;;
+
+
 (defparameter *app* nil)
 (defparameter *sandbox* t)
+
 
 (defparameter *with-functions*
   #+nil
@@ -146,25 +207,6 @@
 		 (when (>= 0 whats-left) (exit)))
 	       (logiorf dead-axis newclamp)))))))
 
-(defparameter *block-aabb*
-  (aabbcc:make-aabb
-   :minx 0.0
-   :miny 0.0
-   :minz 0.0
-   :maxx 1.0 ;1.0
-   :maxy 1.0 ;1.0
-   :maxz 1.0)
-  "an aabb representing a 1x1x1 cube")
-
-(defparameter *slab-aabb*
-  (aabbcc:make-aabb
-   :minx 0.0
-   :miny 0.0
-   :minz 0.0
-   :maxx 1.0 ;1.0
-   :maxy 1.0 ;0.5
-   :maxz 1.0)
-  "an aabb representing a 1x0.5x1 slab")
 
 (defun pos-to-block-aabb (x y z)
   (let ((the-block (world:getblock x y z)))
@@ -441,24 +483,7 @@
    collision-fun
    contact-fun))
 
-;;;;FIXME::The point of this is to reduce the amount of bits to store the hitbox.
-;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
-;;;;get chopped off or something, thus leading to strange clipping.
-;;;;This effectively reduces the precision, giving leeway for math operations.
-;;;;My prediction could be wrong though.
-(defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
-  (* n (round (/ x n))))
-(defparameter *player-aabb*
-  (apply #'aabbcc:make-aabb
-	 (mapcan (lambda (n param)
-		   `(,param ,(round-to-nearest n)))	 
-		 '(-0.3 -1.5 -0.3 0.3 0.12 0.3)
-		 '(:minx 
-		   :miny 
-		   :minz 
-		   :maxx
-		   :maxy 
-		   :maxz))))
+
 
 (defun gentity ()
   (make-entity :collision-fun 'collide-fucks
@@ -489,15 +514,7 @@
    (entity-collision-fun entity)
    (entity-aabb entity)))
 
-;;;a very small cubic fist
-(defparameter *fist-aabb*
-  (aabbcc:make-aabb
-   :minx -0.00005
-   :miny -0.00005
-   :minz -0.00005
-   :maxx 0.00005
-   :maxy 0.00005
-   :maxz 0.00005))
+
 
 (struct->class
  (defstruct fister
@@ -1041,25 +1058,7 @@ gl_FragColor.rgb = color_out;
    '(("position" 0) 
      ("color" 3))
    '((:pmv "projection_model_view"))))
-(defparameter *block-aabb2*
-  (let* ((offset 0.1)
-	 (small (- 0.0 offset))
-	 (large (+ 1.0 offset)))
-    (aabbcc:make-aabb
-     :minx small
-     :miny small
-     :minz small
-     :maxx large
-     :maxy large
-     :maxz large)))
-(defparameter *chunk-aabb*
-  (aabbcc:make-aabb
-   :minx 0.0
-   :miny 0.0
-   :minz 0.0
-   :maxx (floatify world::*chunk-size-x*)
-   :maxy (floatify world::*chunk-size-y*)
-   :maxz (floatify world::*chunk-size-z*)))
+
 (defun render? ()
   (let ((shader (application:getfnc 'solidshader)))
     (glhelp::use-gl-program shader)
@@ -1276,31 +1275,7 @@ gl_FragColor.rgb = color_out;
       (sandbox::unload-extra-chunks))))
 
 (defparameter *big-fist-reach* 32)
-(defparameter *big-fist-aabb*
-  (load-time-value
-   #+nil
-   (aabbcc:make-aabb
-    :minx -1.5
-    :miny -1.5
-    :minz -1.5
-    :maxx  1.5
-    :maxy  1.5
-    :maxz  1.5)
-   #+nil
-   (aabbcc:make-aabb
-    :minx -0.5
-    :miny -0.5
-    :minz -0.5
-    :maxx  0.5
-    :maxy  0.5
-    :maxz  0.5)
-   (aabbcc:make-aabb
-    :minx -8.0
-    :miny -8.0
-    :minz -8.0
-    :maxx  8.0
-    :maxy  8.0
-    :maxz  8.0)))
+
 (defparameter *x* 0)
 (defparameter *y* 0)
 (defparameter *z* 0)
@@ -1522,176 +1497,7 @@ gl_FragColor.rgb = color_out;
 	(countw))))
   count)
 
-(setf *big-fist-fun* 'correct-earth)
-(defun player-feet-at (&rest rest)
-  (declare (ignorable rest))
-  (multiple-value-bind (x y z) (player-feet)
-    ;;(print (list x y z))
-    (dobox ((x (+ x -1) (+ x 2))
-	    (z (+ z -1) (+ z 2)))
-	   (setf (b@ x y z) (nick :grass)))))
-(setf *middle-fist-fnc* 'player-feet-at)
-
-(defun line (px py pz &optional
-			(vx *x*)
-			(vy *y*)
-			(vz *z*)
-	       (blockid *blockid*)
-	       (aabb *fist-aabb*))
-  (aabbcc::aabb-collect-blocks ((+ 0.5 px)
-				(+ 0.5 py)
-				(+ 0.5 pz)
-				(- vx px)
-				(- vy py)
-				(- vz pz)
-				aabb)
-      (x y z dummy)
-    (declare (ignore dummy))
-    (when (b= (nick :air) (b@ x y z))
-      (sandbox::plain-setblock x y z blockid))))
-
-(defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
-		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
-  (aabbcc::make-aabb
-   :minx minx
-   :maxx maxx
-   :miny miny
-   :maxy maxy
-   :minz minz
-   :maxz maxz))
-
-(defun degree-to-rad (&optional (n (random 360)))
-  (* n (load-time-value (floatify (/ pi 180)))))
-(defun rotate-normal (&optional
-			(x (degree-to-rad))
-			(y (degree-to-rad))
-			(z (degree-to-rad)))
-  (sb-cga:transform-point
-   (sb-cga::vec 1.0 0.0 0.0)
-   (sb-cga::rotate* x y z)))
-(defun vec-values (&optional (vec (sb-cga::vec 1.0 2.0 3.0)))
-  (with-vec (x y z) (vec)
-    (values x y z)))
-(defun tree (&optional (x *x*) (y *y*) (z *z*) (minfactor 6.0))
-  (labels ((rec (place minfactor)
-	     (when (>= minfactor 0)
-	       (dotimes (x (random 5))
-		 (let ((random-direction (sb-cga::vec* (rotate-normal) (expt 1.5 minfactor))))
-		   (let ((new (sb-cga::vec+ place random-direction)))
-		     (multiple-value-call
-			 'line
-		       (vec-values place)
-		       (vec-values new)
-		       (if (>= 4 minfactor)
-			   (nick :leaves)
-			   (nick :log))
-		       (create-aabb (* 0.1 minfactor)))
-		     (rec new (1- minfactor))))))))
-    (rec (multiple-value-call 'sb-cga::vec (floatify2 x y z))
-	 minfactor)))
-(defun floatify2 (&rest values)
-  (apply 'values (mapcar 'floatify values)))
-
-(defun line-to-player-feet (&rest rest)
-  (declare (ignorable rest))
-  (multiple-value-bind (x y z) (player-feet)
-    ;;(print (list x y z))
-    (line x
-	  y
-	  z
-	  *x*
-	  *y*
-	  *z*
-	  (nick :glass;:planks
-		))))
-
-(setf *middle-fist-fnc* 'line-to-player-feet)
-
-
-(defun get-chunk (x y z)
-  (multiple-value-bind (x y z) (world::chunk-coordinates-from-block-coordinates x y z)
-    ;;FIXME::use actual chunk dimensions, not magic number 16
-    (values (* x 16)
-	    (* y 16)
-	    (* z 16))))
-(defun background-generation (key)
-  (let ((job-key (cons :world-gen key)))
-    (sucle-mp::submit-unique-task
-     job-key
-     ((lambda ()
-	(generate-for-new-chunk key))
-      :callback (lambda (job-task)
-		  (declare (ignore job-task))
-		  (sandbox::dirty-push-around key)
-		  (sucle-mp::remove-unique-task-key job-key))))))
-
-(utility:with-unsafe-speed
-  (defun generate-for-new-chunk (key)
-    (multiple-value-bind (x y z) (world::unhashfunc key)
-      (declare (type fixnum x y z))
-      ;;(print (list x y z))
-      (when (>= y -1)
-	(dobox ((x0 x (the fixnum (+ x 16)))
-		(y0 y (the fixnum (+ y 16)))
-		(z0 z (the fixnum (+ z 16))))
-	       (let ((block (let ((threshold (/ y 512.0)))
-			      (if (> threshold (black-tie::perlin-noise-single-float
-						(* x0 0.05)
-						(+ (* 1.0 (sin y0)) (* y0 0.05))
-						(* z0 0.05)))
-				  0
-				  1))))
-		 (setf (world::getobj x0 y0 z0)
-		       (world::blockify block
-					(case block
-					  (0 15)
-					  (1 0))
-					0))))))))
-
-(defun 5fun (x y z)
-  (multiple-value-bind (x y z) (get-chunk x y z)
-    (dobox ((0x (- x 16) (+ x 32) :inc 16)
-	    (0y (- y 16) (+ y 32) :inc 16)
-	    (0z (- z 16) (+ z 32) :inc 16))
-	   (background-generation (multiple-value-call
-				      'world::create-chunk-key
-				    (world::chunk-coordinates-from-block-coordinates 
-				     0x
-				     0y
-				     0z))))))
-
-(defun 5fun (x y z)
-  (loop :repeat 10 :do
-     (let ((newx x)
-	   (newy y)
-	   (newz z))
-       (progn
-	 (let ((random (random 3))
-	       (random2 (- (* 2 (random 2)) 1)))
-	   (case random
-	     (0 (incf newx (* random2 3)))
-	     (1 (incf newy (* random2 3)))
-	     (2 (incf newz (* random2 3)))))
-	 (line
-	  x y z
-	  newx newy newz
-	  (nick :gravel))
-	 (setf x newx
-	       y newy
-	       z newz)))))
-
-(defun 5fun (x y z)
-  ;;put a layer of grass on things
-  (around (lambda (x y z)
-	    (when (and (b= (nick :air) (b@ x y z))
-		       (not (b= (nick :air) (b@ x (1- y) z)))
-		       (not (b= (nick :grass) (b@ x (1- y) z))))
-	      (setf (b@ x y z) (nick :grass))))
-	  x y z))
-
-(defun around (fun x y z)
-  (let ((radius 5))
-    (dobox ((0x (- x radius) (+ x radius 1))
-	    (0y (- y radius) (+ y radius 1))
-	    (0z (- z radius) (+ z radius 1)))
-	   (funcall fun 0x 0y 0z))))
+(progn
+  (setf *big-fist-fun* 'correct-earth)
+  (setf *middle-fist-fnc* 'player-feet-at)
+  (setf *middle-fist-fnc* 'line-to-player-feet))
