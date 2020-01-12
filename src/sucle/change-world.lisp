@@ -1,4 +1,6 @@
 (in-package :sandbox)
+(defparameter *daytime* 1.0)
+
 #+nil
 (defun setblock-with-update (i j k blockid &optional
 					     (new-light-value (aref block-data:*lightvalue* blockid)))

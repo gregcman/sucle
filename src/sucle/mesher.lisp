@@ -1,11 +1,15 @@
-(in-package :sandbox)
+(defpackage #:mesher
+  (:use :cl :utility)
+  (:export
+   :mesh-chunk))
+(in-package :mesher)
 
 (defparameter *mesh-etex* nil)
 (defparameter *mesh-dark* nil)
 (defparameter *mesh-epos* nil)
 
 (with-unsafe-speed
-  (defun chunk-shape (iter io jo ko)
+  (defun mesh-chunk (iter io jo ko)
     (declare (type world::block-coord io jo ko))
     (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
       ;;(draw-dispatch (world::getobj io jo ko) io jo ko)
@@ -102,7 +106,6 @@
      clockwise-winding
      (list u0 u1 v0 v1)))))
 
-(defparameter *daytime* 1.0)
 #+nil
 (defun dark-fun (darkness b0 b1 b2 b3 s0 s1 s2 s3)
   (let ((time *daytime*))

@@ -50,7 +50,7 @@
    (:file "persist-world") ;;world <-> filesystem
    (:file "block-data") ;;block data
    ;;(:file "block-light") ;;light propogation
-   (:file "block-meshing");;world data -> mesh 
+   (:file "mesher");;world data -> mesh 
    (:file "change-world")
    ;;</SANDBOX>
    (:file "sucle-package")

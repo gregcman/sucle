@@ -756,7 +756,7 @@ decreases when finished.")
 		    (lambda (iter space chunk-pos)
 		      (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		      (multiple-value-bind (io jo ko) (world:unhashfunc chunk-pos)
-			(sandbox::chunk-shape iter io jo ko)
+			(mesher:mesh-chunk iter io jo ko)
 			(%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
 		    :args (list
 			   (attrib-buffer-iterators)
