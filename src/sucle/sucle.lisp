@@ -234,9 +234,13 @@
 (defun per-frame ()
   ;;FIXME::where is the best place to flush the job-tasks?
   (sucle-mp::flush-job-tasks)
+
+  ;;set the chunk center aroun the player
+  (with-vec (x y z) ((player-position))
+    (sandbox::set-chunk-coordinate-center x y z))
   
   (application::on-session-change *session*
-    (load-world t))
+    (sandbox::load-world t))
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
@@ -266,7 +270,7 @@
 	 (update-world-vao)))
 
      ;;load or unload chunks around the player who may have moved
-     (load-world)
+     (sandbox::load-world)
      ;;render chunks and such
      ;;handle chunk meshing
      (application::on-session-change *last-session*
@@ -293,7 +297,8 @@
      (render-crosshairs)
      ;;FIXME::what is glFlush good for?
      ;;(gl:flush)
-     (designatemeshing))))
+     (complete-render-tasks)
+     (dispatch-mesher-to-dirty-chunks))))
 
 (defparameter *sky-color*
   '(
@@ -431,44 +436,6 @@
   (let* ((player-pointmass (entity-particle *ent*))
 	 (curr (pointmass-position player-pointmass)))
     curr))
-(defun load-world (&optional (force nil))
-  (with-vec (x y z) ((player-position))
-    (sandbox::set-chunk-coordinate-center x y z))
-  (let ((maybe-moved (sandbox::maybe-move-chunk-array)))
-    (when (or force
-	      maybe-moved)
-      (sandbox::load-chunks-around)
-      (unload-extra-chunks))))
-
-(defun chunk-unload (key &key (path (world:world-path)))
-  (let ((chunk (voxel-chunks::obtain-chunk-from-chunk-key key nil)))
-    (when chunk
-      (sandbox::chunk-save chunk :path path)
-      ;;remove the opengl object
-      ;;empty chunks have no opengl counterpart, FIXME::this is implicitly assumed
-      ;;FIXME::remove anyway?
-      (remove-chunk-model key)
-      ;;remove from the chunk-array
-      (voxel-chunks::with-chunk-key-coordinates (x y z)
-	  key
-	(voxel-chunks::remove-chunk-from-chunk-array x y z))
-      ;;remove from the global table
-      (voxel-chunks::remove-chunk-at key))))
-
-
-(defun unload-extra-chunks ()
-  (let ((to-unload
-	 ;;FIXME::get a timer library? metering?
-	 (;;time
-	  progn
-	  (progn ;;(print "getting unloadable chunks")
-		 (sandbox::get-unloadable-chunks)))))
-    ;;(print (length to-unload))
-    (;;time
-     progn
-     (progn ;;(print "unloading the chunks")
-	    (dolist (chunk to-unload)
-	      (chunk-unload chunk))))))
 
 (defparameter *big-fist-reach* 32)
 

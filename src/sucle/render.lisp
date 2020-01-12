@@ -692,8 +692,9 @@ gl_FragColor = vec4(1.0);
 (defparameter *total-background-chunk-mesh-jobs* 0
   "track the number of subprocesses which are actively meshing. Increases when meshing,
 decreases when finished.")
-(defparameter *meshes-pending-for-gl* 0
-  "How many lisp-side meshes are waiting to be sent to the GPU?")
+(defun meshes-pending-for-gl ()
+  "How many lisp-side meshes are waiting to be sent to the GPU?"
+  (lparallel.queue:queue-count *finished-mesh-tasks*))
 (defparameter *max-meshes-pending-for-gl* 4)
 (defparameter *max-total-background-chunk-mesh-jobs* 1)
 (defparameter *max-gl-meshing-iterations-per-frame* 2)
@@ -707,10 +708,13 @@ decreases when finished.")
       (lparallel:kill-tasks :chunk-save))
     (setf *total-background-chunk-mesh-jobs* 0)))
 ;;We limit the amount of chunks that can be sent to the mesh queue
-(defun designatemeshing ()
-  ;;set the meshes pending before
-  (setf *meshes-pending-for-gl* (lparallel.queue:queue-count *finished-mesh-tasks*))
-  (when (plusp *meshes-pending-for-gl*)
+(defun complete-render-tasks (&optional (iteration-count
+					 *max-gl-meshing-iterations-per-frame*))
+  "Iterate through submitted tasks that require an openGL context in order to complete.
+Mostly used to receive chunks meshes from non-gl threads, upon which the chunk 
+meshes are converted to display-lists or VBO/VAOs and saved for later in order
+to be drawn by the render thread."
+  (when (plusp (meshes-pending-for-gl))
     (let ((count 0))
       (block stop-meshing
 	(sucle-mp::do-queue-iterator (job-task *finished-mesh-tasks*)
@@ -721,18 +725,24 @@ decreases when finished.")
 	    (cond (value
 		   (destructuring-bind (type function . args) value
 		     ;;FIXME::document this somewhere?
-		     ;;*achannel* becoming a generic command buffer?
+		     ;;*finshed-mesh-tasks* becoming a generic command buffer?
 		     (assert (eq :mesh-chunk type))
 		     (apply function args)))
-		  (t (print value)))))))
-    ;;and set the meshes pending after reading the queue
-    (setf *meshes-pending-for-gl* (lparallel.queue:queue-count *finished-mesh-tasks*)))
-  (flet ((too-much ()
-	   (or
-	    ;;So there are not too many background jobs
-	    (<= *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
-	    ;;So memory is not entirely eaten up
-	    (<= *max-meshes-pending-for-gl* *meshes-pending-for-gl*))))
+		  (t (print value)))))))))
+(defun dispatch-mesher-to-dirty-chunks ()
+  "Re-draw, draw, or delete the openGL representation of chunks based 
+observed chunk state changes. 
+Chunk state changes can be found in `sandbox::*dirty-chunks*`
+
+Note:limits the amount of background jobs and pending lisp objects."
+  (flet
+      ;;;Limit the amount of background jobs and pending lisp objects.
+      ((too-much ()
+	 (or
+	  ;;So there are not too many background jobs
+	  (<= *max-total-background-chunk-mesh-jobs* *total-background-chunk-mesh-jobs*)
+	  ;;So memory is not entirely eaten up
+	  (<= *max-meshes-pending-for-gl* (meshes-pending-for-gl)))))
     (when (not (too-much))
       (queue::sort-queue
        sandbox::*dirty-chunks*
@@ -748,24 +758,30 @@ decreases when finished.")
 	 :while (not (too-much)) :do
 	 (let ((thechunk (sandbox::dirty-pop)))
 	   (if thechunk
-	       (when (and (voxel-chunks::chunk-exists-p thechunk)
-			  (not (voxel-chunks::empty-chunk-p (voxel-chunks::get-chunk-at thechunk)))
-			  )
-		 (incf *total-background-chunk-mesh-jobs*)
-		 (let ((lparallel:*task-category* 'mesh-chunk))
-		   (sucle-mp::submit 
-		    (lambda (iter space chunk-pos)
-		      (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
-		      (multiple-value-bind (io jo ko) (voxel-chunks:unhashfunc chunk-pos)
-			(mesher:mesh-chunk iter io jo ko)
-			(%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
-		    :args (list
-			   (attrib-buffer-iterators)
-			   (make-list 4)
-			   thechunk)
-		    :callback (lambda (job-task)
-				(lparallel.queue:push-queue job-task *finished-mesh-tasks*)
-				(decf *total-background-chunk-mesh-jobs*)))))
+	       (cond
+		 ;;If the chunk exists and is not empty
+		 ((and (voxel-chunks::chunk-exists-p thechunk)
+		       (not (voxel-chunks::empty-chunk-p
+			     (voxel-chunks::get-chunk-at thechunk))))
+		  ;;Then submit a job to the mesher 
+		  (incf *total-background-chunk-mesh-jobs*)
+		  (let ((lparallel:*task-category* 'mesh-chunk))
+		    (sucle-mp::submit 
+		     (lambda (iter space chunk-pos)
+		       (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
+		       (multiple-value-bind (io jo ko) (voxel-chunks:unhashfunc chunk-pos)
+			 (mesher:mesh-chunk iter io jo ko)
+			 ;;The return value is used as a callback when
+			 ;;sent to the *finished-mesh-task*
+			 (%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
+		     :args (list
+			    (attrib-buffer-iterators)
+			    (make-list 4)
+			    thechunk)
+		     :callback (lambda (job-task)
+				 (lparallel.queue:push-queue job-task *finished-mesh-tasks*)
+				 (decf *total-background-chunk-mesh-jobs*)))))
+		 (t (remove-chunk-model thechunk)))
 	       (return-from submit-mesh-tasks)))))))
 ;;;;<CHUNK-RENDERING?>
 ;;;;************************************************************************;;;;

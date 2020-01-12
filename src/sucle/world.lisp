@@ -372,6 +372,8 @@
 ;;;;<CHANGE-WORLD?>
 (in-package :sandbox)
 ;;;;keeping track of the changes to the world
+;;;; *DIRTY-CHUNKS* contains chunks that need to be remeshed or have their
+;;;; meshes removed.
 (progn
   (defparameter *dirty-chunks* (queue:make-uniq-q))
   (defun clean-dirty ()
@@ -585,6 +587,42 @@
 					(the voxel-chunks::chunk-coord (+ z0 size))))
 			      (add-chunk chunk-x chunk-y chunk-z))))))
       acc)))
+
+(defun load-world (&optional (force nil))
+  (let ((maybe-moved (maybe-move-chunk-array)))
+    (when (or force
+	      maybe-moved)
+      (load-chunks-around)
+      (unload-extra-chunks))))
+
+(defun unload-extra-chunks ()
+  (let ((to-unload
+	 ;;FIXME::get a timer library? metering?
+	 (;;time
+	  progn
+	  (progn ;;(print "getting unloadable chunks")
+		 (get-unloadable-chunks)))))
+    ;;(print (length to-unload))
+    (;;time
+     progn
+      (progn ;;(print "unloading the chunks")
+	(dolist (chunk to-unload)
+	  (chunk-unload chunk))))))
+
+(defun chunk-unload (key &key (path (world:world-path)))
+  (let ((chunk (voxel-chunks::obtain-chunk-from-chunk-key key nil)))
+    (cond
+      (chunk
+       (sandbox::chunk-save chunk :path path)
+       (dirty-push key)
+       ;;remove from the chunk-array
+       (voxel-chunks::with-chunk-key-coordinates (x y z)
+	   key
+	 (voxel-chunks::remove-chunk-from-chunk-array x y z))
+       ;;remove from the global table
+       (voxel-chunks::remove-chunk-at key)
+       t)
+      (t nil))))
 
 (defparameter *persist* t)
 (defun chunk-save (chunk &key (path (world:world-path)))
