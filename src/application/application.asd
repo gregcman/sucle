@@ -4,8 +4,7 @@
   :description "Bring the components together for a desktop app"
   :depends-on (#:utility
 	       #:window
-	       #:scratch-buffer
-	       #:nsb-cga
+	       #:scratch-buffer	       
 	       #:bordeaux-threads
 	       #+darwin
 	       #:trivial-main-thread

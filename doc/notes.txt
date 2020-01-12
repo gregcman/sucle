@@ -54,7 +54,7 @@ TODO:
 - refactor physics engine into managable state, have multiple aabbs and intersections. spatial hashmap lke the voxel one? loose grid?
 - bring ncurses-clone over from lem-opengl and use it here
 - exhaustively write tests and documentation
-- replace nsb-cga and camera-matrix with 3d-vectors
+- replace nsb-cga and camera-matrix with 3d-vectors [CANCELLED]
 - refactor input, use event system? ECS? keymap?
 
 other:
