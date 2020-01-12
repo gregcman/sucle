@@ -67,7 +67,7 @@
 	  (funcall x)
        (print 2))))
   (list
-   'sandbox::call-with-world-meshing-lparallel))
+   'call-with-world-meshing-lparallel))
 (defun run-with (fun)
   (flet ((nest (with-fun cont)
 	   (lambda ()
@@ -252,9 +252,9 @@
      ;;render chunks and such
      ;;handle chunk meshing
      (application::on-session-change *last-session*
-       (sandbox::reset-chunk-display-list)
+       (reset-chunk-display-list)
        ;;FIXME::update vao according to position, not 0 0 0
-       (sandbox::update-world-vao))
+       (update-world-vao))
      ;;update the camera
      (update-camera *camera*)
      (draw-to-default-area)
@@ -275,7 +275,7 @@
      (render-crosshairs)
      ;;FIXME::what is glFlush good for?
      ;;(gl:flush)
-     (sandbox::designatemeshing))))
+     (designatemeshing))))
 
 (defparameter *sky-color*
   '(
@@ -332,7 +332,7 @@
 	(when (window::skey-j-p (window::keyval #\V))
 	  (toggle noclip))
 	(when (window::skey-j-p (window::keyval #\P))
-	  (sandbox::update-world-vao))
+	  (update-world-vao))
 	(when (window::skey-j-p (window::keyval #\F))
 	  (toggle fly)
 	  (toggle gravity)))
