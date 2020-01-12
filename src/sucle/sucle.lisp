@@ -207,6 +207,7 @@
    :frustum-far (* 256.0)
    :frustum-near (/ 1.0 8.0)))
 (defparameter *fog-ratio* 0.75)
+(defparameter *time-of-day* 1.0)
 
 (defun update-camera (&optional (camera *camera*))
   (setf (camera-matrix:camera-aspect-ratio camera)
@@ -263,7 +264,7 @@
      (use-chunk-shader
       :camera *camera*
       :sky-color *sky-color-foo*
-      :time-of-day sandbox::*daytime*
+      :time-of-day *time-of-day*
       :fog-ratio *fog-ratio*
       )
      (render-chunks)
@@ -285,7 +286,7 @@
 (defun the-sky-color ()
   (map-into *sky-color-foo*
 	    (lambda (x)
-	    (alexandria:clamp (* x sandbox::*daytime*) 0.0 1.0))
+	    (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
 	  *sky-color*))
 
 ;;;
@@ -350,7 +351,7 @@
       (multiple-value-bind (fraction times)
 	  (fps:tick
 	    (incf *ticks*)
-	    (setf sandbox::*daytime*
+	    (setf *time-of-day*
 		  (floatify		     
 		   1.0;;0.8
 		   #+nil
