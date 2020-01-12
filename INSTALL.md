@@ -5,7 +5,6 @@ Contents
 1. Requirements
 2. How to install Common Lisp and quicklisp
 3. How to use
-4. Opengl Mishaps
 
 If you:  
 - Are new to Common Lisp, start at the beginning.
@@ -30,6 +29,12 @@ If you:
 `(ql:quickload :sucle)`  
 `(sucle:start)`
 
+Upon starting you will see a black screen. 
+[TODO]:add a splash screen and startup menu. Add a test world
+1. Click on the black area and press "E"
+2. The mouse should disappear, and the test world will load if it exists.
+3. Now you will be able to move around
+
 F - fly  
 E - toggle input  
 WASD move  
@@ -44,12 +49,3 @@ Using the command line as a REPL is a very difficult way to progam.
 Recommended IDEs:  
 - [emacs](https://www.gnu.org/software/emacs/) + [SLIME](https://www.cliki.net/slime-howto)
 - [lem](https://github.com/cxxxr/lem)
-
-4.Will My OpenGL setup work out of the box?
--
-Yes if:
-- If your OpenGL driver provides a compatibility profile, [which is likely for NVidia GPUs](https://stackoverflow.com/questions/4113989/why-were-display-lists-deprecated-in-opengl-3-1), for supporting display lists.
-
-Otherwise:
-For unsupported display lists, a few places would need minor edits to switch from display lists to vertex arrays for creation, deletion, rendering, and iterating, which requires an ability to refactor Common Lisp code.
-- If display lists are not supported, the code must be refactored to use vertex arrays. If you are having trouble with this please [open an issue](https://github.com/gmasching/sucle/issues). The transition is straightforward as the display lists are used as nothing but interleaved float data. Display lists were chosen over vertex arrays because they were faster on my particular NVidia GPUs.
