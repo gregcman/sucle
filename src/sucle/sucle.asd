@@ -46,11 +46,12 @@
    ;;<SANDBOX>
    (:file "queue")
    (:file "voxel-chunks")
+
+   (:file "package")
    ;;(:file "block-light") ;;light propogation
+   (:file "mesher");;world data -> mesh
    (:file "world")
-   (:file "mesher");;world data -> mesh 
    ;;</SANDBOX>
-   (:file "sucle-package")
    (:file "extra")
    (:file "physics")
    (:file "sucle")

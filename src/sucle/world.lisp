@@ -4,29 +4,6 @@
 ;;;;- keeping track of changes to the world
 ;;;;- accessors
 
-(defpackage #:world
-  (:use :cl #:utility)
-  (:export
-   ;;;block accessors
-   #:getblock #:setblock
-   #:getlight #:setlight
-   #:skygetlight #:skysetlight
-   #:getblock-extract
-   #:getlight-extract
-   #:skygetlight-extract
-   #:num-getobj
-
-   #:blockify)
-  (:export
-   #:world-path
-   #:savechunk
-   #:loadchunk
-   
-   #:filename-to-chunk-coordinate
-   #:chunk-coordinate-to-filename
-   #:*some-saves*
-   #:*world-directory*
-   #:convert-object-to-filename))
 (in-package #:world)
 
 (defgeneric lispobj-dispatch (obj))
@@ -87,9 +64,6 @@
     (time (dotimes (x times) (world:getobj 0 0 0)))))
 ;;;;************************************************************************;;;;
 ;;;;<BLOCK-DATA>
-(defpackage #:block-data
-  (:use #:cl
-	#:utility))
 
 (in-package :block-data)
 
@@ -160,6 +134,150 @@
       (if existsp
 	  value
 	  form))))
+;;;;
+
+;;FIXME::is using CLOS to dispatch on the block a good way to organize?
+;; is it efficient?
+(defmethod mesher:draw-dispatch ((bits-block-data fixnum) i j k)
+  (blockshape (world:getblock-extract bits-block-data) i j k))
+
+;;;;block data below
+
+#+nil
+(with-declaim-inline (block-hash)
+  (defun block-hash (i j k)
+    (locally (declare (optimize (speed 3) (safety 0))
+		      (type voxel-chunks::block-coord i j k))
+      (let ((hash (mod (the voxel-chunks::block-coord (* 2654435761 (the voxel-chunks::block-coord (+ i j k))))
+		       (ash 1 32))))
+	(values (logtest hash #b0100)
+		(logtest hash #b1000))))))
+(defmacro flipuv (&optional (i 'i) (j 'j) (k 'k) (u1 'u1) (u0 'u0) (v1 'v1) (v0 'v0))
+  (with-gensyms (u v)
+    `(locally ;;(declare (inline block-hash))
+       (multiple-value-bind (,u ,v) (values t nil) ;;(block-hash ,i ,j ,k)
+	 (when ,u
+	   (rotatef ,u1 ,u0))
+	 (when ,v
+	   (rotatef ,v1 ,v0))))))
+
+;;;if the block is air, the side gets rendered. if the block is transparent
+;;;and the same type ex: texture between glass - there is no texture - if they are
+;;;different - water and glass -it shows
+(defun show-sidep (blockid other-blockid)
+  (or (zerop other-blockid)
+      (and (/= blockid other-blockid)
+	   (not (aref block-data:*opaquecubelooukup* other-blockid)))))
+
+(defgeneric blockshape (blockid i j k))
+(defmethod blockshape ((blockid (eql 0)) i j k)
+  ;;if its air, don't render anything
+  )
+(defmethod blockshape ((blockid (eql 24)) i j k)
+  (rendersandstone blockid i j k))
+(defmethod blockshape ((blockid (eql 2)) i j k)
+  (rendergrass blockid i j k))
+(defmethod blockshape ((blockid (eql 17)) i j k)
+  (renderstandardblock blockid i j k)
+  ;;(renderlog blockid i j k)
+  )
+(defmethod blockshape ((blockid t) i j k)
+  (renderstandardblock blockid i j k))
+(defun renderstandardblock (id i j k)
+  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) texid
+      (flipuv)
+      (let ((adj-id (world:getblock i (1- j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-j i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+j i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1- i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-i i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1+ i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+i i j k u0 v0 u1 v1)))    
+      (let ((adj-id (world:getblock i j (1- k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side-k i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i j (1+ k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side+k i j k u0 v0 u1 v1))))))
+
+(defun rendergrass (id i j k)
+  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) 2
+      (flipuv)
+      (let ((adj-id (world:getblock i (1- j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-j i j k u0 v0 u1 v1))))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) texid
+      (flipuv)
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+j i j k u0 v0 u1 v1))))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) 3
+      (let ((adj-id (world:getblock (1- i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-i i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1+ i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+i i j k u0 v0 u1 v1)))    
+      (let ((adj-id (world:getblock i j (1- k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side-k i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i j (1+ k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side+k i j k u0 v0 u1 v1))))))
+
+(defun rendersandstone (id i j k)
+  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) texid
+      (let ((adj-id (world:getblock i (1- j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-j i j k u0 v0 u1 v1))))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) (- 208 32)
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+j i j k u0 v0 u1 v1))))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) (- 208 16)
+      (let ((adj-id (world:getblock (1- i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-i i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1+ i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+i i j k u0 v0 u1 v1)))    
+      (let ((adj-id (world:getblock i j (1- k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side-k i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i j (1+ k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side+k i j k u0 v0 u1 v1))))))
+(defun renderlog (id i j k)
+  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) 21
+      (let ((adj-id (world:getblock i (1- j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-j i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+j i j k u0 v0 u1 v1))))
+    (mesher:with-texture-translator2 (u0 u1 v0 v1) texid
+      (let ((adj-id (world:getblock (1- i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-i i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1+ i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+i i j k u0 v0 u1 v1)))    
+      (let ((adj-id (world:getblock i j (1- k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side-k i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i j (1+ k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side+k i j k u0 v0 u1 v1))))))
+
 ;;;;</BLOCK-DATA>
 ;;;;************************************************************************;;;;
 ;;;;<PERSIST-WORLD>
@@ -252,8 +370,6 @@
 ;;;;</PERSIST-WORLD>
 ;;;;************************************************************************;;;;
 ;;;;<CHANGE-WORLD?>
-(defpackage #:sandbox
-  (:use #:cl #:utility))
 (in-package :sandbox)
 ;;;;keeping track of the changes to the world
 (progn
