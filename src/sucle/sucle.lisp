@@ -234,109 +234,126 @@
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
-      (window::toggle-mouse-capture)
-      (moused))
+    (window::toggle-mouse-capture)
+    ;;Flush changes to the mouse so
+    ;;moving the mouse while not captured does not
+    ;;affect the camera
+    (moused))
   (setf *paused* (window::mice-free-p))
-  ;;FIXME::?
-  (setf sucle-mp::*paused* *paused*)
+
+  
+  ;;Polling
+  ;;Physics
+  ;;Rendering Chunks
+  ;;Rendering Other stuff
+  ;;Meshing
+  ;;Waiting on vsync
+  ;;Back to polling
+  
+  ;;Physics and Polling should be close together to prevent lag
+  
+  ;;physics
+  (select-block-with-scroll-wheel)
+  ;;Jump if space pressed
+  (setf (entity-jump? *ent*)
+	(window::skey-p (window::keyval #\ )))
+  ;;Set the sneaking state
+  (setf (entity-sneak? *ent*)
+	(cond
+	  ((window::skey-p (window::keyval :left-shift))
+	   0)
+	  ((window::skey-p (window::keyval :left-control))
+	   1)))
+  ;;Toggle noclip with 'v'
+  (when
+      (window::skey-j-p (window::keyval #\V))
+    (toggle (entity-clip? *ent*)))
+  ;;Toggle flying with 'f'
+  (when    
+      (window::skey-j-p (window::keyval #\F))
+    (toggle (entity-fly? *ent*))
+    (toggle (entity-gravity? *ent*)))
+  ;;Set the direction with WASD
+  (setf
+   (entity-hips *ent*)
+   (wasd-mover
+    (window::skey-p (window::keyval #\W))
+    (window::skey-p (window::keyval #\A))
+    (window::skey-p (window::keyval #\S))
+    (window::skey-p (window::keyval #\D))))
+  ;;Calculate what bocks are selected etc..
+  (unless *paused*
+    (fist-stuff (player-position)))
+  ;;Run the game ticks
+  
   (cond
     (*paused*
      (fps:tick))
     (t
-     ;;Polling
-     ;;Physics
-     ;;Rendering Chunks
-     ;;Rendering Other stuff
-     ;;Meshing
-     ;;Waiting on vsync
-     ;;Back to polling
-     
-     ;;Physics and Polling should be close together to prevent lag
-     
-     ;;physics
-     (select-block-with-scroll-wheel)  
-     (setf (entity-jump? *ent*)
-	   (window::skey-p (window::keyval #\ )))
-     (setf (entity-sneak? *ent*)
-	   (cond
-	     ((window::skey-p (window::keyval :left-shift))
-	      0)
-	     ((window::skey-p (window::keyval :left-control))
-	      1)))
-     (when
-	 (window::skey-j-p (window::keyval #\V))
-       (toggle (entity-clip? *ent*)))
-     (when    
-	 (window::skey-j-p (window::keyval #\F))
-       (toggle (entity-fly? *ent*))
-       (toggle (entity-gravity? *ent*)))
      (setf
-      (entity-hips *ent*)
-      (wasd-mover
-       (window::skey-p (window::keyval #\W))
-       (window::skey-p (window::keyval #\A))
-       (window::skey-p (window::keyval #\S))
-       (window::skey-p (window::keyval #\D))))
-     (fist-stuff (player-position))
-     
-     (setf
-      (values *fraction-for-fps* *game-ticks-per-iteration*)
-      (fps:tick
-	(incf *ticks*)
-	(setf *time-of-day* 1.0)
-	;;run the physics
-	(physentity *ent*)))
-     
-     (when (window:mice-locked-p)
-       (update-moused
-	*mouse-multiplier-aux*
+   (values *fraction-for-fps* *game-ticks-per-iteration*)
+   (fps:tick
+     (incf *ticks*)
+     (setf *time-of-day* 1.0)
+     ;;run the physics
+     (physentity *ent*)))))
 
-	;;FIXME::is this formula correct?
-	(/ (+ *fraction-for-fps*
-	      *game-ticks-per-iteration*)
-	   (+ *game-ticks-per-iteration* 1))))
-     (set-camera-position *fraction-for-fps*)
-     
-     (setf (necking-yaw (entity-neck *ent*))
-	   (floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
-	   (necking-pitch (entity-neck *ent*))
-	   (floatify (* *lerp-mouse-y* *mouse-multiplier*)))
-     (unit-pitch-yaw (camera-matrix:camera-vec-forward *camera*)
-		     (necking-pitch (entity-neck *ent*))
-		     (necking-yaw (entity-neck *ent*)))
-     
-     (modify-camera-position-for-sneak)
-     
-     (when (window::skey-j-p (window::keyval #\P))
-       (update-world-vao))
-     ;;load or unload chunks around the player who may have moved
-     (world::load-world)
-     ;;render chunks and such
-     ;;handle chunk meshing
-     (application::on-session-change *last-session*
-       (reset-chunk-display-list)
-       (update-world-vao))
-     ;;update the camera
-     (update-camera *camera*)
-     (draw-to-default-area)
-     ;;this also clears the depth and color buffer.
-     (apply #'render-sky (the-sky-color))
-     (use-chunk-shader
-      :camera *camera*
-      :sky-color *sky-color-foo*
-      :time-of-day *time-of-day*
-      :fog-ratio *fog-ratio*
-      )
-     (render-chunks)
-     (use-occlusion-shader *camera*)
-     (render-chunk-occlusion-queries)
-     ;;selected block and crosshairs
-     (use-solidshader *camera*)
-     (render-fist *fist*)
-     (render-crosshairs)
+  ;;update the internal mouse state
+  ;;taking into consideration fractions
+  (when (window:mice-locked-p)
+    (update-moused
+     *mouse-multiplier-aux*
+     ;;FIXME::is this formula correct?
+     (/ (+ *fraction-for-fps*
+	   *game-ticks-per-iteration*)
+	(+ *game-ticks-per-iteration* 1))))
+  ;;Calculate the camera position from
+  ;;the past, current position of the player and the frame fraction
+  (set-camera-position *fraction-for-fps*)
+  ;;Set the pitch and yaw of the player based on the
+  ;;mouse position
+  (setf (necking-yaw (entity-neck *ent*))
+	(floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
+	(necking-pitch (entity-neck *ent*))
+	(floatify (* *lerp-mouse-y* *mouse-multiplier*)))
+  ;;Set the direction of the camera based on the
+  ;;pitch and yaw of the player
+  (unit-pitch-yaw (camera-matrix:camera-vec-forward *camera*)
+		  (necking-pitch (entity-neck *ent*))
+		  (necking-yaw (entity-neck *ent*)))
+  
+  (modify-camera-position-for-sneak)
+  
+  (when (window::skey-j-p (window::keyval #\P))
+    (update-world-vao))
+  ;;load or unload chunks around the player who may have moved
+  (world::load-world)
+  ;;render chunks and such
+  ;;handle chunk meshing
+  (application::on-session-change *last-session*
+    (reset-chunk-display-list)
+    (update-world-vao))
+  ;;update the camera
+  (update-camera *camera*)
+  (draw-to-default-area)
+  ;;this also clears the depth and color buffer.
+  (apply #'render-sky (the-sky-color))
+  (use-chunk-shader
+   :camera *camera*
+   :sky-color *sky-color-foo*
+   :time-of-day *time-of-day*
+   :fog-ratio *fog-ratio*
+   )
+  (render-chunks)
+  (use-occlusion-shader *camera*)
+  (render-chunk-occlusion-queries)
+  ;;selected block and crosshairs
+  (use-solidshader *camera*)
+  (render-fist *fist*)
+  (render-crosshairs)
 
-     (complete-render-tasks)
-     (dispatch-mesher-to-dirty-chunks))))
+  (complete-render-tasks)
+  (dispatch-mesher-to-dirty-chunks))
 
 (defparameter *sky-color* '(0.68 0.8 1.0))
 (defparameter *sky-color-foo* '(0.0 0.0 0.0))
