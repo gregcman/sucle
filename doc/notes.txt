@@ -72,3 +72,6 @@ TODO: Whats most important?
 TODO:
 - bring in ncurses-clone over from lem-opengl
 - write documentation and tests
+
+TODO:
+- fork lem for quicklisp/ultralisp
