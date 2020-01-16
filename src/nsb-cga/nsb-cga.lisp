@@ -5,13 +5,13 @@
 ;;;;the creation of new single-float matrices leads to stress on the garbage
 ;;;;collector, leading to 10s of megabytes of matrix waste
 
-(set-pprint-dispatch 'sb-cga::matrix nil)
-(declaim (ftype (sb-cga::sfunction (sb-cga::matrix
+(set-pprint-dispatch 'matrix nil)
+(declaim (ftype (sfunction (matrix
 			    single-float single-float single-float single-float
                             single-float single-float single-float single-float
                             single-float single-float single-float single-float
                             single-float single-float single-float single-float)
-                           sb-cga::matrix)
+                           matrix)
                 %matrix)
          (inline %matrix))
 
@@ -37,7 +37,7 @@ major order.)"
       result)))
 
 
-(declaim (ftype (sb-cga::sfunction (sb-cga::matrix) sb-cga::matrix) %zero-matrix)
+(declaim (ftype (sfunction (matrix) matrix) %zero-matrix)
          (inline %zero-matrix))
 (defun %zero-matrix (result)
   "Construct a zero matrix."
@@ -51,7 +51,7 @@ major order.)"
     (wow)
     result))
 
-(declaim (ftype (sb-cga::sfunction (sb-cga::matrix) sb-cga::matrix) %identity-matrix))
+(declaim (ftype (sfunction (matrix) matrix) %identity-matrix))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %identity-matrix (result)
     "Construct an identity matrix."
@@ -65,9 +65,9 @@ major order.)"
 
 ;;;; MATRIX MULTIPLICATION
 
-(declaim (ftype (sb-cga::sfunction
-		 (sb-cga::matrix sb-cga::matrix sb-cga::matrix)
-		 sb-cga::matrix) %matrix*))
+(declaim (ftype (sfunction
+		 (matrix matrix matrix)
+		 matrix) %matrix*))
 (defun %matrix* (result left right)
   "Multiply MATRICES. The result might not be freshly allocated if all,
 or all but one multiplicant is an identity matrix."
@@ -91,8 +91,8 @@ or all but one multiplicant is an identity matrix."
 ;;;; TRANSFORMATIONS
 
 (declaim (ftype
-	  (sb-cga::sfunction
-	   (sb-cga::matrix single-float single-float single-float) sb-cga::matrix)
+	  (sfunction
+	   (matrix single-float single-float single-float) matrix)
 	  %translate*))
 (defun %translate* (result x y z)
   "Construct a translation matrix from translation factors X, Y and Z."
@@ -102,15 +102,15 @@ or all but one multiplicant is an identity matrix."
 	   0f0 0f0 1f0 z
 	   0f0 0f0 0f0 1f0))
 
-(declaim (ftype (sb-cga::sfunction (sb-cga::matrix sb-cga::vec) sb-cga::matrix) %translate))
+(declaim (ftype (sfunction (matrix vec) matrix) %translate))
 (defun %translate (result vec)
   "Construct a translation matrix using first three elements of VEC as the
 translation factors."
   (%translate* result (aref vec 0) (aref vec 1) (aref vec 2)))
 
-(declaim (ftype (sb-cga::sfunction
-		 (sb-cga::matrix single-float single-float single-float)
-		 sb-cga::matrix) %scale*))
+(declaim (ftype (sfunction
+		 (matrix single-float single-float single-float)
+		 matrix) %scale*))
 (defun %scale* (result x y z)
   "Construct a scaling matrix from scaling factors X, Y, and Z."
   (%matrix result
@@ -119,15 +119,15 @@ translation factors."
 	   0f0  0f0  z    0f0
 	   0f0  0f0  0f0  1f0))
 
-(declaim (ftype (sb-cga::sfunction (sb-cga::matrix sb-cga::vec) sb-cga::matrix) %scale))
+(declaim (ftype (sfunction (matrix vec) matrix) %scale))
 (defun %scale (result vec)
   "Construct a scaling matrix using first threee elements of VEC as the
 scaling factors."
   (%scale* result (aref vec 0) (aref vec 1) (aref vec 2)))
 
-(declaim (ftype (sb-cga::sfunction
-		 (sb-cga::matrix
-		  single-float single-float single-float) sb-cga::matrix) %rotate*))
+(declaim (ftype (sfunction
+		 (matrix
+		  single-float single-float single-float) matrix) %rotate*))
 (defun %rotate* (result x y z)
   "Construct a rotation matrix from rotation factors X, Y, Z."
   (let ((rotate (%identity-matrix result)))
@@ -157,14 +157,14 @@ scaling factors."
                                       0f0   0f0   0f0    1f0)))))
     rotate))
 
-(declaim (ftype (sb-cga::sfunction (sb-cga::matrix sb-cga::vec) sb-cga::matrix) %rotate))
+(declaim (ftype (sfunction (matrix vec) matrix) %rotate))
 (defun %rotate (result vec)
   "Construct a rotation matrix using first three elements of VEC as the
 rotation factors."
   (%rotate* result (aref vec 0) (aref vec 1) (aref vec 2)))
 
-(declaim (ftype (sb-cga::sfunction
-		 (sb-cga::matrix sb-cga:vec single-float) sb-cga::matrix) %rotate-around))
+(declaim (ftype (sfunction
+		 (matrix sb-cga:vec single-float) matrix) %rotate-around))
 (defun %rotate-around (result v radians)
   "Construct a rotation matrix that rotates by RADIANS around VEC V. 4th
 element of V is ignored."
@@ -182,11 +182,11 @@ element of V is ignored."
 	       (- gxz (* s y))  (+ gyz (* s x))  (+ gzz c)       0f0
 	       0f0              0f0              0f0             1f0))))
 
-(declaim (ftype (sb-cga::sfunction
-		 (sb-cga::matrix single-float
+(declaim (ftype (sfunction
+		 (matrix single-float
 				 single-float
 				 single-float
-				 single-float) sb-cga::matrix) %rotate-around*)
+				 single-float) matrix) %rotate-around*)
 	 (inline %rotate-around*))
 (defun %rotate-around* (result x y z radians)
   "Construct a rotation matrix that rotates by RADIANS around VEC V. 4th
@@ -202,9 +202,9 @@ element of V is ignored."
 	       (- gxz (* s y))  (+ gyz (* s x))  (+ gzz c)       0f0
 	       0f0              0f0              0f0             1f0))))
 
-(declaim (ftype (sb-cga::sfunction
-		 (sb-cga::matrix sb-cga::vec sb-cga::vec)
-		 sb-cga::matrix) %reorient))
+(declaim (ftype (sfunction
+		 (matrix vec vec)
+		 matrix) %reorient))
 (defun %reorient (result v1 v2)
   "Construct a transformation matrix to reorient V1 with V2."
   (let ((nv1 (normalize v1))
@@ -215,7 +215,7 @@ element of V is ignored."
 			(normalize (cross-product nv1 nv2))
 			(acos (dot-product nv1 nv2))))))
 
-(declaim (ftype (sb-cga::sfunction (sb-cga::matrix sb-cga::matrix) sb-cga::matrix) %transpose-matrix))
+(declaim (ftype (sfunction (matrix matrix) matrix) %transpose-matrix))
 (defun %transpose-matrix (result matrix)
   "Transpose of MATRIX."
   (macrolet ((wow ()
@@ -229,12 +229,12 @@ element of V is ignored."
     (wow))
   result)
 
-(declaim (ftype (sb-cga::sfunction
-		 (sb-cga::matrix sb-cga::matrix)
-		 sb-cga::matrix) %inverse-matrix))
+(declaim (ftype (sfunction
+		 (matrix matrix)
+		 matrix) %inverse-matrix))
 (defun %inverse-matrix (result matrix)
   "Inverse of MATRIX. Signals an error if there is no inverse."
-  (declare (type sb-cga::matrix result matrix))
+  (declare (type matrix result matrix))
   (if (eq matrix +identity-matrix+)
       +identity-matrix+
       (if (and (= 0f0 (mref matrix 3 0) (mref matrix 3 1) (mref matrix 3 2))
@@ -242,7 +242,7 @@ element of V is ignored."
           ;; Affine matrix, fast track (and less loss of accuracy from multiplications)
           (let ((inverse (%zero-matrix result)))
             ;; Inverse of the upper left 3x3
-            (let ((det (sb-cga::submatrix-determinant matrix)))
+            (let ((det (submatrix-determinant matrix)))
               (if (zerop det)
                   ;; If the 3x3 is zero, we're fine -- otherwise punt to the complete
                   ;; implementation.

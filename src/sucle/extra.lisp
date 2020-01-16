@@ -147,9 +147,9 @@
 			(y (degree-to-rad))
 			(z (degree-to-rad)))
   (sb-cga:transform-point
-   (sb-cga::vec 1.0 0.0 0.0)
-   (sb-cga::rotate* x y z)))
-(defun vec-values (&optional (vec (sb-cga::vec 1.0 2.0 3.0)))
+   (sb-cga:vec 1.0 0.0 0.0)
+   (sb-cga:rotate* x y z)))
+(defun vec-values (&optional (vec (sb-cga:vec 1.0 2.0 3.0)))
   (with-vec (x y z) (vec)
     (values x y z)))
 ;;
@@ -157,8 +157,8 @@
   (labels ((rec (place minfactor)
 	     (when (>= minfactor 0)
 	       (dotimes (x (random 5))
-		 (let ((random-direction (sb-cga::vec* (rotate-normal) (expt 1.5 minfactor))))
-		   (let ((new (sb-cga::vec+ place random-direction)))
+		 (let ((random-direction (sb-cga:vec* (rotate-normal) (expt 1.5 minfactor))))
+		   (let ((new (sb-cga:vec+ place random-direction)))
 		     (multiple-value-call
 			 'line
 		       (vec-values place)
@@ -168,7 +168,7 @@
 			   (nick :log))
 		       (create-aabb (* 0.1 minfactor)))
 		     (rec new (1- minfactor))))))))
-    (rec (multiple-value-call 'sb-cga::vec (floatify2 x y z))
+    (rec (multiple-value-call 'sb-cga:vec (floatify2 x y z))
 	 minfactor)))
 (defun floatify2 (&rest values)
   (apply 'values (mapcar 'floatify values)))

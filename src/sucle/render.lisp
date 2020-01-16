@@ -417,7 +417,7 @@ gl_FragColor.rgb = color_out;
 	uniform shader
       (gl:uniform-matrix-4fv 
        (uniform :pmv)
-       ;;(nsb-cga::identity-matrix)
+       ;;(nsb-cga:identity-matrix)
        
        (camera-matrix:camera-matrix-projection-view-player camera)
        nil))))
