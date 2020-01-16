@@ -231,9 +231,9 @@
   
   (application::on-session-change *session*
     (world::load-world t))
-  (when (window::skey-j-p (window::keyval #\))
+  (when (window:button :key :pressed :escape)
     (application::quit))
-  (when (window::skey-j-p (window::keyval #\E))
+  (when (window:button :key :pressed #\e)
     (window::toggle-mouse-capture)
     ;;Flush changes to the mouse so
     ;;moving the mouse while not captured does not
@@ -256,31 +256,29 @@
   (select-block-with-scroll-wheel)
   ;;Jump if space pressed
   (setf (entity-jump? *ent*)
-	(window::skey-p (window::keyval #\ )))
+	(window:button :key :down #\Space))
   ;;Set the sneaking state
   (setf (entity-sneak? *ent*)
 	(cond
-	  ((window::skey-p (window::keyval :left-shift))
+	  ((window:button :key :down :left-shift)
 	   0)
-	  ((window::skey-p (window::keyval :left-control))
+	  ((window:button :key :down :left-control)
 	   1)))
   ;;Toggle noclip with 'v'
-  (when
-      (window::skey-j-p (window::keyval #\V))
+  (when (window:button :key :pressed #\v)
     (toggle (entity-clip? *ent*)))
   ;;Toggle flying with 'f'
-  (when    
-      (window::skey-j-p (window::keyval #\F))
+  (when (window:button :key :pressed #\f)
     (toggle (entity-fly? *ent*))
     (toggle (entity-gravity? *ent*)))
   ;;Set the direction with WASD
   (setf
    (entity-hips *ent*)
    (wasd-mover
-    (window::skey-p (window::keyval #\W))
-    (window::skey-p (window::keyval #\A))
-    (window::skey-p (window::keyval #\S))
-    (window::skey-p (window::keyval #\D))))
+    (window:button :key :down #\w)
+    (window:button :key :down #\a)
+    (window:button :key :down #\s)
+    (window:button :key :down #\d)))
   ;;Calculate what bocks are selected etc..
   (unless *paused*
     (fist-stuff (player-position)))
@@ -324,7 +322,7 @@
   
   (modify-camera-position-for-sneak)
   
-  (when (window::skey-j-p (window::keyval #\P))
+  (when (window:button :key :pressed #\p)
     (update-world-vao))
   ;;load or unload chunks around the player who may have moved
   (world::load-world)
@@ -406,12 +404,12 @@
     (with-vec (px py pz) (pos)
       (with-vec (vx vy vz) (look-vec)	
 	(when (window:mouse-locked?)
-	  (when (window::skey-j-p (window::keyval 2))
+	  (when (window:button :key :pressed #\2) 
 	    (toggle *dirtying2*))
-	  (when (window::skey-j-p (window::keyval 1))
+	  (when (window:button :key :pressed #\1) 
 	    (toggle *dirtying*))
 
-	  (when (window::skey-j-p (window::keyval 3))
+	  (when (window:button :key :pressed #\3) 
 	    (toggle *swinging*))
 	  (when *swinging*
 	    (let ((u *big-fist-reach*))
@@ -425,11 +423,11 @@
 		      (*z* z))
 		  (funcall *big-fist-fun* x y z))))))
 	(let ((fist *fist*))
-	  (let ((left-p (window::skey-j-p (window::mouseval :left)))
-		(right-p (window::skey-j-p (window::mouseval :right)))
-		(middle-p (window::skey-j-p (window::mouseval :middle)))
-		(4-p (window::skey-j-p (window::mouseval :4)))
-		(5-p (window::skey-j-p (window::mouseval :5))))
+	  (let ((left-p (window:button :mouse :pressed :left))
+		(right-p (window:button :mouse :pressed :right))
+		(middle-p (window:button :mouse :pressed :middle))
+		(4-p (window:button :mouse :pressed :4))
+		(5-p (window:button :mouse :pressed :5)))
 	    #+nil
 	    (when (or left-p right-p))
 	    (standard-fist

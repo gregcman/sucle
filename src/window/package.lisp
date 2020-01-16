@@ -4,10 +4,6 @@
    #:*scroll-x*
    #:*scroll-y*)
   (:export
-   #:skey-p
-   #:skey-j-p
-   #:skey-j-r)
-  (:export
    #:get-proc-address
    #:init
    #:poll
