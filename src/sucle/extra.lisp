@@ -51,12 +51,13 @@
 				    (incf *y* 4)
 				    (b@))))
 			  (setf (b@) (nick :stone))))))))))))
-
+#+nil
 (defun correct-earth (&rest rest)
   (declare (ignore rest))
   (let ((b0 (b@)))
     (when (b= (nick :air) b0)
       (setf (b@) (nick :lamp)))))
+#+nil
 (defun correct-earth (&rest rest)
   (declare (ignore rest))
   (let ((b0 (b@)))
@@ -65,7 +66,7 @@
 	;;#+nil
 	(<= 3 (neighbors))
 	(setf (b@) (nick :sandstone))))))
-
+#+nil
 (defun neighbors (&aux (count 0))
   (dobox ((x (+ -1 *x*) (+ 2 *x*))
 	  (y (+ -1 *y*) (+ 2 *y*))
@@ -239,25 +240,36 @@
 				     0z))))))
 #+nil
 (defun 5fun (x y z)
-  (loop :repeat 10 :do
-     (let ((newx x)
-	   (newy y)
-	   (newz z))
-       (progn
-	 (let ((random (random 3))
-	       (random2 (- (* 2 (random 2)) 1)))
-	   (case random
-	     (0 (incf newx (* random2 3)))
-	     (1 (incf newy (* random2 3)))
-	     (2 (incf newz (* random2 3)))))
-	 (line
-	  x y z
-	  newx newy newz
-	  (nick :gravel))
-	 (setf x newx
-	       y newy
-	       z newz)))))
-
+  (incf y)
+  (let ((index 0))
+    (loop :repeat 1000 :do
+       (let ((newx x)
+	     (newy y)
+	     (newz z))
+	 (progn
+	   (let* ((random (random 3))
+		  (random2 (- (* 2 (random 2)) 1))
+		  (distance (* random2 (random 10))))
+	     (case random
+	       (0 (incf newx distance))
+	       (1 (incf newy distance))
+	       (2 (incf newz distance))))
+	   (cond
+	     ((zerop (world:getblock newx newy newz))
+	      (incf index)
+	      (line
+	       x y z
+	       newx newy newz
+	       (case (mod (floor index 30) 2)
+		 (0 (nick :stone))
+		 (otherwise
+		  (nick :sandstone))))
+	      (setf x newx
+		    y newy
+		    z newz))
+	     (t
+	      (setf newx x newy y newz z))))))))
+;;#+nil
 (defun 5fun (x y z)
   ;;put a layer of grass on things
   (around (lambda (x y z)
