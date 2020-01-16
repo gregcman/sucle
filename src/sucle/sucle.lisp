@@ -239,7 +239,7 @@
     ;;moving the mouse while not captured does not
     ;;affect the camera
     (moused))
-  (setf *paused* (window::mice-free-p))
+  (setf *paused* (window:mouse-free?))
 
   
   ;;Polling
@@ -300,7 +300,7 @@
 
   ;;update the internal mouse state
   ;;taking into consideration fractions
-  (when (window:mice-locked-p)
+  (when (window:mouse-locked?)
     (update-moused
      *mouse-multiplier-aux*
      ;;FIXME::is this formula correct?
@@ -405,7 +405,7 @@
     (nsb-cga:%vec* look-vec (camera-matrix:camera-vec-forward *camera*) -1.0)
     (with-vec (px py pz) (pos)
       (with-vec (vx vy vz) (look-vec)	
-	(when (window:mice-locked-p)
+	(when (window:mouse-locked?)
 	  (when (window::skey-j-p (window::keyval 2))
 	    (toggle *dirtying2*))
 	  (when (window::skey-j-p (window::keyval 1))

@@ -19,8 +19,8 @@
   (:export
    #:get-mouse-out
    #:get-mouse-position
-   #:mice-locked-p
-   #:mice-free-p
+   #:mouse-locked?
+   #:mouse-free?
    #:toggle-mouse-capture)
   (:export
    #:*width*
@@ -30,4 +30,7 @@
    #:*resize-hook*)
   (:export
    #:*mouse-x*
-   #:*mouse-y*))
+   #:*mouse-y*)
+
+  (:export
+   #:button))

@@ -539,15 +539,15 @@ for the current implementation."
   (%glfw:set-input-mode *window*  %glfw:+cursor+ %glfw:+cursor-normal+))
 
 (defun toggle-mouse-capture ()
-  (if (mice-locked-p)
+  (if (mouse-locked?)
       (%glfw:set-input-mode *window* %glfw:+cursor+ %glfw:+cursor-normal+)
       (%glfw:set-input-mode *window* %glfw:+cursor+ %glfw:+cursor-disabled+) ))
 
-(defun mice-locked-p ()
+(defun mouse-locked? ()
   (eq %glfw:+cursor-disabled+
       (%glfw:get-input-mode *window* %glfw:+cursor+)))
 
-(defun mice-free-p ()
+(defun mouse-free? ()
   (eq  %glfw:+cursor-normal+
       (%glfw:get-input-mode *window* %glfw:+cursor+)))
 

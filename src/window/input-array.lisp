@@ -74,3 +74,14 @@
       (sbit (etouq *character-keys*) ,x)))
 ;;;;</INPUT ARRAY>
 ;;;;************************************************************************;;;;
+
+(defmacro button (type state button)
+  (mapc (lambda (keystate keyfun)
+	  (when (eq state keystate)
+	    (mapc (lambda (keytype keyfun2)
+		    (when (eq type keytype)
+		      (return-from button `(,keyfun (,keyfun2 ,button)))))
+		  '(:mouse :key)
+		  '(mouseval keyval))))
+	'(:down :pressed :released :repeat)
+	'(skey-p skey-j-p skey-j-r skey-j-p-or-repeat)))
