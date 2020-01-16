@@ -88,7 +88,9 @@
     (projection-matrix projection-matrix camera)
     (relative-lookat view-matrix forward up)
     (nsb-cga:%matrix* projection-view-matrix projection-matrix view-matrix)
-    (nsb-cga:%translate player-matrix (camera-vec-noitisop camera))
+    (let ((cev (camera-vec-noitisop camera)))
+      (nsb-cga:%vec* cev (camera-vec-position camera) -1.0)
+      (nsb-cga:%translate player-matrix cev))
     (nsb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))
 
 

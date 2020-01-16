@@ -41,7 +41,8 @@ TODO:
 - refactor physics engine
 
 TODO:
-- runtime dependencies of glfw-bodge blob
+- runtime dependencies of glfw-bodge blob[DONE]
+- let binaries go in the temp directory?
 
 TODO:
 - separate out opengl state changes and batch events. The chunk manager needs to have knowledge
@@ -67,3 +68,10 @@ TODO: Whats most important?
 
 - opengl state manager, push and pop state, so don't have to keep track of the state machine.
 - refactor deflazy to be like facebook's react?
+
+TODO:
+- bring in ncurses-clone over from lem-opengl
+- write documentation and tests
+
+TODO:
+- fork lem for quicklisp/ultralisp

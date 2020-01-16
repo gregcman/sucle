@@ -93,7 +93,8 @@
 	 (setf world:*world-directory*
 	       ;;"first/"
 	       ;;#+nil
-	       "test/"
+	       ;;"test/"
+	       "other/"
 	       )
 	 #+nil
 	 (progn
@@ -144,6 +145,9 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defparameter *mouse-multiplier* 0.002617)
+(defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
   (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
     (multiple-value-prog1
@@ -215,6 +219,8 @@
 (defparameter *last-session* nil)
 (defparameter *paused* nil)
 (defparameter *session* nil)
+(defparameter *game-ticks-per-iteration* 0)
+(defparameter *fraction-for-fps* 0.0)
 (defun per-frame ()
   ;;FIXME::where is the best place to flush the job-tasks?
   (sucle-mp::flush-job-tasks)
@@ -228,64 +234,128 @@
   (when (window::skey-j-p (window::keyval #\))
     (application::quit))
   (when (window::skey-j-p (window::keyval #\E))
-      (window::toggle-mouse-capture)
-      (moused))
+    (window::toggle-mouse-capture)
+    ;;Flush changes to the mouse so
+    ;;moving the mouse while not captured does not
+    ;;affect the camera
+    (moused))
   (setf *paused* (window::mice-free-p))
-  ;;FIXME::?
-  (setf sucle-mp::*paused* *paused*)
+
+  
+  ;;Polling
+  ;;Physics
+  ;;Rendering Chunks
+  ;;Rendering Other stuff
+  ;;Meshing
+  ;;Waiting on vsync
+  ;;Back to polling
+  
+  ;;Physics and Polling should be close together to prevent lag
+  
+  ;;physics
+  (select-block-with-scroll-wheel)
+  ;;Jump if space pressed
+  (setf (entity-jump? *ent*)
+	(window::skey-p (window::keyval #\ )))
+  ;;Set the sneaking state
+  (setf (entity-sneak? *ent*)
+	(cond
+	  ((window::skey-p (window::keyval :left-shift))
+	   0)
+	  ((window::skey-p (window::keyval :left-control))
+	   1)))
+  ;;Toggle noclip with 'v'
+  (when
+      (window::skey-j-p (window::keyval #\V))
+    (toggle (entity-clip? *ent*)))
+  ;;Toggle flying with 'f'
+  (when    
+      (window::skey-j-p (window::keyval #\F))
+    (toggle (entity-fly? *ent*))
+    (toggle (entity-gravity? *ent*)))
+  ;;Set the direction with WASD
+  (setf
+   (entity-hips *ent*)
+   (wasd-mover
+    (window::skey-p (window::keyval #\W))
+    (window::skey-p (window::keyval #\A))
+    (window::skey-p (window::keyval #\S))
+    (window::skey-p (window::keyval #\D))))
+  ;;Calculate what bocks are selected etc..
+  (unless *paused*
+    (fist-stuff (player-position)))
+  ;;Run the game ticks
+  
   (cond
     (*paused*
      (fps:tick))
     (t
-     ;;Polling
-     ;;Physics
-     ;;Rendering Chunks
-     ;;Rendering Other stuff
-     ;;Meshing
-     ;;Waiting on vsync
-     ;;Back to polling
-     
-     ;;Physics and Polling should be close together to prevent lag
-     
-     ;;physics
-     (stuff)
-     (when (window:mice-locked-p)
-       (when (window::skey-j-p (window::keyval #\P))
-	 (update-world-vao)))
+     (setf
+   (values *fraction-for-fps* *game-ticks-per-iteration*)
+   (fps:tick
+     (incf *ticks*)
+     (setf *time-of-day* 1.0)
+     ;;run the physics
+     (physentity *ent*)))))
 
-     ;;load or unload chunks around the player who may have moved
-     (world::load-world)
-     ;;render chunks and such
-     ;;handle chunk meshing
-     (application::on-session-change *last-session*
-       (reset-chunk-display-list)
-       (update-world-vao))
-     ;;update the camera
-     (update-camera *camera*)
-     (draw-to-default-area)
-     ;;this also clears the depth and color buffer.
-     (apply #'render-sky (the-sky-color))
-     (use-chunk-shader
-      :camera *camera*
-      :sky-color *sky-color-foo*
-      :time-of-day *time-of-day*
-      :fog-ratio *fog-ratio*
-      )
-     (render-chunks)
-     (use-occlusion-shader *camera*)
-     (render-chunk-occlusion-queries)
-     ;;selected block and crosshairs
-     (use-solidshader *camera*)
-     (render-fist *fist*)
-     (render-crosshairs)
+  ;;update the internal mouse state
+  ;;taking into consideration fractions
+  (when (window:mice-locked-p)
+    (update-moused
+     *mouse-multiplier-aux*
+     ;;FIXME::is this formula correct?
+     (/ (+ *fraction-for-fps*
+	   *game-ticks-per-iteration*)
+	(+ *game-ticks-per-iteration* 1))))
+  ;;Calculate the camera position from
+  ;;the past, current position of the player and the frame fraction
+  (set-camera-position *fraction-for-fps*)
+  ;;Set the pitch and yaw of the player based on the
+  ;;mouse position
+  (setf (necking-yaw (entity-neck *ent*))
+	(floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
+	(necking-pitch (entity-neck *ent*))
+	(floatify (* *lerp-mouse-y* *mouse-multiplier*)))
+  ;;Set the direction of the camera based on the
+  ;;pitch and yaw of the player
+  (unit-pitch-yaw (camera-matrix:camera-vec-forward *camera*)
+		  (necking-pitch (entity-neck *ent*))
+		  (necking-yaw (entity-neck *ent*)))
+  
+  (modify-camera-position-for-sneak)
+  
+  (when (window::skey-j-p (window::keyval #\P))
+    (update-world-vao))
+  ;;load or unload chunks around the player who may have moved
+  (world::load-world)
+  ;;render chunks and such
+  ;;handle chunk meshing
+  (application::on-session-change *last-session*
+    (reset-chunk-display-list)
+    (update-world-vao))
+  ;;update the camera
+  (update-camera *camera*)
+  (draw-to-default-area)
+  ;;this also clears the depth and color buffer.
+  (apply #'render-sky (the-sky-color))
+  (use-chunk-shader
+   :camera *camera*
+   :sky-color *sky-color-foo*
+   :time-of-day *time-of-day*
+   :fog-ratio *fog-ratio*
+   )
+  (render-chunks)
+  (use-occlusion-shader *camera*)
+  (render-chunk-occlusion-queries)
+  ;;selected block and crosshairs
+  (use-solidshader *camera*)
+  (render-fist *fist*)
+  (render-crosshairs)
 
-     (complete-render-tasks)
-     (dispatch-mesher-to-dirty-chunks))))
+  (complete-render-tasks)
+  (dispatch-mesher-to-dirty-chunks))
 
-(defparameter *sky-color*
-  '(
-    ;;0.0 0.0 0.0 1.0
-    0.68 0.8 1.0))
+(defparameter *sky-color* '(0.68 0.8 1.0))
 (defparameter *sky-color-foo* '(0.0 0.0 0.0))
 (defun the-sky-color ()
   (map-into *sky-color-foo*
@@ -294,130 +364,36 @@
 	  *sky-color*))
 
 ;;;
-(defparameter *mouse-multiplier* 0.002617)
-(defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
-;;;
 
 (defparameter *ent* (gentity))
 (defparameter *fist* (gen-fister))
 (defparameter *swinging* nil)
 (defparameter *ticks* 0)
 
-#+nil
-(progn
-  (defparameter *start-fov* (* 95 (floatify (/ pi 180.0))))
-  (defparameter *target-fov* (* 110 (floatify (/ pi 180.0))))
-  (defun ease (a b &optional (modifier 0.5))
-    (alexandria:lerp modifier a b))
-  (define-modify-macro easef (b &optional (modifier 0.5)) ease))
-
-(defparameter *reach* 64.0)
-;;FIXME::easier api for getting player position and such
-(defun stuff ()
-  (setf *blockid* (let ((seq
-			 #(3 13 12 24 1 2 18 17 20 5 89)))
-		    (elt seq (mod (round window::*scroll-y*)
-				  (length seq)))))
-  
-  (let* ((player-pointmass (entity-particle *ent*))
-	 (pos (pointmass-position player-pointmass))
-	 (entity *ent*))
-    (symbol-macrolet ((is-jumping (entity-jump? entity))
-		      (is-sneaking (entity-sneak? entity))
-		      (fly (entity-fly? entity))
-		      (gravity (entity-gravity? entity))
-		      (noclip (entity-clip? entity)))
-      (setf is-jumping (window::skey-p (window::keyval #\ )))
-      (setf is-sneaking
-	    (or (when (window::skey-p (window::keyval :left-shift))
-		  0)
-		(when (window::skey-p (window::keyval :left-control))
-		  1)))
-      (when (window:mice-locked-p)
-	(when (window::skey-j-p (window::keyval #\V))
-	  (toggle noclip))
-	(when (window::skey-j-p (window::keyval #\F))
-	  (toggle fly)
-	  (toggle gravity)))
-      (setf (entity-hips *ent*)
-	    (wasd-mover
-	     (window::skey-p (window::keyval #\W))
-	     (window::skey-p (window::keyval #\A))
-	     (window::skey-p (window::keyval #\S))
-	     (window::skey-p (window::keyval #\D))))
-      #+nil
-      (case is-sneaking
-	(1 (easef *fov* *target-fov* 0.1))
-	(otherwise (easef *fov* *start-fov* 0.1)))
-      (fist-stuff pos))
-    (multiple-value-bind (fraction times)
-	(fps:tick
-	  (incf *ticks*)
-	  (set-time-of-day)
-	  (physentity *ent*))
-      (declare (ignorable times))
-      (let ((curr (pointmass-position player-pointmass))
-	    (prev (pointmass-position-old player-pointmass))
-	    (camera *camera*))
-	(let ((vec (camera-matrix:camera-vec-position camera))
-	      (cev (camera-matrix:camera-vec-noitisop camera)))
-	  (nsb-cga:%vec-lerp vec prev curr fraction)
-	  #+nil
-	  ;;;;FIXME::where to put? go lower when crouching.
-	  (when (and (not (entity-fly? *ent*))
-		     (eql 0 (entity-sneak? *ent*)))
-	    (nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))
-	  (nsb-cga:%vec* cev vec -1.0)))
-      
-      (let ((neck (entity-neck *ent*)))
-	(when (window:mice-locked-p)
-	  (update-moused *mouse-multiplier-aux*
-			 ;;fraction
-			 ;;(mouse-lerp-factor)
-			 ;;FIXME::correct formula?
-
-			 (/ (+ fraction times)
-			    (+ times 1)))
-	  (setf (necking-yaw neck)
-		(floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
-		(necking-pitch neck)
-		(floatify (* *lerp-mouse-y* *mouse-multiplier*))))
-	(unit-pitch-yaw (camera-matrix:camera-vec-forward *camera*)
-			(necking-pitch neck)
-			(necking-yaw neck))))))
-
-(defun mouse-lerp-factor ()
-  0.5
-  #+nil
-  ;;smooth when looking slowly, jittery when looking fast
-  (let ((distance
-	 (let ((a (floatify (- *tmouse-x* *lerp-mouse-x*)))
-	       (b (floatify (- *tmouse-y* *lerp-mouse-y*))))
-	   (sqrt
-	    (+ (* a a)
-	       (* b b))))))
-    (min 1.0     
-	 (/
-	  distance
-	  
-	  150.0))))
-
-(defun set-time-of-day ()
-  (setf *time-of-day*
-	(floatify		     
-	 1.0;;0.8
-	 #+nil
-	 (let ((seconds (or 60 840)))
-	   (/ (+ 1 (sin
-		    (/ *ticks*
-		       ;;60
-		       seconds)))
-	      2)))) )
+(defun select-block-with-scroll-wheel ()
+  (setf *blockid*
+	(let ((seq
+	       #(3 13 12 24 1 2 18 17 20 5 89)))
+	  (elt seq (mod (round window::*scroll-y*)
+			(length seq))))))
 
 (defun player-position ()
   (let* ((player-pointmass (entity-particle *ent*))
 	 (curr (pointmass-position player-pointmass)))
     curr))
+(defun player-position-old ()
+  (let* ((player-pointmass (entity-particle *ent*))
+	 (prev (pointmass-position-old player-pointmass)))
+    prev))
+(defparameter *reach* 64.0)
+(defun set-camera-position (fraction)
+  (let ((vec (camera-matrix:camera-vec-position *camera*)))
+    (nsb-cga:%vec-lerp vec (player-position-old) (player-position) fraction)))
+(defun modify-camera-position-for-sneak ()
+  (let ((vec (camera-matrix:camera-vec-position *camera*)))
+    (when (and (not (entity-fly? *ent*))
+	       (eql 0 (entity-sneak? *ent*)))
+      (nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))))
 
 (defparameter *big-fist-reach* 32)
 
