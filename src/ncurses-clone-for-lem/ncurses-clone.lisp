@@ -8,7 +8,8 @@
 
 ;;FIXME::diverging from ncurses
 ;;8 bits for foreground and 8 bits for background
-(defparameter *color-bit-size* 18) 
+(utility:eval-always
+  (defparameter *color-bit-size* 18)) 
 (defparameter A_BOLD
   (ash 1 *color-bit-size*)
   ;;#b100000000 ;;8 bits for char, could be 7?
@@ -77,8 +78,8 @@
 		 :value value
 		 :attributes attributes))
 
-(defparameter *glyph-attribute-bit-size* (+ *color-bit-size* 3))
 (utility:eval-always
+  (defparameter *glyph-attribute-bit-size* (+ *color-bit-size* 3))
   (defparameter *bits-per-char-in-glyph* 8))
 (deftype glyph () `(unsigned-byte ,(+ *bits-per-char-in-glyph* *glyph-attribute-bit-size*)))
 (deftype glyph-attributes () `(unsigned-byte ,*glyph-attribute-bit-size*))
