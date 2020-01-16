@@ -3,8 +3,18 @@
 ;;;;2. Testing for button presses
 ;;;;3. Drawing with the fixed function pipeline
 ;;;;4. Setting up shaders
-;;;;5. deflazy
+;;;;5. Loading textures and rendering
+;;;;6. deflazy
+;;;;7. sucle-multiprocessing
+;;;;8. sucle-serialize
+;;;;9. uncommon-lisp
+;;;;10. nsb-cga
+;;;;11. fps independent-timestep
+;;;;12. text-subsystem
+;;;;13. ncurses-clone-for-lem
 
+
+;;;;************************************************************************;;;;
 (defpackage #:test1
   (:use :cl)
   (:export #:start))
@@ -25,7 +35,7 @@
    :height 512
    ;;The title of the window
    :title "1. Opening a window"))
-
+;;;;************************************************************************;;;;
 (defpackage #:test2
   (:use :cl)
   (:export #:start))
@@ -64,20 +74,11 @@
    :height 512
    ;;The title of the window
    :title "2. Listening to button presses"))
-
+;;;;************************************************************************;;;;
 (defpackage #:test3
   (:use :cl)
   (:export #:start))
 (in-package #:test3)
-
-(defun triangle ()
-  (gl:with-primitives :triangles
-    (gl:color 1.0 0.0 0.0)
-    (gl:vertex 1.0 -1.0 0.5)
-    (gl:color 0.0 1.0 0.0)
-    (gl:vertex 0.0 1.0 0.5)
-    (gl:color 0.0 0.0 1.0)
-    (gl:vertex -1.0 -1.0 0.5)))
 
 (defun start ()
   (application:main
@@ -90,75 +91,21 @@
 	(triangle)))
    :width 512
    :height 512
-   :title "3. Triangle: fixed pipeline"))
+   :title "3. Triangle: immediate fixed pipeline"))
 
+(defun triangle ()
+  (gl:with-primitives :triangles
+    (gl:color 1.0 0.0 0.0)
+    (gl:vertex 1.0 -1.0 0.5)
+    (gl:color 0.0 1.0 0.0)
+    (gl:vertex 0.0 1.0 0.5)
+    (gl:color 0.0 0.0 1.0)
+    (gl:vertex -1.0 -1.0 0.5)))
+;;;;************************************************************************;;;;
 (defpackage #:test4
   (:use :cl)
   (:export #:start))
 (in-package #:test4)
-
-(defun triangle (position-buffer color-buffer)
-  ;;In test3 we used immediate-mode opengl, which means
-  ;;vertices are sent to the CPU every time the triangle is
-  ;;drawn.
-  ;;Here, we send data to an intermediate buffer,
-  ;;position-buffer and color-buffer.
-  ;;Then we send position-buffer and color-buffer in
-  ;;bulk to openGL, where it can be called many times as
-  ;;a display-list or VAO
-  (scratch-buffer:bind-out* ((position-buffer gl-vertex)
-			     (color-buffer gl-color))
-    (gl-color 1.0 0.0 0.0)
-    (gl-vertex 1.0 -1.0 0.5)
-    (gl-color 0.0 1.0 0.0)
-    (gl-vertex 0.0 1.0 0.5)
-    (gl-color 0.0 0.0 1.0)
-    (gl-vertex -1.0 -1.0 0.5)))
-
-(defun frame (shader)
-  (glhelp:use-gl-program shader)
-  (flet ((loop-time (n)
-	    (utility:floatify (/ (fps:microseconds) n))))
-    ;;Set uniforms within the shader
-    (glhelp:with-uniforms uniform shader
-      ;;Set the uniform referenced by :time in shader
-      ;;to mix colors together.
-      (gl:uniformf (uniform :time)
-		   (sin (loop-time 1000000.0)))
-      ;;Set the uniform referenced by :rotate in shader
-      ;;to a rotation matrix that depends on time.
-      (gl:uniform-matrix-4fv
-       (uniform :rotate)
-       (nsb-cga:rotate* 0.0 0.0 (loop-time 10000000.0)))))
-  (gl:clear :color-buffer-bit
-	    :depth-buffer-bit
-	    :stencil-buffer-bit)
-  (let ((position-buffer (scratch-buffer:my-iterator))
-	(color-buffer (scratch-buffer:my-iterator)))
-    ;;Draw triangle coordinates and colors to the
-    ;;intermediate buffers named position-buffer and color-buffer
-    (triangle position-buffer color-buffer)
-    (let
-	;;This becomes set to a display-list or VAO depending
-	;;on the OpenGL version [as well as possible the
-	;;GPU vendor]
-	(drawable) 
-      (scratch-buffer:flush-bind-in* ((position-buffer gl-vertex)
-				      (color-buffer gl-color))
-	(setf drawable
-	      ;;This is a macro that generates code to
-	      ;;write to either a display-list or VAO,
-	      ;;depending on the OpenGL version [as well
-	      ;;as possible the GPU vendor]
-	      (glhelp:create-vao-or-display-list-from-specs
-	       (:triangles 3)
-	       ;;Attribute locations
-	       ((3 (gl-color) (gl-color) (gl-color))
-		(0 (gl-vertex) (gl-vertex) (gl-vertex))))))
-      (glhelp:slow-draw drawable)
-      ;;For the purposes of the example, delete it immediately.
-      ;;Usually we'll draw it many times.
-      (glhelp:slow-delete drawable))))
 
 (defun start ()
   (application:main
@@ -195,8 +142,87 @@ gl_FragColor.xyz = color_out;
 	  (frame shader))))
    :width 512
    :height 512
-   :title "4. Triangle: shaders, vaos, display-lists"))
+   :title "4. Triangle: GLSL shaders, uniforms, vaos, display-lists"))
 
+(defun frame (shader)
+  (glhelp:use-gl-program shader)
+  (flet ((loop-time (n)
+	    (utility:floatify (/ (fps:microseconds) n))))
+    ;;Set uniforms within the shader
+    (glhelp:with-uniforms uniform shader
+      ;;Set the uniform referenced by :time in shader
+      ;;to mix colors together.
+      (gl:uniformf (uniform :time)
+		   (sin (loop-time 1000000.0)))
+      ;;Set the uniform referenced by :rotate in shader
+      ;;to a rotation matrix that depends on time.
+      (gl:uniform-matrix-4fv
+       (uniform :rotate)
+       (nsb-cga:rotate* 0.0 0.0 (loop-time 10000000.0)))))
+  (gl:clear :color-buffer-bit
+	    :depth-buffer-bit
+	    :stencil-buffer-bit)
+  (let ((position-buffer (scratch-buffer:my-iterator))
+	(color-buffer (scratch-buffer:my-iterator)))
+    ;;Draw triangle coordinates and colors to the
+    ;;intermediate buffers named position-buffer and color-buffer
+    (triangle position-buffer color-buffer)
+    (let
+	;;This becomes set to a display-list or VAO depending
+	;;on the OpenGL version [as well as possible the
+	;;GPU vendor]
+	(drawable)
+      (let ((total-vertices
+	     ;;Make sure that each buffer has the correct amount
+	     ;;of data, and determine the total vertices.
+	     (all-the-same
+	      ;;The position-buffer is referenced 3 times per vertex.
+	      (/ (scratch-buffer:iterator-fill-pointer position-buffer)
+		 3)
+	      ;;The color-buffer is rerefenced 3 times per vertex.
+	      (/ (scratch-buffer:iterator-fill-pointer color-buffer)
+		 3))))
+	(scratch-buffer:flush-bind-in* ((position-buffer gl-vertex)
+					(color-buffer gl-color))
+	  (setf drawable
+		;;This is a macro that generates code to
+		;;write to either a display-list or VAO,
+		;;depending on the OpenGL version [as well
+		;;as possible the GPU vendor]
+		(glhelp:create-vao-or-display-list-from-specs
+		 (:triangles total-vertices)
+		 ;;Attribute locations
+		 ((3 (gl-color) (gl-color) (gl-color))
+		  (0 (gl-vertex) (gl-vertex) (gl-vertex)))))))
+      (glhelp:slow-draw drawable)
+      ;;For the purposes of the example, delete it immediately.
+      ;;Usually we'll draw it many times.
+      (glhelp:slow-delete drawable))))
+
+(defun all-the-same (&rest values)
+  (let ((only-one (remove-duplicates values)))
+    (assert (equal (list-length only-one) 1))
+    (car only-one)))
+
+(defun triangle (position-buffer color-buffer)
+  ;;In test3 we used immediate-mode opengl, which means
+  ;;vertices are sent to the CPU every time the triangle is
+  ;;drawn.
+  ;;Here, we send data to an intermediate buffer,
+  ;;position-buffer and color-buffer.
+  ;;Then we send position-buffer and color-buffer in
+  ;;bulk to openGL, where it can be called many times as
+  ;;a display-list or VAO
+  (scratch-buffer:bind-out* ((position-buffer gl-vertex)
+			     (color-buffer gl-color))
+    (gl-color 1.0 0.0 0.0)
+    (gl-vertex 1.0 -1.0 0.5)
+    (gl-color 0.0 1.0 0.0)
+    (gl-vertex 0.0 1.0 0.5)
+    (gl-color 0.0 0.0 1.0)
+    (gl-vertex -1.0 -1.0 0.5)))
+
+;;;;************************************************************************;;;;
  
 (defpackage :application-example-hello-world
   (:use #:cl)
