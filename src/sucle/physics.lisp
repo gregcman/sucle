@@ -75,8 +75,7 @@
 	(x y z contact)
       (declare (ignorable contact))
       (let ((blockid (world:getblock x y z)))
-	(when (aref block-data:*iscollidable*
-		    blockid)
+	(when (block-data:data blockid :hard)
 	  (when *dirtying2*
 	    (world::plain-setblock x y z (1+ (random 5)) 0))
 	  (let ((blockaabb (block-to-block-aabb blockid)))
@@ -111,7 +110,7 @@
     (aabbcc::get-blocks-around (px py pz aabb) (mx my mz contact-var)
       (declare (ignorable contact-var))
       (let ((blockid (world:getblock mx my mz)))
-	(when (aref block-data:*iscollidable* blockid)
+	(when (block-data:data blockid :hard)
 	  (when *dirtying*
 	    (world::plain-setblock mx my mz (1+ (random 5)) 0))
 	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
@@ -417,8 +416,7 @@
     (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
       (declare (ignorable contact))
-      (when (aref block-data:*iscollidable*
-		  (world:getblock x y z))
+      (when (block-data:data (world:getblock x y z) :hard)
 	(multiple-value-bind (minimum type)
 	    (aabbcc:aabb-collide
 	     aabb

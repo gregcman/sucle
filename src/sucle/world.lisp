@@ -197,7 +197,7 @@
 
 #+nil
 (defun setblock-with-update (i j k blockid &optional
-					     (new-light-value (aref block-data:*lightvalue* blockid)))
+					     (new-light-value (block-data:data blockid :light)))
  (let ((old-light-value (world:getlight i j k)))
    (when (setf (world:getblock i j k) blockid)
      #+nil
@@ -223,8 +223,11 @@
       (block-dirtify i j k))))
 
 (defun plain-setblock (i j k blockid &optional
-				       (new-light-value (aref block-data:*lightvalue* blockid))
-				       (new-sky-light-value 0))
+				       (new-light-value (block-data:data blockid :light))
+				       (new-sky-light-value
+					(if (eq blockid (block-data:lookup :void))
+					    15
+					    0)))
   (when (setf (world:getblock i j k) blockid)
     (setf (world:getlight i j k) new-light-value)
     (setf (world:skygetlight i j k) new-sky-light-value)

@@ -77,8 +77,8 @@ TODO:
 - fork lem for quicklisp/ultralisp
 
 TODO:
-- Find all "FIXME::"s and replace with something else, the "::"s get in the
-way of package references.
+- Find all "FIXME\:\:"s and replace with something else, the "::"s get in the
+way of package references.[DONE]
 - Revive pprint-presentations and use it as a GUI?
 - Revive 2d pix grid? Combine with ncurses-for-lem?
 - Revive skybox?

@@ -488,7 +488,7 @@
 
 (defun destroy-block-at (x y z)
   ;;(blocksound x y z)
-  (world::plain-setblock x y z (block-data::blockid :air) 15))
+  (world::plain-setblock x y z (block-data:lookup :air) 15))
 
 (defparameter *blockid* 1)
 
@@ -499,7 +499,7 @@
      y
      z
      blockval
-     (aref block-data:*lightvalue* blockval))
+     (block-data:data blockval :light))
     ;;(blocksound x y z)
     ))
 

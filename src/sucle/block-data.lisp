@@ -2,7 +2,7 @@
 
 (in-package :block-data)
 
-(utility::eval-always
+(utility:eval-always
   (macrolet
       ((defblockprop (name type)
 	 `(progn
@@ -18,7 +18,6 @@
     (defblockprop *lightvalue* (unsigned-byte 4)) ;;needed
     (defblockprop *blockIndexInTexture* (unsigned-byte 8)) ;;needed
     (defblockprop *isCollidable* t))
-
   (defparameter *names-to-blocks* (make-hash-table :test 'eq))
 
   (map
@@ -61,14 +60,29 @@
      
      (89 "lamp" 105 15 T T)))
 
-  (defun blockid (&optional (block-name :void))
+  (defun lookup (&optional (block-name :void))
     (gethash block-name *names-to-blocks* 0))
-  (define-compiler-macro blockid (&whole form &optional (block-name :void))
+  (define-compiler-macro lookup (&whole form &optional (block-name :void))
     (multiple-value-bind (value existsp)
-	(blockid block-name)
+	(lookup block-name)
       (if existsp
 	  value
 	  form))))
+
+(defmacro data (id value)
+  (let ((var '((:name *names*)
+	       (:opaque *opaquecubelooukup*)
+	       (:opacity *lightOpacity*)
+	       (:light *lightvalue*)
+	       (:texture *blockindexintexture*)
+	       (:hard *isCollidable*))))
+    (mapc
+     (lambda (x)
+       (destructuring-bind (value-name array-variable) x
+	 (when (eq value value-name)
+	   (return-from data `(aref ,array-variable ,id)))))
+     var)
+    (error "Wanted:~s ~%Got:~s" (mapcar 'first var) value)))
 ;;;;
 
 ;;[FIXME]is using CLOS to dispatch on the block a good way to organize?
@@ -102,7 +116,7 @@
 (defun show-sidep (blockid other-blockid)
   (or (zerop other-blockid)
       (and (/= blockid other-blockid)
-	   (not (aref block-data:*opaquecubelooukup* other-blockid)))))
+	   (not (data other-blockid :opaque)))))
 
 (defgeneric blockshape (blockid i j k))
 (defmethod blockshape ((blockid (eql 0)) i j k)
@@ -119,7 +133,7 @@
 (defmethod blockshape ((blockid t) i j k)
   (renderstandardblock blockid i j k))
 (defun renderstandardblock (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+  (let ((texid (data id :texture)))
     (mesher:with-texture-translator2 (u0 u1 v0 v1) texid
       (flipuv)
       (let ((adj-id (world:getblock i (1- j) k)))
@@ -142,7 +156,7 @@
 	  (mesher:side+k i j k u0 v0 u1 v1))))))
 
 (defun rendergrass (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+  (let ((texid (data id :texture)))
     (mesher:with-texture-translator2 (u0 u1 v0 v1) 2
       (flipuv)
       (let ((adj-id (world:getblock i (1- j) k)))
@@ -168,7 +182,7 @@
 	  (mesher:side+k i j k u0 v0 u1 v1))))))
 
 (defun rendersandstone (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+  (let ((texid (data id :texture)))
     (mesher:with-texture-translator2 (u0 u1 v0 v1) texid
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
@@ -191,7 +205,7 @@
 	(when (show-sidep id adj-id)
 	  (mesher:side+k i j k u0 v0 u1 v1))))))
 (defun renderlog (id i j k)
-  (let ((texid (aref block-data:*blockIndexInTexture* id)))
+  (let ((texid (data id :texture)))
     (mesher:with-texture-translator2 (u0 u1 v0 v1) 21
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)

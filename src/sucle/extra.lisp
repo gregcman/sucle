@@ -21,7 +21,7 @@
   (eql b0 b1))
 
 (defmacro nick (nickname)
-  `(block-data::blockid ,nickname))
+  `(block-data:lookup ,nickname))
 
 ;;convert dirt, stone, and grass into their 'correct' forms given air:
 ;;grass, dirt, dirt, stone

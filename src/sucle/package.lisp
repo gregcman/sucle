@@ -26,4 +26,7 @@
    #:convert-object-to-filename))
 (defpackage #:block-data
   (:use #:cl
-	#:utility))
+	#:utility)
+  (:export
+   #:data
+   #:lookup))

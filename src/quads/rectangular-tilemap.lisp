@@ -1,6 +1,9 @@
 (defpackage :rectangular-tilemap
-  (:use :cl))
-
+  (:use :cl)
+  (:export
+   #:sequential-index-generator
+   #:regular-enumeration
+   #:index-quad-lookup))
 (in-package :rectangular-tilemap)
 
 (progn
@@ -52,5 +55,3 @@
 	      (aref array (1+ p))
 	      (aref array (+ 2 p))
 	      (aref array (+ 3 p))))))
-
-(export (quote (sequential-index-generator regular-enumeration index-quad-lookup)))
