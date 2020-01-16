@@ -556,7 +556,8 @@ just put together a new vao"
   ((src :accessor gl-program-object-src
 	:initarg :src)
    (uniforms :accessor gl-program-object-uniforms)))
-
+;;FIXME::fix exports
+(export 'use-gl-program)
 (defun use-gl-program (src)
   (gl:use-program (handle src)))
 
@@ -639,7 +640,7 @@ just put together a new vao"
 	     obj
 	     uniform-data))
       inst)))
-
+(export 'create-opengl-shader)
 (defun create-opengl-shader (vert-text frag-text attributes uniforms)
   (create-gl-program2
    (list :vs vert-text
