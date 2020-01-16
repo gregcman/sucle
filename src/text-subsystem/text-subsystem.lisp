@@ -4,7 +4,7 @@
 	#:utility))
 (in-package #:text-sub)
 
-;;FIXME:: 256 by 256 size limit for texture
+;;[FIXME] 256 by 256 size limit for texture
 (defparameter *text-data-height* 256)
 (defparameter *text-data-width* 256)
 (defparameter *text-data-what-type*
@@ -23,7 +23,7 @@
        (glhelp::wrap-opengl-texture
 	(glhelp::create-texture nil w h))))))
 (defun get-text-texture ()
-  ;;;;FIXME:: getfnc must go before, because it has side effects.
+  ;;;;[FIXME] getfnc must go before, because it has side effects.
   ;;;;are side effects and state unavoidable? a property of opengl?
   (let ((value (getfnc 'text-data)))
     (ecase *text-data-type*
@@ -101,7 +101,7 @@ gl_FragColor.a = opacity * fin.a;
        (let ((framebuffer (getfnc 'text-data)))
 	 (gl:bind-framebuffer :framebuffer (glhelp::handle framebuffer))
 	 (glhelp:set-render-area 0 0
-				 ;;TODO: not use generic functions?
+				 ;;[FIXME] not use generic functions?
 				 (glhelp::x framebuffer)
 				 (glhelp::y framebuffer)
 				 ))
@@ -113,7 +113,7 @@ gl_FragColor.a = opacity * fin.a;
 		   nil)))
 	   ,@body)))))
 
-;;;;FIXME:: managing opengl state blows
+;;;;[FIXME] managing opengl state blows
 (defmacro with-text-shader ((uniform-fun) &body body)
   (with-gensyms (program)
     `(progn
@@ -338,7 +338,7 @@ gl_FragColor = value_out;
 		(wfloat (floatify w))
 		(hfloat (floatify h)))
 	   (with-unsafe-speed
-	     ;;FIXME:: nonportably declares things to be fixnums for speed
+	     ;;[FIXME] nonportably declares things to be fixnums for speed
 	     ;;The x and y components are independent of each other, so instead of
 	     ;;computing x and y per point, compute once per x value or v value.
 	     (dotimes (x (the fixnum upw))

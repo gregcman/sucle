@@ -71,7 +71,7 @@
 	  form))))
 ;;;;
 
-;;FIXME::is using CLOS to dispatch on the block a good way to organize?
+;;[FIXME]is using CLOS to dispatch on the block a good way to organize?
 ;; is it efficient?
 (defmethod mesher:draw-dispatch ((bits-block-data fixnum) i j k)
   (blockshape (world:getblock-extract bits-block-data) i j k))

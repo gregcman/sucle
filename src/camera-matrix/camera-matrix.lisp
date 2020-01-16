@@ -42,7 +42,7 @@
 		  (sin (/ fovy 2.0)))))
       (let ((sum (+ far near))
 	    (difference (- near far)))
-	;;FIXME::necessary?
+	;;[FIXME]necessary?
 	(nsb-cga:%matrix result 
 			 (/ cot aspect) 0.0 0.0 0.0
 			 0.0 cot 0.0 0.0

@@ -88,7 +88,7 @@
 (defparameter *quit-token* nil)
 (defmacro with-quit-token ((&optional (value '(cons "default" "quit token"))) &body body)
   `(let ((*quit-token* ,value)
-	 (window::*status* nil)) ;;FIXME::nil = alive
+	 (window::*status* nil)) ;;[FIXME]nil = alive
      (catch *quit-token*
        ,@body)))
 (defun init (fun)
@@ -116,7 +116,7 @@
 
 (defmacro quit (&optional form)
   `(progn
-     (setf window::*status* t) ;;FIXME::t = exit
+     (setf window::*status* t) ;;[FIXME]t = exit
      (throw *quit-token* ,form)))
 
 (defun poll-app ()

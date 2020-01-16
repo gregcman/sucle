@@ -84,3 +84,20 @@ way of package references.
 - Revive skybox?
 - Revivie basic, 3bst, mouse-pointer, skybox, cartesian-graphing,
 - Dont't revive sucle-sketch, or sucle-vecto?
+- Revive a-sound-system, factor out openal + sndfile and remove ffmpeg??
+- Factor out shadowroot cl-c-parse
+- Revive sockets-test?
+- Is "reviving" or saving old code a good idea?
+
+Project goals:
+- Portable, pure Common Lisp, with few dependencies:
+ - Common Lisp
+ - CFFI
+ - OpenGL
+ - GLFW3
+- Paredit
+- SLIME/swank
+- Commmon Lisp REPL
+- Text editor
+- Common Lisp code editor
+- Easy install -> quicklisp [ultralisp? trivial-ship?]

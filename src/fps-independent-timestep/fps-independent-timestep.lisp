@@ -14,7 +14,7 @@
 
 ;;;;<CLOCK>
 (deftype seconds ()
-  ;;FIXME::arbitrary amount
+  ;;[FIXME]arbitrary amount
   '(unsigned-byte 40))
 (deftype nanosecond ()
   `(integer 0 ,(1- (expt 10 9))))
@@ -49,7 +49,7 @@
   (aux 0.0 :type double-float))
 
 ;;(declaim (ftype (function (fixnum fixnum &optional fixnum)) make-ticker))
-(defun make-ticker (dt time &optional (bailout (floor 1000000 4))) ;;FIXME
+(defun make-ticker (dt time &optional (bailout (floor 1000000 4))) ;;[FIXME]
   (%make-ticker :dt dt :current-time time :aux (coerce (/ 1 dt) 'double-float)
 		:bailout bailout))
 

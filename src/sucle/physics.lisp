@@ -69,7 +69,7 @@
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
   (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
-    ;;FIXME:: aabb-collect-blocks does not check slabs, only blocks upon entering.
+    ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
     ;;also check "intersecting shell blocks?"
     (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)

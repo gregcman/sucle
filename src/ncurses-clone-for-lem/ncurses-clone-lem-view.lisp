@@ -19,7 +19,7 @@
    #:print-modeline
    #:redraw-view-after
    
-   ;;FIXME::HACK
+   ;;[FIXME]HACK
    #:ncurses-view-parent-window))
 (in-package #:ncurses-clone-lem-view)
 ;;;;Window mangement code below?
@@ -33,7 +33,7 @@
    width
    height
    lock
-   ;;FIXME::this variable is for determining what lem window
+   ;;[FIXME]this variable is for determining what lem window
    ;;it is in. But the internals of lem are unknown?
    parent-window
    ))
@@ -99,7 +99,7 @@
        (ncurses-view-modeline-scrwin view)))))
 (defun clear (view)
   ;;;https://linux.die.net/man/3/clearok
-  ;;#+nil;;FIXME::what is this for?
+  ;;#+nil;;[FIXME]what is this for?
   (with-view-lock view
     (ncurses-clone::clear-win (ncurses-view-scrwin view))
     #+nil
@@ -166,7 +166,7 @@
      ncurses-clone::ncurses-wclrtobot
      (ncurses-view-scrwin view))))
 (defun update-display ()
-    ;;FIXME::why does this do nothing?
+    ;;[FIXME]why does this do nothing?
   #+nil
   (flet ((render-window (window)
 	   (let ((view (lem:window-view window)))
@@ -185,11 +185,11 @@
 		       (;;charms/ll:wmove
 			ncurses-clone::ncurses-wmove
 			scrwin lem::*cursor-y* lem::*cursor-x*)))
-		 ;;FIXME
+		 ;;[FIXME]
 		 (;;charms/ll:wnoutrefresh
 		  ncurses-clone::ncurses-wnoutrefresh
 		  scrwin)
-		 ;;;FIXME::does not mirror the lem/ncurses code
+		 ;;;[FIXME]does not mirror the lem/ncurses code
 		 (ncurses-clone::ncurses-curs-set 0)
 		 )))))
     #+nil
@@ -246,12 +246,12 @@
 
 (defun redraw-view-after (view)
   (with-view-lock view
-    ;;#+nil ;;;FIXME 
+    ;;#+nil ;;;[FIXME] 
     #+nil
     (;;charms/ll:attron
      ncurses-clone::ncurses-attron
      attr)
-    ;;#+nil ;;FIXME:: disabling
+    ;;#+nil ;;[FIXME] disabling
     ;;(print view)
     ;;(print ncurses-clone::*std-scr*)
     (when (and (ncurses-view-modeline-scrwin view)
@@ -270,7 +270,7 @@
     (;;charms/ll:attroff
      ncurses-clone::ncurses-attroff
      attr)
-    #+nil;;FIXME
+    #+nil;;[FIXME]
     (;;charms/ll:wnoutrefresh
      ncurses-clone::ncurses-wnoutrefresh
      ;;charms/ll:*stdscr*

@@ -60,7 +60,7 @@
 		    (camera-matrix:camera-vec-position camera))
       (%gl:uniform-1f (uniform :foglet)
 		      (/ -1.0
-			 ;;FIXME::16 assumes chunk is a 16x16x16 cube
+			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
 			 (* 16 world::*chunk-radius*)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
@@ -102,7 +102,7 @@
        (uniform :pmv)
        (camera-matrix:camera-matrix-projection-view-player camera)
        nil))))
-;;FIXME::better way to do this? bring render-occlusion-queries here?
+;;[FIXME]better way to do this? bring render-occlusion-queries here?
 (defun render-chunk-occlusion-queries ()
   (render-occlusion-queries))
 
@@ -120,7 +120,7 @@
 		  `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
 			  #+nil
 			  (%gl:vertex-attrib-2f 2 ,u ,v)
-			  ;;FIXME::when using %gl:vertex-attrib, the 0 attrib marks the
+			  ;;[FIXME]when using %gl:vertex-attrib, the 0 attrib marks the
 			  ;;end.
 			  (%gl:vertex-attrib-4f 0 ,x ,y ,z 1.0)
 			  )))
@@ -367,7 +367,7 @@ gl_FragColor.rgb = color_out;
   (gl:disable :cull-face)
   (gl:polygon-mode :front-and-back :line)
   (gl:line-width 2)
-  ;;FIXME::render the fist again
+  ;;[FIXME]render the fist again
   (when (fister-exists fist)
     (let ((selected-block (fister-selected-block fist)))
       (with-vec (a b c) (selected-block)
@@ -378,7 +378,7 @@ gl_FragColor.rgb = color_out;
 	    ;;mesh-fist-box
 	    (let ((box
 		   (let ((n 0.06))
-		     ;;FIXME::why use this *iterator*?
+		     ;;[FIXME]why use this *iterator*?
 		     (scratch-buffer:flush-bind-in* ((iterator xyz))		    
 		       (glhelp:create-vao-or-display-list-from-specs
 			(:quads times)
@@ -493,7 +493,7 @@ gl_FragColor.rgb = color_out;
 		   (not (eq (chunk-gl-representation-occlusion-state value) :init)))
 	      (let ((available (gl:get-query-object query :query-result-available)))
 		(when available
-		  ;;FIXME::bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
+		  ;;[FIXME]bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
 		  (let ((result (gl:get-query-object query :query-result)))		      
 		    (case result
 		      (0 (set-chunk-gl-representation-hidden value))
@@ -542,7 +542,7 @@ gl_FragColor.rgb = color_out;
   (defun reset-chunk-display-list ()
     (clrhash *g/chunk-call-list*)))
 (defun remove-chunk-model (name)
-  ;;FIXME::this calls opengl. Use a queue instead?
+  ;;[FIXME]this calls opengl. Use a queue instead?
   (multiple-value-bind (value existsp) (get-chunk-display-list name)
     (when existsp
       (destroy-chunk-gl-representation value)
@@ -724,7 +724,7 @@ to be drawn by the render thread."
 	  (let ((value (car (sucle-mp::job-task-return-values (job-task)))))
 	    (cond (value
 		   (destructuring-bind (type function . args) value
-		     ;;FIXME::document this somewhere?
+		     ;;[FIXME]document this somewhere?
 		     ;;*finshed-mesh-tasks* becoming a generic command buffer?
 		     (assert (eq :mesh-chunk type))
 		     (apply function args)))
@@ -749,7 +749,7 @@ Note:limits the amount of background jobs and pending lisp objects."
        (lambda (list)
 	 (sort list
 	       ;;remove chunks from the queue that are too far away, don't try to mesh them
-	       #+nil ;;WRONG!!FIXME::separate world loading code from opengl
+	       #+nil ;;WRONG!![FIXME]separate world loading code from opengl
 	       (delete-if (lambda (x)
 			    (>= (blocky-chunk-distance x) *chunk-render-radius*))
 			  list)

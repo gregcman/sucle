@@ -36,7 +36,7 @@
   (suite 4 8 getlight getlight-extract)
   (suite 4 12 skygetlight skygetlight-extract))
 
-;;FIXME::move this to a better place?
+;;[FIXME]move this to a better place?
 (defun blockify (blockid light sky)
   (dpb sky (byte 4 12)
        (dpb light (byte 4 8) blockid)))
@@ -66,7 +66,7 @@
 ;;;;<PERSIST-WORLD>
 (in-package #:world)
 
-;;FIXME::move generic loading and saving with printer and conspack to a separate file?
+;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
 ;;And have chunk loading in another file?
 
 ;;world loading code below?
@@ -79,7 +79,7 @@
   (utility:rebase-path path base-dir))
 
 (defun savechunk (chunk position &optional (path (world-path)))
-  ;;FIXME::undocumented swizzling and multiplication by 16, as well as loadchunk
+  ;;[FIXME]undocumented swizzling and multiplication by 16, as well as loadchunk
   (let ((filename (convert-object-to-filename (chunk-coordinate-to-filename position))))
     ;;(format t "~%Saving chunk ~a" filename)
     (sucle-serialize::store-lisp-objects-to-file
@@ -101,7 +101,7 @@
        (voxel-chunks::with-chunk-key-coordinates (x y z) chunk-coordinates
 	 (voxel-chunks::create-chunk x y z :type :empty)))
 
-      (3 ;;FIXME::does this even work?
+      (3 ;;[FIXME]does this even work?
        (destructuring-bind (blocks light sky) data
 	 (let ((len (length blocks)))
 	   (let ((new (make-array len)))
@@ -121,7 +121,7 @@
 (defun filename-to-chunk-coordinate (filename-position-list)
   (let ((position
 	 (mapcar
-	  ;;FIXME::assumes chunks are 16 by 16 by 16
+	  ;;[FIXME]assumes chunks are 16 by 16 by 16
 	  (lambda (n) (floor n 16))
 	  filename-position-list)))
     (rotatef (third position)
@@ -136,7 +136,7 @@
 
 #+nil
 (defun load-world (path)
-  ;;FIXME::don't load the entire world
+  ;;[FIXME]don't load the entire world
   (let ((files (uiop:directory-files path)))
     (dolist (file files)
       (loadchunk path (read-from-string (pathname-name file))))))
@@ -232,7 +232,7 @@
 
 ;;;;chunk loading
 
-;;FIXME::architecture::one center, the player, and the chunk array centers around it
+;;[FIXME]architecture::one center, the player, and the chunk array centers around it
 (defparameter *chunk-coordinate-center-x* 0)
 (defparameter *chunk-coordinate-center-y* 0)
 (defparameter *chunk-coordinate-center-z* 0)
@@ -250,7 +250,7 @@
 (defun maybe-move-chunk-array ()
   ;;center the chunk array around the player, but don't always, only if above a certain
   ;;threshold
-  ;;FIXME::is this expensive to recompute every frame or does it matter?
+  ;;[FIXME]is this expensive to recompute every frame or does it matter?
   ;;maybe put it in the chunk array object?
   ;;return t if it was moved, nil otherwise
   (let ((half-x-size (utility:etouq (floor voxel-chunks::*chunk-array-default-size-x* 2)))
@@ -265,7 +265,7 @@
 	  (center-z (+ 
 		     (voxel-chunks::chunk-array-z-min voxel-chunks::*chunk-array*)
 		     half-z-size)))
-      ;;FIXME::hard-coded threshold for repositioning the chunk array? 4 chunks?
+      ;;[FIXME]hard-coded threshold for repositioning the chunk array? 4 chunks?
       #+nil
       (print (list (- chunk-x center-x)
 		   (- chunk-y center-y)
@@ -287,7 +287,7 @@
   (subseq seq 0 (min (length seq) end)))
 
 (defparameter *chunk-radius* 6)
-;;FIXME::how to determine the maximum allowed chunks? leave some leeway for loading?
+;;[FIXME]how to determine the maximum allowed chunks? leave some leeway for loading?
 (defparameter *maximum-allowed-chunks* (* (expt (* (+ 1 *chunk-radius*) 2) 3)))
 (defun chunk-memory-usage (&optional (chunks *maximum-allowed-chunks*))
   ;;in megabytes
@@ -305,7 +305,7 @@
      (let ((dx (- x1 x0))
 	   (dy (- y1 y0))
 	   (dz (- z1 z0)))
-       ;;FIXME::we don't need the sqrt for sorting
+       ;;[FIXME]we don't need the sqrt for sorting
        (+ (* dx dx) (* dy dy) (* dz dz))))))
 (defun blocky-chunk-distance (position-key)
   (let ((x0 *chunk-coordinate-center-x*)
@@ -320,7 +320,7 @@
 	    (abs dy)
 	    (abs dz))))))
 (defun get-unloadable-chunks ()
-  ;;FIXME::optimize?
+  ;;[FIXME]optimize?
   (let ((difference (- (- (voxel-chunks::total-loaded-chunks) *maximum-allowed-chunks*)
 		       *threshold*)))
     (when (plusp difference)
@@ -353,7 +353,7 @@
 		       ;;(print (list x y z))
 		       ))
 		   (when (>
-			  ;;FIXME::nonportably assume chunk-count and maxium allowed chunks are fixnums
+			  ;;[FIXME]nonportably assume chunk-count and maxium allowed chunks are fixnums
 			  (the fixnum chunk-count)
 			  (the fixnum *maximum-allowed-chunks*))
 		     ;;exceeded the allowed chunks to load
@@ -379,7 +379,7 @@
 
 (defun unload-extra-chunks ()
   (let ((to-unload
-	 ;;FIXME::get a timer library? metering?
+	 ;;[FIXME]get a timer library? metering?
 	 (;;time
 	  progn
 	  (progn ;;(print "getting unloadable chunks")
@@ -419,7 +419,7 @@
      (when (voxel-chunks::chunk-modified chunk) ;;if it wasn't modified, no point in saving
        (let* ((worth-saving (voxel-chunks::chunk-worth-saving chunk))
 	      (key (voxel-chunks::chunk-key chunk))
-	      ;;FIXME::have multiple unique-task hashes?
+	      ;;[FIXME]have multiple unique-task hashes?
 	      (job-key (cons :save-chunk key)))
 	 ;;save the chunk first?
 	 (sucle-mp::submit-unique-task
@@ -434,7 +434,7 @@
 	       (t
 		;;otherwise, if there is a preexisting file, destroy it
 		(let ((chunk-save-file
-		       ;;FIXME::bad api?
+		       ;;[FIXME]bad api?
 		       (merge-pathnames
 			(world:convert-object-to-filename (world:chunk-coordinate-to-filename key))
 			(world:world-path))))
@@ -450,7 +450,7 @@
 	   :unkillable t)))))))
 
 (defun dirty-push-around (key)
-  ;;FIXME::although this is correct, it
+  ;;[FIXME]although this is correct, it
   ;;lags behind player movement?
   (voxel-chunks::with-chunk-key-coordinates
    (x y z) key
@@ -467,11 +467,11 @@
   (voxel-chunks::empty-chunk-p (voxel-chunks::get-chunk-at key)))
 
 (defun chunk-load (key &optional (path (world:world-path)))
-  ;;FIXME::using chunk-coordinate-to-filename before
+  ;;[FIXME]using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
   #+nil
   (let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
-    (unless (eq load-type :empty) ;;FIXME::better api?
+    (unless (eq load-type :empty) ;;[FIXME]better api?
       (dirty-push-around key)))
   ;;(print 34243)
   (let ((job-key (cons :chunk-load key)))
@@ -491,7 +491,7 @@
 			 (key (cdr job-key))
 			 (chunk
 			  (cdr (sucle-mp::job-task-data job-task))))
-		    ;;FIXME? locking is not necessary if the callback runs in the
+		    ;;[FIXME]? locking is not necessary if the callback runs in the
 		    ;;same thread as the code which changes the chunk-array and *chunks* ?
 		    (cond
 		      ((eq chunk :skipping)
@@ -537,7 +537,7 @@
     (values)))
 ;;conspack is roughly 4 times faster than plain PRINT and READ?
 
-;;FIXME::thread-safety for:
+;;[FIXME]thread-safety for:
 ;;voxel-chunks::*chunks*
 ;;voxel-chunks::*chunk-array*
 ;;world::*dirty-chunks*

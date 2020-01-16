@@ -832,7 +832,7 @@
   #+nil
   (progn
     (setf *mouse-mode* 1)
-    ;;FIXME- mouse?
+    ;;[FIXME]- mouse?
     (charms/ll:mousemask (logior charms/ll:all_mouse_events
 				 charms/ll:report_mouse_position))))
 #+nil
@@ -841,7 +841,7 @@
   #+nil
   (progn
     (setf *mouse-mode* 0)
-    ;;FIXME - mouse?
+    ;;[FIXME] - mouse?
     (charms/ll:mousemask 0)))
 
 
@@ -929,7 +929,7 @@
     (let ((color-data (nth color *ansi-color-names-vector*)))
       (when color-data
 	(return-from color-fun (apply #'c color-data))))
-    ;;FIXME::the case statement below goes through redundant numbers?
+    ;;[FIXME]the case statement below goes through redundant numbers?
     (case color
       (0 (c 0 0 0))
       (1 (c 205 0 0))
@@ -1005,16 +1005,16 @@
     ;;(charms/ll:init-pair *pair-counter* (car pair-color) (cdr pair-color))
     (ncurses-clone::ncurses-init-pair *pair-counter* (car pair-color) (cdr pair-color))
     (setf (gethash pair-color *color-pair-table*)
-	  *pair-counter* ;;FIXME wat
+	  *pair-counter* ;;[FIXME] wat
 	  ;;(ncurses-clone::ncurses-color-pair *pair-counter*)
 	  ;;(charms/ll:color-pair *pair-counter*)
 	  )
-    ;;FIXME:: return color-pair?
+    ;;[FIXME] return color-pair?
     *pair-counter*)
   #+nil
   "After it has been initialized, COLOR_PAIR(n), a macro defined in <curses.h>, can be used as a new video attribute. "
 ;;;https://linux.die.net/man/3/color_pair
-  (defparameter *color-pairs* 256) ;;;FIXME::wtf does this mean? I added this and am guessing.
+  (defparameter *color-pairs* 256) ;;;[FIXME]wtf does this mean? I added this and am guessing.
 
   (defun get-color-pair (fg-color-name bg-color-name)
     (let* ((fg-color (if (null fg-color-name) -1 (get-color fg-color-name)))
@@ -1073,11 +1073,11 @@
 	   (error "Undefined color: ~A" name)))))
 
 (defun background-mode ()
-  ;;FIXME
+  ;;[FIXME]
   :light
   ;;:dark
   #+nil
-  ;;FIXME
+  ;;[FIXME]
   (let ((b (nth-value 1 (get-default-colors))))
     (cond ((= b -1) :light
 	   )
@@ -1141,7 +1141,7 @@
   ;;#+win32(charms/ll:use-default-colors)
   (init-colors 256
 	       )
-  ;;;FIXME: find out what all these options do
+  ;;;[FIXME] find out what all these options do
   ;;(set-default-color nil nil)
   ;;(charms/ll:noecho)
   ;;(charms/ll:cbreak)
@@ -1207,13 +1207,13 @@ The echo and noecho routines control whether characters typed by the user are ec
 
 (defun get-attribute-bits (fg bg boldp underlinep reversep)
   (logior
-   ;;FIXME::fragile bit layout
+   ;;[FIXME]fragile bit layout
    (if fg
-       ;;FIXME::why the logior?
+       ;;[FIXME]why the logior?
        (logior fg (load-time-value (ash 1 8)))
        ncurses-clone::*fg-default*)
    (ash (if bg
-	    ;;FIXME::Why the logior?
+	    ;;[FIXME]Why the logior?
 	    (logior bg (load-time-value (ash 1 8)))
 	    ncurses-clone::*bg-default*)
 	9)

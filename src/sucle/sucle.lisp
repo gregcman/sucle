@@ -21,7 +21,7 @@
   ;;;;slab
   (create-aabb 1.0  #+nil 0.5 1.0 1.0 0.0 0.0 0.0))
 
-;;;;FIXME::The point of this is to reduce the amount of bits to store the hitbox.
+;;;;[FIXME]The point of this is to reduce the amount of bits to store the hitbox.
 ;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
 ;;;;get chopped off or something, thus leading to strange clipping.
 ;;;;This effectively reduces the precision, giving leeway for math operations.
@@ -113,7 +113,7 @@
 	       (per-frame))
 	 (progn
 	   ;;(atest::remove-zeroes)
-	   ;;FIXME::don't remove all the chunks?
+	   ;;[FIXME]don't remove all the chunks?
 	   (world::msave)))))))
 
 ;;;;
@@ -222,7 +222,7 @@
 (defparameter *game-ticks-per-iteration* 0)
 (defparameter *fraction-for-fps* 0.0)
 (defun per-frame ()
-  ;;FIXME::where is the best place to flush the job-tasks?
+  ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp::flush-job-tasks)
 
   ;;set the chunk center aroun the player
@@ -301,7 +301,7 @@
   (when (window:mouse-locked?)
     (update-moused
      *mouse-multiplier-aux*
-     ;;FIXME::is this formula correct?
+     ;;[FIXME]is this formula correct?
      (/ (+ *fraction-for-fps*
 	   *game-ticks-per-iteration*)
 	(+ *game-ticks-per-iteration* 1))))
@@ -438,7 +438,7 @@
 		  (selected-block (fister-selected-block fist))
 		  (normal-block (fister-normal-block fist)))
 	      (when fist?
-		;;FIXME::reactive? functional?
+		;;[FIXME]reactive? functional?
 		(when left-p
 		  (with-vec (a b c) (selected-block)
 		    (let ((*x* a)

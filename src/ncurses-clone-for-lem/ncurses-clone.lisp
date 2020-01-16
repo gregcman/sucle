@@ -6,7 +6,7 @@
 ;;;;Attributes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;FIXME::diverging from ncurses
+;;[FIXME]diverging from ncurses
 ;;8 bits for foreground and 8 bits for background
 (utility:eval-always
   (defparameter *color-bit-size* 18)) 
@@ -38,7 +38,7 @@
 (defun ncurses-attroff (n)
   (setf *current-attributes*
 	(logand *current-attributes* (lognot n))))
-;;FIXME::this is not how ncurses is implemented
+;;[FIXME]this is not how ncurses is implemented
 (defmacro with-attributes ((attributes &optional attribute-object save-attributes-object) &body body)
   `(let ((*current-attributes* ,attributes)
 	 (*current-attributes-object* ,attribute-object)
@@ -57,7 +57,7 @@
    attributes))
 ;;Extra big glyph is used to hold an attribute object,
 ;;which then points to an overlay, which points to a window and so on
-;;FIXME::uses struct-to-clos, but depends on big-glyph being a class
+;;[FIXME]uses struct-to-clos, but depends on big-glyph being a class
 (defclass extra-big-glyph (big-glyph)
   ((attribute-data
     :initarg :attribute-data
@@ -154,7 +154,7 @@
 	    (setf (gethash 0 pairs)
 		  (cons *fg-default-really*
 			*bg-default-really*)
- ;;;;FIXME whats white and black for default? short?
+ ;;;;[FIXME] whats white and black for default? short?
 		  )
 	    pairs)))
 
@@ -230,7 +230,7 @@
     (terpri stream)
     (write-char #\| stream)
     (let ((row-data (aref grid grid-row)))	
-      (dotimes (grid-column (grid-columns grid)) ;;FIXME dereferencing redundancy
+      (dotimes (grid-column (grid-columns grid)) ;;[FIXME] dereferencing redundancy
 	(let ((cursor-here-p (and (= grid-column cursor-x)
 				  (= grid-row cursor-y)))
 	      (x (aref row-data grid-column)))
@@ -262,7 +262,7 @@
 	 (min (grid-columns grid-src)
 	      (grid-columns grid-dest))))
     (dotimes (row-index shared-rows)
-      ;;FIXME optimization? can cache the row. but its a fragile optimization
+      ;;[FIXME] optimization? can cache the row. but its a fragile optimization
       (dotimes (column-index shared-columns)
 	(setf (ref-grid column-index row-index grid-dest)
 	      (ref-grid column-index row-index grid-src)))))
@@ -359,11 +359,11 @@
   (setf (win-clearok win)
 	(c-true value)))
 
-;;;FIXME add default window for ncurses like stdscr
+;;;[FIXME] add default window for ncurses like stdscr
 
 (defun ncurses-mvwin (win y x)
   "Calling mvwin moves the window so that the upper left-hand corner is at position (x, y). If the move would cause the window to be off the screen, it is an error and the window is not moved. Moving subwindows is allowed, but should be avoided."
-  ;;;FIXME: detect off screen 
+  ;;;[FIXME] detect off screen 
   (setf (win-x win) x
 	(win-y win) y))
 
@@ -409,7 +409,7 @@
 			  (+ i move-distance)
 			  grid))))
 	  ((zerop n) t))
-    ;;;;fill in those nil's. OR FIXME
+    ;;;;fill in those nil's. OR [FIXME]
     (map-into grid (lambda (x) (or x (make-row width))) grid))
   grid)
 (defun ncurses-wscrl (win n)
@@ -544,14 +544,14 @@ If ch is a tab, newline, or backspace, the cursor is moved appropriately within 
   win)
 
 (defun char-control (char)
-  ;;FIXME: not portable common lisp, requires ASCII
+  ;;[FIXME] not portable common lisp, requires ASCII
   (let ((value (char-code char)))
 	(if (> 32 value)
 	    t
 	    nil)))
 
 (defun char-control-printable (char)
-  ;;FIXME: not portable common lisp, requires ASCII
+  ;;[FIXME] not portable common lisp, requires ASCII
   (code-char (logior 64 (char-code char))))
 
 (defun fuzz (&optional (win *win*))
@@ -564,11 +564,11 @@ If ch is a tab, newline, or backspace, the cursor is moved appropriately within 
 
 (defun ncurses-wnoutrefresh (&optional (win *win*) ;;(cursor-mode *cursor-state*)
 			       )
-  ;;;FIXME:: follow https://linux.die.net/man/3/wnoutrefresh with "touching"
+  ;;;[FIXME] follow https://linux.die.net/man/3/wnoutrefresh with "touching"
   ;;;different lines
   #+nil
   (when (win-clearok win)
-    ;;FIXME -> clearok? what to do? check this: https://linux.die.net/man/3/clearok
+    ;;[FIXME] -> clearok? what to do? check this: https://linux.die.net/man/3/clearok
     (clear-win *std-scr*)
     (setf (win-clearok win) nil))
   (with-virtual-window-lock

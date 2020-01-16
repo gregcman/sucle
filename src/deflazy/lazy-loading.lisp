@@ -8,7 +8,7 @@
 
 (in-package :deflazy)
 
-;;;;;TODO: clean this area up with dependency graph 
+;;;;;[FIXME]: clean this area up with dependency graph 
 (defvar *stuff* (make-hash-table :test 'eq))
 (defmacro deflazy (name (&rest deps) &rest gen-forms)
   `(eval-when (:load-toplevel :execute)

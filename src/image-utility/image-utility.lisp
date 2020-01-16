@@ -21,7 +21,7 @@
       (setf array (normalize-to-rgba-undigned-byte-8 array)))
     array))
 
-;;FIXME::image-width and image-height create garbage with cons cells?
+;;[FIXME]image-width and image-height create garbage with cons cells?
 (defun w (image)
   "Return the width of the image."
   (destructuring-bind (height width . nope) (array-dimensions image)
@@ -64,7 +64,7 @@
 	  opticl-data
 	  (let ((new (make-array (list width height 4)
 				 :element-type '(unsigned-byte 8))))
-	    ;;FIXME::bits not correct? 
+	    ;;[FIXME]bits not correct? 
 	    ;;32 -> 8 = ash n -24
 	    ;;16 -> 8 = ash n -8
 	    ;;8 -> 8 = identity n
@@ -105,7 +105,7 @@
 		  (flet ((dump-pixels-1 (w h)
 			   (let ((gray
 				  (convert-value (aref opticl-data w h))))
-			     ;;FIXME::include alpha channel or not?
+			     ;;[FIXME]include alpha channel or not?
 			     (values
 			      gray
 			      gray

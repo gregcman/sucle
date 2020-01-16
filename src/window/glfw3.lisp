@@ -398,7 +398,7 @@ for the current implementation."
                                   (,codepoint :unsigned-int)
 				  (,mod-keys :int))
      ,@body))
-;;;FIXME::move to bodge-glfw?
+;;;[FIXME]move to bodge-glfw?
 (define-char-mods-callback char-mods-callback (window char mod-keys)
   (declare (ignorable window))
   (setf *mod-keys* mod-keys)
@@ -411,7 +411,7 @@ for the current implementation."
                                   (,count :int)
 				  (,paths (:pointer (:pointer :char))))
      ,@body))
-;;;FIXME::move to bodge-glfw?
+;;;[FIXME]move to bodge-glfw?
 (define-drop-callback drop-callback (window count paths)
   (declare (ignorable window))
   (with-float-traps-restored
@@ -469,7 +469,7 @@ for the current implementation."
 			 ((eql value %glfw:+false+) nil)
 			 (t (error "what is this value? ~a" value)))))
   (poll-events)
-  ;;;FIXME::mod keys only updated indirectly through mouse or key or unicode char callback
+  ;;;[FIXME]mod keys only updated indirectly through mouse or key or unicode char callback
   (let ((mods *mod-keys*))
     (setf *shift* (logtest +shift+ mods)
 	  *control* (logtest +control+ mods)
@@ -524,7 +524,7 @@ for the current implementation."
     (glfw:with-init ()
       (init)
       (glfw:with-window-hints
-	    ;;FIXME::better interface?
+	    ;;[FIXME]better interface?
 	    ((%glfw:+resizable+ (if (getf params :resizable)
 				    %glfw:+true+
 				    %glfw:+false+)))

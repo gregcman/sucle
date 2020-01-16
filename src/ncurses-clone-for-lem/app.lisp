@@ -61,7 +61,7 @@
   (setf *glyph-height* h)
   (setf text-sub::*block-height* h)
   (progn
-    ;;FIXME::Better way to organize this? as of now manually determining that
+    ;;[FIXME]Better way to organize this? as of now manually determining that
     ;;these two depend on the *block-height* and *block-width* variables
     (deflazy::refresh 'text-sub::render-normal-text-indirection)
     (deflazy::refresh 'virtual-window)))
@@ -149,7 +149,7 @@
 		     (let* ((glyph-character (ncurses-clone::glyph-value glyph))
 			    (width (ncurses-clone::char-width-at glyph-character index)))
 
-		       ;;FIXME::for some reason, when resizing really quickly,
+		       ;;[FIXME]for some reason, when resizing really quickly,
 		       ;;this can get screwed up, so bail out
 		       (when (<= (+ 1 ncurses-clone::*columns*)
 				 (+ width index))
@@ -168,7 +168,7 @@
 			      (pair (ncurses-clone::ncurses-color-pair
 				     (ldb (byte 8 0) attributes))))
 			 (let ((realfg
-				;;FIXME::fragile bit layout
+				;;[FIXME]fragile bit layout
 				(if (zerop (ldb (byte 1 8) attributes))
 				    ncurses-clone::*fg-default*
 				    (ldb (byte 8 0) attributes))
@@ -177,7 +177,7 @@
 				  (if (or
 				       (not pair)
 				       (= -1 fg))
-				      ncurses-clone::*fg-default* ;;FIXME :cache?
+				      ncurses-clone::*fg-default* ;;[FIXME] :cache?
 				      fg)))
 			       (realbg
 				(if (zerop (ldb (byte 1 (+ 1 8 8)) attributes))
@@ -188,14 +188,14 @@
 				  (if (or
 				       (not pair)
 				       (= -1 bg))
-				      ncurses-clone::*bg-default* ;;FIXME :cache?
+				      ncurses-clone::*bg-default* ;;[FIXME] :cache?
 				      bg))))
 			   (when (logtest ncurses-clone::A_reverse attributes)
 			     (rotatef realfg realbg))
 			   (dotimes (offset width)
 			     (block abort-writing
 			       (color 
-				;;FIXME::this is temporary, to chop off extra unicode bits
+				;;[FIXME]this is temporary, to chop off extra unicode bits
 				(let ((code (char-code glyph-character)))
 				  (if (ncurses-clone::n-char-fits-in-glyph code)
 				      code

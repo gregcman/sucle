@@ -79,7 +79,7 @@
   (unless *gl-context*
     (error "no opengl context you idiot!")))
 
-;;FIXME::does code involving deflazy belong here at all?
+;;[FIXME]does code involving deflazy belong here at all?
 (export '(deflazy-gl))
 (defmacro deflazy-gl (name (&rest deps) &rest gen-forms)
   "for objects that should be forgotten because they were
@@ -94,7 +94,7 @@ not made in the current OpenGL context, so they are garbage"
 
 (defmacro with-gl-context ((gl-proc-address) &body body)
   `(unwind-protect (progn
-		     (setf %gl:*gl-get-proc-address* ,gl-proc-address) ;;FIXME::is this needed?
+		     (setf %gl:*gl-get-proc-address* ,gl-proc-address) ;;[FIXME]is this needed?
 		     (setf *gl-context* (cons "gl-context" "token"))
 		     (setf *gl-version* (gl:get-string :version))
 		     (setf *gl-version-substring*
@@ -556,7 +556,7 @@ just put together a new vao"
   ((src :accessor gl-program-object-src
 	:initarg :src)
    (uniforms :accessor gl-program-object-uniforms)))
-;;FIXME::fix exports
+;;[FIXME]fix exports
 (export 'use-gl-program)
 (defun use-gl-program (src)
   (gl:use-program (handle src)))
@@ -569,7 +569,7 @@ just put together a new vao"
   (set-active-texture num)
   (gl:bind-texture :texture-2d texture))
 
-;;FIXME::is a macro really necessary here? To prevent consing?
+;;[FIXME]is a macro really necessary here? To prevent consing?
 (defmacro set-uniforms-to-textures (&rest specs)
   (cons 'progn
 	(mapcar (lambda (spec number)
@@ -622,7 +622,7 @@ just put together a new vao"
 (export (quote (pic-texture make-shader-program-from-strings)))
 ;;;;
 (defun create-gl-program2 (src)
-  ;;FIXME::add ability to rename varyings so
+  ;;[FIXME]add ability to rename varyings so
   ;;vertex shader and fragment shader can have different variable names
   (let ((raw-attributes (getf src :attributes))
 	(uniform-data (getf src :uniforms))
@@ -682,7 +682,7 @@ gl_FragColor = pixcolor;
 }")
 (defparameter *newline* (format nil "~%"))
 (defparameter *gl-fragcolor-replacement*
-  ;;FIXME::procedurally generate a name that definitely does not clash with
+  ;;[FIXME]procedurally generate a name that definitely does not clash with
   ;;any glsl names or other names
   "roloCgarF_lg")
 (defun fixup-shader-for-version (&optional (shader-type (or :frag :vs))
@@ -713,7 +713,7 @@ gl_FragColor = pixcolor;
 			    (eq (first ast)
 				'glsl-toolkit:variable-declaration))
 		   (let
-		       (;;FIXME::This assumes the type-qualifiers are in the second position
+		       (;;[FIXME]This assumes the type-qualifiers are in the second position
 			(type-qualifier-data (second ast)))
 		     (when (consp type-qualifier-data)
 		       (symbol-macrolet ((type-qualifiers (cdr type-qualifier-data)))
@@ -722,7 +722,7 @@ gl_FragColor = pixcolor;
 					(nsubst new old type-qualifiers))))
 			   (when (member :uniform type-qualifiers)
 			     (unless (>= version 120)
-			       ;;FIXME::this represents the variable declaration.
+			       ;;[FIXME]this represents the variable declaration.
 			       ;;How to actually refer? ask shinmera?
 			       ;;This hack code removes the optional init form.
 			       ;;glsl version 120 and greater allow initialization
@@ -737,12 +737,12 @@ gl_FragColor = pixcolor;
 				:in))
 			     (when (member :out type-qualifiers)
 			       (ecase shader-type
-				 ;;FIXME out in the fragment shader?
+				 ;;[FIXME] out in the fragment shader?
 				 #+nil
 				 (:frag (add-qualifier "varying"))
 				 (:vs (replace-qualifer :out
 							"varying"))))
-			     #+nil ;;FIXME:: varying does not occur
+			     #+nil ;;[FIXME] varying does not occur
 			     (when (member :varying type-qualifiers))))))))
 		 (walk-next ast)))))))
     (concatenate-strings
@@ -773,7 +773,7 @@ gl_FragColor = pixcolor;
     (3 `(%gl:vertex-attrib-3f ,index ,@forms))
     (4 `(%gl:vertex-attrib-4f ,index ,@forms))))
 
-;;FIXME::make sure 0 comes last, because that completes each vertex?
+;;[FIXME]make sure 0 comes last, because that completes each vertex?
 (defmacro vertex-attrib-f* ((&rest forms))
   `(progn ,@(mapcar (lambda (x) `(vertex-attrib-f ,@x)) forms)))
 
@@ -802,10 +802,10 @@ gl_FragColor = pixcolor;
     array))
 
 (export 'quads-triangles-index-buffer)
-;;FIXME::rename from gl-list to display-list?
+;;[FIXME]rename from gl-list to display-list?
 (defmacro create-gl-list-from-specs ((type times) form)
   (utility:with-gensyms (fixed-times fixed-type)
-    ;;FIXME:: the prefix "fix" is unrelated for fixed-type,fixed-times vs fixnum
+    ;;[FIXME] the prefix "fix" is unrelated for fixed-type,fixed-times vs fixnum
     `(let ((,fixed-type ,type)
 	   (,fixed-times ,times))
        (declare (type fixnum ,fixed-times))
@@ -893,7 +893,7 @@ gl_FragColor = pixcolor;
 		     ,vertex-buffer
 		     index-buffer
 		     ',layout
-		     ;;FIXME:: is it the total count of primitives, or points?
+		     ;;[FIXME] is it the total count of primitives, or points?
 		     fixed-times
 		     fixed-type))))
 	      (setf (i-delete-p vao) nil)

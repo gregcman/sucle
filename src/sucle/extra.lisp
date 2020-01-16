@@ -188,7 +188,7 @@
 		))))
 (defun get-chunk (x y z)
   (multiple-value-bind (x y z) (voxel-chunks::chunk-coordinates-from-block-coordinates x y z)
-    ;;FIXME::use actual chunk dimensions, not magic number 16
+    ;;[FIXME]use actual chunk dimensions, not magic number 16
     (values (* x 16)
 	    (* y 16)
 	    (* z 16))))
