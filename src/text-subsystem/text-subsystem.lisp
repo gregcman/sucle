@@ -77,10 +77,10 @@ gl_FragColor.a = opacity * fin.a;
 
 (deflazy font-png ()
   (let ((array
-	 (image-utility::load-image-from-file
+	 (img:load
 	  (sucle-temp:path "res/font.png"))))
-    (dobox ((width 0 (image-utility::image-width array))
-	    (height 0 (image-utility::image-height array)))
+    (dobox ((width 0 (img:w array))
+	    (height 0 (img:h array)))
 	   (let ((value (aref array width height 0)))
 	     (setf (aref array width height 3) 255)
 	     (dotimes (i 3)

@@ -267,7 +267,7 @@ gl_FragColor = color;
 	    '(128.0 180.0 151.0))))
 
 (deflazy terrain-png ()
-  (image-utility::load-image-from-file
+  (img:load
    (sucle-temp:path #P"res/terrain.png")))
 
 (deflazy modified-terrain-png (terrain-png)
@@ -563,7 +563,7 @@ gl_FragColor.rgb = color_out;
 	(sort (alexandria:hash-table-keys voxel-chunks::*chunks*) #'< :key
 	      'world::unsquared-chunk-distance)))
 
-(defparameter *chunk-query-buffer-size* 8)
+(defparameter *chunk-query-buffer-size* 0)
 (defvar *iterator*)
 (defun update-chunk-mesh (coords iter)
   (when coords
