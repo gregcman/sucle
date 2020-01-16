@@ -4,10 +4,6 @@
    #:*scroll-x*
    #:*scroll-y*)
   (:export
-   #:skey-p
-   #:skey-j-p
-   #:skey-j-r)
-  (:export
    #:get-proc-address
    #:init
    #:poll
@@ -19,8 +15,8 @@
   (:export
    #:get-mouse-out
    #:get-mouse-position
-   #:mice-locked-p
-   #:mice-free-p
+   #:mouse-locked?
+   #:mouse-free?
    #:toggle-mouse-capture)
   (:export
    #:*width*
@@ -30,4 +26,7 @@
    #:*resize-hook*)
   (:export
    #:*mouse-x*
-   #:*mouse-y*))
+   #:*mouse-y*)
+
+  (:export
+   #:button))

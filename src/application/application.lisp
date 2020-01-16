@@ -15,7 +15,10 @@
    #:w
    #:h
    #:gl-context
-   #:al-context))
+   #:al-context)
+
+  (:export
+   #:quit))
 (in-package :application)
 
 (defparameter *main-subthread-p*

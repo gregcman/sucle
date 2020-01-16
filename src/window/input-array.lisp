@@ -74,3 +74,25 @@
       (sbit (etouq *character-keys*) ,x)))
 ;;;;</INPUT ARRAY>
 ;;;;************************************************************************;;;;
+
+(defmacro button (type state button
+		  &optional (control-state *control-state* control-state-supplied-p))
+  ;;FIXME::pair allowed-button-states and allowed-button-types with the
+  ;;quoted lists below
+  (let ((allowed-button-states '(:down :pressed :released :repeat))
+	(allowed-button-types '(:mouse :key)))
+    (assert (member type allowed-button-types)
+	    nil "Wanted one of:state:~s~%Got:~s" allowed-button-types type)
+    (assert (member state allowed-button-states)
+	    nil "Wanted one of:type:~s~%Got:~s" allowed-button-states state)
+    (mapc (lambda (keystate keyfun)
+	    (when (eq state keystate)
+	      (mapc (lambda (keytype keyfun2)
+		      (when (eq type keytype)
+			(return-from button `(,keyfun (,keyfun2 ,button)
+						      ,@(when control-state-supplied-p
+							  (list control-state))))))
+		    allowed-button-types
+		    '(mouseval keyval))))
+	  allowed-button-states
+	  '(skey-p skey-j-p skey-j-r skey-j-p-or-repeat))))

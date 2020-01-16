@@ -3,7 +3,7 @@
   (:export
    #:tick
    #:set-fps
-   )
+   #:microseconds)
   (:nicknames :fps))
 
 ;;;;1. set the fps with SET-FPS

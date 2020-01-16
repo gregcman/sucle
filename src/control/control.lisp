@@ -45,9 +45,8 @@
     'cond
     (mapcar
      (lambda (n)
-       `((window::skey-j-p
-	  (window::keyval ,n)
-	  control-state) ,n))
+       `((window:button :key :pressed ,n control-state)
+	 ,n))
      '(0 1 2 3 4 5 6 7 8 9)))))
 
 (defmacro get-control-sequence ((control-state char-var shift control alt super
@@ -68,7 +67,7 @@
 			(dotimes (index len)
 			  (enter-char (aref string index)))))))
 	     (macrolet ((foo (x a b)
-			  `(when (window::skey-j-p-or-repeat (window::keyval ,a))
+			  `(when (window:button :key :repeat ,a)
 			     ,(list (ecase x
 				      (0 'enter)
 				      (1 'enter-string))
