@@ -4,8 +4,7 @@
    #:flip-image)
   (:export
    #:*flip-image-p*
-   #:read-png-file
-   #:write-png-file))
+   ))
 
 (in-package #:image-utility)
 
@@ -25,34 +24,15 @@
 (defparameter *flip-image-p* nil)
 (defparameter *normalize-to-rgba-unsigned-byte-8* t)
 
-(defun write-png-file (pathname image)
-  (opticl:write-png-file pathname image))
-
 (defun load-image-from-file (path &key (flip *flip-image-p*)
 				  (normalize-to-rgba-unsigned-byte-8
 				   *normalize-to-rgba-unsigned-byte-8*))
-  (let ((array (opticl-load-image path)))
+  (let ((array (opticl:read-image-file path)))
     (when flip
       (setf array (flip-image array)))
     (when normalize-to-rgba-unsigned-byte-8
       (setf array (normalize-to-rgba-undigned-byte-8 array)))
     array))
-
-(defun opticl-load-image (file)
-  (let ((extension (pathname-type file)))
-    (cond ((string= extension "png")
-	   (opticl:read-png-file file))
-	  ((string= extension "jpeg")
-	   (opticl:read-jpeg-file file))
-	  ((string= extension "tiff")
-	   (opticl:read-tiff-file file))
-	  ((string= extension "pnm")
-	   (opticl:read-pnm-file file))
-	  ((string= extension "pbm")
-	   (opticl:read-pbm-file file))
-	  ((string= extension "gif")
-	   (opticl:read-gif-file file))
-	  (t (error "unsupported file format ~s ~s" extension file)))))
 
 ;;FIXME::image-width and image-height create garbage with cons cells?
 (defun image-width (image)
