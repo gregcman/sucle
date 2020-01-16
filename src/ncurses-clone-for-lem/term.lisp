@@ -1,16 +1,19 @@
 (defpackage :lem.term
   (:use :cl)
-  (:export :get-color-pair
-           :term-set-foreground
-           :term-set-background
-           :background-mode
-           :term-init
-           :term-finalize
-           :term-set-tty
+  (:export ;;:get-color-pair
+           #:term-set-foreground
+           #:term-set-background
+           #:background-mode
+           ;;:term-init
+           ;;:term-finalize
+           ;;:term-set-tty
            ;;win32 patch
-           :get-mouse-mode
-           :enable-mouse
-           :disable-mouse))
+           ;;:get-mouse-mode
+           ;;:enable-mouse
+           ;;:disable-mouse
+	   #:attribute-bits
+	   #:attribute-bits2
+	   #:with-attribute))
 (in-package :lem.term)
 ;;;;<LEM COLORS.LISP> -> entire section ripped from lem/core/colors.lisp
 (defparameter *rgb.txt* "! $Xorg: rgb.txt,v 1.3 2000/08/17 19:54:00 cpqbld Exp $
@@ -985,7 +988,7 @@
   (let ((color (get-color-1 string)))
     (if color
         (values color t)
-        (values 0 nil))))
+        (values nil nil))))
 
 
 #+nil
@@ -1202,3 +1205,39 @@ The echo and noecho routines control whether characters typed by the user are ec
   (charms/ll:endwin)
   (charms/ll:delscreen charms/ll:*stdscr*))
 
+(defun get-attribute-bits (fg bg boldp underlinep reversep)
+  (logior
+   ;;FIXME::fragile bit layout
+   (if fg
+       ;;FIXME::why the logior?
+       (logior fg (load-time-value (ash 1 8)))
+       ncurses-clone::*fg-default*)
+   (ash (if bg
+	    ;;FIXME::Why the logior?
+	    (logior bg (load-time-value (ash 1 8)))
+	    ncurses-clone::*bg-default*)
+	9)
+   ;;(lem.term:get-color-pair foreground background)
+   (if boldp
+       ;;charms/ll:a_bold
+       ncurses-clone::a_bold
+       0)
+   (if underlinep
+       ;;charms/ll:a_underline
+       ncurses-clone::a_underline
+       0)
+   (if reversep
+       ncurses-clone::a_reverse
+       0)))
+
+(defun get-attribute-bits-2 (fg-name bg-name boldp underlinep reversep)
+  (get-attribute-bits
+   (get-color fg-name)
+   (get-color bg-name)
+   boldp
+   underlinep
+   reversep))
+
+(defmacro with-attribute ((&key fg bg bold underline reverse) &body body)
+  `(ncurses-clone::with-attributes ((get-attribute-bits-2 ,fg ,bg ,bold ,underline ,reverse))
+     ,@body))

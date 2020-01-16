@@ -38,7 +38,7 @@
   (setf *current-attributes*
 	(logand *current-attributes* (lognot n))))
 ;;FIXME::this is not how ncurses is implemented
-(defmacro with-attributes ((attributes attribute-object &optional save-attributes-object) &body body)
+(defmacro with-attributes ((attributes &optional attribute-object save-attributes-object) &body body)
   `(let ((*current-attributes* ,attributes)
 	 (*current-attributes-object* ,attribute-object)
 	 (*force-extra-big-glyphs-for-attributes-object* ,save-attributes-object))
