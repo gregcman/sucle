@@ -78,7 +78,7 @@
 
 (defun player-feet ()
   (let ((miny
-	 (aabbcc::aabb-miny
+	 (aabbcc:aabb-miny
 	  (entity-aabb *ent*))))
     (with-vec (x y z) ((player-position))
       (values (floor x)
@@ -128,7 +128,7 @@
 			(vz *z*)
 	       (blockid *blockid*)
 	       (aabb *fist-aabb*))
-  (aabbcc::aabb-collect-blocks ((+ 0.5 px)
+  (aabbcc:aabb-collect-blocks ((+ 0.5 px)
 				(+ 0.5 py)
 				(+ 0.5 pz)
 				(- vx px)
@@ -194,14 +194,14 @@
 	    (* z 16))))
 (defun background-generation (key)
   (let ((job-key (cons :world-gen key)))
-    (sucle-mp::submit-unique-task
+    (sucle-mp:submit-unique-task
      job-key
      ((lambda ()
 	(generate-for-new-chunk key))
       :callback (lambda (job-task)
 		  (declare (ignore job-task))
 		  (world::dirty-push-around key)
-		  (sucle-mp::remove-unique-task-key job-key))))))
+		  (sucle-mp:remove-unique-task-key job-key))))))
 
 (utility:with-unsafe-speed
   (defun generate-for-new-chunk (key)
@@ -301,8 +301,8 @@
     ))
 #+nil
 (defun camera-al-listener (camera)
-  (let ((look (camera-matrix::camera-vec-forward camera))
-	(up (camera-matrix::camera-vec-up camera)))   
+  (let ((look (camera-matrix:camera-vec-forward camera))
+	(up (camera-matrix:camera-vec-up camera)))   
     (cffi:with-foreign-object (array :float 6)
       (let ((count 0))
 	(flet ((add (x)

@@ -68,10 +68,10 @@
 
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
-  (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
+  (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
     ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
     ;;also check "intersecting shell blocks?"
-    (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
+    (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
       (declare (ignorable contact))
       (let ((blockid (world:getblock x y z)))
@@ -107,7 +107,7 @@
 (defparameter *dirtying* nil)
 (defun a-contact-fun (px py pz aabb)
   (let ((acc #b000000))
-    (aabbcc::get-blocks-around (px py pz aabb) (mx my mz contact-var)
+    (aabbcc:get-blocks-around (px py pz aabb) (mx my mz contact-var)
       (declare (ignorable contact-var))
       (let ((blockid (world:getblock mx my mz)))
 	(when (block-data:data blockid :hard)
@@ -413,7 +413,7 @@
 
 (defun collide-fucks2 (px py pz vx vy vz aabb)
   (block first-block
-    (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
+    (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
       (declare (ignorable contact))
       (when (block-data:data (world:getblock x y z) :hard)

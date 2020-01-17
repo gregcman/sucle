@@ -101,3 +101,7 @@ Project goals:
 - Text editor
 - Common Lisp code editor
 - Easy install -> quicklisp [ultralisp? trivial-ship?]
+
+TODO:
+- Fix packaging for: voxel-chunks, world, glhelp, aabbcc, sucle-mp, utility, text-sub, ncurses-clone,
+- Just sucle-mp, glhelp, and ncurses-clone-lem-view? aabbcc, world, voxel-chunks are all linked together?

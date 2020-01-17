@@ -5,7 +5,7 @@
 ;;;;<BOXES?>
 (defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
 		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
-  (aabbcc::make-aabb
+  (aabbcc:make-aabb
    :minx minx
    :maxx maxx
    :miny miny
@@ -223,7 +223,7 @@
 (defparameter *fraction-for-fps* 0.0)
 (defun per-frame ()
   ;;[FIXME]where is the best place to flush the job-tasks?
-  (sucle-mp::flush-job-tasks)
+  (sucle-mp:flush-job-tasks)
 
   ;;set the chunk center aroun the player
   (with-vec (x y z) ((player-position))
@@ -413,7 +413,7 @@
 	    (toggle *swinging*))
 	  (when *swinging*
 	    (let ((u *big-fist-reach*))
-	      (aabbcc::aabb-collect-blocks
+	      (aabbcc:aabb-collect-blocks
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      *big-fist-aabb*)
 		  (x y z contact)
@@ -476,7 +476,7 @@
   (let ((aabb (entity-aabb ent))
 	(pos (pointmass-position
 	      (entity-particle ent))))
-    (aabbcc::aabb-not-overlap
+    (aabbcc:aabb-not-overlap
      (pos-to-block-aabb x y z)
      (floatify x)
      (floatify y)

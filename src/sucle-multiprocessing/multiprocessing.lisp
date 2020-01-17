@@ -1,6 +1,17 @@
 (defpackage #:sucle-multiprocessing
   (:use :cl)
-  (:nicknames :sucle-mp))
+  (:nicknames :sucle-mp)
+  (:export
+   #:submit-unique-task
+   #:remove-unique-task-key
+   #:job-task-data
+   #:job-task-return-values
+   #:*current-job-task*
+   #:with-initialize-multiprocessing
+   #:with-kernel
+   #:do-queue-iterator
+   #:submit
+   #:flush-job-tasks))
 (in-package #:sucle-mp)
 
 (defun quickload ()
@@ -36,15 +47,15 @@
 (defparameter *finished-task-queue* (lparallel.queue:make-queue))
 (defparameter *shutting-down-p* nil)
 (defun set-dynamic-variables ()
-  (setf *lparallel-kernel* (lparallel::make-kernel (cpus:get-number-of-processors)))
+  (setf *lparallel-kernel* (lparallel:make-kernel (cpus:get-number-of-processors)))
   (setf *unique-tasks* (make-hash-table :test 'eq))
   (setf *finished-task-queue* (lparallel.queue:make-queue))
   (with-kernel
     (setf *channel* (lparallel:make-channel))))
 (defun reset ()
-  (lparallel::end-kernel)
+  (lparallel:end-kernel)
   (set-dynamic-variables)
-  (setf lparallel::*kernel* *lparallel-kernel*))
+  (setf lparallel:*kernel* *lparallel-kernel*))
 
 (defmacro with-initialize-multiprocessing (&body body)
   `(let ((*lparallel-kernel* nil))

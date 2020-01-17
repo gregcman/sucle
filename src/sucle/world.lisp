@@ -425,7 +425,7 @@
 	      ;;[FIXME]have multiple unique-task hashes?
 	      (job-key (cons :save-chunk key)))
 	 ;;save the chunk first?
-	 (sucle-mp::submit-unique-task
+	 (sucle-mp:submit-unique-task
 	  job-key
 	  ((lambda ()
 	     (cond
@@ -447,8 +447,8 @@
 	   :data job-key
 	   :callback (lambda (job-task)
 		       (declare (ignorable job-task))
-		       (sucle-mp::remove-unique-task-key
-			(sucle-mp::job-task-data job-task)))
+		       (sucle-mp:remove-unique-task-key
+			(sucle-mp:job-task-data job-task)))
 	   ;;this task, saving and loading, must not be interrupted
 	   :unkillable t)))))))
 
@@ -478,11 +478,11 @@
       (dirty-push-around key)))
   ;;(print 34243)
   (let ((job-key (cons :chunk-load key)))
-    (sucle-mp::submit-unique-task
+    (sucle-mp:submit-unique-task
      job-key
      ((lambda ()
-	(setf (cdr (sucle-mp::job-task-data
-		    sucle-mp::*current-job-task*))
+	(setf (cdr (sucle-mp:job-task-data
+		    sucle-mp:*current-job-task*))
 	      (cond ((not (space-for-new-chunk-p key))
 		     ;;(format t "~%WTF? ~a chunk already exists" key)
 		     :skipping)
@@ -490,10 +490,10 @@
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
-		  (let* ((job-key (car (sucle-mp::job-task-data job-task)))
+		  (let* ((job-key (car (sucle-mp:job-task-data job-task)))
 			 (key (cdr job-key))
 			 (chunk
-			  (cdr (sucle-mp::job-task-data job-task))))
+			  (cdr (sucle-mp:job-task-data job-task))))
 		    ;;[FIXME]? locking is not necessary if the callback runs in the
 		    ;;same thread as the code which changes the chunk-array and *chunks* ?
 		    (cond
@@ -517,28 +517,9 @@
 			     ;;(background-generation key)
 			     )
 			    (t (dirty-push-around key))))))))
-		  (sucle-mp::remove-unique-task-key job-key)
+		  (sucle-mp:remove-unique-task-key job-key)
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))
-
-
-(defun test34 ()
-  ;;(with-output-to-string (print ))
-  (let* ((data (voxel-chunks::chunk-data (voxel-chunks::get-chunk 1 1 1 nil)))
-	 (str (with-output-to-string (str)
-		(with-standard-io-syntax
-		  (print data str))))
-	 (conspack (conspack::tracking-refs () (conspack::encode data)))
-	 (times (expt 10 3)))
-    (time
-     (dotimes (x times)
-       (with-standard-io-syntax
-	 (read-from-string str))))
-    (time
-     (dotimes (x times)
-       (conspack::decode conspack)))
-    (values)))
-;;conspack is roughly 4 times faster than plain PRINT and READ?
 
 ;;[FIXME]thread-safety for:
 ;;voxel-chunks::*chunks*

@@ -551,7 +551,7 @@ gl_FragColor.rgb = color_out;
 (defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 
 (defun call-with-world-meshing-lparallel (fun)
-  (sucle-mp::with-initialize-multiprocessing
+  (sucle-mp:with-initialize-multiprocessing
     (funcall fun)))
 
 (defun update-world-vao ()
@@ -593,7 +593,7 @@ gl_FragColor.rgb = color_out;
 			     (draw-aabb x y z
 					(load-time-value
 					 (let ((foo *chunk-query-buffer-size*))
-					   (aabbcc::make-aabb
+					   (aabbcc:make-aabb
 					    :minx (- 0.0 foo)
 					    :miny (- 0.0 foo)
 					    :minz (- 0.0 foo)
@@ -616,8 +616,12 @@ gl_FragColor.rgb = color_out;
 
 
 (defun draw-aabb (x y z aabb &optional (iterator *iterator*))
-  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
-	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
+  (let ((minx (aabbcc:aabb-minx aabb))
+	(miny (aabbcc:aabb-miny aabb))
+	(minz (aabbcc:aabb-minz aabb))
+	(maxx (aabbcc:aabb-maxx aabb))
+	(maxy (aabbcc:aabb-maxy aabb))
+	(maxz (aabbcc:aabb-maxz aabb)))
       aabb
     (draw-box
      (+ minx x -0) (+  miny y -0) (+  minz z -0)
@@ -700,7 +704,7 @@ decreases when finished.")
 (defparameter *max-gl-meshing-iterations-per-frame* 2)
 
 (defun reset-meshers ()
-  (sucle-mp::with-kernel
+  (sucle-mp:with-kernel
     (lparallel:kill-tasks 'mesh-chunk)
     #+nil
     (progn
@@ -717,11 +721,11 @@ to be drawn by the render thread."
   (when (plusp (meshes-pending-for-gl))
     (let ((count 0))
       (block stop-meshing
-	(sucle-mp::do-queue-iterator (job-task *finished-mesh-tasks*)
+	(sucle-mp:do-queue-iterator (job-task *finished-mesh-tasks*)
 	  (when (> count *max-gl-meshing-iterations-per-frame*)
 	    (return-from stop-meshing))
 	  (incf count)
-	  (let ((value (car (sucle-mp::job-task-return-values (job-task)))))
+	  (let ((value (car (sucle-mp:job-task-return-values (job-task)))))
 	    (cond (value
 		   (destructuring-bind (type function . args) value
 		     ;;[FIXME]document this somewhere?
@@ -766,7 +770,7 @@ Note:limits the amount of background jobs and pending lisp objects."
 		  ;;Then submit a job to the mesher 
 		  (incf *total-background-chunk-mesh-jobs*)
 		  (let ((lparallel:*task-category* 'mesh-chunk))
-		    (sucle-mp::submit 
+		    (sucle-mp:submit 
 		     (lambda (iter space chunk-pos)
 		       (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		       (multiple-value-bind (io jo ko) (voxel-chunks:unhashfunc chunk-pos)
