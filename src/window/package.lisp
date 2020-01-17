@@ -34,7 +34,7 @@
    #:*alt*
    #:*super*)
   (:export
-   ;;[FIXME]::This?
+   ;;[FIXME] This?
    #:update-control-state2
    #:update-control-state
    #:do-character-keys

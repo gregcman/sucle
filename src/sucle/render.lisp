@@ -744,7 +744,7 @@ Note:limits the amount of background jobs and pending lisp objects."
 	  ;;So memory is not entirely eaten up
 	  (<= *max-meshes-pending-for-gl* (meshes-pending-for-gl)))))
     (when (not (too-much))
-      (queue::sort-queue
+      (queue:sort-queue
        world::*dirty-chunks*
        (lambda (list)
 	 (sort list
