@@ -1,5 +1,19 @@
 (defpackage #:text-subsystem-generate-font
-  (:use :cl))
+  (:use :cl)
+  (:import-from
+   #:freetype2
+   #:flat-array
+   #:row-width
+   #:ft-bitmap-buffer
+   #:ft-bitmap-rows
+   #:ft-bitmap-pitch
+   #:ft-bitmap-width
+   #:ft-bitmap-pixel-mode
+   #:string-pixel-width
+   #:string-pixel-height
+   #:inc-pointer
+   #:nth-gray-pixel
+   #:nth-mono-pixel))
 
 (in-package :text-subsystem-generate-font)
 
@@ -26,7 +40,7 @@
   (multiple-value-bind (pt width) (find-max-width-points max-height face)
     (set-size pt 1)
     ;;We assume that the block character takes up the maximum space in the monospace font.
-    (let ((height (ceiling (freetype2::string-pixel-height *freetype-face-object*  "█"))))
+    (let ((height (ceiling (string-pixel-height *freetype-face-object*  "█"))))
       (values pt height width))))
 
 (defun dump-font () ;;Run this function in order to dump the font.png
@@ -82,7 +96,7 @@ fonts are generally taller than they are wide. Return (values pt height)"
       (loop
 	 (set-size pt 1 face)
 	 (let ((new-width
-		(ceiling (freetype2::string-pixel-width face "█"))))
+		(ceiling (string-pixel-width face "█"))))
 	   (when (> new-width max-width)
 	     (return-from out))
 	   (incf pt)
@@ -128,7 +142,7 @@ fonts are generally taller than they are wide. Return (values pt height)"
        (incf xbase (* char-x-offset width))
        (incf ybase (* char-y-offset height))
        (destructuring-bind (sub-height sub-width) (array-dimensions array)
-	 (utility::dobox
+	 (utility:dobox
 	  ((y 0 sub-height)
 	   (x 0 sub-width))
 	  (let ((ax (+ x xbase))
@@ -168,10 +182,10 @@ fonts are generally taller than they are wide. Return (values pt height)"
   "Destructivly copy arr2 into arr1 for 2- and 3-dimensional (Y:X, Y:X:RGB(A))
 arrays.  X and Y may be specified as a 2D offset into ARR1."
   (assert (= (array-rank arr1) (array-rank arr2)))
-  (let ((flat1 (freetype2::flat-array arr1))
-	(flat2 (freetype2::flat-array arr2))
-	(height1 (freetype2::row-width arr1))
-	(height2 (freetype2::row-width arr2))
+  (let ((flat1 (flat-array arr1))
+	(flat2 (flat-array arr2))
+	(height1 (row-width arr1))
+	(height2 (row-width arr2))
 	(width1 (array-dimension arr1 1))
 	(width2 (array-dimension arr2 1))
 	(xoff (* x (if (= (array-rank arr1) 3)
@@ -197,22 +211,22 @@ a native array.  This is specified for a `FT-BITMAP-PIXEL-FORMAT` of `:MONO`,
 
 Note that for :LCD and :LCD-V, the result is a either 3\\*width or
 3\\*height, respectively.  This may change in the future."
-  (let ((buffer (freetype2::ft-bitmap-buffer bitmap))
-	(rows (freetype2::ft-bitmap-rows bitmap))
-	(width (freetype2::ft-bitmap-width bitmap))
-	(pitch (freetype2::ft-bitmap-pitch bitmap))
-	(format (freetype2::ft-bitmap-pixel-mode bitmap)))
+  (let ((buffer (ft-bitmap-buffer bitmap))
+	(rows (ft-bitmap-rows bitmap))
+	(width (ft-bitmap-width bitmap))
+	(pitch (ft-bitmap-pitch bitmap))
+	(format (ft-bitmap-pixel-mode bitmap)))
     (let ((pixel-fn (ecase format
-		      (:mono #'freetype2::nth-mono-pixel)
-		      (:gray #'freetype2::nth-gray-pixel)
-		      (:lcd #'freetype2::nth-gray-pixel)
-		      (:lcd-v #'freetype2::nth-gray-pixel)))
+		      (:mono #'nth-mono-pixel)
+		      (:gray #'nth-gray-pixel)
+		      (:lcd #'nth-gray-pixel)
+		      (:lcd-v #'nth-gray-pixel)))
 	  (array (make-array (list rows width) :element-type '(unsigned-byte 8))))
       (declare (function pixel-fn))
       #+-(format t "buffer: ~A rows: ~A width: ~A pitch: ~A format: ~A~%"
 		 buffer rows width pitch format)
       (loop for i from 0 below rows
-	 as ptr = (freetype2::inc-pointer buffer (* i pitch))
+	 as ptr = (inc-pointer buffer (* i pitch))
 	 do (loop for j from 0 below width
 	       do (setf (aref array i j) (funcall pixel-fn ptr j)))
 	 finally (return (values array format))))))
