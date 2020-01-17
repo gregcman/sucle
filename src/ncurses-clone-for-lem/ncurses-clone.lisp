@@ -1,5 +1,51 @@
 (defpackage #:ncurses-clone
-  (:use #:cl))
+  (:use #:cl)
+  (:export
+   #:*columns*
+   #:*lines*
+   #:with-virtual-window-lock
+   #:ncurses-wresize
+   #:*std-scr*
+   #:*virtual-window*
+   #:make-virtual-window
+   #:*update-p*
+   #:win-data
+   #:*widechar-placeholder*
+   #:*clear-glyph*
+   #:glyph-value
+   #:char-width-at
+   #:extra-big-glyph
+   #:extra-big-glyph-x
+   #:extra-big-glyph-y
+   #:glyph-attributes
+   #:*fg-default*
+   #:*bg-default*
+   #:n-char-fits-in-glyph
+   #:a_bold
+   #:a_underline
+   #:a_reverse
+   #:ncurses-newwin
+   ;;#:ncurses-keypad
+   #:ncurses-delwin
+   #:clear-win
+   #:ncurses-clearok
+   #:ncurses-wresize
+   #:ncurses-mvwin
+   #:ncurses-wscrl
+   #:ncurses-wmove
+   #:ncurses-wclrtoeol
+   #:ncurses-wclrtobot
+   #:ncurses-curs-set
+   #:ncurses-wnoutrefresh
+   #:ncurses-doupdate
+   #:ncurses-wattron
+   #:ncurses-mvwaddstr
+   #:ncurses-wattroff
+   #:ncurses-attron
+   #:ncurses-vline
+   #:ncurses-move
+   #:print-virtual-window
+   #:with-attributes))
 (in-package :ncurses-clone)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
