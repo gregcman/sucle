@@ -187,7 +187,7 @@
 	  (nick :glass;:planks
 		))))
 (defun get-chunk (x y z)
-  (multiple-value-bind (x y z) (voxel-chunks::chunk-coordinates-from-block-coordinates x y z)
+  (multiple-value-bind (x y z) (voxel-chunks:chunk-coordinates-from-block-coordinates x y z)
     ;;[FIXME]use actual chunk dimensions, not magic number 16
     (values (* x 16)
 	    (* y 16)
@@ -205,7 +205,7 @@
 
 (utility:with-unsafe-speed
   (defun generate-for-new-chunk (key)
-    (multiple-value-bind (x y z) (voxel-chunks::unhashfunc key)
+    (multiple-value-bind (x y z) (voxel-chunks:unhashfunc key)
       (declare (type fixnum x y z))
       ;;(print (list x y z))
       (when (>= y -1)
@@ -213,7 +213,7 @@
 		(y0 y (the fixnum (+ y 16)))
 		(z0 z (the fixnum (+ z 16))))
 	       (let ((block (let ((threshold (/ y 512.0)))
-			      (if (> threshold (black-tie::perlin-noise-single-float
+			      (if (> threshold (black-tie:perlin-noise-single-float
 						(* x0 0.05)
 						(+ (* 1.0 (sin y0)) (* y0 0.05))
 						(* z0 0.05)))
@@ -233,8 +233,8 @@
 	    (0y (- y 16) (+ y 32) :inc 16)
 	    (0z (- z 16) (+ z 32) :inc 16))
 	   (background-generation (multiple-value-call
-				      'voxel-chunks::create-chunk-key
-				    (voxel-chunks::chunk-coordinates-from-block-coordinates 
+				      'voxel-chunks:create-chunk-key
+				    (voxel-chunks:chunk-coordinates-from-block-coordinates 
 				     0x
 				     0y
 				     0z))))))

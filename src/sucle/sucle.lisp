@@ -40,9 +40,9 @@
   (apply 'create-aabb
 	 (mapcar 'floatify
 		 (list
-		  voxel-chunks::*chunk-size-x*
-		  voxel-chunks::*chunk-size-y*
-		  voxel-chunks::*chunk-size-z*
+		  voxel-chunks:*chunk-size-x*
+		  voxel-chunks:*chunk-size-y*
+		  voxel-chunks:*chunk-size-z*
 		  0.0
 		  0.0
 		  0.0))))

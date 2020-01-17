@@ -5,7 +5,53 @@
    #:chunkhashfunc
    #:getobj
    #:setobj
-   #:clearworld))
+   #:clearworld)
+  (:export
+   #:*chunks*
+   #:total-loaded-chunks
+   #:*chunk-array*
+
+   #:*chunk-size-x*
+   #:*chunk-size-y*
+   #:*chunk-size-z*
+   
+   #:*chunk-array-default-size-x*
+   #:*chunk-array-default-size-y*
+   #:*chunk-array-default-size-z*  
+   
+   #:block-coord
+   #:chunk-coord
+   #:chunk-data
+   #:chunk-modified
+   #:chunk-key
+   
+   #:chunk-coordinates-from-block-coordinates
+   #:create-chunk-key
+
+   #:empty-chunk-p
+   #:reset-empty-chunk-value  
+   
+   #:create-chunk
+   #:make-chunk-from-key-and-data
+   #:with-chunk-key-coordinates
+   
+   #:obtain-chunk-from-block-coordinates
+   #:obtain-chunk-from-chunk-key
+
+   #:remove-chunk-from-chunk-array
+   #:remove-chunk-at
+   #:get-chunk-at
+   #:set-chunk-at
+
+   #:chunk-array-x-min
+   #:chunk-array-y-min
+   #:chunk-array-z-min
+   
+   #:reposition-chunk-array
+   
+   #:chunk-worth-saving
+   #:chunk-exists-p
+   ))
 (in-package #:voxel-chunks)
 
 (utility:eval-always

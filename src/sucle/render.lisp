@@ -560,7 +560,7 @@ gl_FragColor.rgb = color_out;
   (loop :for key :being :the :hash-keys :of *g/chunk-call-list* :do
      (remove-chunk-model key))
   (mapc #'world::dirty-push
-	(sort (alexandria:hash-table-keys voxel-chunks::*chunks*) #'< :key
+	(sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'< :key
 	      'world::unsquared-chunk-distance)))
 
 (defparameter *chunk-query-buffer-size* 0)
@@ -597,9 +597,9 @@ gl_FragColor.rgb = color_out;
 					    :minx (- 0.0 foo)
 					    :miny (- 0.0 foo)
 					    :minz (- 0.0 foo)
-					    :maxx (+ (floatify voxel-chunks::*chunk-size-x*) foo)
-					    :maxy (+ (floatify voxel-chunks::*chunk-size-y*) foo)
-					    :maxz (+ (floatify voxel-chunks::*chunk-size-z*) foo)))))))
+					    :maxx (+ (floatify voxel-chunks:*chunk-size-x*) foo)
+					    :maxy (+ (floatify voxel-chunks:*chunk-size-y*) foo)
+					    :maxz (+ (floatify voxel-chunks:*chunk-size-z*) foo)))))))
 			(scratch-buffer:flush-bind-in*
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
@@ -764,9 +764,9 @@ Note:limits the amount of background jobs and pending lisp objects."
 	   (if thechunk
 	       (cond
 		 ;;If the chunk exists and is not empty
-		 ((and (voxel-chunks::chunk-exists-p thechunk)
-		       (not (voxel-chunks::empty-chunk-p
-			     (voxel-chunks::get-chunk-at thechunk))))
+		 ((and (voxel-chunks:chunk-exists-p thechunk)
+		       (not (voxel-chunks:empty-chunk-p
+			     (voxel-chunks:get-chunk-at thechunk))))
 		  ;;Then submit a job to the mesher 
 		  (incf *total-background-chunk-mesh-jobs*)
 		  (let ((lparallel:*task-category* 'mesh-chunk))
