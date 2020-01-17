@@ -96,11 +96,11 @@
      'salza2:zlib-compressor)))
 (progn
   (defun encode-conspack-payload (things)
-    (conspack::tracking-refs ()
-      (conspack::encode things)))
+    (conspack:tracking-refs ()
+      (conspack:encode things)))
   (defun decode-conspack-payload (data)
-    (conspack::tracking-refs ()
-      (conspack::decode data))))
+    (conspack:tracking-refs ()
+      (conspack:decode data))))
 (progn
   (defun decode-zlib-conspack-payload (data)
     (decode-conspack-payload (decode-zlib-payload data)))
@@ -116,7 +116,7 @@
     (write-sequence (encode-zlib-conspack-payload things) stream)))
 
 (defun retrieve-lisp-objects-from-file-zlib-conspack (path)
-  ;;ripped from conspack::decode-file
+  ;;ripped from conspack:decode-file
   (with-open-file
       (stream path :direction :input :element-type '(unsigned-byte 8)
 	      :if-does-not-exist :error)

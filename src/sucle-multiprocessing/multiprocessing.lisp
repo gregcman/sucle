@@ -253,7 +253,7 @@
   ;;fun, callback, args are only evaluated if
   ;;the task is non-existent
   (utility:once-only (key)
-    (utility::with-gensyms (value existsp job-task)
+    (utility:with-gensyms (value existsp job-task)
       `(bordeaux-threads:with-recursive-lock-held (*unique-tasks-lock*)
 	 (multiple-value-bind (,value ,existsp) (gethash ,key *unique-tasks*)
 	   (declare (ignorable ,value))

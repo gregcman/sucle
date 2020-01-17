@@ -50,7 +50,7 @@
    #+nil
    (lambda (n)
      (values-list
-      (print (mapcar (lambda (x) (/ (utility::floatify x) 255.0))
+      (print (mapcar (lambda (x) (/ (utility:floatify x) 255.0))
 		     (nbutlast (aref lem.term::*colors* n))))))
    ))
 

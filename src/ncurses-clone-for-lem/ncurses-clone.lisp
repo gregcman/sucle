@@ -90,7 +90,7 @@
 	 (declare (type glyph glyph)
 		  (optimize (speed 3)
 			    (safety 0)))
-       (code-char (logand glyph (utility::etouq (1- (ash 1 *bits-per-char-in-glyph*)))))))
+       (code-char (logand glyph (utility:etouq (1- (ash 1 *bits-per-char-in-glyph*)))))))
     (big-glyph (big-glyph-value glyph))))
 (defun glyph-attributes (glyph)
   (etypecase glyph
@@ -111,7 +111,7 @@
   (declaim (inline n-char-fits-in-glyph))
   (defun n-char-fits-in-glyph (n)
     ;;(> code 256)
-    (zerop (logandc2 n (utility::etouq (1- (ash 1 *bits-per-char-in-glyph*)))))))
+    (zerop (logandc2 n (utility:etouq (1- (ash 1 *bits-per-char-in-glyph*)))))))
 
 (defun gen-glyph (value attributes)
   (declare (optimize (speed 3)
@@ -215,7 +215,7 @@
   (length grid))
 (defun grid-columns (grid)
   (length (aref grid 0)))
-(utility::etouq
+(utility:etouq
   (let ((place '(aref (aref grid y) x))
 	(args '(x y grid)))
     `(progn

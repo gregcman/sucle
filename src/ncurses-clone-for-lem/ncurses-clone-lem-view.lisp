@@ -84,7 +84,7 @@
      :height height
      :lock (bt:make-recursive-lock "window-lock"))))
 (defmacro with-view-lock (view &body body)
-  (utility::with-gensyms (lock)
+  (utility:with-gensyms (lock)
     `(let ((,lock (ncurses-view-lock ,view)))
        (bt:with-recursive-lock-held (,lock)
 	 ,@body))))

@@ -364,7 +364,7 @@
 		   ))
 	    (let ((size *chunk-radius*))
 	      (declare (type voxel-chunks::chunk-coord size))
-	      (utility::dobox ((chunk-x (the voxel-chunks::chunk-coord (- x0 size))
+	      (utility:dobox ((chunk-x (the voxel-chunks::chunk-coord (- x0 size))
 					(the voxel-chunks::chunk-coord (+ x0 size)))
 			       (chunk-y (the voxel-chunks::chunk-coord (- y0 size))
 					(the voxel-chunks::chunk-coord (+ y0 size)))

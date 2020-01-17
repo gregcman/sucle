@@ -1,5 +1,8 @@
 (defpackage #:fps-independent-timestep
   (:use #:cl)
+  (:import-from
+   #:local-time
+   #:%get-current-time)
   (:export
    #:tick
    #:set-fps
@@ -23,7 +26,7 @@
   #+(or allegro cmu sbcl abcl ccl (and lispworks (or linux darwin)))
   (let ((zeroed-seconds (load-time-value (local-time:timestamp-to-unix (local-time:now)))))
     (declare (type seconds zeroed-seconds))
-    (multiple-value-bind (sec nsec) (local-time::%get-current-time)
+    (multiple-value-bind (sec nsec) (%get-current-time)
       (declare (type nanosecond nsec)
 	       (type seconds sec))
       (+ (* 1000000 (- sec zeroed-seconds))
@@ -38,7 +41,6 @@
 	
 	(round (/ 1000000 internal-time-units-per-second))))))
 ;;;;</CLOCK>
-
 
 (defstruct (ticker (:constructor %make-ticker))
   (ticks 0 :type fixnum)

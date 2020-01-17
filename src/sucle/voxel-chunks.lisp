@@ -140,7 +140,7 @@
 (defun total-loaded-chunks ()
   (hash-table-count *chunks*))
 
-(utility::eval-always
+(utility:eval-always
   (defparameter *chunk-array-default-size-x* 32)
   (defparameter *chunk-array-default-size-y* 32)
   (defparameter *chunk-array-default-size-z* 32)
@@ -172,7 +172,7 @@
 (;;utility:with-unsafe-speed
  progn
   (
-   ;;utility::with-declaim-inline
+   ;;utility:with-declaim-inline
    progn
     #+nil
    (obtain-chunk reference-inside-chunk get-chunk
