@@ -87,7 +87,7 @@
 	   (entity-gravity? *ent*) t)
      ;;(our-load)
      (let ((text-sub::*text-data-what-type* :framebuffer))
-       (window::set-vsync t)
+       (window:set-vsync t)
        (fps:set-fps 60)
        (progn
 	 (setf world:*world-directory*
@@ -149,7 +149,7 @@
 (defparameter *mouse-multiplier* 0.002617)
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
-  (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
+  (multiple-value-bind (x y) (values window:*mouse-x* window:*mouse-y*)
     (multiple-value-prog1
 	(values (- x (car data))
 		(- y (cdr data)))
@@ -210,8 +210,8 @@
 
 (defun update-camera (&optional (camera *camera*))
   (setf (camera-matrix:camera-aspect-ratio camera)
-	(/ (floatify window::*width*)
-	   (floatify window::*height*)))
+	(/ (floatify window:*width*)
+	   (floatify window:*height*)))
   (setf (camera-matrix:camera-fov camera) *fov*)
   (setf (camera-matrix:camera-frustum-far camera) (* 1024.0 256.0))
   (camera-matrix:update-matrices camera))
@@ -234,7 +234,7 @@
   (when (window:button :key :pressed :escape)
     (application:quit))
   (when (window:button :key :pressed #\e)
-    (window::toggle-mouse-capture)
+    (window:toggle-mouse-capture)
     ;;Flush changes to the mouse so
     ;;moving the mouse while not captured does not
     ;;affect the camera
@@ -372,7 +372,7 @@
   (setf *blockid*
 	(let ((seq
 	       #(3 13 12 24 1 2 18 17 20 5 89)))
-	  (elt seq (mod (round window::*scroll-y*)
+	  (elt seq (mod (round window:*scroll-y*)
 			(length seq))))))
 
 (defun player-position ()

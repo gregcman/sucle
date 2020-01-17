@@ -6,7 +6,7 @@
   ;;draw to default framebuffer
   (glhelp::bind-default-framebuffer)
   ;;setup clipping area
-  (glhelp::set-render-area 0 0 window::*width* window::*height*))
+  (glhelp::set-render-area 0 0 window:*width* window:*height*))
 
 (defun render-sky (x y z)
   (gl:clear-color x y z 1.0)
@@ -400,8 +400,8 @@ gl_FragColor.rgb = color_out;
 
 (defun render-crosshairs ()
   (glhelp:set-render-area
-   (- (/ window::*width* 2.0) 1.0)
-   (- (/ window::*height* 2.0) 1.0)
+   (- (/ window:*width* 2.0) 1.0)
+   (- (/ window:*height* 2.0) 1.0)
    2
    2)
   (gl:clear-color 1.0 1.0 1.0 1.0)

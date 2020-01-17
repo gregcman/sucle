@@ -276,5 +276,5 @@ gl_FragColor.xyz = color_out;
 	(1 #())
 	(2 (code-char (random 2000)))
 	(3 (list (random 100)))))))
-  (when (window::skey-j-p (window::keyval #\))
-    (application::quit)))
+  (when (window:button :key :pressed #\Escape)
+    (application:quit)))

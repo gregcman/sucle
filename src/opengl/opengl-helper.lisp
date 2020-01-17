@@ -1,5 +1,9 @@
 (defpackage #:glhelp
-  (:use :cl))
+  (:use :cl)
+  (:import-from
+   #:gl
+   #:enum=
+   #:make-gl-array-from-pointer))
 (in-package :glhelp)
 ;;;;************************************************************************;;;;
 ;;;;<CONTENTS>
@@ -517,7 +521,7 @@ just put together a new vao"
 
     ;; validate framebuffer
     (let ((framebuffer-status (gl:check-framebuffer-status :framebuffer)))
-      (unless (gl::enum= framebuffer-status :framebuffer-complete)
+      (unless (enum= framebuffer-status :framebuffer-complete)
         (error "Framebuffer not complete: ~A." framebuffer-status)))
 
     #+nil
@@ -882,7 +886,7 @@ gl_FragColor = pixcolor;
 			 (incf ,index)))
 		  (loop :repeat ,times :do
 		     ,@(mapcar (lambda (form) `(,add ,form)) forms))))
-	      (let ((glarray (gl::make-gl-array-from-pointer ,arr :float ,array-count)))
+	      (let ((glarray (make-gl-array-from-pointer ,arr :float ,array-count)))
 		(use-array-buffer ,vertex-buffer glarray)))
 	
 	    (let

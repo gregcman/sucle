@@ -27,6 +27,17 @@
   (:export
    #:*mouse-x*
    #:*mouse-y*)
-
+  (:export
+   #:*control-state*
+   #:*shift*
+   #:*control*
+   #:*alt*
+   #:*super*)
+  (:export
+   ;;[FIXME]::This?
+   #:update-control-state2
+   #:update-control-state
+   #:do-character-keys
+   #:control-state-jp-or-repeat)
   (:export
    #:button))

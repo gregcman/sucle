@@ -39,7 +39,7 @@
 		   array))
 	  acc)))
 
-(defun num-key-jp (&optional (control-state window::*control-state*))
+(defun num-key-jp (&optional (control-state window:*control-state*))
   (etouq
    (cons
     'cond
@@ -80,7 +80,7 @@
 	       (foo 1 :left "[D")
 	       (foo 1 :right "[C"))))      
 
-	 (window::do-character-keys ((window::control-state-jp-or-repeat ,control-state) true? code)
+	 (window:do-character-keys ((window:control-state-jp-or-repeat ,control-state) true? code)
 	   (when true?
 	     (multiple-value-bind (char esc)
 		 (character-modifier-bits:character-modifier-bits
@@ -96,12 +96,12 @@
   (setf (fill-pointer command-buffer) 0)
   (values
    command-buffer
-   (get-control-sequence (window::*control-state*
+   (get-control-sequence (window:*control-state*
 			       char
-			       window::*shift*
-			       window::*control*
-			       window::*alt*
-			       window::*super*
+			       window:*shift*
+			       window:*control*
+			       window:*alt*
+			       window:*super*
 			       *terminal-emulator-p*)
 	  (vector-push-extend char command-buffer))))
 
