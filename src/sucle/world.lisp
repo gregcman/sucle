@@ -58,10 +58,10 @@
 (defun test ()
   (let ((times (expt 10 6)))
     (time (dotimes (x times) (setf (getobj 0 0 0) 0)))
-    (time (dotimes (x times) (setf (world:getobj 0 0 0) 0))))
+    (time (dotimes (x times) (setf (getobj 0 0 0) 0))))
   (let ((times (expt 10 6)))
     (time (dotimes (x times) (getobj 0 0 0)))
-    (time (dotimes (x times) (world:getobj 0 0 0)))))
+    (time (dotimes (x times) (getobj 0 0 0)))))
 ;;;;************************************************************************;;;;
 ;;;;<PERSIST-WORLD>
 (in-package #:world)
@@ -82,7 +82,7 @@
   ;;[FIXME]undocumented swizzling and multiplication by 16, as well as loadchunk
   (let ((filename (convert-object-to-filename (chunk-coordinate-to-filename position))))
     ;;(format t "~%Saving chunk ~a" filename)
-    (sucle-serialize::store-lisp-objects-to-file
+    (sucle-serialize:save
      (merge-pathnames
       filename
       path)
@@ -91,7 +91,7 @@
 
 (defun loadchunk (chunk-coordinates &optional (path (world-path)))
   (let ((data
-	 (sucle-serialize::retrieve-lisp-objects-from-file
+	 (sucle-serialize:load
 	  (merge-pathnames (convert-object-to-filename
 			    (chunk-coordinate-to-filename chunk-coordinates))
 			   path))))
@@ -107,7 +107,7 @@
 	   (let ((new (make-array len)))
 	     (dotimes (i len)
 	       (setf (aref new i)
-		     (world:blockify (aref blocks i)  (aref light i) (aref sky i))))
+		     (blockify (aref blocks i)  (aref light i) (aref sky i))))
 	     (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates new)))))
       (1
        (destructuring-bind (objdata) data
@@ -191,20 +191,20 @@
 
 #+nil
 (defun block-dirtify-hashed (xyz)
-  (multiple-value-bind (x y z) (world:unhashfunc xyz)
+  (multiple-value-bind (x y z) (unhashfunc xyz)
     (block-dirtify x y z)))
 
 
 #+nil
 (defun setblock-with-update (i j k blockid &optional
 					     (new-light-value (block-data:data blockid :light)))
- (let ((old-light-value (world:getlight i j k)))
-   (when (setf (world:getblock i j k) blockid)
+ (let ((old-light-value (getlight i j k)))
+   (when (setf (getblock i j k) blockid)
      #+nil
       (when (< new-light-value old-light-value)
 	(de-light-node i j k))
       (unless (= old-light-value new-light-value)
-	(setf (world:getlight i j k) new-light-value))
+	(setf (getlight i j k) new-light-value))
       #+nil
       (sky-de-light-node i j k)
       #+nil
@@ -228,14 +228,14 @@
 					(if (eq blockid (block-data:lookup :void))
 					    15
 					    0)))
-  (when (setf (world:getblock i j k) blockid)
-    (setf (world:getlight i j k) new-light-value)
-    (setf (world:skygetlight i j k) new-sky-light-value)
+  (when (setf (getblock i j k) blockid)
+    (setf (getlight i j k) new-light-value)
+    (setf (skygetlight i j k) new-sky-light-value)
     (block-dirtify i j k)))
 
 ;;;;chunk loading
 
-;;[FIXME]architecture::one center, the player, and the chunk array centers around it
+;;[FIXME]architecture:one center, the player, and the chunk array centers around it
 (defparameter *chunk-coordinate-center-x* 0)
 (defparameter *chunk-coordinate-center-y* 0)
 (defparameter *chunk-coordinate-center-z* 0)
@@ -334,7 +334,7 @@
 
 (defun load-chunks-around ()
   (mapc (lambda (key)
-	  (world::chunk-load key))
+	  (chunk-load key))
 	(get-chunks-to-load)))
 (defun get-chunks-to-load ()
   (let ((x0 *chunk-coordinate-center-x*)
@@ -394,11 +394,11 @@
 	(dolist (chunk to-unload)
 	  (chunk-unload chunk))))))
 
-(defun chunk-unload (key &key (path (world:world-path)))
+(defun chunk-unload (key &key (path (world-path)))
   (let ((chunk (voxel-chunks:obtain-chunk-from-chunk-key key nil)))
     (cond
       (chunk
-       (world::chunk-save chunk :path path)
+       (chunk-save chunk :path path)
        (dirty-push key)
        ;;remove from the chunk-array
        (voxel-chunks:with-chunk-key-coordinates (x y z)
@@ -410,7 +410,7 @@
       (t nil))))
 
 (defparameter *persist* t)
-(defun chunk-save (chunk &key (path (world:world-path)))
+(defun chunk-save (chunk &key (path (world-path)))
   (when (not *persist*)
     (return-from chunk-save))
   (cond
@@ -431,7 +431,7 @@
 	     (cond
 	       (worth-saving
 		;;write the chunk to disk if its worth saving
-		(world:savechunk chunk key path)
+		(savechunk chunk key path)
 		;;(format t "~%saved chunk ~s" key)
 		)
 	       (t
@@ -439,8 +439,8 @@
 		(let ((chunk-save-file
 		       ;;[FIXME]bad api?
 		       (merge-pathnames
-			(world:convert-object-to-filename (world:chunk-coordinate-to-filename key))
-			(world:world-path))))
+			(convert-object-to-filename (chunk-coordinate-to-filename key))
+			(world-path))))
 		  (let ((file-exists-p (probe-file chunk-save-file)))
 		    (when file-exists-p
 		      (delete-file chunk-save-file)))))))
@@ -469,7 +469,7 @@
 (defun space-for-new-chunk-p (key)
   (voxel-chunks:empty-chunk-p (voxel-chunks:get-chunk-at key)))
 
-(defun chunk-load (key &optional (path (world:world-path)))
+(defun chunk-load (key &optional (path (world-path)))
   ;;[FIXME]using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
   #+nil
@@ -486,7 +486,7 @@
 	      (cond ((not (space-for-new-chunk-p key))
 		     ;;(format t "~%WTF? ~a chunk already exists" key)
 		     :skipping)
-		    (t (world:loadchunk key path)))))
+		    (t (loadchunk key path)))))
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
@@ -524,17 +524,17 @@
 ;;[FIXME]thread-safety for:
 ;;voxel-chunks:*chunks*
 ;;voxel-chunks:*chunk-array*
-;;world::*dirty-chunks*
-;;world::*achannel*
+;;*dirty-chunks*
+;;*achannel*
 
    ;;#:msave
    ;;#:save-world
 
-(defun msave (&optional (path world:*world-directory*))
-  (let ((newpath (world:world-path path)))
+(defun msave (&optional (path *world-directory*))
+  (let ((newpath (world-path path)))
     (ensure-directories-exist newpath)
     (save-world newpath)))
-(defun save-world (&optional (path (world:world-path)))
+(defun save-world (&optional (path (world-path)))
   (loop :for chunk :being :the :hash-values :of  voxel-chunks:*chunks* :do
      (chunk-save chunk :path path)))
 

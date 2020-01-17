@@ -77,7 +77,7 @@
       (let ((blockid (world:getblock x y z)))
 	(when (block-data:data blockid :hard)
 	  (when *dirtying2*
-	    (world::plain-setblock x y z (1+ (random 5)) 0))
+	    (world:plain-setblock x y z (1+ (random 5)) 0))
 	  (let ((blockaabb (block-to-block-aabb blockid)))
 	    (#+nil
 	     let
@@ -112,7 +112,7 @@
       (let ((blockid (world:getblock mx my mz)))
 	(when (block-data:data blockid :hard)
 	  (when *dirtying*
-	    (world::plain-setblock mx my mz (1+ (random 5)) 0))
+	    (world:plain-setblock mx my mz (1+ (random 5)) 0))
 	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
 					    (block-to-block-aabb blockid))))))
     acc))
@@ -317,7 +317,7 @@
 	   (yvel j+ j-)
 	   (zvel k+ k-))))))))
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct entity
    particle ;;center of mass
    neck ;;
@@ -365,7 +365,7 @@
 
 
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct fister
    (selected-block (vector 0 0 0))
    (normal-block (vector 0 0 0))
@@ -433,12 +433,12 @@
     (setf (fister-fun fist) #'collide-fucks2)
     fist))
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct necking
    (yaw 0.0)
    (pitch 0.0)))
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct pointmass
    (position (nsb-cga:vec 0.0 0.0 0.0))
    (position-old (nsb-cga:vec 0.0 0.0 0.0))

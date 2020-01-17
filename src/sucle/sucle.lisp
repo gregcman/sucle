@@ -112,9 +112,7 @@
 	       (application:poll-app)
 	       (per-frame))
 	 (progn
-	   ;;(atest::remove-zeroes)
-	   ;;[FIXME]don't remove all the chunks?
-	   (world::msave)))))))
+	   (world:msave)))))))
 
 ;;;;
 
@@ -122,7 +120,7 @@
 (defun start ()
   (application:main
    (lambda ()
-     (world::call-with-world-meshing-lparallel 
+     (call-with-world-meshing-lparallel 
       (lambda ()
 	(loop
 	   (application:poll-app)
@@ -132,7 +130,7 @@
    :title "conceptually simple block game"))
 #+nil
 (defun load-world-again (name)
-  (setf world::*persist* nil)
+  (setf world:*persist* nil)
   (setf world:*world-directory* name)
   (load-world t))
 
@@ -227,10 +225,10 @@
 
   ;;set the chunk center aroun the player
   (with-vec (x y z) ((player-position))
-    (world::set-chunk-coordinate-center x y z))
+    (world:set-chunk-coordinate-center x y z))
   
   (application:on-session-change *session*
-    (world::load-world t))
+    (world:load-world t))
   (when (window:button :key :pressed :escape)
     (application:quit))
   (when (window:button :key :pressed #\e)
@@ -274,7 +272,7 @@
   ;;Set the direction with WASD
   (setf
    (entity-hips *ent*)
-   (wasd-mover
+   (control:wasd-mover
     (window:button :key :down #\w)
     (window:button :key :down #\a)
     (window:button :key :down #\s)
@@ -325,7 +323,7 @@
   (when (window:button :key :pressed #\p)
     (update-world-vao))
   ;;load or unload chunks around the player who may have moved
-  (world::load-world)
+  (world:load-world)
   ;;render chunks and such
   ;;handle chunk meshing
   (application:on-session-change *last-session*
@@ -488,13 +486,13 @@
 
 (defun destroy-block-at (x y z)
   ;;(blocksound x y z)
-  (world::plain-setblock x y z (block-data:lookup :air) 15))
+  (world:plain-setblock x y z (block-data:lookup :air) 15))
 
 (defparameter *blockid* 1)
 
 (defun place-block-at (x y z &optional (blockval *blockid*))
   (when (not-occupied x y z)
-    (world::plain-setblock
+    (world:plain-setblock
      x
      y
      z

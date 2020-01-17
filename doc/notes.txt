@@ -105,3 +105,5 @@ Project goals:
 TODO:
 - Fix packaging for: voxel-chunks, world, glhelp, aabbcc, sucle-mp, utility, text-sub, ncurses-clone,
 - Just sucle-mp, glhelp, and ncurses-clone-lem-view? aabbcc, world, voxel-chunks are all linked together?
+
+- use import-from for split-sequence, struct-to-clos:struct->class, utility, and alexandria

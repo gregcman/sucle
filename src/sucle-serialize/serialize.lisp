@@ -1,6 +1,17 @@
 (defpackage #:sucle-serialize
-  (:use :cl))
+  (:use :cl)
+  (:shadow
+   #:load)
+  (:export
+   ;;[FIXME] All of the functions in here can be potentially useful. 
+   #:load
+   #:save))
 (in-package #:sucle-serialize)
+
+(defun load (path)
+  (retrieve-lisp-objects-from-file path))
+(defun save (path thing &key (storage-type :conspack))
+  (store-lisp-objects-to-file path thing :storage-type storage-type))
 
 ;;;Store a list of lisp objects as multiple lisp objects printed by
 ;;;the lisp printer in order
@@ -125,6 +136,7 @@
 	   (array (make-array remaining-bytes :element-type '(unsigned-byte 8))))
       (read-sequence array stream)
       (decode-zlib-conspack-payload array))))
+
 
 (defun retrieve-lisp-objects-from-file (path)
   ;;A file contains 0 or more lisp objects.

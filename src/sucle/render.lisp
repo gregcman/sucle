@@ -17,7 +17,7 @@
     ;;optimization to see if drawing a fullscreen quad is faster than a gl:clear
     #+nil
     (nil 
-     (let ((shader (deflazy:getfnc 'world::gl-clear-color-buffer)))
+     (let ((shader (deflazy:getfnc 'gl-clear-color-buffer)))
        (glhelp:use-gl-program shader)
        (glhelp:with-uniforms uniform shader 
 	 (with-vec (x y z) (*sky-color-foo*)
@@ -27,7 +27,7 @@
 
      (gl:depth-mask nil)
      (gl:polygon-mode :front-and-back :fill)
-     (world::draw-fullscreen-quad)
+     (draw-fullscreen-quad)
      (gl:depth-mask t)
      (gl:clear :depth-buffer-bit))
     (t (gl:clear
@@ -61,7 +61,7 @@
       (%gl:uniform-1f (uniform :foglet)
 		      (/ -1.0
 			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
-			 (* 16 world::*chunk-radius*)
+			 (* 16 world:*chunk-radius*)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
 			 fog-ratio))
@@ -272,7 +272,7 @@ gl_FragColor = color;
 
 (deflazy:deflazy modified-terrain-png (terrain-png)
   (color-grasses
-   (alexandria::copy-array terrain-png)))
+   (alexandria:copy-array terrain-png)))
 
 (glhelp:deflazy-gl terrain (modified-terrain-png)
   (glhelp:wrap-opengl-texture
@@ -392,9 +392,9 @@ gl_FragColor.rgb = color_out;
 #+nil
 (defun render-chunk-outline ()
   (draw-aabb
-   (* 16.0 world::*chunk-coordinate-center-x*)
-   (* 16.0 world::*chunk-coordinate-center-y*)
-   (* 16.0 world::*chunk-coordinate-center-z*)
+   (* 16.0 world:*chunk-coordinate-center-x*)
+   (* 16.0 world:*chunk-coordinate-center-y*)
+   (* 16.0 world:*chunk-coordinate-center-z*)
    *chunk-aabb*))
   ;;render crosshairs
 
@@ -473,10 +473,10 @@ gl_FragColor.rgb = color_out;
 (defun get-chunks-to-draw ()
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
-    (let* ((foo (+ 1 world::*chunk-radius*)))
+    (let* ((foo (+ 1 world:*chunk-radius*)))
       (dohash (key value) *g/chunk-call-list*
 	      ;;(declare (ignore key))
-	      (when (> (the fixnum foo) (the fixnum (world::blocky-chunk-distance key)))
+	      (when (> (the fixnum foo) (the fixnum (world:blocky-chunk-distance key)))
 		(vector-push-extend value vec))))
     vec))
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
@@ -555,13 +555,13 @@ gl_FragColor.rgb = color_out;
     (funcall fun)))
 
 (defun update-world-vao ()
-  (world::clean-dirty)
+  (world:clean-dirty)
   (reset-meshers)
   (loop :for key :being :the :hash-keys :of *g/chunk-call-list* :do
      (remove-chunk-model key))
-  (mapc #'world::dirty-push
+  (mapc #'world:dirty-push
 	(sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'< :key
-	      'world::unsquared-chunk-distance)))
+	      'world:unsquared-chunk-distance)))
 
 (defparameter *chunk-query-buffer-size* 0)
 (defvar *iterator*)
@@ -736,7 +736,7 @@ to be drawn by the render thread."
 (defun dispatch-mesher-to-dirty-chunks ()
   "Re-draw, draw, or delete the openGL representation of chunks based 
 observed chunk state changes. 
-Chunk state changes can be found in `world::*dirty-chunks*`
+Chunk state changes can be found in `world:*dirty-chunks*`
 
 Note:limits the amount of background jobs and pending lisp objects."
   (flet
@@ -749,7 +749,7 @@ Note:limits the amount of background jobs and pending lisp objects."
 	  (<= *max-meshes-pending-for-gl* (meshes-pending-for-gl)))))
     (when (not (too-much))
       (queue:sort-queue
-       world::*dirty-chunks*
+       world:*dirty-chunks*
        (lambda (list)
 	 (sort list
 	       ;;remove chunks from the queue that are too far away, don't try to mesh them
@@ -757,10 +757,10 @@ Note:limits the amount of background jobs and pending lisp objects."
 	       (delete-if (lambda (x)
 			    (>= (blocky-chunk-distance x) *chunk-render-radius*))
 			  list)
-	       '< :key 'world::unsquared-chunk-distance)))
+	       '< :key 'world:unsquared-chunk-distance)))
       (loop :named submit-mesh-tasks
 	 :while (not (too-much)) :do
-	 (let ((thechunk (world::dirty-pop)))
+	 (let ((thechunk (world:dirty-pop)))
 	   (if thechunk
 	       (cond
 		 ;;If the chunk exists and is not empty
