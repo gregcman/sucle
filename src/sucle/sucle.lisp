@@ -5,7 +5,7 @@
 ;;;;<BOXES?>
 (defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
 		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
-  (aabbcc::make-aabb
+  (aabbcc:make-aabb
    :minx minx
    :maxx maxx
    :miny miny
@@ -21,7 +21,7 @@
   ;;;;slab
   (create-aabb 1.0  #+nil 0.5 1.0 1.0 0.0 0.0 0.0))
 
-;;;;FIXME::The point of this is to reduce the amount of bits to store the hitbox.
+;;;;[FIXME]The point of this is to reduce the amount of bits to store the hitbox.
 ;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
 ;;;;get chopped off or something, thus leading to strange clipping.
 ;;;;This effectively reduces the precision, giving leeway for math operations.
@@ -40,9 +40,9 @@
   (apply 'create-aabb
 	 (mapcar 'floatify
 		 (list
-		  voxel-chunks::*chunk-size-x*
-		  voxel-chunks::*chunk-size-y*
-		  voxel-chunks::*chunk-size-z*
+		  voxel-chunks:*chunk-size-x*
+		  voxel-chunks:*chunk-size-y*
+		  voxel-chunks:*chunk-size-z*
 		  0.0
 		  0.0
 		  0.0))))
@@ -75,8 +75,8 @@
 (defun start ()
   (application:main
    *sucle-app-function*
-   :width (floor (* 80 text-sub::*block-width*))
-   :height (floor (* 25 text-sub::*block-height*))
+   :width (floor (* 80 text-sub:*block-width*))
+   :height (floor (* 25 text-sub:*block-height*))
    :title ""))
 
 (defparameter *sucle-app-function*
@@ -86,8 +86,8 @@
      (setf (entity-fly? *ent*) nil
 	   (entity-gravity? *ent*) t)
      ;;(our-load)
-     (let ((text-sub::*text-data-what-type* :framebuffer))
-       (window::set-vsync t)
+     (let ((text-sub:*text-data-what-type* :framebuffer))
+       (window:set-vsync t)
        (fps:set-fps 60)
        (progn
 	 (setf world:*world-directory*
@@ -112,17 +112,15 @@
 	       (application:poll-app)
 	       (per-frame))
 	 (progn
-	   ;;(atest::remove-zeroes)
-	   ;;FIXME::don't remove all the chunks?
-	   (world::msave)))))))
+	   (world:msave)))))))
 
 ;;;;
 
 #+nil
 (defun start ()
-  (application::main
+  (application:main
    (lambda ()
-     (world::call-with-world-meshing-lparallel 
+     (call-with-world-meshing-lparallel 
       (lambda ()
 	(loop
 	   (application:poll-app)
@@ -132,7 +130,7 @@
    :title "conceptually simple block game"))
 #+nil
 (defun load-world-again (name)
-  (setf world::*persist* nil)
+  (setf world:*persist* nil)
   (setf world:*world-directory* name)
   (load-world t))
 
@@ -149,7 +147,7 @@
 (defparameter *mouse-multiplier* 0.002617)
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
-  (multiple-value-bind (x y) (values window::*mouse-x* window::*mouse-y*)
+  (multiple-value-bind (x y) (values window:*mouse-x* window:*mouse-y*)
     (multiple-value-prog1
 	(values (- x (car data))
 		(- y (cdr data)))
@@ -210,8 +208,8 @@
 
 (defun update-camera (&optional (camera *camera*))
   (setf (camera-matrix:camera-aspect-ratio camera)
-	(/ (floatify window::*width*)
-	   (floatify window::*height*)))
+	(/ (floatify window:*width*)
+	   (floatify window:*height*)))
   (setf (camera-matrix:camera-fov camera) *fov*)
   (setf (camera-matrix:camera-frustum-far camera) (* 1024.0 256.0))
   (camera-matrix:update-matrices camera))
@@ -222,19 +220,19 @@
 (defparameter *game-ticks-per-iteration* 0)
 (defparameter *fraction-for-fps* 0.0)
 (defun per-frame ()
-  ;;FIXME::where is the best place to flush the job-tasks?
-  (sucle-mp::flush-job-tasks)
+  ;;[FIXME]where is the best place to flush the job-tasks?
+  (sucle-mp:flush-job-tasks)
 
   ;;set the chunk center aroun the player
   (with-vec (x y z) ((player-position))
-    (world::set-chunk-coordinate-center x y z))
+    (world:set-chunk-coordinate-center x y z))
   
-  (application::on-session-change *session*
-    (world::load-world t))
+  (application:on-session-change *session*
+    (world:load-world t))
   (when (window:button :key :pressed :escape)
-    (application::quit))
+    (application:quit))
   (when (window:button :key :pressed #\e)
-    (window::toggle-mouse-capture)
+    (window:toggle-mouse-capture)
     ;;Flush changes to the mouse so
     ;;moving the mouse while not captured does not
     ;;affect the camera
@@ -274,7 +272,7 @@
   ;;Set the direction with WASD
   (setf
    (entity-hips *ent*)
-   (wasd-mover
+   (control:wasd-mover
     (window:button :key :down #\w)
     (window:button :key :down #\a)
     (window:button :key :down #\s)
@@ -301,7 +299,7 @@
   (when (window:mouse-locked?)
     (update-moused
      *mouse-multiplier-aux*
-     ;;FIXME::is this formula correct?
+     ;;[FIXME]is this formula correct?
      (/ (+ *fraction-for-fps*
 	   *game-ticks-per-iteration*)
 	(+ *game-ticks-per-iteration* 1))))
@@ -325,10 +323,10 @@
   (when (window:button :key :pressed #\p)
     (update-world-vao))
   ;;load or unload chunks around the player who may have moved
-  (world::load-world)
+  (world:load-world)
   ;;render chunks and such
   ;;handle chunk meshing
-  (application::on-session-change *last-session*
+  (application:on-session-change *last-session*
     (reset-chunk-display-list)
     (update-world-vao))
   ;;update the camera
@@ -372,7 +370,7 @@
   (setf *blockid*
 	(let ((seq
 	       #(3 13 12 24 1 2 18 17 20 5 89)))
-	  (elt seq (mod (round window::*scroll-y*)
+	  (elt seq (mod (round window:*scroll-y*)
 			(length seq))))))
 
 (defun player-position ()
@@ -413,7 +411,7 @@
 	    (toggle *swinging*))
 	  (when *swinging*
 	    (let ((u *big-fist-reach*))
-	      (aabbcc::aabb-collect-blocks
+	      (aabbcc:aabb-collect-blocks
 		  (px py pz (* u vx) (* u vy) (* u vz)
 		      *big-fist-aabb*)
 		  (x y z contact)
@@ -438,7 +436,7 @@
 		  (selected-block (fister-selected-block fist))
 		  (normal-block (fister-normal-block fist)))
 	      (when fist?
-		;;FIXME::reactive? functional?
+		;;[FIXME]reactive? functional?
 		(when left-p
 		  (with-vec (a b c) (selected-block)
 		    (let ((*x* a)
@@ -476,7 +474,7 @@
   (let ((aabb (entity-aabb ent))
 	(pos (pointmass-position
 	      (entity-particle ent))))
-    (aabbcc::aabb-not-overlap
+    (aabbcc:aabb-not-overlap
      (pos-to-block-aabb x y z)
      (floatify x)
      (floatify y)
@@ -488,18 +486,18 @@
 
 (defun destroy-block-at (x y z)
   ;;(blocksound x y z)
-  (world::plain-setblock x y z (block-data::blockid :air) 15))
+  (world:plain-setblock x y z (block-data:lookup :air) 15))
 
 (defparameter *blockid* 1)
 
 (defun place-block-at (x y z &optional (blockval *blockid*))
   (when (not-occupied x y z)
-    (world::plain-setblock
+    (world:plain-setblock
      x
      y
      z
      blockval
-     (aref block-data:*lightvalue* blockval))
+     (block-data:data blockval :light))
     ;;(blocksound x y z)
     ))
 

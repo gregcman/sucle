@@ -1,16 +1,40 @@
-(defpackage #:image-utility
+(defpackage #:img
   (:use #:cl)
+  (:shadow #:load)
   (:export
-   #:flip-image)
-  (:export
-   #:*flip-image-p*
-   #:read-png-file
-   #:write-png-file))
+   #:w
+   #:h
+   #:load))
 
-(in-package #:image-utility)
+(in-package #:img)
 
-;;;;destructive flip
-(defun flip-image (image)
+(defparameter *flip-image-p* nil)
+(defparameter *normalize-to-rgba-unsigned-byte-8* t)
+(defun load (path &key (flip *flip-image-p*)
+		    (normalize-to-rgba-unsigned-byte-8
+		     *normalize-to-rgba-unsigned-byte-8*))
+  "Return an image loaded from `path`. When `flip` is t, flip the rows of the image from top to bottom. Default is nil. If `normalize-to-rgba-unsigned-byte-8` is t, coerce the array, which may have various formats, such as black and white, rgb, or be of type 1,2,4,8,16,32 ubyte, to an array with depth 4 and type unsigned-byte 8. This conversion makes some assumptions. Default is t."
+  (let ((array (opticl:read-image-file path)))
+    (when flip
+      (setf array (%flip-image array)))
+    (when normalize-to-rgba-unsigned-byte-8
+      (setf array (normalize-to-rgba-undigned-byte-8 array)))
+    array))
+
+;;[FIXME]image-width and image-height create garbage with cons cells?
+(defun w (image)
+  "Return the width of the image."
+  (destructuring-bind (height width . nope) (array-dimensions image)
+    (declare (ignorable height nope))
+    width))
+(defun h (image)
+  "Return the height of the image."
+  (destructuring-bind (height width . nope) (array-dimensions image)
+    (declare (ignorable width nope))
+    height))
+
+(defun %flip-image (image)
+  "Destructively flip the image in place."
   (let ((dims (array-dimensions image)))
     (let ((height (pop dims))
 	  (longjumps (reduce #'* dims)))
@@ -22,49 +46,8 @@
 			   (row-major-aref image (+ h w))))))))
   image)
 
-(defparameter *flip-image-p* nil)
-(defparameter *normalize-to-rgba-unsigned-byte-8* t)
-
-(defun write-png-file (pathname image)
-  (opticl:write-png-file pathname image))
-
-(defun load-image-from-file (path &key (flip *flip-image-p*)
-				  (normalize-to-rgba-unsigned-byte-8
-				   *normalize-to-rgba-unsigned-byte-8*))
-  (let ((array (opticl-load-image path)))
-    (when flip
-      (setf array (flip-image array)))
-    (when normalize-to-rgba-unsigned-byte-8
-      (setf array (normalize-to-rgba-undigned-byte-8 array)))
-    array))
-
-(defun opticl-load-image (file)
-  (let ((extension (pathname-type file)))
-    (cond ((string= extension "png")
-	   (opticl:read-png-file file))
-	  ((string= extension "jpeg")
-	   (opticl:read-jpeg-file file))
-	  ((string= extension "tiff")
-	   (opticl:read-tiff-file file))
-	  ((string= extension "pnm")
-	   (opticl:read-pnm-file file))
-	  ((string= extension "pbm")
-	   (opticl:read-pbm-file file))
-	  ((string= extension "gif")
-	   (opticl:read-gif-file file))
-	  (t (error "unsupported file format ~s ~s" extension file)))))
-
-;;FIXME::image-width and image-height create garbage with cons cells?
-(defun image-width (image)
-  (destructuring-bind (height width . nope) (array-dimensions image)
-    (declare (ignorable height nope))
-    width))
-(defun image-height (image)
-  (destructuring-bind (height width . nope) (array-dimensions image)
-    (declare (ignorable width nope))
-    height))
-
 (defun normalize-to-rgba-undigned-byte-8 (opticl-data)
+  "Coerce the `opticl-data`, which may have various formats, such as black and white, rgb, or be of 1,2,4,8,16,32 ubyte, to an array with depth 4 and type unsigned-byte 8. This conversion makes some assumptions. Default is t."
   (let ((dimensions (array-dimensions opticl-data))
 	(type (array-element-type opticl-data)))
     (when (or (not (eq 'unsigned-byte
@@ -81,7 +64,7 @@
 	  opticl-data
 	  (let ((new (make-array (list width height 4)
 				 :element-type '(unsigned-byte 8))))
-	    ;;FIXME::bits not correct? 
+	    ;;[FIXME]bits not correct? 
 	    ;;32 -> 8 = ash n -24
 	    ;;16 -> 8 = ash n -8
 	    ;;8 -> 8 = identity n
@@ -122,7 +105,7 @@
 		  (flet ((dump-pixels-1 (w h)
 			   (let ((gray
 				  (convert-value (aref opticl-data w h))))
-			     ;;FIXME::include alpha channel or not?
+			     ;;[FIXME]include alpha channel or not?
 			     (values
 			      gray
 			      gray
@@ -131,7 +114,7 @@
 			 (dump-pixels-2 (w h)
 			   (let ((gray (convert-value (aref opticl-data w h 0)))
 				 (alpha (convert-value (aref opticl-data w h 1))))
-			     (values gray gray alpha)))
+			     (values gray gray gray alpha)))
 			 (dump-pixels-3 (w h)
 			   (values
 			    (convert-value (aref opticl-data w h 0))

@@ -179,7 +179,7 @@ gl_FragColor.xyz = color_out;
 	      ;;The position-buffer is referenced 3 times per vertex.
 	      (/ (scratch-buffer:iterator-fill-pointer position-buffer)
 		 3)
-	      ;;The color-buffer is rerefenced 3 times per vertex.
+	      ;;The color-buffer is referenced 3 times per vertex.
 	      (/ (scratch-buffer:iterator-fill-pointer color-buffer)
 		 3))))
 	(scratch-buffer:flush-bind-in* ((position-buffer gl-vertex)
@@ -223,7 +223,9 @@ gl_FragColor.xyz = color_out;
     (gl-vertex -1.0 -1.0 0.5)))
 
 ;;;;************************************************************************;;;;
- 
+
+;;;;************************************************************************;;;;
+  
 (defpackage :application-example-hello-world
   (:use #:cl)
   (:export #:start))
@@ -274,5 +276,5 @@ gl_FragColor.xyz = color_out;
 	(1 #())
 	(2 (code-char (random 2000)))
 	(3 (list (random 100)))))))
-  (when (window::skey-j-p (window::keyval #\))
-    (application::quit)))
+  (when (window:button :key :pressed #\Escape)
+    (application:quit)))

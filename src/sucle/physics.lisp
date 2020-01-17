@@ -68,17 +68,16 @@
 
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
-  (aabbcc::with-touch-collector (collect-touch collapse-touch min-ratio)
-    ;;FIXME:: aabb-collect-blocks does not check slabs, only blocks upon entering.
+  (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
+    ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
     ;;also check "intersecting shell blocks?"
-    (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
+    (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
       (declare (ignorable contact))
       (let ((blockid (world:getblock x y z)))
-	(when (aref block-data:*iscollidable*
-		    blockid)
+	(when (block-data:data blockid :hard)
 	  (when *dirtying2*
-	    (world::plain-setblock x y z (1+ (random 5)) 0))
+	    (world:plain-setblock x y z (1+ (random 5)) 0))
 	  (let ((blockaabb (block-to-block-aabb blockid)))
 	    (#+nil
 	     let
@@ -108,12 +107,12 @@
 (defparameter *dirtying* nil)
 (defun a-contact-fun (px py pz aabb)
   (let ((acc #b000000))
-    (aabbcc::get-blocks-around (px py pz aabb) (mx my mz contact-var)
+    (aabbcc:get-blocks-around (px py pz aabb) (mx my mz contact-var)
       (declare (ignorable contact-var))
       (let ((blockid (world:getblock mx my mz)))
-	(when (aref block-data:*iscollidable* blockid)
+	(when (block-data:data blockid :hard)
 	  (when *dirtying*
-	    (world::plain-setblock mx my mz (1+ (random 5)) 0))
+	    (world:plain-setblock mx my mz (1+ (random 5)) 0))
 	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
 					    (block-to-block-aabb blockid))))))
     acc))
@@ -318,7 +317,7 @@
 	   (yvel j+ j-)
 	   (zvel k+ k-))))))))
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct entity
    particle ;;center of mass
    neck ;;
@@ -366,7 +365,7 @@
 
 
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct fister
    (selected-block (vector 0 0 0))
    (normal-block (vector 0 0 0))
@@ -414,11 +413,10 @@
 
 (defun collide-fucks2 (px py pz vx vy vz aabb)
   (block first-block
-    (aabbcc::aabb-collect-blocks (px py pz vx vy vz aabb)
+    (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
       (declare (ignorable contact))
-      (when (aref block-data:*iscollidable*
-		  (world:getblock x y z))
+      (when (block-data:data (world:getblock x y z) :hard)
 	(multiple-value-bind (minimum type)
 	    (aabbcc:aabb-collide
 	     aabb
@@ -435,12 +433,12 @@
     (setf (fister-fun fist) #'collide-fucks2)
     fist))
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct necking
    (yaw 0.0)
    (pitch 0.0)))
 
-(struct->class
+(struct-to-clos:struct->class
  (defstruct pointmass
    (position (nsb-cga:vec 0.0 0.0 0.0))
    (position-old (nsb-cga:vec 0.0 0.0 0.0))

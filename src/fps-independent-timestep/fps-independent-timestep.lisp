@@ -1,5 +1,8 @@
 (defpackage #:fps-independent-timestep
   (:use #:cl)
+  (:import-from
+   #:local-time
+   #:%get-current-time)
   (:export
    #:tick
    #:set-fps
@@ -14,7 +17,7 @@
 
 ;;;;<CLOCK>
 (deftype seconds ()
-  ;;FIXME::arbitrary amount
+  ;;[FIXME]arbitrary amount
   '(unsigned-byte 40))
 (deftype nanosecond ()
   `(integer 0 ,(1- (expt 10 9))))
@@ -23,7 +26,7 @@
   #+(or allegro cmu sbcl abcl ccl (and lispworks (or linux darwin)))
   (let ((zeroed-seconds (load-time-value (local-time:timestamp-to-unix (local-time:now)))))
     (declare (type seconds zeroed-seconds))
-    (multiple-value-bind (sec nsec) (local-time::%get-current-time)
+    (multiple-value-bind (sec nsec) (%get-current-time)
       (declare (type nanosecond nsec)
 	       (type seconds sec))
       (+ (* 1000000 (- sec zeroed-seconds))
@@ -39,7 +42,6 @@
 	(round (/ 1000000 internal-time-units-per-second))))))
 ;;;;</CLOCK>
 
-
 (defstruct (ticker (:constructor %make-ticker))
   (ticks 0 :type fixnum)
   (dt (floor 1000000 60) :type fixnum)
@@ -49,7 +51,7 @@
   (aux 0.0 :type double-float))
 
 ;;(declaim (ftype (function (fixnum fixnum &optional fixnum)) make-ticker))
-(defun make-ticker (dt time &optional (bailout (floor 1000000 4))) ;;FIXME
+(defun make-ticker (dt time &optional (bailout (floor 1000000 4))) ;;[FIXME]
   (%make-ticker :dt dt :current-time time :aux (coerce (/ 1 dt) 'double-float)
 		:bailout bailout))
 

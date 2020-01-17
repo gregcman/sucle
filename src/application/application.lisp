@@ -1,5 +1,5 @@
 (defpackage #:application
-  (:use #:cl #:utility #:deflazy)
+  (:use #:cl #:utility)
   (:export
    #:main
    #:*thread*
@@ -7,16 +7,14 @@
   (:export
    #:poll-app
    #:*quit-token*
-   #:on-session-change)
-  (:export
-   #:getfnc
-   #:deflazy)  
+   #:on-session-change)  
   (:export
    #:w
    #:h
-   #:gl-context
+   #:gl-context)
+  #+nil
+  (:export
    #:al-context)
-
   (:export
    #:quit))
 (in-package :application)
@@ -72,32 +70,32 @@
 	      (initfun (init start-fun)))
 	  (lambda ()
 	    (let ((*standard-output* stdo))
-	      (window::wrapper initfun
+	      (window:wrapper initfun
 			       rest))))))))
 
-(deflazy w ()
-  window::*width*)
-(deflazy h ()
-  window::*height*)
+(deflazy:deflazy w ()
+  window:*width*)
+(deflazy:deflazy h ()
+  window:*height*)
 (defun root-window-change (w h)
-  (unless (= (getfnc 'h) h)
-    (refresh 'h t))
-  (unless (= (getfnc 'w) w)
-    (refresh 'w t)))
+  (unless (= (deflazy:getfnc 'h) h)
+    (deflazy:refresh 'h t))
+  (unless (= (deflazy:getfnc 'w) w)
+    (deflazy:refresh 'w t)))
 
 (defparameter *quit-token* nil)
 (defmacro with-quit-token ((&optional (value '(cons "default" "quit token"))) &body body)
   `(let ((*quit-token* ,value)
-	 (window::*status* nil)) ;;FIXME::nil = alive
+	 (window:*status* nil)) ;;[FIXME]nil = alive
      (catch *quit-token*
        ,@body)))
 (defun init (fun)
   (lambda ()
     (declare (optimize (debug 3)))
     (glhelp:with-gl-context (nil)
-      (setf window::*resize-hook* 'root-window-change)
+      (setf window:*resize-hook* 'root-window-change)
       (dolist (item '(h w))
-	(refresh item t))
+	(deflazy:refresh item t))
       (window:set-vsync t)
       (gl:enable :scissor-test)
       (with-quit-token ((cons "trampoline" "token"))
@@ -116,26 +114,26 @@
 
 (defmacro quit (&optional form)
   `(progn
-     (setf window::*status* t) ;;FIXME::t = exit
+     (setf window:*status* t) ;;[FIXME]t = exit
      (throw *quit-token* ,form)))
 
 (defun poll-app ()
   (when window:*status*
     (quit))
-  (window::update-control-state2)
-  (flush-refreshes)
+  (window:update-control-state2)
+  (deflazy:flush-refreshes)
   (window:update-display)
   (window:poll)
-  (window::update-control-state))
+  (window:update-control-state))
 
 #+nil
-(deflazy al-context ()
-  (music::really-start)
-  music::*al-context*)
+(deflazy:deflazy al-context ()
+  (music:really-start)
+  music:*al-context*)
 
 #+nil
-(getfnc 'al-context)
+(deflazy:getfnc 'al-context)
 #+nil
 (defun restart-sound-system ()
-  (music::restart-al)
-  (refresh 'al-context t))
+  (music:restart-al)
+  (deflazy:refresh 'al-context t))

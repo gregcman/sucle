@@ -1,5 +1,19 @@
 (defpackage :dependency-graph
-  (:use #:cl #:utility))
+  (:use #:cl)
+  (:export
+   #:*namespace*
+   #:%defnode
+   #:redefine-node
+   #:ensure-node
+   #:timestamp
+   #:touch-node
+   #:map-dependents2
+   #:dirty-p
+   #:get-value
+   #:value
+   #:state
+   #:%invalidate-node
+   #:get-node))
 (in-package :dependency-graph)
 
 (defclass node ()
@@ -54,13 +68,12 @@
    (write (name node) :stream stream :escape nil :case :downcase)))
 
 (defvar *namespace* (make-hash-table :test 'eq))
-(etouq
- (let ((place '(gethash id namespace)))
-   `(progn
-      (defun get-node (id &optional (namespace *namespace*))
-	,place)
-      (defun set-node (id node &optional (namespace *namespace*))
-	(setf ,place node)))))
+
+(progn
+  (defun get-node (id &optional (namespace *namespace*))
+    (gethash id namespace))
+  (defun set-node (id node &optional (namespace *namespace*))
+    (setf (gethash id namespace) node)))
 
 
 (defun ensure-node (name &optional (namespace *namespace*))
@@ -182,7 +195,7 @@
   (incf (timestamp node)))
 
 (defun %invalidate-node (node)
-  (with-slots ((state dependency-graph::state)) node
+  (with-slots ((state state)) node
     (touch-node node)
     (setf state nil)))
 
@@ -196,7 +209,8 @@
 	  (do ((stamp dependencies-timestamps (cdr stamp))
 	       (arg dependencies (cdr arg)))
 	      ((not (any arg
-			 stamp)) nil)
+			 stamp))
+	       nil)
 	      ;;;iterate old timestamps and see if any differ now
 	    (when (not (= (car stamp)
 			  (timestamp (car arg))))
@@ -261,7 +275,7 @@
 
 #+nil
 (defun print-dependents (name)
-  (dependency-graph::map-dependents name #'print *stuff*))
+  (map-dependents name #'print *stuff*))
 
 (defun map-dependents2 (name fun test &optional (namespace *namespace*))
   (with-named-node (node) name

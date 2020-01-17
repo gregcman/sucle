@@ -222,9 +222,7 @@
     (dolist (x *modified-mouse-enums*)
       (when (listp x)
 	(setf (aref array
-		    (substitute-foreign-enum-value "MOUSE-BUTTON" (first x))
-		    ;;(cffi:foreign-enum-value '%glfw::mouse (first x))
-		    )
+		    (substitute-foreign-enum-value "MOUSE-BUTTON" (first x)))
 	      (second x))))
     array))
 (defparameter *key-array*
@@ -232,9 +230,7 @@
     (dolist (x *modified-key-enums*)
       (when (listp x)
 	(setf (aref array
-		    (substitute-foreign-enum-value "KEY" (first x))
-		    ;;(cffi:foreign-enum-value '%glfw::key (first x))
-		    )
+		    (substitute-foreign-enum-value "KEY" (first x)))
 	      (second x))))
     array))
 (defparameter *character-keys*
@@ -254,45 +250,29 @@
       (when (listp item)
 	(setf (aref back-map (second item))
 	      (cons :key (first item)))))
-    #+nil
-    (flet ((thing (array enum)
-	     (dotimes (i (length array))
-	       (let ((value (cffi:foreign-enum-keyword enum i :errorp nil)))
-		 (when value
-		   (setf (aref back-map (aref array i))
-			 (cons enum value)))))))
-      (thing *mouse-array* (quote %glfw::mouse))
-      (thing *key-array* (quote %glfw::key)))
     back-map)))
 
 (defun back-value (n)
   (let ((cell (aref *back-map* n)))
     (values (cdr cell)
 	    (case (car cell)
-	      (;;%cl-glfw3::key
-	       :key
+	      (:key
 	       :key)
-	      (;;%cl-glfw3::mouse
-	       :mouse
+	      (:mouse
 	       :mouse)))))
 
 (defmacro mouseval (identifier)
   (etypecase identifier
     (keyword
      (aref *mouse-array*
-	   (substitute-foreign-enum-value "MOUSE-BUTTON" identifier)
-	   ;;(cffi:foreign-enum-value (quote %glfw::mouse) identifier)
-	   ))
+	   (substitute-foreign-enum-value "MOUSE-BUTTON" identifier)))
     (integer
      (aref *mouse-array* (1- identifier)))))
 (defmacro keyval (identifier)
   (etypecase identifier
     (keyword
      (aref *key-array*
-	   (substitute-foreign-enum-value "KEY" identifier)
-	   #+nil
-	   (cffi:foreign-enum-value (quote %glfw::key)
-				    identifier)))
+	   (substitute-foreign-enum-value "KEY" identifier)))
     (character
      (char-code (char-upcase identifier)))
     (integer
@@ -398,7 +378,7 @@ for the current implementation."
                                   (,codepoint :unsigned-int)
 				  (,mod-keys :int))
      ,@body))
-;;;FIXME::move to bodge-glfw?
+;;;[FIXME]move to bodge-glfw?
 (define-char-mods-callback char-mods-callback (window char mod-keys)
   (declare (ignorable window))
   (setf *mod-keys* mod-keys)
@@ -411,7 +391,7 @@ for the current implementation."
                                   (,count :int)
 				  (,paths (:pointer (:pointer :char))))
      ,@body))
-;;;FIXME::move to bodge-glfw?
+;;;[FIXME]move to bodge-glfw?
 (define-drop-callback drop-callback (window count paths)
   (declare (ignorable window))
   (with-float-traps-restored
@@ -469,7 +449,7 @@ for the current implementation."
 			 ((eql value %glfw:+false+) nil)
 			 (t (error "what is this value? ~a" value)))))
   (poll-events)
-  ;;;FIXME::mod keys only updated indirectly through mouse or key or unicode char callback
+  ;;;[FIXME]mod keys only updated indirectly through mouse or key or unicode char callback
   (let ((mods *mod-keys*))
     (setf *shift* (logtest +shift+ mods)
 	  *control* (logtest +control+ mods)
@@ -524,7 +504,7 @@ for the current implementation."
     (glfw:with-init ()
       (init)
       (glfw:with-window-hints
-	    ;;FIXME::better interface?
+	    ;;[FIXME]better interface?
 	    ((%glfw:+resizable+ (if (getf params :resizable)
 				    %glfw:+true+
 				    %glfw:+false+)))
@@ -580,19 +560,3 @@ for the current implementation."
     (values 
      (cffi:mem-ref x :double)
      (cffi:mem-ref y :double))))
-
-#+nil
-(cffi:defcstruct |GLFWStruct|
-  (width :int)
-  (height :int)
-  (pixels :pointer))
-#+nil
-(cffi:defcfun ("glfwSetCursor" %glfw::set-cursor) :void
-  (window :pointer)
-  (cursor :pointer))
-
-#+nil
-(cffi:defcfun ("glfwGetTimerFrequency" %glfw::get-timer-frequency) :uint64)
-#+nil
-(cffi:defcfun ("glfwGetTimerValue" %glfw::get-timer-value) :uint64)
-

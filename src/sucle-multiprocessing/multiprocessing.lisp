@@ -1,6 +1,17 @@
 (defpackage #:sucle-multiprocessing
   (:use :cl)
-  (:nicknames :sucle-mp))
+  (:nicknames :sucle-mp)
+  (:export
+   #:submit-unique-task
+   #:remove-unique-task-key
+   #:job-task-data
+   #:job-task-return-values
+   #:*current-job-task*
+   #:with-initialize-multiprocessing
+   #:with-kernel
+   #:do-queue-iterator
+   #:submit
+   #:flush-job-tasks))
 (in-package #:sucle-mp)
 
 (defun quickload ()
@@ -32,19 +43,19 @@
      (when (zerop (unkillable-count *unkillable*))
        (return-from out))
      (bordeaux-threads:thread-yield)))
-;;FIXME::should the finished-task-queue be a global variable?
+;;[FIXME]should the finished-task-queue be a global variable?
 (defparameter *finished-task-queue* (lparallel.queue:make-queue))
 (defparameter *shutting-down-p* nil)
 (defun set-dynamic-variables ()
-  (setf *lparallel-kernel* (lparallel::make-kernel (cpus:get-number-of-processors)))
+  (setf *lparallel-kernel* (lparallel:make-kernel (cpus:get-number-of-processors)))
   (setf *unique-tasks* (make-hash-table :test 'eq))
   (setf *finished-task-queue* (lparallel.queue:make-queue))
   (with-kernel
     (setf *channel* (lparallel:make-channel))))
 (defun reset ()
-  (lparallel::end-kernel)
+  (lparallel:end-kernel)
   (set-dynamic-variables)
-  (setf lparallel::*kernel* *lparallel-kernel*))
+  (setf lparallel:*kernel* *lparallel-kernel*))
 
 (defmacro with-initialize-multiprocessing (&body body)
   `(let ((*lparallel-kernel* nil))
@@ -147,14 +158,14 @@
 	  (setf (job-task-return-status job-task) nil)
 	  (setf (job-task-finished job-task) t)
 	  (maybe-decrement-unkillable job-task)
-	  ;;FIXME::use bordeaux threads and kill the thread directly or use lparallel:kill-tasks?
+	  ;;[FIXME]use bordeaux threads and kill the thread directly or use lparallel:kill-tasks?
 	  ;;(lparallel:kill-tasks job-task)
 	  (when (eq status :running)
 	    ;;kill a task that has been started
 	    (bordeaux-threads:destroy-thread thread)))
 	;;we push to the *finished-task-queue*, because otherwise lparallel does not
 	;;let us know about killed task objects
-	;;FIXME::This means tasks killed with kill-tasks or bordeaux-threads:destroy-thread
+	;;[FIXME]This means tasks killed with kill-tasks or bordeaux-threads:destroy-thread
 	;;will not be registered correctly, the job-task object will still say :pending/:running
 	;;and contain the dead thread.
 	(lparallel.queue:push-queue/no-lock job-task *finished-task-queue*))))
@@ -207,7 +218,7 @@
 		    (return-from outer-loop))
 		  (when (typep value 'job-task))
 		  (lparallel.queue:push-queue/no-lock value queue)))
-	   ;;FIXME::allow errors to pass through?
+	   ;;[FIXME]allow errors to pass through?
 	   (error (c)
 	     (declare (ignorable c))
 	     (debugging (print c))
@@ -253,7 +264,7 @@
   ;;fun, callback, args are only evaluated if
   ;;the task is non-existent
   (utility:once-only (key)
-    (utility::with-gensyms (value existsp job-task)
+    (utility:with-gensyms (value existsp job-task)
       `(bordeaux-threads:with-recursive-lock-held (*unique-tasks-lock*)
 	 (multiple-value-bind (,value ,existsp) (gethash ,key *unique-tasks*)
 	   (declare (ignorable ,value))

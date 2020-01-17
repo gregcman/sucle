@@ -1,6 +1,11 @@
 (defpackage #:nsb-cga
   (:use #:cl)
   (:use #:sb-cga)
+  (:import-from #:sb-cga
+		#:matrix
+		#:sfunction
+
+		#:submatrix-determinant)
   (:export
    #:%matrix
    #:%identity-matrix

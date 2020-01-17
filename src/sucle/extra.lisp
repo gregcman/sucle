@@ -15,13 +15,13 @@
   (defun b@ (&optional (x *x*) (y *y*) (z *z*))
     (world:getblock x y z))
   (defun (setf b@) (value &optional (x *x*) (y *y*) (z *z*))
-    (world::plain-setblock x y z value)))
+    (world:plain-setblock x y z value)))
 
 (defun b= (b0 b1)
   (eql b0 b1))
 
 (defmacro nick (nickname)
-  `(block-data::blockid ,nickname))
+  `(block-data:lookup ,nickname))
 
 ;;convert dirt, stone, and grass into their 'correct' forms given air:
 ;;grass, dirt, dirt, stone
@@ -78,7 +78,7 @@
 
 (defun player-feet ()
   (let ((miny
-	 (aabbcc::aabb-miny
+	 (aabbcc:aabb-miny
 	  (entity-aabb *ent*))))
     (with-vec (x y z) ((player-position))
       (values (floor x)
@@ -128,7 +128,7 @@
 			(vz *z*)
 	       (blockid *blockid*)
 	       (aabb *fist-aabb*))
-  (aabbcc::aabb-collect-blocks ((+ 0.5 px)
+  (aabbcc:aabb-collect-blocks ((+ 0.5 px)
 				(+ 0.5 py)
 				(+ 0.5 pz)
 				(- vx px)
@@ -138,7 +138,7 @@
       (x y z dummy)
     (declare (ignore dummy))
     (when (b= (nick :air) (b@ x y z))
-      (world::plain-setblock x y z blockid))))
+      (world:plain-setblock x y z blockid))))
 
 (defun degree-to-rad (&optional (n (random 360)))
   (* n (load-time-value (floatify (/ pi 180)))))
@@ -147,9 +147,9 @@
 			(y (degree-to-rad))
 			(z (degree-to-rad)))
   (sb-cga:transform-point
-   (sb-cga::vec 1.0 0.0 0.0)
-   (sb-cga::rotate* x y z)))
-(defun vec-values (&optional (vec (sb-cga::vec 1.0 2.0 3.0)))
+   (sb-cga:vec 1.0 0.0 0.0)
+   (sb-cga:rotate* x y z)))
+(defun vec-values (&optional (vec (sb-cga:vec 1.0 2.0 3.0)))
   (with-vec (x y z) (vec)
     (values x y z)))
 ;;
@@ -157,8 +157,8 @@
   (labels ((rec (place minfactor)
 	     (when (>= minfactor 0)
 	       (dotimes (x (random 5))
-		 (let ((random-direction (sb-cga::vec* (rotate-normal) (expt 1.5 minfactor))))
-		   (let ((new (sb-cga::vec+ place random-direction)))
+		 (let ((random-direction (sb-cga:vec* (rotate-normal) (expt 1.5 minfactor))))
+		   (let ((new (sb-cga:vec+ place random-direction)))
 		     (multiple-value-call
 			 'line
 		       (vec-values place)
@@ -168,7 +168,7 @@
 			   (nick :log))
 		       (create-aabb (* 0.1 minfactor)))
 		     (rec new (1- minfactor))))))))
-    (rec (multiple-value-call 'sb-cga::vec (floatify2 x y z))
+    (rec (multiple-value-call 'sb-cga:vec (floatify2 x y z))
 	 minfactor)))
 (defun floatify2 (&rest values)
   (apply 'values (mapcar 'floatify values)))
@@ -187,25 +187,25 @@
 	  (nick :glass;:planks
 		))))
 (defun get-chunk (x y z)
-  (multiple-value-bind (x y z) (voxel-chunks::chunk-coordinates-from-block-coordinates x y z)
-    ;;FIXME::use actual chunk dimensions, not magic number 16
+  (multiple-value-bind (x y z) (voxel-chunks:chunk-coordinates-from-block-coordinates x y z)
+    ;;[FIXME]use actual chunk dimensions, not magic number 16
     (values (* x 16)
 	    (* y 16)
 	    (* z 16))))
 (defun background-generation (key)
   (let ((job-key (cons :world-gen key)))
-    (sucle-mp::submit-unique-task
+    (sucle-mp:submit-unique-task
      job-key
      ((lambda ()
 	(generate-for-new-chunk key))
       :callback (lambda (job-task)
 		  (declare (ignore job-task))
-		  (world::dirty-push-around key)
-		  (sucle-mp::remove-unique-task-key job-key))))))
+		  (world:dirty-push-around key)
+		  (sucle-mp:remove-unique-task-key job-key))))))
 
 (utility:with-unsafe-speed
   (defun generate-for-new-chunk (key)
-    (multiple-value-bind (x y z) (voxel-chunks::unhashfunc key)
+    (multiple-value-bind (x y z) (voxel-chunks:unhashfunc key)
       (declare (type fixnum x y z))
       ;;(print (list x y z))
       (when (>= y -1)
@@ -213,7 +213,7 @@
 		(y0 y (the fixnum (+ y 16)))
 		(z0 z (the fixnum (+ z 16))))
 	       (let ((block (let ((threshold (/ y 512.0)))
-			      (if (> threshold (black-tie::perlin-noise-single-float
+			      (if (> threshold (black-tie:perlin-noise-single-float
 						(* x0 0.05)
 						(+ (* 1.0 (sin y0)) (* y0 0.05))
 						(* z0 0.05)))
@@ -233,8 +233,8 @@
 	    (0y (- y 16) (+ y 32) :inc 16)
 	    (0z (- z 16) (+ z 32) :inc 16))
 	   (background-generation (multiple-value-call
-				      'voxel-chunks::create-chunk-key
-				    (voxel-chunks::chunk-coordinates-from-block-coordinates 
+				      'voxel-chunks:create-chunk-key
+				    (voxel-chunks:chunk-coordinates-from-block-coordinates 
 				     0x
 				     0y
 				     0z))))))
@@ -301,8 +301,8 @@
     ))
 #+nil
 (defun camera-al-listener (camera)
-  (let ((look (camera-matrix::camera-vec-forward camera))
-	(up (camera-matrix::camera-vec-up camera)))   
+  (let ((look (camera-matrix:camera-vec-forward camera))
+	(up (camera-matrix:camera-vec-up camera)))   
     (cffi:with-foreign-object (array :float 6)
       (let ((count 0))
 	(flet ((add (x)

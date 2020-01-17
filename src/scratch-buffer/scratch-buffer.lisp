@@ -96,7 +96,7 @@
      `(utility:nest ,@(mapcar (lambda (x) `(,',name1 ,x)) forms)
 		    (locally ,@body))))
 
-;;FIXME::refactor out for * type macros?
+;;[FIXME]refactor out for * type macros?
 (start-nest bind-in)
 (start-nest bind-out)
 (start-nest flush-bind-in)

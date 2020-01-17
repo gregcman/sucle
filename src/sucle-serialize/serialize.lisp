@@ -1,6 +1,17 @@
 (defpackage #:sucle-serialize
-  (:use :cl))
+  (:use :cl)
+  (:shadow
+   #:load)
+  (:export
+   ;;[FIXME] All of the functions in here can be potentially useful. 
+   #:load
+   #:save))
 (in-package #:sucle-serialize)
+
+(defun load (path)
+  (retrieve-lisp-objects-from-file path))
+(defun save (path thing &key (storage-type :conspack))
+  (store-lisp-objects-to-file path thing :storage-type storage-type))
 
 ;;;Store a list of lisp objects as multiple lisp objects printed by
 ;;;the lisp printer in order
@@ -96,11 +107,11 @@
      'salza2:zlib-compressor)))
 (progn
   (defun encode-conspack-payload (things)
-    (conspack::tracking-refs ()
-      (conspack::encode things)))
+    (conspack:tracking-refs ()
+      (conspack:encode things)))
   (defun decode-conspack-payload (data)
-    (conspack::tracking-refs ()
-      (conspack::decode data))))
+    (conspack:tracking-refs ()
+      (conspack:decode data))))
 (progn
   (defun decode-zlib-conspack-payload (data)
     (decode-conspack-payload (decode-zlib-payload data)))
@@ -116,7 +127,7 @@
     (write-sequence (encode-zlib-conspack-payload things) stream)))
 
 (defun retrieve-lisp-objects-from-file-zlib-conspack (path)
-  ;;ripped from conspack::decode-file
+  ;;ripped from conspack:decode-file
   (with-open-file
       (stream path :direction :input :element-type '(unsigned-byte 8)
 	      :if-does-not-exist :error)
@@ -125,6 +136,7 @@
 	   (array (make-array remaining-bytes :element-type '(unsigned-byte 8))))
       (read-sequence array stream)
       (decode-zlib-conspack-payload array))))
+
 
 (defun retrieve-lisp-objects-from-file (path)
   ;;A file contains 0 or more lisp objects.

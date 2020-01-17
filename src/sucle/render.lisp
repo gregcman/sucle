@@ -4,9 +4,9 @@
 
 (defun draw-to-default-area ()
   ;;draw to default framebuffer
-  (glhelp::bind-default-framebuffer)
+  (glhelp:bind-default-framebuffer)
   ;;setup clipping area
-  (glhelp::set-render-area 0 0 window::*width* window::*height*))
+  (glhelp:set-render-area 0 0 window:*width* window:*height*))
 
 (defun render-sky (x y z)
   (gl:clear-color x y z 1.0)
@@ -17,9 +17,9 @@
     ;;optimization to see if drawing a fullscreen quad is faster than a gl:clear
     #+nil
     (nil 
-     (let ((shader (getfnc 'world::gl-clear-color-buffer)))
-       (glhelp::use-gl-program shader)
-       (glhelp::with-uniforms uniform shader 
+     (let ((shader (deflazy:getfnc 'gl-clear-color-buffer)))
+       (glhelp:use-gl-program shader)
+       (glhelp:with-uniforms uniform shader 
 	 (with-vec (x y z) (*sky-color-foo*)
 	   (%gl:uniform-4f (uniform :color) x y z 1.0))))
      (gl:disable :depth-test)
@@ -27,7 +27,7 @@
 
      (gl:depth-mask nil)
      (gl:polygon-mode :front-and-back :fill)
-     (world::draw-fullscreen-quad)
+     (draw-fullscreen-quad)
      (gl:depth-mask t)
      (gl:clear :depth-buffer-bit))
     (t (gl:clear
@@ -40,8 +40,8 @@
 			   (fog-ratio 0.01)
 			   (time-of-day (random 1.0)))
   ;;set up shader
-  (let ((shader (getfnc 'blockshader)))
-    (glhelp::use-gl-program shader)
+  (let ((shader (deflazy:getfnc 'blockshader)))
+    (glhelp:use-gl-program shader)
 
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms uniform shader
@@ -60,8 +60,8 @@
 		    (camera-matrix:camera-vec-position camera))
       (%gl:uniform-1f (uniform :foglet)
 		      (/ -1.0
-			 ;;FIXME::16 assumes chunk is a 16x16x16 cube
-			 (* 16 world::*chunk-radius*)
+			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
+			 (* 16 world:*chunk-radius*)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
 			 fog-ratio))
@@ -70,9 +70,9 @@
       (%gl:uniform-1f (uniform :time)
 		      time-of-day)
 
-      (glhelp::set-uniforms-to-textures
+      (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
-	(glhelp::handle (getfnc 'terrain)))))))
+	(glhelp:handle (deflazy:getfnc 'terrain)))))))
 (defun render-chunks ()  
   (gl:enable :depth-test)
   (gl:enable :cull-face)
@@ -94,33 +94,33 @@
 	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
 
 (defun use-occlusion-shader (&optional (camera *camera*))
-  (let ((shader (getfnc 'occlusion-shader)))
-    (glhelp::use-gl-program shader)
+  (let ((shader (deflazy:getfnc 'occlusion-shader)))
+    (glhelp:use-gl-program shader)
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms uniform shader
       (gl:uniform-matrix-4fv 
        (uniform :pmv)
        (camera-matrix:camera-matrix-projection-view-player camera)
        nil))))
-;;FIXME::better way to do this? bring render-occlusion-queries here?
+;;[FIXME]better way to do this? bring render-occlusion-queries here?
 (defun render-chunk-occlusion-queries ()
   (render-occlusion-queries))
 
 #+nil
 (defun draw-fullscreen-quad ()
   (gl:call-list
-   (glhelp::handle (application::getfnc 'fullscreen-quad))))
+   (glhelp:handle (deflazy:getfnc 'fullscreen-quad))))
 #+nil
-(glhelp::deflazy-gl fullscreen-quad ()
+(glhelp:deflazy-gl fullscreen-quad ()
   (make-instance
-   'glhelp::gl-list
+   'glhelp:gl-list
    :handle
-   (glhelp::with-gl-list
+   (glhelp:with-gl-list
      (macrolet ((vvv (darkness u v x y z)
 		  `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
 			  #+nil
 			  (%gl:vertex-attrib-2f 2 ,u ,v)
-			  ;;FIXME::when using %gl:vertex-attrib, the 0 attrib marks the
+			  ;;[FIXME]when using %gl:vertex-attrib, the 0 attrib marks the
 			  ;;end.
 			  (%gl:vertex-attrib-4f 0 ,x ,y ,z 1.0)
 			  )))
@@ -131,7 +131,7 @@
 	 (vvv 0.0 w1 h3 1.0 -1.0 0.99999994))))))
 #+nil
 (glhelp:deflazy-gl gl-clear-color-buffer ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "in vec4 position;
 
 void main () {
@@ -266,19 +266,19 @@ gl_FragColor = color;
 	    '(191.0 183.0 85.0)
 	    '(128.0 180.0 151.0))))
 
-(deflazy terrain-png ()
-  (image-utility::load-image-from-file
+(deflazy:deflazy terrain-png ()
+  (img:load
    (sucle-temp:path #P"res/terrain.png")))
 
-(deflazy modified-terrain-png (terrain-png)
+(deflazy:deflazy modified-terrain-png (terrain-png)
   (color-grasses
-   (alexandria::copy-array terrain-png)))
+   (alexandria:copy-array terrain-png)))
 
 (glhelp:deflazy-gl terrain (modified-terrain-png)
-  (glhelp::wrap-opengl-texture
-   (glhelp::create-opengl-texture-from-data modified-terrain-png)))
+  (glhelp:wrap-opengl-texture
+   (glhelp:create-opengl-texture-from-data modified-terrain-png)))
 (glhelp:deflazy-gl blockshader ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "
 out float color_out;
 out vec2 texcoord_out;
@@ -336,7 +336,7 @@ gl_FragColor.rgb = temp;
 
 
 (glhelp:deflazy-gl solidshader ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "
 out vec3 color_out;
 in vec4 position;
@@ -367,7 +367,7 @@ gl_FragColor.rgb = color_out;
   (gl:disable :cull-face)
   (gl:polygon-mode :front-and-back :line)
   (gl:line-width 2)
-  ;;FIXME::render the fist again
+  ;;[FIXME]render the fist again
   (when (fister-exists fist)
     (let ((selected-block (fister-selected-block fist)))
       (with-vec (a b c) (selected-block)
@@ -378,30 +378,30 @@ gl_FragColor.rgb = color_out;
 	    ;;mesh-fist-box
 	    (let ((box
 		   (let ((n 0.06))
-		     ;;FIXME::why use this *iterator*?
+		     ;;[FIXME]why use this *iterator*?
 		     (scratch-buffer:flush-bind-in* ((iterator xyz))		    
 		       (glhelp:create-vao-or-display-list-from-specs
 			(:quads times)
 			((3 n n n)
 			 (0 (xyz) (xyz) (xyz))))
 		       ))))
-	      (glhelp::slow-draw box)
-	      (glhelp::slow-delete box)
+	      (glhelp:slow-draw box)
+	      (glhelp:slow-delete box)
 	      )))
 	))))
 #+nil
 (defun render-chunk-outline ()
   (draw-aabb
-   (* 16.0 world::*chunk-coordinate-center-x*)
-   (* 16.0 world::*chunk-coordinate-center-y*)
-   (* 16.0 world::*chunk-coordinate-center-z*)
+   (* 16.0 world:*chunk-coordinate-center-x*)
+   (* 16.0 world:*chunk-coordinate-center-y*)
+   (* 16.0 world:*chunk-coordinate-center-z*)
    *chunk-aabb*))
   ;;render crosshairs
 
 (defun render-crosshairs ()
   (glhelp:set-render-area
-   (- (/ window::*width* 2.0) 1.0)
-   (- (/ window::*height* 2.0) 1.0)
+   (- (/ window:*width* 2.0) 1.0)
+   (- (/ window:*height* 2.0) 1.0)
    2
    2)
   (gl:clear-color 1.0 1.0 1.0 1.0)
@@ -410,14 +410,14 @@ gl_FragColor.rgb = color_out;
    ))
 
 (defun use-solidshader (&optional (camera *camera*))
-  (let ((shader (application:getfnc 'solidshader)))
-    (glhelp::use-gl-program shader)
+  (let ((shader (deflazy:getfnc 'solidshader)))
+    (glhelp:use-gl-program shader)
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms
 	uniform shader
       (gl:uniform-matrix-4fv 
        (uniform :pmv)
-       ;;(nsb-cga::identity-matrix)
+       ;;(nsb-cga:identity-matrix)
        
        (camera-matrix:camera-matrix-projection-view-player camera)
        nil))))
@@ -473,10 +473,10 @@ gl_FragColor.rgb = color_out;
 (defun get-chunks-to-draw ()
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
-    (let* ((foo (+ 1 world::*chunk-radius*)))
+    (let* ((foo (+ 1 world:*chunk-radius*)))
       (dohash (key value) *g/chunk-call-list*
 	      ;;(declare (ignore key))
-	      (when (> (the fixnum foo) (the fixnum (world::blocky-chunk-distance key)))
+	      (when (> (the fixnum foo) (the fixnum (world:blocky-chunk-distance key)))
 		(vector-push-extend value vec))))
     vec))
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
@@ -493,7 +493,7 @@ gl_FragColor.rgb = color_out;
 		   (not (eq (chunk-gl-representation-occlusion-state value) :init)))
 	      (let ((available (gl:get-query-object query :query-result-available)))
 		(when available
-		  ;;FIXME::bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
+		  ;;[FIXME]bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
 		  (let ((result (gl:get-query-object query :query-result)))		      
 		    (case result
 		      (0 (set-chunk-gl-representation-hidden value))
@@ -514,10 +514,10 @@ gl_FragColor.rgb = color_out;
 		 (gl:begin-query :samples-passed query)
 		 ;;draw occlusion box here
 		 ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
-		 (glhelp::slow-draw display-list)
+		 (glhelp:slow-draw display-list)
 		 (gl:end-query :samples-passed))
 		(t
-		 (glhelp::slow-draw display-list)))))
+		 (glhelp:slow-draw display-list)))))
 	  ;;(gl:call-list display-list)
 	  )
 	 (t ;;(print "WHAT?")
@@ -542,7 +542,7 @@ gl_FragColor.rgb = color_out;
   (defun reset-chunk-display-list ()
     (clrhash *g/chunk-call-list*)))
 (defun remove-chunk-model (name)
-  ;;FIXME::this calls opengl. Use a queue instead?
+  ;;[FIXME]this calls opengl. Use a queue instead?
   (multiple-value-bind (value existsp) (get-chunk-display-list name)
     (when existsp
       (destroy-chunk-gl-representation value)
@@ -551,19 +551,19 @@ gl_FragColor.rgb = color_out;
 (defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 
 (defun call-with-world-meshing-lparallel (fun)
-  (sucle-mp::with-initialize-multiprocessing
+  (sucle-mp:with-initialize-multiprocessing
     (funcall fun)))
 
 (defun update-world-vao ()
-  (world::clean-dirty)
+  (world:clean-dirty)
   (reset-meshers)
   (loop :for key :being :the :hash-keys :of *g/chunk-call-list* :do
      (remove-chunk-model key))
-  (mapc #'world::dirty-push
-	(sort (alexandria:hash-table-keys voxel-chunks::*chunks*) #'< :key
-	      'world::unsquared-chunk-distance)))
+  (mapc #'world:dirty-push
+	(sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'< :key
+	      'world:unsquared-chunk-distance)))
 
-(defparameter *chunk-query-buffer-size* 8)
+(defparameter *chunk-query-buffer-size* 0)
 (defvar *iterator*)
 (defun update-chunk-mesh (coords iter)
   (when coords
@@ -593,13 +593,13 @@ gl_FragColor.rgb = color_out;
 			     (draw-aabb x y z
 					(load-time-value
 					 (let ((foo *chunk-query-buffer-size*))
-					   (aabbcc::make-aabb
+					   (aabbcc:make-aabb
 					    :minx (- 0.0 foo)
 					    :miny (- 0.0 foo)
 					    :minz (- 0.0 foo)
-					    :maxx (+ (floatify voxel-chunks::*chunk-size-x*) foo)
-					    :maxy (+ (floatify voxel-chunks::*chunk-size-y*) foo)
-					    :maxz (+ (floatify voxel-chunks::*chunk-size-z*) foo)))))))
+					    :maxx (+ (floatify voxel-chunks:*chunk-size-x*) foo)
+					    :maxy (+ (floatify voxel-chunks:*chunk-size-y*) foo)
+					    :maxz (+ (floatify voxel-chunks:*chunk-size-z*) foo)))))))
 			(scratch-buffer:flush-bind-in*
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
@@ -616,8 +616,12 @@ gl_FragColor.rgb = color_out;
 
 
 (defun draw-aabb (x y z aabb &optional (iterator *iterator*))
-  (with-slots ((minx aabbcc::minx) (miny aabbcc::miny) (minz aabbcc::minz)
-	       (maxx aabbcc::maxx) (maxy aabbcc::maxy) (maxz aabbcc::maxz))
+  (let ((minx (aabbcc:aabb-minx aabb))
+	(miny (aabbcc:aabb-miny aabb))
+	(minz (aabbcc:aabb-minz aabb))
+	(maxx (aabbcc:aabb-maxx aabb))
+	(maxy (aabbcc:aabb-maxy aabb))
+	(maxz (aabbcc:aabb-maxz aabb)))
       aabb
     (draw-box
      (+ minx x -0) (+  miny y -0) (+  minz z -0)
@@ -670,7 +674,7 @@ gl_FragColor.rgb = color_out;
     (values (* 6 4))))
 
 (glhelp:deflazy-gl occlusion-shader ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "in vec4 position;
 
 uniform mat4 projection_model_view;
@@ -700,7 +704,7 @@ decreases when finished.")
 (defparameter *max-gl-meshing-iterations-per-frame* 2)
 
 (defun reset-meshers ()
-  (sucle-mp::with-kernel
+  (sucle-mp:with-kernel
     (lparallel:kill-tasks 'mesh-chunk)
     #+nil
     (progn
@@ -717,14 +721,14 @@ to be drawn by the render thread."
   (when (plusp (meshes-pending-for-gl))
     (let ((count 0))
       (block stop-meshing
-	(sucle-mp::do-queue-iterator (job-task *finished-mesh-tasks*)
+	(sucle-mp:do-queue-iterator (job-task *finished-mesh-tasks*)
 	  (when (> count *max-gl-meshing-iterations-per-frame*)
 	    (return-from stop-meshing))
 	  (incf count)
-	  (let ((value (car (sucle-mp::job-task-return-values (job-task)))))
+	  (let ((value (car (sucle-mp:job-task-return-values (job-task)))))
 	    (cond (value
 		   (destructuring-bind (type function . args) value
-		     ;;FIXME::document this somewhere?
+		     ;;[FIXME]document this somewhere?
 		     ;;*finshed-mesh-tasks* becoming a generic command buffer?
 		     (assert (eq :mesh-chunk type))
 		     (apply function args)))
@@ -732,7 +736,7 @@ to be drawn by the render thread."
 (defun dispatch-mesher-to-dirty-chunks ()
   "Re-draw, draw, or delete the openGL representation of chunks based 
 observed chunk state changes. 
-Chunk state changes can be found in `world::*dirty-chunks*`
+Chunk state changes can be found in `world:*dirty-chunks*`
 
 Note:limits the amount of background jobs and pending lisp objects."
   (flet
@@ -744,29 +748,29 @@ Note:limits the amount of background jobs and pending lisp objects."
 	  ;;So memory is not entirely eaten up
 	  (<= *max-meshes-pending-for-gl* (meshes-pending-for-gl)))))
     (when (not (too-much))
-      (queue::sort-queue
-       world::*dirty-chunks*
+      (queue:sort-queue
+       world:*dirty-chunks*
        (lambda (list)
 	 (sort list
 	       ;;remove chunks from the queue that are too far away, don't try to mesh them
-	       #+nil ;;WRONG!!FIXME::separate world loading code from opengl
+	       #+nil ;;WRONG!![FIXME]separate world loading code from opengl
 	       (delete-if (lambda (x)
 			    (>= (blocky-chunk-distance x) *chunk-render-radius*))
 			  list)
-	       '< :key 'world::unsquared-chunk-distance)))
+	       '< :key 'world:unsquared-chunk-distance)))
       (loop :named submit-mesh-tasks
 	 :while (not (too-much)) :do
-	 (let ((thechunk (world::dirty-pop)))
+	 (let ((thechunk (world:dirty-pop)))
 	   (if thechunk
 	       (cond
 		 ;;If the chunk exists and is not empty
-		 ((and (voxel-chunks::chunk-exists-p thechunk)
-		       (not (voxel-chunks::empty-chunk-p
-			     (voxel-chunks::get-chunk-at thechunk))))
+		 ((and (voxel-chunks:chunk-exists-p thechunk)
+		       (not (voxel-chunks:empty-chunk-p
+			     (voxel-chunks:get-chunk-at thechunk))))
 		  ;;Then submit a job to the mesher 
 		  (incf *total-background-chunk-mesh-jobs*)
 		  (let ((lparallel:*task-category* 'mesh-chunk))
-		    (sucle-mp::submit 
+		    (sucle-mp:submit 
 		     (lambda (iter space chunk-pos)
 		       (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		       (multiple-value-bind (io jo ko) (voxel-chunks:unhashfunc chunk-pos)

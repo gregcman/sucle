@@ -13,7 +13,10 @@
            ;;:disable-mouse
 	   #:attribute-bits
 	   #:attribute-bits2
-	   #:with-attribute))
+	   #:with-attribute
+
+	   #:color-fun
+	   #:*colors*))
 (in-package :lem.term)
 ;;;;<LEM COLORS.LISP> -> entire section ripped from lem/core/colors.lisp
 (defparameter *rgb.txt* "! $Xorg: rgb.txt,v 1.3 2000/08/17 19:54:00 cpqbld Exp $
@@ -814,7 +817,7 @@
 ;;;;</LEM COLORS.LISP>
 
 #+nil
-(cffi:defcvar ("COLOR_PAIRS" *COLOR-PAIRS* :library charms/ll::libcurses) :int)
+(cffi:defcvar ("COLOR_PAIRS" *COLOR-PAIRS* :library charms/ll:libcurses) :int)
 
 ;; mouse mode
 ;;   =0: not use mouse
@@ -828,20 +831,20 @@
   *mouse-mode*)
 #+nil
 (defun enable-mouse ()
-  (setf ncurses-clone::*mouse-enabled-p* t)
+  (setf ncurses-clone:*mouse-enabled-p* t)
   #+nil
   (progn
     (setf *mouse-mode* 1)
-    ;;FIXME- mouse?
+    ;;[FIXME]- mouse?
     (charms/ll:mousemask (logior charms/ll:all_mouse_events
 				 charms/ll:report_mouse_position))))
 #+nil
 (defun disable-mouse ()
-  (setf ncurses-clone::*mouse-enabled-p* nil)
+  (setf ncurses-clone:*mouse-enabled-p* nil)
   #+nil
   (progn
     (setf *mouse-mode* 0)
-    ;;FIXME - mouse?
+    ;;[FIXME] - mouse?
     (charms/ll:mousemask 0)))
 
 
@@ -909,9 +912,9 @@
 (defparameter *ansi-color-names-vector* nil)
 (defun color-fun (color)
   (labels ((bcolor (r g b)
-	     (values (/ (utility::floatify r) 255.0)
-		     (/ (utility::floatify g) 255.0)
-		     (/ (utility::floatify b) 255.0)))
+	     (values (/ (utility:floatify r) 255.0)
+		     (/ (utility:floatify g) 255.0)
+		     (/ (utility:floatify b) 255.0)))
 	   (c (r g b)
 	     (bcolor r g b))
 	   (c6 (x)
@@ -929,7 +932,7 @@
     (let ((color-data (nth color *ansi-color-names-vector*)))
       (when color-data
 	(return-from color-fun (apply #'c color-data))))
-    ;;FIXME::the case statement below goes through redundant numbers?
+    ;;[FIXME]the case statement below goes through redundant numbers?
     (case color
       (0 (c 0 0 0))
       (1 (c 205 0 0))
@@ -1003,18 +1006,18 @@
   (defun init-pair (pair-color)
     (incf *pair-counter*)
     ;;(charms/ll:init-pair *pair-counter* (car pair-color) (cdr pair-color))
-    (ncurses-clone::ncurses-init-pair *pair-counter* (car pair-color) (cdr pair-color))
+    (ncurses-clone:ncurses-init-pair *pair-counter* (car pair-color) (cdr pair-color))
     (setf (gethash pair-color *color-pair-table*)
-	  *pair-counter* ;;FIXME wat
-	  ;;(ncurses-clone::ncurses-color-pair *pair-counter*)
+	  *pair-counter* ;;[FIXME] wat
+	  ;;(ncurses-clone:ncurses-color-pair *pair-counter*)
 	  ;;(charms/ll:color-pair *pair-counter*)
 	  )
-    ;;FIXME:: return color-pair?
+    ;;[FIXME] return color-pair?
     *pair-counter*)
   #+nil
   "After it has been initialized, COLOR_PAIR(n), a macro defined in <curses.h>, can be used as a new video attribute. "
 ;;;https://linux.die.net/man/3/color_pair
-  (defparameter *color-pairs* 256) ;;;FIXME::wtf does this mean? I added this and am guessing.
+  (defparameter *color-pairs* 256) ;;;[FIXME]wtf does this mean? I added this and am guessing.
 
   (defun get-color-pair (fg-color-name bg-color-name)
     (let* ((fg-color (if (null fg-color-name) -1 (get-color fg-color-name)))
@@ -1036,7 +1039,7 @@
 		(cffi:mem-ref b :short))))))
 
   (defun get-default-colors ()
-    (ncurses-clone::ncurses-pair-content 0)
+    (ncurses-clone:ncurses-pair-content 0)
     #+nil
     (cffi:with-foreign-pointer (f (cffi:foreign-type-size '(:pointer :short)))
       (cffi:with-foreign-pointer (b (cffi:foreign-type-size '(:pointer :short)))
@@ -1048,7 +1051,7 @@
   ;;;;-1 for values mean defaults.
     (let ((fg-color (if foreground (get-color foreground) -1))
 	  (bg-color (if background (get-color background) -1)))
-      (ncurses-clone::ncurses-assume-default-color fg-color bg-color)
+      (ncurses-clone:ncurses-assume-default-color fg-color bg-color)
       #+nil
       (charms/ll:assume-default-colors fg-color
 				       bg-color))))
@@ -1057,7 +1060,7 @@
   (multiple-value-bind (fg found) (get-color name)
     (cond (found
 	   ;;charms/ll:assume-default-colors
-	   (setf  ncurses-clone::*fg-default* fg)
+	   (setf  ncurses-clone:*fg-default* fg)
 	   t)
 	  (t
 	   (error "Undefined color: ~A" name)))))
@@ -1067,17 +1070,17 @@
     (cond (found
 	   ;;charms/ll:assume-default-colors
 	   (setf
-	    ncurses-clone::*bg-default* bg)
+	    ncurses-clone:*bg-default* bg)
 	   t)
 	  (t
 	   (error "Undefined color: ~A" name)))))
 
 (defun background-mode ()
-  ;;FIXME
+  ;;[FIXME]
   :light
   ;;:dark
   #+nil
-  ;;FIXME
+  ;;[FIXME]
   (let ((b (nth-value 1 (get-default-colors))))
     (cond ((= b -1) :light
 	   )
@@ -1141,7 +1144,7 @@
   ;;#+win32(charms/ll:use-default-colors)
   (init-colors 256
 	       )
-  ;;;FIXME: find out what all these options do
+  ;;;[FIXME] find out what all these options do
   ;;(set-default-color nil nil)
   ;;(charms/ll:noecho)
   ;;(charms/ll:cbreak)
@@ -1149,7 +1152,7 @@
   ;;(charms/ll:nonl)
   ;;(charms/ll:refresh)
   ;;(charms/ll:keypad charms/ll:*stdscr* 1)
-  ;;(setf charms/ll::*escdelay* 0)
+  ;;(setf charms/ll:*escdelay* 0)
   ;; (charms/ll:curs-set 0)
   ;; for mouse
   #+nil
@@ -1186,7 +1189,7 @@ The echo and noecho routines control whether characters typed by the user are ec
   "The nl and nonl routines control whether the underlying display device translates the return key into newline on input, and whether it translates newline into return and line-feed on output (in either case, the call addch('\n') does the equivalent of return and line feed on the virtual screen). Initially, these translations do occur. If you disable them using nonl, curses will be able to make better use of the line-feed capability, resulting in faster cursor motion. Also, curses will then be able to detect the return key. https://linux.die.net/man/3/clearok"
   (charms/ll:refresh)
   (charms/ll:keypad charms/ll:*stdscr* 1)
-  (setf charms/ll::*escdelay* 0)
+  (setf charms/ll:*escdelay* 0)
   ;; (charms/ll:curs-set 0)
   ;; for mouse
   (when (= *mouse-mode* 1)
@@ -1207,27 +1210,27 @@ The echo and noecho routines control whether characters typed by the user are ec
 
 (defun get-attribute-bits (fg bg boldp underlinep reversep)
   (logior
-   ;;FIXME::fragile bit layout
+   ;;[FIXME]fragile bit layout
    (if fg
-       ;;FIXME::why the logior?
+       ;;[FIXME]why the logior?
        (logior fg (load-time-value (ash 1 8)))
-       ncurses-clone::*fg-default*)
+       ncurses-clone:*fg-default*)
    (ash (if bg
-	    ;;FIXME::Why the logior?
+	    ;;[FIXME]Why the logior?
 	    (logior bg (load-time-value (ash 1 8)))
-	    ncurses-clone::*bg-default*)
+	    ncurses-clone:*bg-default*)
 	9)
    ;;(lem.term:get-color-pair foreground background)
    (if boldp
        ;;charms/ll:a_bold
-       ncurses-clone::a_bold
+       ncurses-clone:a_bold
        0)
    (if underlinep
        ;;charms/ll:a_underline
-       ncurses-clone::a_underline
+       ncurses-clone:a_underline
        0)
    (if reversep
-       ncurses-clone::a_reverse
+       ncurses-clone:a_reverse
        0)))
 
 (defun get-attribute-bits-2 (fg-name bg-name boldp underlinep reversep)
@@ -1239,5 +1242,5 @@ The echo and noecho routines control whether characters typed by the user are ec
    reversep))
 
 (defmacro with-attribute ((&key fg bg bold underline reverse) &body body)
-  `(ncurses-clone::with-attributes ((get-attribute-bits-2 ,fg ,bg ,bold ,underline ,reverse))
+  `(ncurses-clone:with-attributes ((get-attribute-bits-2 ,fg ,bg ,bold ,underline ,reverse))
      ,@body))

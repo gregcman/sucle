@@ -11,7 +11,12 @@
    #:type-collapser
    #:aabb-collide
    #:aabb-contact
-   #:make-aabb))
+   #:make-aabb
+   #:get-blocks-around
+   #:with-touch-collector
+   #:aabb-not-overlap
+   #:aabb-collect-blocks
+   ))
 (in-package #:aabbcc)
 
 (defun %collision-type (x y z)

@@ -77,7 +77,7 @@
 
 (defmacro button (type state button
 		  &optional (control-state *control-state* control-state-supplied-p))
-  ;;FIXME::pair allowed-button-states and allowed-button-types with the
+  ;;[FIXME]pair allowed-button-states and allowed-button-types with the
   ;;quoted lists below
   (let ((allowed-button-states '(:down :pressed :released :repeat))
 	(allowed-button-types '(:mouse :key)))

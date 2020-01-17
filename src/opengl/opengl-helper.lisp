@@ -1,5 +1,54 @@
 (defpackage #:glhelp
-  (:use :cl))
+  (:use :cl)
+  (:import-from
+   #:gl
+   #:enum=
+   #:make-gl-array-from-pointer)
+  (:export
+   
+   #:with-gl-context
+   
+   #:deflazy-gl
+   
+   #:handle
+   #:alive-p
+   
+   #:bind-default-framebuffer
+   #:make-gl-framebuffer
+   #:w
+   #:h
+   #:set-render-area
+   
+   #:gl-list
+   #:with-gl-list
+   #:create-gl-list-from-specs
+   
+   #:wrap-opengl-texture
+   #:create-opengl-texture-from-data
+   #:create-texture
+   #:texture
+   #:apply-tex-params
+   
+   #:set-uniforms-to-textures
+
+   #:getuniform
+   #:cache-program-uniforms
+   #:make-uniform-cache
+   #:with-uniforms
+
+   #:create-gl-program2
+   #:make-shader-program-from-strings
+   #:create-opengl-shader
+
+   #:use-gl-program
+   #:vertex-attrib-f
+   #:vertex-attrib-f*
+   
+   #:create-vao-or-display-list-from-specs
+   
+   #:slow-draw
+   #:slow-delete
+   ))
 (in-package :glhelp)
 ;;;;************************************************************************;;;;
 ;;;;<CONTENTS>
@@ -69,7 +118,6 @@
 (defun alive-p (obj)
   (eq *gl-context*
       (context obj)))
-(export '(alive-p))
 
 ;;;;</PARENT OBJECT>
 ;;;;************************************************************************;;;;
@@ -79,8 +127,7 @@
   (unless *gl-context*
     (error "no opengl context you idiot!")))
 
-;;FIXME::does code involving deflazy belong here at all?
-(export '(deflazy-gl))
+;;[FIXME]does code involving deflazy belong here at all?
 (defmacro deflazy-gl (name (&rest deps) &rest gen-forms)
   "for objects that should be forgotten because they were
 not made in the current OpenGL context, so they are garbage"
@@ -88,13 +135,13 @@ not made in the current OpenGL context, so they are garbage"
      (declare (ignorable gl-context))
      ,@gen-forms))
 
-(defmethod deflazy::cleanup-node-value ((object gl-object))
+(defmethod deflazy:cleanup-node-value ((object gl-object))
   (when (alive-p object)
     (gl-delete* object)))
 
 (defmacro with-gl-context ((gl-proc-address) &body body)
   `(unwind-protect (progn
-		     (setf %gl:*gl-get-proc-address* ,gl-proc-address) ;;FIXME::is this needed?
+		     (setf %gl:*gl-get-proc-address* ,gl-proc-address) ;;[FIXME]is this needed?
 		     (setf *gl-context* (cons "gl-context" "token"))
 		     (setf *gl-version* (gl:get-string :version))
 		     (setf *gl-version-substring*
@@ -104,8 +151,6 @@ not made in the current OpenGL context, so they are garbage"
 		     (deflazy:refresh 'gl-context t)
 		     ,@body)
      (setf *gl-context* nil)))
-
-(export '(with-gl-context))
 
 ;;;;</SETUP>
 ;;;;************************************************************************;;;;
@@ -369,7 +414,6 @@ just put together a new vao"
 		   ,@body)
 	 (gl:end-list))
        ,list-sym)))
-(export '(with-gl-list))
 ;;;
 
 (defun draw-display-list (display-list)
@@ -448,7 +492,6 @@ just put together a new vao"
 			    (row-major-aref thepic (+ wi base1))))))
 		(create-texture array w h :format type))))))))
 
-(export '(apply-tex-params))
 (defun apply-tex-params (tex-parameters)
   (dolist (param tex-parameters)
     (gl:tex-parameter :texture-2d (car param) (cdr param))))
@@ -464,14 +507,14 @@ just put together a new vao"
 (defclass gl-framebuffer (gl-object)
   ((texture :accessor texture)
    (depth :accessor depth)
-   (x :accessor x)
-   (y :accessor y)))
+   (w :accessor w)
+   (h :accessor h)))
 
 (defun make-gl-framebuffer (width height)
   (let ((inst (make-instance 'gl-framebuffer)))
-    (with-slots (x y handle texture depth) inst
-      (setf x width
-	    y height)
+    (with-slots (w h handle texture depth) inst
+      (setf w width
+	    h height)
       (setf (values texture handle depth)
 	    (create-framebuffer width height)))
     inst))
@@ -517,7 +560,7 @@ just put together a new vao"
 
     ;; validate framebuffer
     (let ((framebuffer-status (gl:check-framebuffer-status :framebuffer)))
-      (unless (gl::enum= framebuffer-status :framebuffer-complete)
+      (unless (enum= framebuffer-status :framebuffer-complete)
         (error "Framebuffer not complete: ~A." framebuffer-status)))
 
     #+nil
@@ -551,13 +594,11 @@ just put together a new vao"
 		    (list 'getuniform ',uniforms-var id)))
 	 ,@body))))
 
-(export '(getuniform cache-program-uniforms make-uniform-cache with-uniforms))
 (defclass gl-program (gl-object)
   ((src :accessor gl-program-object-src
 	:initarg :src)
    (uniforms :accessor gl-program-object-uniforms)))
-;;FIXME::fix exports
-(export 'use-gl-program)
+
 (defun use-gl-program (src)
   (gl:use-program (handle src)))
 
@@ -569,7 +610,7 @@ just put together a new vao"
   (set-active-texture num)
   (gl:bind-texture :texture-2d texture))
 
-;;FIXME::is a macro really necessary here? To prevent consing?
+;;[FIXME]is a macro really necessary here? To prevent consing?
 (defmacro set-uniforms-to-textures (&rest specs)
   (cons 'progn
 	(mapcar (lambda (spec number)
@@ -618,11 +659,9 @@ just put together a new vao"
     (gl:delete-shader vert)
     (gl:delete-shader frag)
     program))
-
-(export (quote (pic-texture make-shader-program-from-strings)))
 ;;;;
 (defun create-gl-program2 (src)
-  ;;FIXME::add ability to rename varyings so
+  ;;[FIXME]add ability to rename varyings so
   ;;vertex shader and fragment shader can have different variable names
   (let ((raw-attributes (getf src :attributes))
 	(uniform-data (getf src :uniforms))
@@ -640,7 +679,7 @@ just put together a new vao"
 	     obj
 	     uniform-data))
       inst)))
-(export 'create-opengl-shader)
+
 (defun create-opengl-shader (vert-text frag-text attributes uniforms)
   (create-gl-program2
    (list :vs vert-text
@@ -682,7 +721,7 @@ gl_FragColor = pixcolor;
 }")
 (defparameter *newline* (format nil "~%"))
 (defparameter *gl-fragcolor-replacement*
-  ;;FIXME::procedurally generate a name that definitely does not clash with
+  ;;[FIXME]procedurally generate a name that definitely does not clash with
   ;;any glsl names or other names
   "roloCgarF_lg")
 (defun fixup-shader-for-version (&optional (shader-type (or :frag :vs))
@@ -713,7 +752,7 @@ gl_FragColor = pixcolor;
 			    (eq (first ast)
 				'glsl-toolkit:variable-declaration))
 		   (let
-		       (;;FIXME::This assumes the type-qualifiers are in the second position
+		       (;;[FIXME]This assumes the type-qualifiers are in the second position
 			(type-qualifier-data (second ast)))
 		     (when (consp type-qualifier-data)
 		       (symbol-macrolet ((type-qualifiers (cdr type-qualifier-data)))
@@ -722,7 +761,7 @@ gl_FragColor = pixcolor;
 					(nsubst new old type-qualifiers))))
 			   (when (member :uniform type-qualifiers)
 			     (unless (>= version 120)
-			       ;;FIXME::this represents the variable declaration.
+			       ;;[FIXME]this represents the variable declaration.
 			       ;;How to actually refer? ask shinmera?
 			       ;;This hack code removes the optional init form.
 			       ;;glsl version 120 and greater allow initialization
@@ -737,12 +776,12 @@ gl_FragColor = pixcolor;
 				:in))
 			     (when (member :out type-qualifiers)
 			       (ecase shader-type
-				 ;;FIXME out in the fragment shader?
+				 ;;[FIXME] out in the fragment shader?
 				 #+nil
 				 (:frag (add-qualifier "varying"))
 				 (:vs (replace-qualifer :out
 							"varying"))))
-			     #+nil ;;FIXME:: varying does not occur
+			     #+nil ;;[FIXME] varying does not occur
 			     (when (member :varying type-qualifiers))))))))
 		 (walk-next ast)))))))
     (concatenate-strings
@@ -773,11 +812,10 @@ gl_FragColor = pixcolor;
     (3 `(%gl:vertex-attrib-3f ,index ,@forms))
     (4 `(%gl:vertex-attrib-4f ,index ,@forms))))
 
-;;FIXME::make sure 0 comes last, because that completes each vertex?
+;;[FIXME]make sure 0 comes last, because that completes each vertex?
 (defmacro vertex-attrib-f* ((&rest forms))
   `(progn ,@(mapcar (lambda (x) `(vertex-attrib-f ,@x)) forms)))
 
-(export '(vertex-attrib-f vertex-attrib-f*))
 ;;;;</LEGACY>
 ;;;;************************************************************************;;;;
 ;;;;<SWITCH BETWEEN DISPLAY LISTS AND VAOS>
@@ -801,11 +839,10 @@ gl_FragColor = pixcolor;
 	  (foo 5 3))))
     array))
 
-(export 'quads-triangles-index-buffer)
-;;FIXME::rename from gl-list to display-list?
+;;[FIXME]rename from gl-list to display-list?
 (defmacro create-gl-list-from-specs ((type times) form)
   (utility:with-gensyms (fixed-times fixed-type)
-    ;;FIXME:: the prefix "fix" is unrelated for fixed-type,fixed-times vs fixnum
+    ;;[FIXME] the prefix "fix" is unrelated for fixed-type,fixed-times vs fixnum
     `(let ((,fixed-type ,type)
 	   (,fixed-times ,times))
        (declare (type fixnum ,fixed-times))
@@ -813,9 +850,6 @@ gl_FragColor = pixcolor;
 	 (gl:with-primitives ,fixed-type
 	   (loop :repeat ,fixed-times :do 
 	      (vertex-attrib-f* ,form)))))))
-
-(export 'create-gl-list-from-specs)
-
 
 (defparameter *quad-to-triangle-index-buffer-quad-count*
   ;;the number of quads in a 16x16x16 chunk if each block has 6 faces showing.
@@ -882,7 +916,7 @@ gl_FragColor = pixcolor;
 			 (incf ,index)))
 		  (loop :repeat ,times :do
 		     ,@(mapcar (lambda (form) `(,add ,form)) forms))))
-	      (let ((glarray (gl::make-gl-array-from-pointer ,arr :float ,array-count)))
+	      (let ((glarray (make-gl-array-from-pointer ,arr :float ,array-count)))
 		(use-array-buffer ,vertex-buffer glarray)))
 	
 	    (let
@@ -893,7 +927,7 @@ gl_FragColor = pixcolor;
 		     ,vertex-buffer
 		     index-buffer
 		     ',layout
-		     ;;FIXME:: is it the total count of primitives, or points?
+		     ;;[FIXME] is it the total count of primitives, or points?
 		     fixed-times
 		     fixed-type))))
 	      (setf (i-delete-p vao) nil)
@@ -905,9 +939,8 @@ gl_FragColor = pixcolor;
       (create-gl-list-from-specs (,type ,times) ,form))
      (:vertex-array-object
       (create-vao-from-specs (,type ,times) ,form))))
-(export 'create-vao-or-display-list-from-specs)
 
-#+nil
+#+nil ;;[FIXME] Refactor into a test case
 (create-vao-or-display-list-from-specs
  (:quads 10)
  ((2 (xyz) (xyz) (xyz))
@@ -925,8 +958,7 @@ gl_FragColor = pixcolor;
   (typecase gl-thing
     (+gluint+ (draw-display-list gl-thing))
     (vao (draw-vertex-array gl-thing))
-    (gl-list (draw-display-list (handle gl-thing))))
-  )
+    (gl-list (draw-display-list (handle gl-thing)))))
 
 (defun slow-delete (gl-thing)
   ;;;dispatch on either display-list or vao
@@ -934,14 +966,11 @@ gl_FragColor = pixcolor;
   (typecase gl-thing
     (+gluint+ (gl:delete-lists gl-thing 1))
     (vao (delete-vao gl-thing))
-    (gl-list (gl:delete-lists (handle gl-thing) 1)))
-  )
-(export '(slow-draw slow-delete))
+    (gl-list (gl:delete-lists (handle gl-thing) 1))))
 
 ;;;;</SWITCH BETWEEN DISPLAY LISTS AND VAOS>
 ;;;;************************************************************************;;;;
 ;;;;<VIEWPORT>
-(export '(set-render-area))
 (defun set-render-area (x y width height)
   (gl:viewport x y width height)
   (gl:scissor x y width height))

@@ -5,7 +5,53 @@
    #:chunkhashfunc
    #:getobj
    #:setobj
-   #:clearworld))
+   #:clearworld)
+  (:export
+   #:*chunks*
+   #:total-loaded-chunks
+   #:*chunk-array*
+
+   #:*chunk-size-x*
+   #:*chunk-size-y*
+   #:*chunk-size-z*
+   
+   #:*chunk-array-default-size-x*
+   #:*chunk-array-default-size-y*
+   #:*chunk-array-default-size-z*  
+   
+   #:block-coord
+   #:chunk-coord
+   #:chunk-data
+   #:chunk-modified
+   #:chunk-key
+   
+   #:chunk-coordinates-from-block-coordinates
+   #:create-chunk-key
+
+   #:empty-chunk-p
+   #:reset-empty-chunk-value  
+   
+   #:create-chunk
+   #:make-chunk-from-key-and-data
+   #:with-chunk-key-coordinates
+   
+   #:obtain-chunk-from-block-coordinates
+   #:obtain-chunk-from-chunk-key
+
+   #:remove-chunk-from-chunk-array
+   #:remove-chunk-at
+   #:get-chunk-at
+   #:set-chunk-at
+
+   #:chunk-array-x-min
+   #:chunk-array-y-min
+   #:chunk-array-z-min
+   
+   #:reposition-chunk-array
+   
+   #:chunk-worth-saving
+   #:chunk-exists-p
+   ))
 (in-package #:voxel-chunks)
 
 (utility:eval-always
@@ -32,7 +78,7 @@
   (defun chunk-data (chunk)
     chunk))
 
-;;FIXME::chunk-coord and block-coord being fixnums is not theoretically correct,
+;;[FIXME]chunk-coord and block-coord being fixnums is not theoretically correct,
 ;;but its still a lot of space?
 (deftype chunk-coord () 'fixnum)
 (deftype chunk-data () `(simple-array t (,(* *chunk-size-x* *chunk-size-y* *chunk-size-z*))))
@@ -64,7 +110,7 @@
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))
 (defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
-  ;;FIXME::is this a good api?
+  ;;[FIXME]is this a good api?
   (with-chunk-key-coordinates (x y z) chunk-key 
     (obtain-chunk x y z force-load)))
 
@@ -140,7 +186,7 @@
 (defun total-loaded-chunks ()
   (hash-table-count *chunks*))
 
-(utility::eval-always
+(utility:eval-always
   (defparameter *chunk-array-default-size-x* 32)
   (defparameter *chunk-array-default-size-y* 32)
   (defparameter *chunk-array-default-size-z* 32)
@@ -172,7 +218,7 @@
 (;;utility:with-unsafe-speed
  progn
   (
-   ;;utility::with-declaim-inline
+   ;;utility:with-declaim-inline
    progn
     #+nil
    (obtain-chunk reference-inside-chunk get-chunk
@@ -207,7 +253,7 @@
 	  (if existsp
 	      (values value t)
 	      (progn
-		;;FIXME::load chunks here, unload chunks here?
+		;;[FIXME]load chunks here, unload chunks here?
 		(if force-load
 		    (progn
 		      (print "NOPeE3")
@@ -221,7 +267,7 @@
 		       nil))))))))
 
     (defun load-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
-      ;;FIXME::actually load chunks
+      ;;[FIXME]actually load chunks
       (print "NOPE")
       (create-chunk chunk-x chunk-y chunk-z))
     
@@ -279,7 +325,7 @@
     (defun remove-chunk-from-chunk-array (&optional 
 					 (chunk-x 0) (chunk-y 0) (chunk-z 0)
 					    (chunk-array *chunk-array*))
-      ;;FIXME::Some of the code is identical to get-chunk-from-chunk-array,
+      ;;[FIXME]Some of the code is identical to get-chunk-from-chunk-array,
       ;;namely the when and lets establishing the bounds of the chunk coordinates
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
       ;;if the coordinates are correct, return a chunk, otherwise return nil
@@ -337,12 +383,12 @@
 	(coerce-empty-chunk-to-regular-chunk chunk)
 	(setf (chunk-modified chunk) t)
 	(setf (reference-inside-chunk chunk inner-x inner-y inner-z) value)))
-    ;;FIXME::setobj is provided for backwards compatibility?
+    ;;[FIXME]setobj is provided for backwards compatibility?
     (defun setobj (x y z new)
       (setf (getobj x y z) new))))
 
 (defun chunk-coordinates-from-block-coordinates (&optional (x 0) (y 0) (z 0))
-  ;;FIXME? combine with obtain-chunk-from-block-coordinates? 
+  ;;[FIXME]? combine with obtain-chunk-from-block-coordinates? 
   (declare (type block-coord x y z))
   (let ((chunk-x (floor x (utility:etouq *chunk-size-x*)))
 	(chunk-y (floor y (utility:etouq *chunk-size-y*)))
@@ -360,7 +406,7 @@
 #+nil
 (defun chunkhashfunc (x y z)
   (create-chunk-key x y z))
-;;FIXME::clearworld does not handle loading and stuff?
+;;[FIXME]clearworld does not handle loading and stuff?
 (defun clearworld ()
   (setf *chunks* (make-chunk-table)
 	*chunk-array* (create-chunk-array))
@@ -368,8 +414,8 @@
 
 (defun chunk-worth-saving (chunk)
   ;;a chunk is not worth saving if all the values are the empty value
-  ;;FIXME::optimize?
-  ;;FIXME::what about terrain generation? if a chunk is generated with terrain,
+  ;;[FIXME]optimize?
+  ;;[FIXME]what about terrain generation? if a chunk is generated with terrain,
   ;;then erased with the *empty-space* value, it will be reloaded.
   (let ((empty-space *empty-space*))
     (not (every (lambda (x) (eql x empty-space))
