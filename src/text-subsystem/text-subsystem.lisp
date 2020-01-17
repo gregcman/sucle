@@ -7,7 +7,8 @@
    #:dobox
    #:with-gensyms
    #:once-only
-   #:floatify)
+   #:floatify
+   #:with-unsafe-speed)
   (:export
    #:*block-width*
    #:*block-height*
@@ -38,17 +39,17 @@
 	(h *text-data-height*))
     (ecase *text-data-what-type*
       (:framebuffer
-       (glhelp::make-gl-framebuffer w h))
+       (glhelp:make-gl-framebuffer w h))
       (:texture-2d
-       (glhelp::wrap-opengl-texture
-	(glhelp::create-texture nil w h))))))
+       (glhelp:wrap-opengl-texture
+	(glhelp:create-texture nil w h))))))
 (defun get-text-texture ()
   ;;;;[FIXME] getfnc must go before, because it has side effects.
   ;;;;are side effects and state unavoidable? a property of opengl?
   (let ((value (deflazy:getfnc 'text-data)))
     (ecase *text-data-type*
-      (:framebuffer (glhelp::texture value))
-      (:texture-2d (glhelp::handle value)))))
+      (:framebuffer (glhelp:texture value))
+      (:texture-2d (glhelp:handle value)))))
 
 (deflazy:deflazy text-shader-source2 ()
   '(:vs
@@ -107,7 +108,7 @@ gl_FragColor.a = opacity * fin.a;
 	       (setf (aref array width height i) value))))
     array))
 (glhelp:deflazy-gl font-texture (font-png)
-  (glhelp::wrap-opengl-texture (glhelp::create-opengl-texture-from-data font-png)))
+  (glhelp:wrap-opengl-texture (glhelp:create-opengl-texture-from-data font-png)))
 
 (defparameter *trans* (sb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
 (defun retrans (x y &optional (trans *trans*))
@@ -117,13 +118,13 @@ gl_FragColor.a = opacity * fin.a;
 (defmacro with-data-shader ((uniform-fun rebase-fun) &body body)
   (with-gensyms (program)
     `(let ((,program (deflazy:getfnc 'flat-shader)))
-       (glhelp::use-gl-program ,program)
+       (glhelp:use-gl-program ,program)
        (let ((framebuffer (deflazy:getfnc 'text-data)))
-	 (gl:bind-framebuffer :framebuffer (glhelp::handle framebuffer))
+	 (gl:bind-framebuffer :framebuffer (glhelp:handle framebuffer))
 	 (glhelp:set-render-area 0 0
 				 ;;[FIXME] not use generic functions?
-				 (glhelp::x framebuffer)
-				 (glhelp::y framebuffer)
+				 (glhelp:w framebuffer)
+				 (glhelp:h framebuffer)
 				 ))
        (glhelp:with-uniforms ,uniform-fun ,program
 	 (flet ((,rebase-fun (x y)
@@ -140,11 +141,11 @@ gl_FragColor.a = opacity * fin.a;
          (deflazy:getfnc 'render-normal-text-indirection)
 	 (deflazy:getfnc 'color-lookup)
 	 (let ((,program (deflazy:getfnc 'text-shader)))
-	   (glhelp::use-gl-program ,program)
+	   (glhelp:use-gl-program ,program)
 	   (glhelp:with-uniforms ,uniform-fun ,program
-	     (glhelp::set-uniforms-to-textures
+	     (glhelp:set-uniforms-to-textures
 	      ((,uniform-fun 'indirection) (get-indirection-texture))
-	      ((,uniform-fun 'font-texture) (glhelp::handle (deflazy:getfnc 'font-texture)))
+	      ((,uniform-fun 'font-texture) (glhelp:handle (deflazy:getfnc 'font-texture)))
 	      ((,uniform-fun 'text-data) (get-text-texture)))
 	     ,@body)))))
 
@@ -241,15 +242,15 @@ gl_FragColor.a = opacity * fin.a;
   (deflazy:refresh 'color-lookup)
   (write-to-color-lookup color-fun))
 (glhelp:deflazy-gl color-lookup (text-shader)
-  (glhelp::use-gl-program text-shader)
+  (glhelp:use-gl-program text-shader)
   (glhelp:with-uniforms uniform text-shader
     (with-foreign-array (var *color-font-info-data* :float len)
       (%gl:uniform-4fv (uniform 'color-font-info-data)
 		       (/ len 4)
 		       var))))
 (glhelp:deflazy-gl text-shader (text-shader-source2) 
-  (let ((shader (glhelp::create-gl-program2 text-shader-source2)))
-    (glhelp::use-gl-program shader)
+  (let ((shader (glhelp:create-gl-program2 text-shader-source2)))
+    (glhelp:use-gl-program shader)
     (glhelp:with-uniforms uniform shader
       (with-foreign-array (var *color-font-info-data* :float len)
 	(%gl:uniform-4fv (uniform 'color-font-info-data)
@@ -263,7 +264,7 @@ gl_FragColor.a = opacity * fin.a;
     shader))
 
 (glhelp:deflazy-gl flat-shader ()
-  (glhelp::create-opengl-shader 
+  (glhelp:create-opengl-shader 
    "
 out vec4 value_out;
 in vec4 value;
@@ -301,18 +302,18 @@ gl_FragColor = value_out;
   (setf *indirection-type* *indirection-what-type*)
   (ecase *indirection-what-type*
     (:framebuffer
-     (glhelp::make-gl-framebuffer
+     (glhelp:make-gl-framebuffer
 		   *indirection-width*
 		   *indirection-height*))
     (:texture-2d
-     (glhelp::wrap-opengl-texture
-      (glhelp::create-texture nil
+     (glhelp:wrap-opengl-texture
+      (glhelp:create-texture nil
 			      *indirection-width*
 			      *indirection-height*)))))
 (defun get-indirection-texture ()
   (ecase *indirection-type*
-    (:framebuffer (glhelp::texture (deflazy:getfnc 'indirection)))
-    (:texture-2d (glhelp::handle (deflazy:getfnc 'indirection)))))
+    (:framebuffer (glhelp:texture (deflazy:getfnc 'indirection)))
+    (:texture-2d (glhelp:handle (deflazy:getfnc 'indirection)))))
 
 ;;;Round up to next power of two
 (defun power-of-2-ceiling (n)
@@ -331,7 +332,7 @@ gl_FragColor = value_out;
     (ecase *indirection-type*
       (:framebuffer
        (let ((refract (deflazy:getfnc 'indirection-shader)))
-	 (glhelp::use-gl-program refract)
+	 (glhelp:use-gl-program refract)
 	 (glhelp:with-uniforms uniform refract
 	   (gl:uniform-matrix-4fv
 	    (uniform :pmv)
@@ -344,10 +345,10 @@ gl_FragColor = value_out;
        (gl:disable :depth-test)
        (gl:disable :blend)
        (glhelp:set-render-area 0 0 upw uph)
-       (gl:bind-framebuffer :framebuffer (glhelp::handle (deflazy:getfnc 'indirection)))
+       (gl:bind-framebuffer :framebuffer (glhelp:handle (deflazy:getfnc 'indirection)))
        (gl:clear :color-buffer-bit)
        (gl:clear :depth-buffer-bit)
-       (glhelp::slow-draw (deflazy:getfnc 'fullscreen-quad)))
+       (glhelp:slow-draw (deflazy:getfnc 'fullscreen-quad)))
       (:texture-2d
        (gl:bind-texture :texture-2d (get-indirection-texture))
        (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
@@ -388,7 +389,7 @@ gl_FragColor = value_out;
 
 ;;;;;;;;;;;;;;;;;;;;
 (glhelp:deflazy-gl indirection-shader ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "
 out vec2 texcoord_out;
 in vec4 position;
@@ -438,4 +439,4 @@ gl_FragColor = pixcolor;
 	(0 (xyz) (xyz) (xyz) 1.0))))))
 
 (defun draw-fullscreen-quad ()
-  (glhelp::slow-draw (deflazy:getfnc 'fullscreen-quad)))
+  (glhelp:slow-draw (deflazy:getfnc 'fullscreen-quad)))

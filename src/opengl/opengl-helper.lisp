@@ -3,7 +3,52 @@
   (:import-from
    #:gl
    #:enum=
-   #:make-gl-array-from-pointer))
+   #:make-gl-array-from-pointer)
+  (:export
+   
+   #:with-gl-context
+   
+   #:deflazy-gl
+   
+   #:handle
+   #:alive-p
+   
+   #:bind-default-framebuffer
+   #:make-gl-framebuffer
+   #:w
+   #:h
+   #:set-render-area
+   
+   #:gl-list
+   #:with-gl-list
+   #:create-gl-list-from-specs
+   
+   #:wrap-opengl-texture
+   #:create-opengl-texture-from-data
+   #:create-texture
+   #:texture
+   #:apply-tex-params
+   
+   #:set-uniforms-to-textures
+
+   #:getuniform
+   #:cache-program-uniforms
+   #:make-uniform-cache
+   #:with-uniforms
+
+   #:create-gl-program2
+   #:make-shader-program-from-strings
+   #:create-opengl-shader
+
+   #:use-gl-program
+   #:vertex-attrib-f
+   #:vertex-attrib-f*
+   
+   #:create-vao-or-display-list-from-specs
+   
+   #:slow-draw
+   #:slow-delete
+   ))
 (in-package :glhelp)
 ;;;;************************************************************************;;;;
 ;;;;<CONTENTS>
@@ -73,7 +118,6 @@
 (defun alive-p (obj)
   (eq *gl-context*
       (context obj)))
-(export '(alive-p))
 
 ;;;;</PARENT OBJECT>
 ;;;;************************************************************************;;;;
@@ -84,7 +128,6 @@
     (error "no opengl context you idiot!")))
 
 ;;[FIXME]does code involving deflazy belong here at all?
-(export '(deflazy-gl))
 (defmacro deflazy-gl (name (&rest deps) &rest gen-forms)
   "for objects that should be forgotten because they were
 not made in the current OpenGL context, so they are garbage"
@@ -108,8 +151,6 @@ not made in the current OpenGL context, so they are garbage"
 		     (deflazy:refresh 'gl-context t)
 		     ,@body)
      (setf *gl-context* nil)))
-
-(export '(with-gl-context))
 
 ;;;;</SETUP>
 ;;;;************************************************************************;;;;
@@ -373,7 +414,6 @@ just put together a new vao"
 		   ,@body)
 	 (gl:end-list))
        ,list-sym)))
-(export '(with-gl-list))
 ;;;
 
 (defun draw-display-list (display-list)
@@ -452,7 +492,6 @@ just put together a new vao"
 			    (row-major-aref thepic (+ wi base1))))))
 		(create-texture array w h :format type))))))))
 
-(export '(apply-tex-params))
 (defun apply-tex-params (tex-parameters)
   (dolist (param tex-parameters)
     (gl:tex-parameter :texture-2d (car param) (cdr param))))
@@ -468,14 +507,14 @@ just put together a new vao"
 (defclass gl-framebuffer (gl-object)
   ((texture :accessor texture)
    (depth :accessor depth)
-   (x :accessor x)
-   (y :accessor y)))
+   (w :accessor w)
+   (h :accessor h)))
 
 (defun make-gl-framebuffer (width height)
   (let ((inst (make-instance 'gl-framebuffer)))
-    (with-slots (x y handle texture depth) inst
-      (setf x width
-	    y height)
+    (with-slots (w h handle texture depth) inst
+      (setf w width
+	    h height)
       (setf (values texture handle depth)
 	    (create-framebuffer width height)))
     inst))
@@ -555,13 +594,11 @@ just put together a new vao"
 		    (list 'getuniform ',uniforms-var id)))
 	 ,@body))))
 
-(export '(getuniform cache-program-uniforms make-uniform-cache with-uniforms))
 (defclass gl-program (gl-object)
   ((src :accessor gl-program-object-src
 	:initarg :src)
    (uniforms :accessor gl-program-object-uniforms)))
-;;[FIXME]fix exports
-(export 'use-gl-program)
+
 (defun use-gl-program (src)
   (gl:use-program (handle src)))
 
@@ -622,8 +659,6 @@ just put together a new vao"
     (gl:delete-shader vert)
     (gl:delete-shader frag)
     program))
-
-(export (quote (pic-texture make-shader-program-from-strings)))
 ;;;;
 (defun create-gl-program2 (src)
   ;;[FIXME]add ability to rename varyings so
@@ -644,7 +679,7 @@ just put together a new vao"
 	     obj
 	     uniform-data))
       inst)))
-(export 'create-opengl-shader)
+
 (defun create-opengl-shader (vert-text frag-text attributes uniforms)
   (create-gl-program2
    (list :vs vert-text
@@ -781,7 +816,6 @@ gl_FragColor = pixcolor;
 (defmacro vertex-attrib-f* ((&rest forms))
   `(progn ,@(mapcar (lambda (x) `(vertex-attrib-f ,@x)) forms)))
 
-(export '(vertex-attrib-f vertex-attrib-f*))
 ;;;;</LEGACY>
 ;;;;************************************************************************;;;;
 ;;;;<SWITCH BETWEEN DISPLAY LISTS AND VAOS>
@@ -805,7 +839,6 @@ gl_FragColor = pixcolor;
 	  (foo 5 3))))
     array))
 
-(export 'quads-triangles-index-buffer)
 ;;[FIXME]rename from gl-list to display-list?
 (defmacro create-gl-list-from-specs ((type times) form)
   (utility:with-gensyms (fixed-times fixed-type)
@@ -817,9 +850,6 @@ gl_FragColor = pixcolor;
 	 (gl:with-primitives ,fixed-type
 	   (loop :repeat ,fixed-times :do 
 	      (vertex-attrib-f* ,form)))))))
-
-(export 'create-gl-list-from-specs)
-
 
 (defparameter *quad-to-triangle-index-buffer-quad-count*
   ;;the number of quads in a 16x16x16 chunk if each block has 6 faces showing.
@@ -909,9 +939,8 @@ gl_FragColor = pixcolor;
       (create-gl-list-from-specs (,type ,times) ,form))
      (:vertex-array-object
       (create-vao-from-specs (,type ,times) ,form))))
-(export 'create-vao-or-display-list-from-specs)
 
-#+nil
+#+nil ;;[FIXME] Refactor into a test case
 (create-vao-or-display-list-from-specs
  (:quads 10)
  ((2 (xyz) (xyz) (xyz))
@@ -929,8 +958,7 @@ gl_FragColor = pixcolor;
   (typecase gl-thing
     (+gluint+ (draw-display-list gl-thing))
     (vao (draw-vertex-array gl-thing))
-    (gl-list (draw-display-list (handle gl-thing))))
-  )
+    (gl-list (draw-display-list (handle gl-thing)))))
 
 (defun slow-delete (gl-thing)
   ;;;dispatch on either display-list or vao
@@ -938,14 +966,11 @@ gl_FragColor = pixcolor;
   (typecase gl-thing
     (+gluint+ (gl:delete-lists gl-thing 1))
     (vao (delete-vao gl-thing))
-    (gl-list (gl:delete-lists (handle gl-thing) 1)))
-  )
-(export '(slow-draw slow-delete))
+    (gl-list (gl:delete-lists (handle gl-thing) 1))))
 
 ;;;;</SWITCH BETWEEN DISPLAY LISTS AND VAOS>
 ;;;;************************************************************************;;;;
 ;;;;<VIEWPORT>
-(export '(set-render-area))
 (defun set-render-area (x y width height)
   (gl:viewport x y width height)
   (gl:scissor x y width height))

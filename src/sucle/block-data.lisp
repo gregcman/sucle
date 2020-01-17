@@ -10,8 +10,7 @@
 	      (make-array 256 ;;block types limit
 			  ;;the number of different types of blocks in the world. its 8 bit
 			  :element-type (quote ,type)
-			  :initial-element (coerce 0 (quote ,type))))
-	    (export ',name))))
+			  :initial-element (coerce 0 (quote ,type)))))))
     (defblockprop *names* t)
     (defblockprop *opaquecubelooukup* t) ;;needed
     (defblockprop *lightOpacity* fixnum) ;;needed

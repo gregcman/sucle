@@ -4,9 +4,9 @@
 
 (defun draw-to-default-area ()
   ;;draw to default framebuffer
-  (glhelp::bind-default-framebuffer)
+  (glhelp:bind-default-framebuffer)
   ;;setup clipping area
-  (glhelp::set-render-area 0 0 window:*width* window:*height*))
+  (glhelp:set-render-area 0 0 window:*width* window:*height*))
 
 (defun render-sky (x y z)
   (gl:clear-color x y z 1.0)
@@ -18,8 +18,8 @@
     #+nil
     (nil 
      (let ((shader (deflazy:getfnc 'world::gl-clear-color-buffer)))
-       (glhelp::use-gl-program shader)
-       (glhelp::with-uniforms uniform shader 
+       (glhelp:use-gl-program shader)
+       (glhelp:with-uniforms uniform shader 
 	 (with-vec (x y z) (*sky-color-foo*)
 	   (%gl:uniform-4f (uniform :color) x y z 1.0))))
      (gl:disable :depth-test)
@@ -41,7 +41,7 @@
 			   (time-of-day (random 1.0)))
   ;;set up shader
   (let ((shader (deflazy:getfnc 'blockshader)))
-    (glhelp::use-gl-program shader)
+    (glhelp:use-gl-program shader)
 
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms uniform shader
@@ -70,9 +70,9 @@
       (%gl:uniform-1f (uniform :time)
 		      time-of-day)
 
-      (glhelp::set-uniforms-to-textures
+      (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
-	(glhelp::handle (deflazy:getfnc 'terrain)))))))
+	(glhelp:handle (deflazy:getfnc 'terrain)))))))
 (defun render-chunks ()  
   (gl:enable :depth-test)
   (gl:enable :cull-face)
@@ -95,7 +95,7 @@
 
 (defun use-occlusion-shader (&optional (camera *camera*))
   (let ((shader (deflazy:getfnc 'occlusion-shader)))
-    (glhelp::use-gl-program shader)
+    (glhelp:use-gl-program shader)
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms uniform shader
       (gl:uniform-matrix-4fv 
@@ -109,13 +109,13 @@
 #+nil
 (defun draw-fullscreen-quad ()
   (gl:call-list
-   (glhelp::handle (deflazy:getfnc 'fullscreen-quad))))
+   (glhelp:handle (deflazy:getfnc 'fullscreen-quad))))
 #+nil
-(glhelp::deflazy-gl fullscreen-quad ()
+(glhelp:deflazy-gl fullscreen-quad ()
   (make-instance
-   'glhelp::gl-list
+   'glhelp:gl-list
    :handle
-   (glhelp::with-gl-list
+   (glhelp:with-gl-list
      (macrolet ((vvv (darkness u v x y z)
 		  `(progn #+nil(%gl:vertex-attrib-1f 8 ,darkness)
 			  #+nil
@@ -131,7 +131,7 @@
 	 (vvv 0.0 w1 h3 1.0 -1.0 0.99999994))))))
 #+nil
 (glhelp:deflazy-gl gl-clear-color-buffer ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "in vec4 position;
 
 void main () {
@@ -275,10 +275,10 @@ gl_FragColor = color;
    (alexandria::copy-array terrain-png)))
 
 (glhelp:deflazy-gl terrain (modified-terrain-png)
-  (glhelp::wrap-opengl-texture
-   (glhelp::create-opengl-texture-from-data modified-terrain-png)))
+  (glhelp:wrap-opengl-texture
+   (glhelp:create-opengl-texture-from-data modified-terrain-png)))
 (glhelp:deflazy-gl blockshader ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "
 out float color_out;
 out vec2 texcoord_out;
@@ -336,7 +336,7 @@ gl_FragColor.rgb = temp;
 
 
 (glhelp:deflazy-gl solidshader ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "
 out vec3 color_out;
 in vec4 position;
@@ -385,8 +385,8 @@ gl_FragColor.rgb = color_out;
 			((3 n n n)
 			 (0 (xyz) (xyz) (xyz))))
 		       ))))
-	      (glhelp::slow-draw box)
-	      (glhelp::slow-delete box)
+	      (glhelp:slow-draw box)
+	      (glhelp:slow-delete box)
 	      )))
 	))))
 #+nil
@@ -411,7 +411,7 @@ gl_FragColor.rgb = color_out;
 
 (defun use-solidshader (&optional (camera *camera*))
   (let ((shader (deflazy:getfnc 'solidshader)))
-    (glhelp::use-gl-program shader)
+    (glhelp:use-gl-program shader)
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms
 	uniform shader
@@ -514,10 +514,10 @@ gl_FragColor.rgb = color_out;
 		 (gl:begin-query :samples-passed query)
 		 ;;draw occlusion box here
 		 ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
-		 (glhelp::slow-draw display-list)
+		 (glhelp:slow-draw display-list)
 		 (gl:end-query :samples-passed))
 		(t
-		 (glhelp::slow-draw display-list)))))
+		 (glhelp:slow-draw display-list)))))
 	  ;;(gl:call-list display-list)
 	  )
 	 (t ;;(print "WHAT?")
@@ -674,7 +674,7 @@ gl_FragColor.rgb = color_out;
     (values (* 6 4))))
 
 (glhelp:deflazy-gl occlusion-shader ()
-  (glhelp::create-opengl-shader
+  (glhelp:create-opengl-shader
    "in vec4 position;
 
 uniform mat4 projection_model_view;

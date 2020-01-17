@@ -239,7 +239,7 @@
      (uniform :pmv)
      (load-time-value (nsb-cga:identity-matrix))
      nil)   
-    (glhelp::bind-default-framebuffer)
+    (glhelp:bind-default-framebuffer)
     (glhelp:set-render-area 0 0
 			    (deflazy:getfnc 'application:w)
 			    (deflazy:getfnc 'application:h))
