@@ -75,8 +75,8 @@
 (defun start ()
   (application:main
    *sucle-app-function*
-   :width (floor (* 80 text-sub::*block-width*))
-   :height (floor (* 25 text-sub::*block-height*))
+   :width (floor (* 80 text-sub:*block-width*))
+   :height (floor (* 25 text-sub:*block-height*))
    :title ""))
 
 (defparameter *sucle-app-function*
@@ -86,7 +86,7 @@
      (setf (entity-fly? *ent*) nil
 	   (entity-gravity? *ent*) t)
      ;;(our-load)
-     (let ((text-sub::*text-data-what-type* :framebuffer))
+     (let ((text-sub:*text-data-what-type* :framebuffer))
        (window:set-vsync t)
        (fps:set-fps 60)
        (progn

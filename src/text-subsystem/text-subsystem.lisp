@@ -1,7 +1,27 @@
 (defpackage #:text-sub
   (:use #:cl
-	#:application
-	#:utility))
+	#:application)
+  (:import-from
+   #:utility
+   #:etouq
+   #:dobox
+   #:with-gensyms
+   #:once-only
+   #:floatify)
+  (:export
+   #:*block-width*
+   #:*block-height*
+   #:*text-data-what-type*
+   #:change-color-lookup
+   #:color-fun
+   #:render-normal-text-indirection
+   #:with-data-shader
+   #:*text-data-width*
+   #:*text-data-height*
+   #:char-attribute
+   #:get-text-texture
+   #:with-text-shader
+   #:draw-fullscreen-quad))
 (in-package #:text-sub)
 
 ;;[FIXME] 256 by 256 size limit for texture
@@ -418,4 +438,4 @@ gl_FragColor = pixcolor;
 	(0 (xyz) (xyz) (xyz) 1.0))))))
 
 (defun draw-fullscreen-quad ()
-  (glhelp::slow-draw (deflazy:getfnc 'text-sub::fullscreen-quad)))
+  (glhelp::slow-draw (deflazy:getfnc 'fullscreen-quad)))

@@ -41,11 +41,11 @@
   (setf ncurses-clone::*columns* 80
 	ncurses-clone::*lines* 25)
   (set-glyph-dimensions 8 16)
-  (setf text-sub::*text-data-what-type* :texture-2d)
+  (setf text-sub:*text-data-what-type* :texture-2d)
   (deflazy:refresh 'virtual-window)
   (update-resize)
-  (text-sub::change-color-lookup
-   ;;'text-sub::color-fun
+  (text-sub:change-color-lookup
+   ;;'text-sub:color-fun
    'lem.term::color-fun
    #+nil
    (lambda (n)
@@ -57,13 +57,13 @@
 (defun set-glyph-dimensions (w h)
   ;;Set the pixel dimensions of a 1 wide by 1 high character
   (setf *glyph-width* w)
-  (setf text-sub::*block-width* w)
+  (setf text-sub:*block-width* w)
   (setf *glyph-height* h)
-  (setf text-sub::*block-height* h)
+  (setf text-sub:*block-height* h)
   (progn
     ;;[FIXME]Better way to organize this? as of now manually determining that
     ;;these two depend on the *block-height* and *block-width* variables
-    (deflazy:refresh 'text-sub::render-normal-text-indirection)
+    (deflazy:refresh 'text-sub:render-normal-text-indirection)
     (deflazy:refresh 'virtual-window)))
 
 (defparameter *redraw-display-p* nil)
@@ -76,7 +76,7 @@
   ;;Make sure the virtual window has the correct specs
   (deflazy:getfnc 'virtual-window)
   #+nil
-  (;;text-sub::with-data-shader (uniform rebase)
+  (;;text-sub:with-data-shader (uniform rebase)
    ;; (gl:clear :color-buffer-bit)
    ;;   (gl:disable :depth-test)
    #+nil
@@ -105,10 +105,10 @@
     ;;;Copy the virtual screen to a c-array,
     ;;;then send the c-array to an opengl texture
     (let* ((c-array-lines
-	    (min text-sub::*text-data-height* ;do not send data larger than text data
+	    (min text-sub:*text-data-height* ;do not send data larger than text data
 		 (+ 1 ncurses-clone::*lines*)))              ;width or height
 	   (c-array-columns
-	    (min text-sub::*text-data-width*
+	    (min text-sub:*text-data-width*
 		 (+ 1 ncurses-clone::*columns*)))
 	   (c-array-len (* 4
 			   c-array-columns
@@ -220,7 +220,7 @@
 						  (return-from abort-writing)))))))))
 				realfg
 				realbg
-				(text-sub::char-attribute
+				(text-sub:char-attribute
 				 (logtest ncurses-clone::A_bold attributes)
 				 (logtest ncurses-clone::A_Underline attributes)
 				 t)
@@ -228,13 +228,13 @@
 				i)))))
 		       (incf index width)))))))))
        ;;;;write the data out to the texture
-       (let ((texture (text-sub::get-text-texture)))
+       (let ((texture (text-sub:get-text-texture)))
 	 (gl:bind-texture :texture-2d texture)
 	 (gl:tex-sub-image-2d :texture-2d 0 0 0
 			      c-array-columns
 			      c-array-lines
 			      :rgba :unsigned-byte arr)))))
-  (text-sub::with-text-shader (uniform)
+  (text-sub:with-text-shader (uniform)
     (gl:uniform-matrix-4fv
      (uniform :pmv)
      (load-time-value (nsb-cga:identity-matrix))
@@ -248,6 +248,6 @@
       (gl:enable :blend)
       (gl:blend-func :src-alpha :one-minus-src-alpha))
 
-    (text-sub::draw-fullscreen-quad)
+    (text-sub:draw-fullscreen-quad)
     ))
 
