@@ -120,7 +120,7 @@
 
 #+nil
 (defun start ()
-  (application::main
+  (application:main
    (lambda ()
      (world::call-with-world-meshing-lparallel 
       (lambda ()
@@ -229,10 +229,10 @@
   (with-vec (x y z) ((player-position))
     (world::set-chunk-coordinate-center x y z))
   
-  (application::on-session-change *session*
+  (application:on-session-change *session*
     (world::load-world t))
   (when (window:button :key :pressed :escape)
-    (application::quit))
+    (application:quit))
   (when (window:button :key :pressed #\e)
     (window::toggle-mouse-capture)
     ;;Flush changes to the mouse so
@@ -328,7 +328,7 @@
   (world::load-world)
   ;;render chunks and such
   ;;handle chunk meshing
-  (application::on-session-change *last-session*
+  (application:on-session-change *last-session*
     (reset-chunk-display-list)
     (update-world-vao))
   ;;update the camera

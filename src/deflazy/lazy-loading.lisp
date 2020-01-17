@@ -4,7 +4,8 @@
    #:getfnc
    #:deflazy
    #:refresh
-   #:flush-refreshes))
+   #:flush-refreshes
+   #:cleanup-node-value))
 
 (in-package :deflazy)
 

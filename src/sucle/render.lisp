@@ -17,7 +17,7 @@
     ;;optimization to see if drawing a fullscreen quad is faster than a gl:clear
     #+nil
     (nil 
-     (let ((shader (getfnc 'world::gl-clear-color-buffer)))
+     (let ((shader (deflazy:getfnc 'world::gl-clear-color-buffer)))
        (glhelp::use-gl-program shader)
        (glhelp::with-uniforms uniform shader 
 	 (with-vec (x y z) (*sky-color-foo*)
@@ -40,7 +40,7 @@
 			   (fog-ratio 0.01)
 			   (time-of-day (random 1.0)))
   ;;set up shader
-  (let ((shader (getfnc 'blockshader)))
+  (let ((shader (deflazy:getfnc 'blockshader)))
     (glhelp::use-gl-program shader)
 
     ;;uniform crucial for first person 3d
@@ -72,7 +72,7 @@
 
       (glhelp::set-uniforms-to-textures
        ((uniform :sampler)
-	(glhelp::handle (getfnc 'terrain)))))))
+	(glhelp::handle (deflazy:getfnc 'terrain)))))))
 (defun render-chunks ()  
   (gl:enable :depth-test)
   (gl:enable :cull-face)
@@ -94,7 +94,7 @@
 	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
 
 (defun use-occlusion-shader (&optional (camera *camera*))
-  (let ((shader (getfnc 'occlusion-shader)))
+  (let ((shader (deflazy:getfnc 'occlusion-shader)))
     (glhelp::use-gl-program shader)
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms uniform shader
@@ -109,7 +109,7 @@
 #+nil
 (defun draw-fullscreen-quad ()
   (gl:call-list
-   (glhelp::handle (application::getfnc 'fullscreen-quad))))
+   (glhelp::handle (deflazy:getfnc 'fullscreen-quad))))
 #+nil
 (glhelp::deflazy-gl fullscreen-quad ()
   (make-instance
@@ -266,11 +266,11 @@ gl_FragColor = color;
 	    '(191.0 183.0 85.0)
 	    '(128.0 180.0 151.0))))
 
-(deflazy terrain-png ()
+(deflazy:deflazy terrain-png ()
   (img:load
    (sucle-temp:path #P"res/terrain.png")))
 
-(deflazy modified-terrain-png (terrain-png)
+(deflazy:deflazy modified-terrain-png (terrain-png)
   (color-grasses
    (alexandria::copy-array terrain-png)))
 
@@ -410,7 +410,7 @@ gl_FragColor.rgb = color_out;
    ))
 
 (defun use-solidshader (&optional (camera *camera*))
-  (let ((shader (application:getfnc 'solidshader)))
+  (let ((shader (deflazy:getfnc 'solidshader)))
     (glhelp::use-gl-program shader)
     ;;uniform crucial for first person 3d
     (glhelp:with-uniforms

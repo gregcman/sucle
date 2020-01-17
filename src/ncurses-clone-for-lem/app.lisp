@@ -14,7 +14,7 @@
 (defparameter *glyph-width* 8.0)
 
 (defparameter *resized-p* nil)
-(deflazy::deflazy virtual-window ((w application::w) (h application::h))
+(deflazy:deflazy virtual-window ((w application:w) (h application:h))
   (setf *resized-p* t)
   (setf ncurses-clone::*columns* (floor w *glyph-width*)
 	ncurses-clone::*lines* (floor h *glyph-height*))
@@ -42,7 +42,7 @@
 	ncurses-clone::*lines* 25)
   (set-glyph-dimensions 8 16)
   (setf text-sub::*text-data-what-type* :texture-2d)
-  (deflazy::refresh 'virtual-window)
+  (deflazy:refresh 'virtual-window)
   (update-resize)
   (text-sub::change-color-lookup
    ;;'text-sub::color-fun
@@ -63,8 +63,8 @@
   (progn
     ;;[FIXME]Better way to organize this? as of now manually determining that
     ;;these two depend on the *block-height* and *block-width* variables
-    (deflazy::refresh 'text-sub::render-normal-text-indirection)
-    (deflazy::refresh 'virtual-window)))
+    (deflazy:refresh 'text-sub::render-normal-text-indirection)
+    (deflazy:refresh 'virtual-window)))
 
 (defparameter *redraw-display-p* nil)
 (defun redraw-display ()
@@ -74,7 +74,7 @@
 (defun render
     (&key (ondraw (lambda ())) (big-glyph-fun 'identity))
   ;;Make sure the virtual window has the correct specs
-  (deflazy::getfnc 'virtual-window)
+  (deflazy:getfnc 'virtual-window)
   #+nil
   (;;text-sub::with-data-shader (uniform rebase)
    ;; (gl:clear :color-buffer-bit)
@@ -241,8 +241,8 @@
      nil)   
     (glhelp::bind-default-framebuffer)
     (glhelp:set-render-area 0 0
-			    (deflazy::getfnc 'application::w)
-			    (deflazy::getfnc 'application::h))
+			    (deflazy:getfnc 'application:w)
+			    (deflazy:getfnc 'application:h))
     #+nil
     (progn
       (gl:enable :blend)
