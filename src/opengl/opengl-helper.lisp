@@ -779,8 +779,7 @@ gl_FragColor = pixcolor;
 				 ;;[FIXME] out in the fragment shader?
 				 #+nil
 				 (:frag (add-qualifier "varying"))
-				 (:vs (replace-qualifer :out
-							"varying"))))
+				 (:vs (replace-qualifer "varying" :out))))
 			     #+nil ;;[FIXME] varying does not occur
 			     (when (member :varying type-qualifiers))))))))
 		 (walk-next ast)))))))
