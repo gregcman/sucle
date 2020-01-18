@@ -27,4 +27,4 @@
    )
   :serial t
   :components 
-  (("sucle-test")))
+  ((:file "sucle-test")))
