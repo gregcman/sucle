@@ -224,6 +224,137 @@ gl_FragColor.xyz = color_out;
 
 ;;;;************************************************************************;;;;
 
+(defpackage #:test5
+  (:use :cl)
+  (:export #:start))
+(in-package #:test5)
+
+(defun start ()
+  (application:main
+   (lambda ()
+     (gl:clear-color 0.5 0.5 0.5 0.0)
+     (let ((shader
+	    (glhelp:create-opengl-shader
+	     ;;The vertex shader
+	     "
+out vec2 texcoord_out;
+in vec3 position;
+in vec2 texcoord;
+void main () {
+texcoord_out = texcoord;
+gl_Position=vec4(position,1.0)*vec4(1.0,-1.0,1.0,1.0);
+}"
+	     ;;The fragment shader
+	     "
+in vec2 texcoord_out;
+uniform sampler2D sampler;
+void main () {
+gl_FragColor = texture2D(sampler,texcoord_out.xy); 
+}"
+	     ;;Bind inputs to locations
+	     '(("position" 0) 
+	       ("texcoord" 2))
+	     ;;Unifrom name in lisp, uniform name in the shader
+	     '((:sampler "sampler")))))     
+       (loop (application:poll-app)
+	  (frame shader))))
+   :width 512
+   :height 512
+   :title "5. Drawing an image"))
+
+(defun change-image (new-data)
+  (deflazy:refresh 'image nil)
+  (setf *image-data* new-data)
+  (values))
+(defparameter *image-data* nil)
+(deflazy:deflazy image ()
+  (or *image-data*
+      (img:load
+       (sucle-temp:path #P"res/terrain.png"))))
+
+(glhelp:deflazy-gl terrain (image)
+  (glhelp:wrap-opengl-texture
+   (glhelp:create-opengl-texture-from-data image)))
+
+(defun frame (shader)
+  (glhelp:use-gl-program shader)
+  (let* ((image (deflazy:getfnc 'image))
+	 (w (array-dimension image 1))
+	 (h (array-dimension image 0)))
+    (glhelp:set-render-area 0 0 w h))
+  ;;Set uniforms within the shader
+  (glhelp:with-uniforms uniform shader
+    (glhelp:set-uniforms-to-textures
+     ((uniform :sampler)
+      (glhelp:handle (deflazy:getfnc 'terrain))))
+    ;;Set the uniform referenced by :sampler in shader to the terrain texture
+    )
+  (gl:clear :color-buffer-bit
+	    :depth-buffer-bit
+	    :stencil-buffer-bit)
+  (gl:disable :cull-face :depth-test)
+  (let ((position-buffer (scratch-buffer:my-iterator))
+	(tex-buffer (scratch-buffer:my-iterator)))
+    ;;Draw square coordinates and texcoords to the
+    ;;intermediate buffers named position-buffer and color-buffer
+    (square position-buffer tex-buffer)
+    (let
+	;;This becomes set to a display-list or VAO depending
+	;;on the OpenGL version [as well as possible the
+	;;GPU vendor]
+	(drawable)
+      (let ((total-vertices
+	     ;;Make sure that each buffer has the correct amount
+	     ;;of data, and determine the total vertices.
+	     (all-the-same
+	      ;;The position-buffer is referenced 3 times per vertex.
+	      (/ (scratch-buffer:iterator-fill-pointer position-buffer)
+		 3)
+	      ;;The tex-buffer is referenced 2 times per vertex.
+	      (/ (scratch-buffer:iterator-fill-pointer tex-buffer)
+		 2))))
+	(scratch-buffer:flush-bind-in* ((position-buffer gl-vertex)
+					(tex-buffer gl-texcoord))
+	  (setf drawable
+		;;This is a macro that generates code to
+		;;write to either a display-list or VAO,
+		;;depending on the OpenGL version [as well
+		;;as possible the GPU vendor]
+		(glhelp:create-vao-or-display-list-from-specs
+		 (:quads total-vertices)
+		 ;;Attribute locations
+		 ((2 (gl-texcoord) (gl-texcoord))
+		  (0 (gl-vertex) (gl-vertex) (gl-vertex)))))))
+      (glhelp:slow-draw drawable)
+      ;;For the purposes of the example, delete it immediately.
+      ;;Usually we'll draw it many times.
+      (glhelp:slow-delete drawable))))
+
+(defun all-the-same (&rest values)
+  (let ((only-one (remove-duplicates values)))
+    (assert (equal (list-length only-one) 1))
+    (car only-one)))
+
+(defun square (position-buffer tex-buffer)
+  ;;In test3 we used immediate-mode opengl, which means
+  ;;vertices are sent to the CPU every time the triangle is
+  ;;drawn.
+  ;;Here, we send data to an intermediate buffer,
+  ;;position-buffer and color-buffer.
+  ;;Then we send position-buffer and color-buffer in
+  ;;bulk to openGL, where it can be called many times as
+  ;;a display-list or VAO
+  (scratch-buffer:bind-out* ((position-buffer gl-vertex)
+			     (tex-buffer gl-texcoord))
+    (gl-texcoord 0.0 0.0)
+    (gl-vertex -1.0 -1.0 0.5)
+    (gl-texcoord 0.0 1.0)
+    (gl-vertex -1.0 1.0 0.5)
+    (gl-texcoord 1.0 1.0)
+    (gl-vertex 1.0 1.0 0.5)
+    (gl-texcoord 1.0 0.0)
+    (gl-vertex 1.0 -1.0 0.5)))
+
 ;;;;************************************************************************;;;;
   
 (defpackage :application-example-hello-world

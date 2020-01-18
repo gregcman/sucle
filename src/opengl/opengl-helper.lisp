@@ -887,17 +887,28 @@ gl_FragColor = pixcolor;
      (values type (deflazy:getfnc 'shared-plain-index-buffer) times))))
 
 (defmacro create-vao-from-specs ((type-form times-form) form)
-  (let* ((data 
-	  (mapcar (lambda (n)
-		    (destructuring-bind (index &rest forms) n
-		      (list index (length forms))))
-		  form))
+  (let* ((temp-vars (loop :repeat (length form) :collect (gensym)))
 	 (layout
-	  (simple-vertex-array-layout data))
+	  `(let ,(mapcar (lambda (n temp-var)
+			   (destructuring-bind (index &rest forms) n
+			     (declare (ignorable forms))
+			     `(,temp-var ,index)))
+			 form temp-vars)
+	     (simple-vertex-array-layout
+	      (list 
+	       ,@(mapcar (lambda (n temp-var)
+			   (destructuring-bind (index &rest forms) n
+			     (declare (ignorable index))
+			     `(list ,temp-var ,(length forms))))
+			 form
+			 temp-vars)))))
 	 (forms (apply 'concatenate 'list (mapcar 'rest form))))
 
-    (let ((len (vertex-array-layout-total-size layout)))
-      (assert (= len (length forms)))
+    (let ((len
+	   (length forms)
+	   ;;(vertex-array-layout-total-size layout)
+	   ))
+      ;;(assert (= len (length forms)))
       (values
        ;;data
        ;;forms
@@ -926,7 +937,7 @@ gl_FragColor = pixcolor;
 		    (assemble-vao
 		     ,vertex-buffer
 		     index-buffer
-		     ',layout
+		     ,layout
 		     ;;[FIXME] is it the total count of primitives, or points?
 		     fixed-times
 		     fixed-type))))
@@ -944,10 +955,10 @@ gl_FragColor = pixcolor;
 (create-vao-or-display-list-from-specs
  (:quads 10)
  ((2 (xyz) (xyz) (xyz))
-    ;;why???
-    (8 0.06 0.06)
-    (1 0.0 0.0 0.0 0.0)
-    ;;zero always comes last?
+  ;;why???
+  (8 0.06 0.06)
+  (1 0.0 0.0 0.0 0.0)
+  ;;zero always comes last?
   (0 0.0 0.0 0.0 0.0)))
 
 

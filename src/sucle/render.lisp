@@ -277,6 +277,8 @@ gl_FragColor = color;
 (glhelp:deflazy-gl terrain (modified-terrain-png)
   (glhelp:wrap-opengl-texture
    (glhelp:create-opengl-texture-from-data modified-terrain-png)))
+(defparameter *position-attr* 0)
+(defparameter *texcoord-attr* 2)
 (glhelp:deflazy-gl blockshader ()
   (glhelp:create-opengl-shader
    "
@@ -320,10 +322,10 @@ vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
 if (pixdata.a == 0.0){discard;}
 gl_FragColor.rgb = temp; 
 }"
-   '(("position" 2) 
-     ("texcoord" 8)
-     ("blocklight" 1)
-     ("skylight" 0))
+   `(("position" ,*position-attr*) 
+     ("texcoord" ,*texcoord-attr*)
+     ("blocklight" 4)
+     ("skylight" 5))
    '((:pmv "projection_model_view")
      (:fogcolor "fogcolor")
      (:foglet "foglet")
@@ -353,7 +355,7 @@ void main () {
 gl_FragColor.a = 1.0;
 gl_FragColor.rgb = color_out;
 }"
-   '(("position" 0) 
+   `(("position" ,*position-attr*) 
      ("color" 3))
    '((:pmv "projection_model_view"))))
 (defparameter *selected-block-aabb*
@@ -383,7 +385,7 @@ gl_FragColor.rgb = color_out;
 		       (glhelp:create-vao-or-display-list-from-specs
 			(:quads times)
 			((3 n n n)
-			 (0 (xyz) (xyz) (xyz))))
+			 (*position-attr* (xyz) (xyz) (xyz))))
 		       ))))
 	      (glhelp:slow-draw box)
 	      (glhelp:slow-delete box)
@@ -580,12 +582,11 @@ gl_FragColor.rgb = color_out;
 		     (glhelp:create-vao-or-display-list-from-specs
 		      ;;glhelp:create-gl-list-from-specs
 		      (:quads len)
-		      ((2 (xyz) (xyz) (xyz))
-		       (8 (uv) (uv))
-		       (1 (dark) (dark) (dark) (dark))
+		      ((*texcoord-attr* (uv) (uv))
+		       (4 (dark) (dark) (dark) (dark))
 			   ;;;zero always comes last?
-		       (0 (dark) (dark) (dark) (dark))
-		       )))))
+		       (5 (dark) (dark) (dark) (dark))
+		       (*position-attr* (xyz) (xyz) (xyz) 1.0))))))
 		(occlusion-box	 
 		 (multiple-value-bind (x y z) (voxel-chunks:unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))
@@ -604,12 +605,12 @@ gl_FragColor.rgb = color_out;
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
 			  (:quads times)
-			  ((2 (xyz) (xyz) (xyz))
-			   ;;why???
-			   (8 0.06 0.06)
-			   (1 0.0 0.0 0.0 0.0)
+			  (;;why???
+			   (*texcoord-attr* 0.06 0.06)
+			   (4 0.0 0.0 0.0 0.0)
 			   ;;zero always comes last?
-			   (0 0.0 0.0 0.0 0.0)))))))))
+			   (5 0.0 0.0 0.0 0.0)
+			   (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))))
 	    (set-chunk-display-list
 	     coords
 	     (create-chunk-gl-representation display-list occlusion-box))))))))
@@ -686,7 +687,7 @@ gl_Position = projection_model_view * position;
 void main () {
 gl_FragColor = vec4(1.0);
 }"
-   '(("position" 2)) 
+   `(("position" ,*position-attr*)) 
    '((:pmv "projection_model_view"))))
 
 (defun attrib-buffer-iterators ()

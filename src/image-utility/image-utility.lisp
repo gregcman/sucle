@@ -24,14 +24,10 @@
 ;;[FIXME]image-width and image-height create garbage with cons cells?
 (defun w (image)
   "Return the width of the image."
-  (destructuring-bind (height width . nope) (array-dimensions image)
-    (declare (ignorable height nope))
-    width))
+  (array-dimension image 0))
 (defun h (image)
   "Return the height of the image."
-  (destructuring-bind (height width . nope) (array-dimensions image)
-    (declare (ignorable width nope))
-    height))
+  (array-dimensions image 1))
 
 (defun %flip-image (image)
   "Destructively flip the image in place."
