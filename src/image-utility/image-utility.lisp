@@ -27,7 +27,7 @@
   (array-dimension image 0))
 (defun h (image)
   "Return the height of the image."
-  (array-dimensions image 1))
+  (array-dimension image 1))
 
 (defun %flip-image (image)
   "Destructively flip the image in place."
