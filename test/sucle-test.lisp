@@ -279,8 +279,8 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
 (defun frame (shader)
   (glhelp:use-gl-program shader)
   (let* ((image (deflazy:getfnc 'image))
-	 (w (array-dimension image 0))
-	 (h (array-dimension image 1)))
+	 (w (array-dimension image 1))
+	 (h (array-dimension image 0)))
     (glhelp:set-render-area 0 0 w h))
   ;;Set uniforms within the shader
   (glhelp:with-uniforms uniform shader
