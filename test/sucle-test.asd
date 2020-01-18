@@ -15,7 +15,7 @@
    #:image-utility
    #:ncurses-clone-for-lem
    #:nsb-cga
-   #:opengl
+   #:cl-opengl
    #:quads
    #:scratch-buffer
    #:sucle
