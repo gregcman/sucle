@@ -21,7 +21,7 @@ If you:
 
 2.Installing Common Lisp and Quicklisp
 -
-[see here](https://github.com/gmasching/shared-documents/blob/master/INSTALL-CL-AND-QUICKLISP.md)
+[see here](https://github.com/gregcman/shared-documents/blob/master/INSTALL-CL-AND-QUICKLISP.md)
 
 3.How to use
 -
