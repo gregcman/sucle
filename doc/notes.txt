@@ -148,3 +148,22 @@ Add versioning?
 A game that's just a bunch of colored rectangles
 - I'm not an artist
 - Or a storyteller
+
+TODO:
+- colorful world
+- infinite, dense, sparse, lighthearted, dark
+- billboarded images
+-- memes, wojak
+-- gui
+- pick which world to load
+- it doesn't have to be pure common lisp
+- items
+- inventory
+- health
+- particle effects
+- skinning animation
+- lem integration: minilem
+- aabb frustum culling, 'weeping angel' type mechanic
+- all sorts of materials: water, sand, metal, green painted metal, brick, pipes
+
+FIXME::loading the wrong world, still some sucle-multiprocessing threads going on

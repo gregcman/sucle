@@ -72,7 +72,24 @@
       (setf fun (nest with-fun fun))))
   fun)
 
-(defun start ()
+(defun start (&optional
+		(world
+		 ;;"first/"
+		 ;;#+nil
+		 ;;"test/"
+		 "other/"
+		 ;;"third/"
+		 ;;"ridikulisp/"
+		 )
+		(working-dir
+		 (sucle-temp:path "save/")
+		 #+nil
+		 (cdr (assoc (machine-instance) 
+			     '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
+			       ("nootboke" . #P"/home/terminal256/Documents/saves/"))
+			     :test 'equal))))
+  (setf world:*world-directory* world)
+  (setf world:*some-saves* working-dir) 
   (application:main
    *sucle-app-function*
    :width (floor (* 80 text-sub:*block-width*))
@@ -89,31 +106,11 @@
      (let ((text-sub:*text-data-what-type* :framebuffer))
        (window:set-vsync t)
        (fps:set-fps 60)
-       (progn
-	 (setf world:*world-directory*
-	       ;;"first/"
-	       ;;#+nil
-	       ;;"test/"
-	       "other/"
-	       ;;"third/"
-	       ;;"ridikulisp/"
-	       )
-	 #+nil
-	 (progn
-	   (setf world:*some-saves*
-		 (cdr (assoc (machine-instance) 
-			     '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-			       ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-			     :test 'equal))))
-	 ;;#+nil
-	 (progn
-	   (setf world:*some-saves*
-		 (sucle-temp:path "save/"))))
        (unwind-protect
 	    (loop
 	       (application:poll-app)
 	       (per-frame))
-	 (progn
+	 (when world:*persist*
 	   (world:msave)))))))
 
 ;;;;
