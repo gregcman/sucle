@@ -20,7 +20,5 @@
 	       (:file "impl")
 	       (:file "keys")
                (:file "sucle")
-	       (:module "other"
-			:components
-			((:file "test")
-			 (:file "test2")))))
+	       (:file "main")
+	       (:file "overlay-injection")))
