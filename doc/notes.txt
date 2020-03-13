@@ -167,3 +167,10 @@ TODO:
 - all sorts of materials: water, sand, metal, green painted metal, brick, pipes
 
 FIXME::loading the wrong world, still some sucle-multiprocessing threads going on
+FIXME::fix lem-opengl and ncurses-clone-for-lem so that it can be repositioned
+FIXME::deflazy forces singletons. This is bad?
+
+FIXME::better deflazy:
+- non-singletons
+- update definitions from the editor
+- default dependencies, dependency swapping

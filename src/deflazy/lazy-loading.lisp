@@ -22,7 +22,7 @@
 ;;;;queue node to be unloaded if it already has stuff in it 
 (defun refresh-new-node (name)
   (let ((node (dependency-graph:ensure-node name *stuff*)))
-    (unless (= 0 (dependency-graph:timestamp node))
+    (unless (= 0 (dependency-graph:node-timestamp node))
       (refresh name))))
 
 (defparameter *refresh* (make-hash-table :test 'eq))
@@ -59,10 +59,10 @@
 (defmethod cleanup-node-value ((object t))
   (declare (ignorable object)))
 (defun cleanup-node (node)
-  (let ((value (dependency-graph:value node)))
+  (let ((value (dependency-graph:node-value node)))
     (cleanup-node-value value)))
 
 (defun clean-and-invalidate-node (node)
-  (when (dependency-graph:state node)
+  (when (dependency-graph:node-state node)
     (cleanup-node node))
   (dependency-graph:%invalidate-node node))

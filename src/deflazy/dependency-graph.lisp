@@ -5,67 +5,43 @@
    #:%defnode
    #:redefine-node
    #:ensure-node
-   #:timestamp
+   #:node-timestamp
    #:touch-node
    #:map-dependents2
    #:dirty-p
    #:get-value
-   #:value
-   #:state
+   #:node-value
+   #:node-state
    #:%invalidate-node
    #:get-node))
 (in-package :dependency-graph)
 
-(defclass node ()
-  ((state ;fulfilled or unfulfilled
-    :accessor state
-    :initform nil)
+(struct-to-clos:struct->class
+ (defstruct node
+   (state ;fulfilled or unfulfilled
+    nil)
    (timestamp ;last time fulfilled
-    :accessor timestamp
-    :initform 0)
-   (value
-    :accessor value
-    :initform nil)
-   (fun 
-    :accessor fun
-    :initform nil)
-   (fun-old
-    :accessor fun-old
-    :initform nil)
-   (arguments
-    :accessor arguments
-    :initform nil)
+    0)
+   (value nil)
+   (fun nil)
+   (fun-old nil)
+   (arguments nil)
    #+nil
-   (dependencies-symbols
-    :accessor dependencies-symbols
-    :initform nil)
-   (dependencies 
-    :accessor dependencies
-    :initform nil) 
-   (dependencies-timestamps
-    :accessor dependencies-timestamps
-    :initform nil)
-   (lock
-    :accessor lock
-    :initform (bordeaux-threads:make-recursive-lock))
-   (lock-value
-    :accessor lock-value
-    :initform nil)
-   (dependents
-    :accessor dependents
-    :initform nil)
+   (dependencies-symbols nil)
+   (dependencies nil) 
+   (dependencies-timestamps nil)  
+   (lock (bordeaux-threads:make-recursive-lock))
+   (lock-value nil)
+   (dependents nil)
    #+nil
    (height ;height of node in dependency tree
-    :accessor height
-    :initform nil)
-   (name 
-    :accessor name
-    :initform "anon")))
+    nil)
+   (name "anon")))
 
 (set-pprint-dispatch
  'node
  (lambda (stream node)
-   (write (name node) :stream stream :escape nil :case :downcase)))
+   (write (node-name node) :stream stream :escape nil :case :downcase)))
 
 (defvar *namespace* (make-hash-table :test 'eq))
 
@@ -92,41 +68,41 @@
      (setf ,place nil)))
 (defmacro with-locked-node ((node &optional else) &body body)
   `(with-locked-lock (node)
-     (if (lock-value ,node)
+     (if (node-lock-value ,node)
 	 ,else
-	 (with-t (lock-value ,node)
+	 (with-t (node-lock-value ,node)
 	   ,@body))))
 
 (defmacro with-locked-lock ((node) &body body)
-  `(bordeaux-threads:with-recursive-lock-held ((lock ,node))
+  `(bordeaux-threads:with-recursive-lock-held ((node-lock ,node))
      ,@body))
 
 (defun %get-value (node)
-  (if (state node)
-      (value node)
+  (if (node-state node)
+      (node-value node)
       (with-locked-node (node (error "circular dependency: ~a" node))
-	(let ((dependencies (dependencies node)))
-	  (let ((args (map-into (arguments node)
+	(let ((dependencies (node-dependencies node)))
+	  (let ((args (map-into (node-arguments node)
 				#'%get-value
 				dependencies)))
-	    (map-into (dependencies-timestamps node)
-		      #'timestamp
+	    (map-into (node-dependencies-timestamps node)
+		      #'node-timestamp
 		      dependencies)
 	    #+nil
 	    (update-node-height node)
-	    (let ((value (apply (fun node)
+	    (let ((value (apply (node-fun node)
 				args)))
 	      (prog1 value
-		(setf (value node) value)
+		(setf (node-value node) value)
 		(touch-node node)
-		(setf (fun-old node)
-		      (fun node))
-		(setf (state node) t))))))))
+		(setf (node-fun-old node)
+		      (node-fun node))
+		(setf (node-state node) t))))))))
 
 #+nil
 (defun update-node-height (node)
-  (setf (height node)
-	(1+ (reduce #'max (dependencies node)
+  (setf (node-height node)
+	(1+ (reduce #'max (node-dependencies node)
 		    :key
 		    #'height
 		    :initial-value 0))))
@@ -140,9 +116,9 @@
 	#+nil
 	(when (zerop deps-len)
 	  (setf (height node) 0))
-	(setf (arguments node)
+	(setf (node-arguments node)
 	      (make-list deps-len))
-	(setf (dependencies-timestamps node)
+	(setf (node-dependencies-timestamps node)
 	      (make-list deps-len :initial-element 0))
 	(unless (and deps-same?
 		     fun-same?)
@@ -156,23 +132,23 @@
 (defun ensure-dependent (dependent dependency)
   (with-locked-lock (dependent)
     (with-locked-lock (dependency)
-      (symbol-macrolet ((place (dependents dependency)))
+      (symbol-macrolet ((place (node-dependents dependency)))
 	(unless (find dependent place)
 	  (push dependent place))))))
 (defun remove-dependent (dependent dependency)
   (with-locked-lock (dependent)
     (with-locked-lock (dependency)
-      (symbol-macrolet ((place (dependents dependency)))
+      (symbol-macrolet ((place (node-dependents dependency)))
 	(setf place (delete dependent place))))))
 
 (defun redefine-node (fun deps name &optional (namespace *namespace*))
   (let ((dependencies (mapcar (lambda (x) (ensure-node x namespace)) deps))
 	(node (ensure-node name namespace)))
     (with-locked-lock (node)
-      (let ((old-dependencies (dependencies node)))
+      (let ((old-dependencies (node-dependencies node)))
 	#+nil
 	(setf (dependencies-symbols node) deps)
-	(setf (name node) name)
+	(setf (node-name node) name)
 	(map nil (lambda (x) (remove-dependent node x)) (set-difference old-dependencies dependencies))
 	(map nil (lambda (x) (ensure-dependent node x)) (set-difference dependencies old-dependencies))
 	(make-node fun dependencies node)
@@ -192,7 +168,7 @@
 	    node-deps)))
 
 (defun touch-node (node)
-  (incf (timestamp node)))
+  (incf (node-timestamp node)))
 
 (defun %invalidate-node (node)
   (with-slots ((state state)) node
@@ -213,7 +189,7 @@
 	       nil)
 	      ;;;iterate old timestamps and see if any differ now
 	    (when (not (= (car stamp)
-			  (timestamp (car arg))))
+			  (node-timestamp (car arg))))
 	      (return t)))))))
 
 ;;;;convenience stuff below
@@ -248,7 +224,7 @@
 
 (defun get-value-no-update (id &optional (namespace *namespace*))
   (with-named-node (node) id
-		   (value node)))
+		   (node-value node)))
 
 (defun invalidate-node (id &optional (namespace *namespace*))
   (with-named-node (node) id
@@ -263,7 +239,7 @@
 
 (defun %map-dependents2 (node fun test)
   (with-locked-node (node nil)
-    (dolist (dependent (dependents node))
+    (dolist (dependent (node-dependents node))
       (when (funcall test dependent)
 	(funcall fun dependent)
 	(%map-dependents2 dependent fun test)))))
