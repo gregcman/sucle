@@ -8,20 +8,138 @@
    #:cleanup-node-value))
 
 (in-package :deflazy)
+;;;;
+
+;;#:*namespace*
+;; #:ensure-node
+;; #:redefine-node
+;; #:map-dependents2
+;; #:%invalidate-node
+;; #:get-node
+
+(defvar *namespace* (make-hash-table :test 'eq))
+
+(progn
+  (defun get-node (id &optional (namespace *namespace*))
+    (gethash id namespace))
+  (defun set-node (id node &optional (namespace *namespace*))
+    (setf (gethash id namespace) node)))
+(defun ensure-node (name &optional (namespace *namespace*))
+  (or (multiple-value-bind (node existsp)
+	  (get-node name)
+	(if existsp node nil))
+      (let ((new (make-instance 'dependency-graph:node)))
+	(set-node name new namespace)
+	new)))
+(defun redefine-node (fun deps name &optional (namespace *namespace*))
+  (let ((dependencies (mapcar (lambda (x) (ensure-node x namespace)) deps))
+	(node (ensure-node name namespace)))
+    (dependency-graph:with-locked-lock (node)
+      (let ((old-dependencies (dependency-graph:node-dependencies node)))
+	#+nil
+	(setf (dependencies-symbols node) deps)
+	(setf (dependency-graph:node-name node) name)
+	(map nil (lambda (x) (dependency-graph:remove-dependent node x))
+	     (set-difference old-dependencies dependencies))
+	(map nil (lambda (x) (dependency-graph:ensure-dependent node x))
+	     (set-difference dependencies old-dependencies))
+	(dependency-graph:really-make-node fun dependencies node)
+	node))))
+
+;;;;convenience stuff below
+
+
+(defmacro with-named-node ((node-var &optional (namespace 'namespace))
+				       name &optional t-form
+					      (nil-form
+					       `(no-named-node ,name)))
+  (let ((existsp (gensym)))
+    `(multiple-value-bind (,node-var ,existsp) (get-node ,name ,namespace)
+       (if ,existsp
+	   ,t-form
+	   ,nil-form))))
+;;no longer keep track of node
+#+nil
+(defun remove-node (id &optional (namespace *namespace*))
+  (with-named-node
+      (node) id
+      (progn
+	(remhash id namespace)
+	(map nil
+	     (lambda (x) (remove-dependent node x))
+	     (dependencies node)))))
+
+(defun no-named-node (id)
+  (error "no lazy load named as ~a" id))
+
+(defun get-value (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (dependency-graph:%get-value node)))
+
+(defun get-value-no-update (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (dependency-graph:node-value node)))
+
+(defun invalidate-node (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (dependency-graph:%invalidate-node node)))
+
+#+nil
+(defun %map-dependents (node fun)
+  (with-locked-node (node nil)
+    (dolist (dependent (dependents node))
+      (funcall fun dependent)
+      (%map-dependents dependent fun))))
+
+(defun %map-dependents2 (node fun test)
+  (dependency-graph:with-locked-node (node nil)
+    (dolist (dependent (dependency-graph:node-dependents node))
+      (when (funcall test dependent)
+	(funcall fun dependent)
+	(%map-dependents2 dependent fun test)))))
+
+#+nil
+(defun map-dependents (name fun &optional (namespace *namespace*))
+  (with-named-node (node) name
+		   (%map-dependents node fun)))
+
+#+nil
+(defun print-dependents (name)
+  (map-dependents name #'print *stuff*))
+
+(defun map-dependents2 (name fun test &optional (namespace *namespace*))
+  (with-named-node (node) name
+		   (%map-dependents2 node fun test)))
+
+#+nil
+(defmacro defnode (name deps &body body)
+  (multiple-value-bind (fun node-deps) (%defnode deps body)
+    `(reload-node ,fun ',node-deps ',name)))
+#+nil
+(progn
+  (defnode b () (print 2893))
+  (defnode a (b) (* b b)))
+
+#+nil
+(progn
+  (remove-node 'c)
+  (defnode c (c) c))
+
+;;;;;
 
 ;;;;;[FIXME]: clean this area up with dependency graph 
 (defvar *stuff* (make-hash-table :test 'eq))
 (defmacro deflazy (name (&rest deps) &rest gen-forms)
   `(eval-when (:load-toplevel :execute)
-     (let ((dependency-graph:*namespace* *stuff*))
+     (let ((*namespace* *stuff*))
        (refresh-new-node ',name)
        ,(multiple-value-bind
 	 (fun node-deps) (dependency-graph:%defnode deps gen-forms)
-	 `(dependency-graph:redefine-node ,fun ',node-deps ',name)))))
+	 `(redefine-node ,fun ',node-deps ',name)))))
 
 ;;;;queue node to be unloaded if it already has stuff in it 
 (defun refresh-new-node (name)
-  (let ((node (dependency-graph:ensure-node name *stuff*)))
+  (let ((node (ensure-node name *stuff*)))
     (unless (= 0 (dependency-graph:node-timestamp node))
       (refresh name))))
 
@@ -42,18 +160,18 @@
 	(clrhash *refresh*)))))
 
 (defun %refresh (name)
-  (let ((node (dependency-graph:get-node name *stuff*)))
+  (let ((node (get-node name *stuff*)))
     (when node
       (dependency-graph:touch-node node)
       (clean-and-invalidate-node node)
-      (dependency-graph:map-dependents2
+      (map-dependents2
        name
        #'clean-and-invalidate-node
        #'dependency-graph:dirty-p
        *stuff*))))
 
 (defun getfnc (name)
-  (dependency-graph:get-value name *stuff*))
+  (get-value name *stuff*))
 
 (defgeneric cleanup-node-value (object))
 (defmethod cleanup-node-value ((object t))
