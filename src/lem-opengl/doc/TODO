@@ -1,0 +1,46 @@
+;;render unicode, specifically japanese
+;; ->use vecto or something. the super fast text grid might be overkill.
+;; -> tack on unicode characters after rendering to the super fast text grid?
+;;be able to reload lem without errors
+;; -> actually just never close lem. figuring out how to tear it down and up again seems too hard for now.
+;;fix wide characters for ncurses-clone
+;; -> for now, it just renders placeholders
+;;does lem have line wrapping?
+;; -> seemingly, no, the line wrapping feature of ncurses is not used?
+;;cursor position is based on character widths?
+;;but window position is not?
+;;character width depends on where it is? tab?
+;;add selecting regions with the mouse?
+
+;;lem has lexcial variables found in lem.lisp that are named "once" which set only once. disable?
+;;FIXME::what is stdscr supposed to do? is it transparent?
+
+;;FIXME::correctly render the vertical bar between windows
+;;FIXME::when characters overwrite wide characters
+;;FIXME::resolution blurry when width thin and height tall
+;;FIXME::don't use 'virtual window', use *std-scr*?
+
+;;Noob mode-> z undo x delete c copy v paste keys, region selecting with the mouse
+
+;;FIXME::multithreading problems? lem send-event?
+;;just got rid of lem:send-event and called in the same thread. multithreading problem?
+;;FIXME::lisp repl flashing when entering on the last char?
+;;FIXME::off center mouse pointer
+;;FIXME::The control button does not seem to work on windows
+
+;;FIXME::This seems to be a lem rendering bug.
+;;if you mark a region, scroll down with the point until the region fills the screen,
+;;then up again, on the first line the whole screen will be highlighted
+;;see:
+;;https://github.com/cxxxr/lem/pull/374/commits/e16af46a658c289d27a0919808c4ac14c8948104
+
+;;FIXME::get rid of ncurses-color pairs. Just store the foreground and background
+;;8 bits char, 8 fg, 8 bg, 1 reverse 1 bold 1 underline = 27 bits, 30 bit fixnum of
+;;32 bit lisp machines
+
+;;FIXME::lem bug where moving the cursor to a long, wrapping line causes
+;;the beginning of the line to be forced into view. Then scrolling down with the cursor,
+;;the cursor can leave the screen. Scrolling on wrapping lines causes window to jump up
+
+;;FIXME::improper window draggin when 3 or more divisions
+;;FIXME::still improper window dragging. has to do with window tree structure?
