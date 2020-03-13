@@ -768,6 +768,8 @@ gl_FragColor = pixcolor;
 			       (setf (cdr (cdr (cdr (cdr (cdr ast)))))
 				     nil)))
 			   (unless (> version 120)
+			     ;;(print shader-type)
+			     ;;(format t "before~s" type-qualifiers)
 			     (when (member :in type-qualifiers)
 			       (replace-qualifer
 				(ecase shader-type
@@ -779,8 +781,8 @@ gl_FragColor = pixcolor;
 				 ;;[FIXME] out in the fragment shader?
 				 #+nil
 				 (:frag (add-qualifier "varying"))
-				 (:vs (replace-qualifer :out
-							"varying"))))
+				 (:vs (replace-qualifer "varying" :out))))
+			     ;;(format t "after~s" type-qualifiers)
 			     #+nil ;;[FIXME] varying does not occur
 			     (when (member :varying type-qualifiers))))))))
 		 (walk-next ast)))))))

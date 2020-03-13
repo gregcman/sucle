@@ -279,9 +279,18 @@ gl_FragColor = color;
    (glhelp:create-opengl-texture-from-data modified-terrain-png)))
 (defparameter *position-attr* 0)
 (defparameter *texcoord-attr* 2)
+
+(defparameter *shader-version* 120)
+(defun test-all-shader-versions ()
+  (dolist (x glhelp::*version-data*)
+    (setf *shader-version* (second x))
+    (deflazy:refresh 'blockshader nil)
+    (sleep 0.5)))
+
 (glhelp:deflazy-gl blockshader ()
-  (glhelp:create-opengl-shader
-   "
+  (let ((glhelp::*glsl-version* *shader-version*))
+    (glhelp:create-opengl-shader
+     "
 out float color_out;
 out vec2 texcoord_out;
 out float fogratio_out;
@@ -305,11 +314,11 @@ texcoord_out = texcoord;
 
 float distance = 
 //distance(position.xyz,vec3(0.0));
-//distance(camera_pos.xyz, position.xyz);
-max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
+distance(camera_pos.xyz, position.xyz);
+//max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
 fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
 }"
-   "
+     "
 in vec2 texcoord_out;
 in float color_out;
 uniform sampler2D sampler;
@@ -317,22 +326,24 @@ in float fogratio_out;
 uniform vec3 fogcolor;
 
 void main () {
-vec4 pixdata = texture2D(sampler,texcoord_out.xy);
+vec4 pixdata = 
+//vec4(1.0);
+texture2D(sampler,texcoord_out.xy);
 vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
-if (pixdata.a == 0.0){discard;}
+//if (pixdata.a == 0.0){discard;}
 gl_FragColor.rgb = temp; 
 }"
-   `(("position" ,*position-attr*) 
-     ("texcoord" ,*texcoord-attr*)
-     ("blocklight" 4)
-     ("skylight" 5))
-   '((:pmv "projection_model_view")
-     (:fogcolor "fogcolor")
-     (:foglet "foglet")
-     (:aratio "aratio")
-     (:camera-pos "camera_pos")
-     (:sampler "sampler")
-     (:time "time"))))
+     `(("position" ,*position-attr*) 
+       ("texcoord" ,*texcoord-attr*)
+       ("blocklight" 4)
+       ("skylight" 5))
+     '((:pmv "projection_model_view")
+       (:fogcolor "fogcolor")
+       (:foglet "foglet")
+       (:aratio "aratio")
+       (:camera-pos "camera_pos")
+       (:sampler "sampler")
+       (:time "time")))))
 
 ;;;
 
@@ -580,21 +591,21 @@ gl_FragColor.rgb = color_out;
 			(b uv)
 			(c dark))
 		     (glhelp:create-vao-or-display-list-from-specs
-		      ;;glhelp:create-gl-list-from-specs
 		      (:quads len)
 		      ((*texcoord-attr* (uv) (uv))
 		       (4 (dark) (dark) (dark) (dark))
-			   ;;;zero always comes last?
 		       (5 (dark) (dark) (dark) (dark))
+		       ;;[FIXME]zero always comes last for display lists?
+		       ;;have to figure this out manually?
 		       (*position-attr* (xyz) (xyz) (xyz) 1.0))))))
 		(occlusion-box	 
 		 (multiple-value-bind (x y z) (voxel-chunks:unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))
-		      (let ((times
-			     (draw-aabb x y z
-					(load-time-value
-					 (let ((foo *chunk-query-buffer-size*))
-					   (aabbcc:make-aabb
+		     (let ((times
+			    (draw-aabb x y z
+				       (load-time-value
+					(let ((foo *chunk-query-buffer-size*))
+					  (aabbcc:make-aabb
 					    :minx (- 0.0 foo)
 					    :miny (- 0.0 foo)
 					    :minz (- 0.0 foo)
@@ -605,11 +616,10 @@ gl_FragColor.rgb = color_out;
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
 			  (:quads times)
-			  (;;why???
-			   (*texcoord-attr* 0.06 0.06)
-			   (4 0.0 0.0 0.0 0.0)
-			   ;;zero always comes last?
-			   (5 0.0 0.0 0.0 0.0)
+			  (;;Query objects don't need the other attributes
+			   ;;(*texcoord-attr* 0.06 0.06)
+			   ;;(4 0.0 0.0 0.0 0.0)
+			   ;;(5 0.0 0.0 0.0 0.0)
 			   (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))))
 	    (set-chunk-display-list
 	     coords

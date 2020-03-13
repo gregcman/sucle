@@ -103,7 +103,48 @@ Project goals:
 - Easy install -> quicklisp [ultralisp? trivial-ship?]
 
 TODO:
-- Fix packaging for: voxel-chunks, world, glhelp, aabbcc, sucle-mp, utility, text-sub, ncurses-clone,
-- Just sucle-mp, glhelp, and ncurses-clone-lem-view? aabbcc, world, voxel-chunks are all linked together?
+- Fix packaging for: voxel-chunks, world, glhelp, aabbcc, sucle-mp, utility, text-sub, ncurses-clone, [DONE]
+- Just sucle-mp, glhelp, and ncurses-clone-lem-view? aabbcc, world, voxel-chunks are all linked together? [CANCELLED]
 
 - use import-from for split-sequence, struct-to-clos:struct->class, utility, and alexandria
+
+TODO:
+- add frustum culling, for chunks
+- use objects for blocks, not numbers
+
+TODO:
+- Text menu
+- lem-opengl, minilem integration
+- tutorial and videos, youtube
+
+
+TODO:
+- simple persistent hash table? 4k chunks?
+
+
+n bytes -> 4k 2^12 chunks?
+1 byte
+2^1 byte 2
+2^2 4
+2^3 8 byte 
+2^4 16
+2^5 32
+2^6 64
+2^7 128 -> smallest chunks
+2^8
+2^9
+2^10
+
+Add versioning?
+
+1 000 000 000 000 bytes in terabyte
+1 000 000 times that 1 000 000 000 000 000 000
+(log (expt 10 18) 2) -> 2^59.794704 bytes
+2^63.794704 bits
+
+- lock file to prevent others from accessing database
+- data file with a folder and each file is numbered 1 -> upper limit ~ 64 2^number byte blocks
+
+A game that's just a bunch of colored rectangles
+- I'm not an artist
+- Or a storyteller

@@ -95,6 +95,8 @@
 	       ;;#+nil
 	       ;;"test/"
 	       "other/"
+	       ;;"third/"
+	       ;;"ridikulisp/"
 	       )
 	 #+nil
 	 (progn
@@ -189,7 +191,7 @@
 						*lerp-mouse-y*
 						*lerp-mouse-y0*)))))))
 
-(defun unit-pitch-yaw (result pitch yaw)
+(defun unit-pitch-yaw (pitch yaw &optional (result (sb-cga:vec 0.0 0.0 0.0)))
   (let ((cos-pitch (cos pitch)))
     (with-vec (x y z) (result symbol-macrolet)
       (setf x (* cos-pitch (sin yaw))
@@ -314,9 +316,10 @@
 	(floatify (* *lerp-mouse-y* *mouse-multiplier*)))
   ;;Set the direction of the camera based on the
   ;;pitch and yaw of the player
-  (unit-pitch-yaw (camera-matrix:camera-vec-forward *camera*)
-		  (necking-pitch (entity-neck *ent*))
-		  (necking-yaw (entity-neck *ent*)))
+  (unit-pitch-yaw 
+   (necking-pitch (entity-neck *ent*))
+   (necking-yaw (entity-neck *ent*))
+   (camera-matrix:camera-vec-forward *camera*))
   
   (modify-camera-position-for-sneak)
   
@@ -351,13 +354,37 @@
   (complete-render-tasks)
   (dispatch-mesher-to-dirty-chunks))
 
-(defparameter *sky-color* '(0.68 0.8 1.0))
+(defparameter *sky-color*
+  (mapcar 'utility:byte/255 '(255 255 255))
+  )
+(defparameter *sky-color2*
+  ;;(mapcar 'utility:byte/255 '(0 0 0))
+  (mapcar 'utility:byte/255 '(173 204 255))
+  )
+;;(defun rad-deg (rad))
+(defun deg-rad (deg)
+  (* deg (load-time-value (utility:floatify (/ pi 180)))))
+
+(defparameter *sun-direction* (unit-pitch-yaw (deg-rad 90) (deg-rad 0)))
 (defparameter *sky-color-foo* '(0.0 0.0 0.0))
+(defun neck-angle ()
+  (/ (+ 1.0
+	(-
+	 (sb-cga:dot-product
+	  (sb-cga:normalize (camera-matrix:camera-vec-forward *camera*))
+	  (sb-cga:normalize *sun-direction*))))
+     2.0))
 (defun the-sky-color ()
   (map-into *sky-color-foo*
 	    (lambda (x)
-	    (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
-	  *sky-color*))
+	      (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
+	    *sky-color2*
+	    #+nil
+	    (mapcar 
+	     (lambda (a0 a1)
+	       (expt (alexandria:lerp (neck-angle) a0 a1) 0.5))
+	     *sky-color2*
+	     *sky-color*)))
 
 ;;;
 

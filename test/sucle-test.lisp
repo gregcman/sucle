@@ -226,7 +226,7 @@ gl_FragColor.xyz = color_out;
 
 (defpackage #:test5
   (:use :cl)
-  (:export #:start))
+  (:export #:start #:change-image))
 (in-package #:test5)
 
 (defun start ()
