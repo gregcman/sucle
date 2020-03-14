@@ -17,7 +17,7 @@
   (dependency-graph:%%refresh
    (etypecase thing
      (symbol
-      (symbol-value thing))
+      (symbol-value (get-special-name thing)))
      (dependency-graph:node
       thing)) :same-thread same-thread)
   (values))
@@ -29,7 +29,7 @@
   (dependency-graph:%get-value
    (etypecase thing
      (symbol
-      (symbol-value thing))
+      (symbol-value (get-special-name thing)))
      (dependency-graph:node
       thing))))
 
@@ -44,6 +44,11 @@
   (defun set-lambda-list (name lambda-list)
     (setf (get name sym) lambda-list))
   (defun get-lambda-list (name)
+    (get name sym)))
+(symbol-macrolet ((sym :dlaz-special-name))
+  (defun set-special-name (name special)
+    (setf (get name sym) special))
+  (defun get-special-name (name)
     (get name sym)))
 ;;;;;;
 
@@ -70,22 +75,28 @@
   `(dlaz (apply ',name ,@args nil)))
 (defmacro define-lazgen (name lambda-list &body body)
   `(dlaz (defun ,name ,lambda-list ,@body)))
-
+(utility:eval-always
+ (defun special-name (sym)
+   ;;[FIXME] safety through obscurity.
+   (utility:symbolicate2 (list "*-*-*" sym "*-*-*") (symbol-package sym))))
 (defmacro deflazy (name (&rest deps) &body body)
   ;;Careful -> defines both a variable and a function
   ;;with the same name
-  `(progn
-     (define-lazgen ,name ,(mapcar (lambda (x)
-				     (etypecase x
-				       (symbol x)
-				       (cons (car x))))
-				   deps)
-       ,@body)
-     (defvar ,name 
-       (lazgen ,name
-	       ,@(mapcar (lambda (x)
-			   (etypecase x
-			     (symbol x)
-			     (cons (cdr x))))
-			 deps)))
-     (dependency-graph:refresh-old-node ,name)))
+  (let ((special-name (special-name name)))
+    `(progn
+       (define-lazgen ,name ,(mapcar (lambda (x)
+				       (etypecase x
+					 (symbol x)
+					 (cons (car x))))
+				     deps)
+	 ,@body)
+       (set-special-name ',name ',special-name)
+       (defvar ,special-name
+	 (lazgen ,name
+		 ,@(mapcar (lambda (x)
+			     (special-name
+			      (etypecase x
+				(symbol x)
+				(cons (second x)))))
+			   deps)))
+       (dependency-graph:refresh-old-node ,special-name))))
