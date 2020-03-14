@@ -23,7 +23,9 @@
    #:node
    #:do-node-dependencies
 
-   #:%redefine-node))
+   #:%redefine-node
+   #:%refresh
+   #:cleanup-node-value))
 (in-package :dependency-graph)
 
 (struct-to-clos:struct->class
@@ -98,6 +100,18 @@
 	    (funcall (mutable-cell-observe cell)
 		     (mutable-cell-observing cell))))))
 
+;;Permanently prevent a mutable cell from updating anymore
+;;Keep in mind when used in conjuction with node,
+;;that the dependents have to be updated with (remove-dependent observing)
+(defun sterilize-mutable-cell (cell)
+  (let ((result (mutable-cell-result cell))
+	(observing (mutable-cell-observing cell)))
+    (setf (mutable-cell-observing cell) result
+	  (mutable-cell-snapshot cell) result
+	  (mutable-cell-un-changed cell) (load-time-value (constantly t))
+	  (mutable-cell-snapshot-key cell) 'identity
+	  (mutable-cell-observe cell) 'identity)))
+
 ;;;;Locking
 (defmacro with-t (place &body body)
   `(unwind-protect
@@ -162,9 +176,15 @@
 (defun really-make-node (func deps node)
   (with-locked-lock (node)
     (setf (node-state node) nil)
+    ;;The function that is called when the cell is fulfilled
     (let ((mutable-cell (ensure-func node)))
-      (setf (mutable-cell-observing mutable-cell)
-	    func))
+      (setf (mutable-cell-observing mutable-cell) func
+	    (mutable-cell-observe mutable-cell)
+	    (etypecase func
+	      (function #'identity)
+	      (symbol #'symbol-function))))
+    ;;Convert dependencies to mutable cells and store them
+    ;;in the node
     (let ((count 0))
       ;;funny thing with hash table storing numbers
       (dolist (dep deps)
@@ -225,7 +245,8 @@
       (lambda (k v)
 	(declare (ignorable k))
 	(let ((observing (mutable-cell-observing v)))
-	  (remove-dependent node observing))
+	  (when (typep observing 'node)
+	    (remove-dependent node observing)))
 	))
     ;;Rebuild dependents
     (map nil (lambda (x) (ensure-dependent node x))
@@ -242,6 +263,34 @@
     (really-make-node fun dependencies node)
     node))
 ;;;
+
+(defun %refresh (node)
+  (touch-node node)
+  (clean-and-invalidate-node node)
+  (%map-dependents2
+   node
+   #'clean-and-invalidate-node
+   #'dependency-graph:dirty-p))
+
+(defun %map-dependents2 (node fun test)
+  (dependency-graph:with-locked-node (node nil)
+    (dolist (dependent (dependency-graph:node-dependents node))
+      (when (funcall test dependent)
+	(funcall fun dependent)
+	(%map-dependents2 dependent fun test)))))
+
+(defgeneric cleanup-node-value (object))
+(defmethod cleanup-node-value ((object t))
+  (declare (ignorable object)))
+(defun cleanup-node (node)
+  (let ((value (dependency-graph:node-value node)))
+    (cleanup-node-value value)))
+
+(defun clean-and-invalidate-node (node)
+  (when (node-state node)
+    (cleanup-node node))
+  (%invalidate-node node))
+
 ;;[TODO] -> move to test file, documentation?
 #+nil
 "

@@ -174,3 +174,8 @@ FIXME::better deflazy:
 - non-singletons
 - update definitions from the editor
 - default dependencies, dependency swapping
+
+- named dependencies, for dependency swapping
+- phase out deflazy? and getfnc? and others?
+
+global variables essentially

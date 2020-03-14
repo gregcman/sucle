@@ -135,7 +135,7 @@ not made in the current OpenGL context, so they are garbage"
      (declare (ignorable gl-context))
      ,@gen-forms))
 
-(defmethod deflazy:cleanup-node-value ((object gl-object))
+(defmethod dependency-graph:cleanup-node-value ((object gl-object))
   (when (alive-p object)
     (gl-delete* object)))
 

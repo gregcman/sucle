@@ -4,8 +4,7 @@
    #:getfnc
    #:deflazy
    #:refresh
-   #:flush-refreshes
-   #:cleanup-node-value))
+   #:flush-refreshes))
 
 (in-package :deflazy)
 ;;;;
@@ -61,10 +60,6 @@
 (defun no-named-node (id)
   (error "no lazy load named as ~a" id))
 
-(defun get-value (id &optional (namespace *namespace*))
-  (with-named-node (node) id
-		   (dependency-graph:%get-value node)))
-
 #+nil
 (defun get-value-no-update (id &optional (namespace *namespace*))
   (with-named-node (node) id
@@ -81,13 +76,6 @@
       (funcall fun dependent)
       (%map-dependents dependent fun))))
 
-(defun %map-dependents2 (node fun test)
-  (dependency-graph:with-locked-node (node nil)
-    (dolist (dependent (dependency-graph:node-dependents node))
-      (when (funcall test dependent)
-	(funcall fun dependent)
-	(%map-dependents2 dependent fun test)))))
-
 #+nil
 (defun map-dependents (name fun &optional (namespace *namespace*))
   (with-named-node (node) name
@@ -97,6 +85,7 @@
 (defun print-dependents (name)
   (map-dependents name #'print))
 
+#+nil
 (defun map-dependents2 (name fun test &optional (namespace *namespace*))
   (with-named-node (node) name
 		   (%map-dependents2 node fun test)))
@@ -157,43 +146,24 @@
 (defparameter *refresh* (make-hash-table :test 'eq))
 (defparameter *refresh-lock* (bordeaux-threads:make-recursive-lock "refresh"))
 (defun refresh (name &optional (main-thread nil))
-  (if main-thread
-      (%refresh name)
-      (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
-	(setf (gethash name *refresh*) t))))
+  (let ((node (get-node name)))
+    (when node      
+      (if main-thread
+	  (dependency-graph:%refresh node)
+	  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+	    (setf (gethash node *refresh*) t))))))
 (defun flush-refreshes ()
   (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
     (let ((length (hash-table-count *refresh*)))
       (unless (zerop length)
-	(utility:dohash (name value) *refresh*
+	(utility:dohash (node value) *refresh*
 			(declare (ignore value))
-			(%refresh name))
+			(dependency-graph:%refresh node))
 	(clrhash *refresh*)))))
 
-(defun %refresh (name)
-  (let ((node (get-node name)))
-    (when node
-      (dependency-graph:touch-node node)
-      (clean-and-invalidate-node node)
-      (map-dependents2
-       name
-       #'clean-and-invalidate-node
-       #'dependency-graph:dirty-p))))
-
-(defun getfnc (name)
-  (get-value name))
-
-(defgeneric cleanup-node-value (object))
-(defmethod cleanup-node-value ((object t))
-  (declare (ignorable object)))
-(defun cleanup-node (node)
-  (let ((value (dependency-graph:node-value node)))
-    (cleanup-node-value value)))
-
-(defun clean-and-invalidate-node (node)
-  (when (dependency-graph:node-state node)
-    (cleanup-node node))
-  (dependency-graph:%invalidate-node node))
+(defun getfnc (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (dependency-graph:%get-value node)))
 
 ;;;tests
 ;;[TODO] -> move to test file
