@@ -48,7 +48,11 @@
    
    #:slow-draw
    #:slow-delete
-   ))
+
+   #:gl-framebuffer
+   #:gl-texture
+
+   #:texture-like))
 (in-package :glhelp)
 ;;;;************************************************************************;;;;
 ;;;;<CONTENTS>
@@ -992,3 +996,7 @@ gl_FragColor = pixcolor;
 ;;;;</VIEWPORT>
 ;;;;************************************************************************;;;;
 
+(defun texture-like (thing)
+  (etypecase thing
+    (gl-framebuffer (glhelp:texture thing))
+    (gl-texture (glhelp:handle thing))))

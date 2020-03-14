@@ -7,9 +7,13 @@
 
    #:dlaz
    #:lazgen
-   #:define-lazgen))
+   #:define-lazgen
+   #:singleton))
 
 (in-package :deflazy)
+
+(defun singleton (sym)
+  (symbol-value (get-special-name sym)))
 
 (defun refresh (thing &optional (same-thread nil))
   ;;refresh symbol -> look it up
@@ -17,9 +21,10 @@
   (dependency-graph:%%refresh
    (etypecase thing
      (symbol
-      (symbol-value (get-special-name thing)))
+      (singleton thing))
      (dependency-graph:node
-      thing)) :same-thread same-thread)
+      thing))
+   :same-thread same-thread)
   (values))
 (defun getfnc (thing
 	       ;; &optional (namespace *namespace*)
@@ -29,7 +34,7 @@
   (dependency-graph:%get-value
    (etypecase thing
      (symbol
-      (symbol-value (get-special-name thing)))
+      (singleton thing))
      (dependency-graph:node
       thing))))
 

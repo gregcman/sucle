@@ -63,7 +63,10 @@
   (progn
     ;;[FIXME]Better way to organize this? as of now manually determining that
     ;;these two depend on the *block-height* and *block-width* variables
-    (deflazy:refresh 'text-sub:render-normal-text-indirection)
+    (deflazy:refresh
+     'text-sub:indirection
+     ;;'text-sub:render-normal-text-indirection
+     )
     (deflazy:refresh 'virtual-window)))
 
 (defparameter *redraw-display-p* nil)
@@ -228,12 +231,13 @@
 				i)))))
 		       (incf index width)))))))))
        ;;;;write the data out to the texture
-       (let ((texture (text-sub:get-text-texture)))
+       (let ((texture (glhelp:texture-like (deflazy:getfnc 'text-sub:text-data))))
 	 (gl:bind-texture :texture-2d texture)
 	 (gl:tex-sub-image-2d :texture-2d 0 0 0
 			      c-array-columns
 			      c-array-lines
 			      :rgba :unsigned-byte arr)))))
+  
   (text-sub:with-text-shader (uniform)
     (gl:uniform-matrix-4fv
      (uniform :pmv)

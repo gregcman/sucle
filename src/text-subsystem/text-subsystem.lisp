@@ -22,7 +22,10 @@
    #:char-attribute
    #:get-text-texture
    #:with-text-shader
-   #:draw-fullscreen-quad))
+   #:draw-fullscreen-quad
+
+   #:text-data
+   #:indirection))
 (in-package #:text-sub)
 
 ;;[FIXME] 256 by 256 size limit for texture
@@ -43,6 +46,7 @@
       (:texture-2d
        (glhelp:wrap-opengl-texture
 	(glhelp:create-texture nil w h))))))
+#+nil
 (defun get-text-texture ()
   ;;;;[FIXME] getfnc must go before, because it has side effects.
   ;;;;are side effects and state unavoidable? a property of opengl?
@@ -138,16 +142,22 @@ gl_FragColor.a = opacity * fin.a;
 (defmacro with-text-shader ((uniform-fun) &body body)
   (with-gensyms (program)
     `(progn
-         (deflazy:getfnc 'render-normal-text-indirection)
-	 (deflazy:getfnc 'color-lookup)
-	 (let ((,program (deflazy:getfnc 'text-shader)))
-	   (glhelp:use-gl-program ,program)
-	   (glhelp:with-uniforms ,uniform-fun ,program
-	     (glhelp:set-uniforms-to-textures
-	      ((,uniform-fun 'indirection) (get-indirection-texture))
-	      ((,uniform-fun 'font-texture) (glhelp:handle (deflazy:getfnc 'font-texture)))
-	      ((,uniform-fun 'text-data) (get-text-texture)))
-	     ,@body)))))
+       ;;(deflazy:getfnc 'render-normal-text-indirection)
+       ;;Getting the indirection changes the opengl state to
+       ;;a different shader, so do it outside
+       (deflazy:getfnc 'indirection)
+       (deflazy:getfnc 'color-lookup)
+       (let ((,program (deflazy:getfnc 'text-shader)))
+	 (glhelp:use-gl-program ,program)
+	 (glhelp:with-uniforms ,uniform-fun ,program
+	   (glhelp:set-uniforms-to-textures
+	    ((,uniform-fun 'indirection)
+	     (glhelp:texture-like (deflazy:getfnc 'indirection)))
+	    ((,uniform-fun 'font-texture)
+	     (glhelp:handle (deflazy:getfnc 'font-texture)))
+	    ((,uniform-fun 'text-data)
+	     (glhelp:texture-like (deflazy:getfnc 'text-data))))
+	   ,@body)))))
 
 (defun char-attribute (bold-p underline-p opaque-p)
   (logior
@@ -284,108 +294,6 @@ gl_FragColor = value_out;
      ("value" 3))
    '((:pmv "projection_model_view"))))
 
-;;;;;;;;;;;;;;;;
-(defparameter *block-height* 16.0)
-(defparameter *block-width* 8.0)
-(defparameter *indirection-width* 0)
-(defparameter *indirection-height* 0)
-;;;;a framebuffer is faster and allows rendering to it if thats what you want
-;;;;but a texture is easier to maintain. theres no -ext framebuffer madness,
-;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
-;;;;pattern to put in it.
-(defparameter *indirection-what-type*
-  :framebuffer
-  ;;:texture-2d
-  )
-(defparameter *indirection-type* nil)
-(glhelp:deflazy-gl indirection ()
-  (setf *indirection-type* *indirection-what-type*)
-  (ecase *indirection-what-type*
-    (:framebuffer
-     (glhelp:make-gl-framebuffer
-		   *indirection-width*
-		   *indirection-height*))
-    (:texture-2d
-     (glhelp:wrap-opengl-texture
-      (glhelp:create-texture nil
-			      *indirection-width*
-			      *indirection-height*)))))
-(defun get-indirection-texture ()
-  (ecase *indirection-type*
-    (:framebuffer (glhelp:texture (deflazy:getfnc 'indirection)))
-    (:texture-2d (glhelp:handle (deflazy:getfnc 'indirection)))))
-
-;;;Round up to next power of two
-(defun power-of-2-ceiling (n)
-  (ash 1 (ceiling (log n 2))))
-(glhelp:deflazy-gl render-normal-text-indirection ((w application:w) (h application:h))
-  (let* ((upw (power-of-2-ceiling w))
-	 (uph (power-of-2-ceiling h))
-	 (need-to-update-size
-	  (not (and (= *indirection-width* upw)
-		    (= *indirection-height* uph)))))
-    (when need-to-update-size
-      (setf *indirection-width* upw
-	    *indirection-height* uph)
-      (deflazy:refresh 'indirection t))
-    (deflazy:getfnc 'indirection) ;;;refresh the indirection
-    (ecase *indirection-type*
-      (:framebuffer
-       (let ((refract (deflazy:getfnc 'indirection-shader)))
-	 (glhelp:use-gl-program refract)
-	 (glhelp:with-uniforms uniform refract
-	   (gl:uniform-matrix-4fv
-	    (uniform :pmv)
-	    (load-time-value (sb-cga:identity-matrix))
-	    nil)
-	   (gl:uniformf (uniform 'size)
-			(/ w *block-width*)
-			(/ h *block-height*))))
-       (gl:disable :cull-face)
-       (gl:disable :depth-test)
-       (gl:disable :blend)
-       (glhelp:set-render-area 0 0 upw uph)
-       (gl:bind-framebuffer :framebuffer (glhelp:handle (deflazy:getfnc 'indirection)))
-       (gl:clear :color-buffer-bit)
-       (gl:clear :depth-buffer-bit)
-       (glhelp:slow-draw (deflazy:getfnc 'fullscreen-quad)))
-      (:texture-2d
-       (gl:bind-texture :texture-2d (get-indirection-texture))
-       (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
-	 (let* ((tempx (floatify (* upw *block-width*)))
-		(tempy (floatify (* uph *block-height*)))
-		(bazx (floatify (/ tempx w)))
-		(bazy (floatify (/ tempy h)))
-		(wfloat (floatify w))
-		(hfloat (floatify h)))
-	   (with-unsafe-speed
-	     ;;[FIXME] nonportably declares things to be fixnums for speed
-	     ;;The x and y components are independent of each other, so instead of
-	     ;;computing x and y per point, compute once per x value or v value.
-	     (dotimes (x (the fixnum upw))
-	       (let* ((tex-x (+ 0.5 (floatify x)))
-		      (barx (floor (* 255.0 (/ (mod tex-x bazx)
-					       bazx))))
-		      (foox (floor (/ (* wfloat tex-x)
-				      tempx)))
-		      (base (the fixnum (* 4 x)))
-		      (delta (the fixnum (* 4 upw))))
-		 (dotimes (y (the fixnum uph))
-		   (setf (cffi:mem-ref data :uint8 (+ base 0)) barx
-			 (cffi:mem-ref data :uint8 (+ base 2)) foox)
-		   (setf base (the fixnum (+ base delta))))))
-	     (dotimes (y (the fixnum uph))
-	       (let* ((tex-y (+ 0.5 (floatify y)))			
-		      (bary (floor (* 255.0 (/ (mod tex-y bazy)
-					       bazy))))			
-		      (fooy (floor (/ (* hfloat tex-y)
-				      tempy)))
-		      (base (the fixnum (* 4 (the fixnum (* upw y))))))
-		 (dotimes (x upw)
-		   (setf (cffi:mem-ref data :uint8 (+ base 1)) bary
-			 (cffi:mem-ref data :uint8 (+ base 3)) fooy)
-		   (setf base (the fixnum (+ base 4))))))))
-	 (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))))
 
 ;;;;;;;;;;;;;;;;;;;;
 (glhelp:deflazy-gl indirection-shader ()
@@ -440,3 +348,184 @@ gl_FragColor = pixcolor;
 
 (defun draw-fullscreen-quad ()
   (glhelp:slow-draw (deflazy:getfnc 'fullscreen-quad)))
+
+;;;;;;;;;;;;;;;;
+(defparameter *block-height* 16.0)
+(defparameter *block-width* 8.0)
+;;(defparameter *indirection-width* 0)
+;;(defparameter *indirection-height* 0)
+;;;;a framebuffer is faster and allows rendering to it if thats what you want
+;;;;but a texture is easier to maintain. theres no -ext framebuffer madness,
+;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
+;;;;pattern to put in it.
+(defparameter *indirection-what-type*
+  :framebuffer
+  ;;:texture-2d
+  )
+;;(defparameter *indirection-type* nil)
+(glhelp:deflazy-gl indirection ((w application:w)
+				(h application:h)
+				;;FIXME::these are not necessarily used,
+				;;but factor in. Be more like the
+				;;kenny-tilton cells engine?
+				indirection-shader
+				fullscreen-quad)		   
+  (let* ((upw (power-of-2-ceiling w))
+	 (uph (power-of-2-ceiling h))
+	 #+nil
+	 (need-to-update-size
+	  (not (and (= *indirection-width* upw)
+		    (= *indirection-height* uph)))))
+    ;;[FIXME] The size of the indirection texture does not
+    ;;need to be updated if the power of twos align.
+    #+nil
+    (when need-to-update-size
+      (setf *indirection-width* upw
+	    *indirection-height* uph)
+      (deflazy:refresh 'indirection t))
+    
+    ;;;refresh the indirection
+    ;;(deflazy:getfnc 'indirection) 
+    ;;(setf *indirection-type* *indirection-what-type*)
+    (let ((indirection 
+	   (ecase *indirection-what-type*
+	     (:framebuffer
+	      (glhelp:make-gl-framebuffer
+	       ;;*indirection-width*
+	       upw
+	       ;;*indirection-height*
+	       uph
+	       ))
+	     (:texture-2d
+	      (glhelp:wrap-opengl-texture
+	       (glhelp:create-texture nil
+				      ;;*indirection-width*
+				      upw
+				      ;;*indirection-height*
+				      uph))))))
+      (etypecase indirection
+	(glhelp:gl-framebuffer
+	 (let ((refract indirection-shader))
+	   (glhelp:use-gl-program refract)
+	   (glhelp:with-uniforms uniform refract
+	     (gl:uniform-matrix-4fv
+	      (uniform :pmv)
+	      (load-time-value (sb-cga:identity-matrix))
+	      nil)
+	     (gl:uniformf (uniform 'size)
+			  (/ w *block-width*)
+			  (/ h *block-height*))))
+	 (gl:disable :cull-face)
+	 (gl:disable :depth-test)
+	 (gl:disable :blend)
+	 (glhelp:set-render-area 0 0 upw uph)
+	 (gl:bind-framebuffer :framebuffer (glhelp:handle indirection))
+	 (gl:clear :color-buffer-bit)
+	 (gl:clear :depth-buffer-bit)
+	 (glhelp:slow-draw fullscreen-quad))
+	(glhelp:gl-texture
+	 (gl:bind-texture :texture-2d (glhelp:handle indirection))
+	 (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
+	   (let* ((tempx (floatify (* upw *block-width*)))
+		  (tempy (floatify (* uph *block-height*)))
+		  (bazx (floatify (/ tempx w)))
+		  (bazy (floatify (/ tempy h)))
+		  (wfloat (floatify w))
+		  (hfloat (floatify h)))
+	     (progn
+	      ;;with-unsafe-speed
+	       ;;[FIXME] nonportably declares things to be fixnums for speed
+	       ;;The x and y components are independent of each other, so instead of
+	       ;;computing x and y per point, compute once per x value or v value.
+	       (dotimes (x (the fixnum upw))
+		 (let* ((tex-x (+ 0.5 (floatify x)))
+			(barx (floor (* 255.0 (/ (mod tex-x bazx)
+						 bazx))))
+			(foox (floor (/ (* wfloat tex-x)
+					tempx)))
+			(base (the fixnum (* 4 x)))
+			(delta (the fixnum (* 4 upw))))
+		   (dotimes (y (the fixnum uph))
+		     (setf (cffi:mem-ref data :uint8 (+ base 0)) barx
+			   (cffi:mem-ref data :uint8 (+ base 2)) foox)
+		     (setf base (the fixnum (+ base delta))))))
+	       (dotimes (y (the fixnum uph))
+		 (let* ((tex-y (+ 0.5 (floatify y)))			
+			(bary (floor (* 255.0 (/ (mod tex-y bazy)
+						 bazy))))			
+			(fooy (floor (/ (* hfloat tex-y)
+					tempy)))
+			(base (the fixnum (* 4 (the fixnum (* upw y))))))
+		   (dotimes (x upw)
+		     (setf (cffi:mem-ref data :uint8 (+ base 1)) bary
+			   (cffi:mem-ref data :uint8 (+ base 3)) fooy)
+		     (setf base (the fixnum (+ base 4))))))))
+	   (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))
+      indirection)))
+#+nil
+(defun get-indirection-texture ()
+  (ecase *indirection-type*
+    (:framebuffer (glhelp:texture (deflazy:getfnc 'indirection)))
+    (:texture-2d (glhelp:handle (deflazy:getfnc 'indirection)))))
+
+;;;Round up to next power of two
+(defun power-of-2-ceiling (n)
+  (ash 1 (ceiling (log n 2))))
+;;;This is not an object per se.
+;;;It depends on the size of the window,
+;;;and on the size of each object block.
+#+nil
+(glhelp:deflazy-gl render-normal-text-indirection ()
+  )
+#+nil
+(defun text-subsystem ()
+
+  ;;variables
+  *text-data-what-type*
+  *text-data-type*
+  *terminal256color-lookup*
+  *block-height*
+  *block-width*
+  *indirection-width*
+  *indirection-height*
+  *indirection-what-type*
+  ;;*indirection-type*
+ 
+
+  ;;functions
+  ;;get-text-texture
+  write-to-color-lookup
+  change-color-lookup
+  get-indirection-texture
+  
+  ;;macro
+  with-text-shader
+  with-data-shader
+  
+  ;;deflazy
+  (let*
+      ((text-data (deflazy:lazgen text-data))
+       (text-shader-source2 (deflazy:lazgen text-shader-source2))
+       (font-png (deflazy:lazgen font-png))
+       (font-texture (deflazy:lazgen font-texture font-png))  ;;   
+       (text-shader (deflazy:lazgen text-shader text-shader-source2))
+       (color-lookup (deflazy:lazgen color-lookup text-shader))
+       (flat-shader (deflazy:lazgen flat-shader))
+       (indirection (deflazy:lazgen indirection))
+       #+nil
+       (render-normal-text-indirection
+	(deflazy:lazgen
+	 render-normal-text-indirection
+	 (deflazy:singleton application:w)
+	 (deflazy:singleton application:h)))
+       (indirection-shader (deflazy:lazgen indirection-shader))
+       (fullscreen-quad (deflazy:lazgen fullscreen-quad)))))
+
+
+#+nil
+(symbol-macrolet ((foo (foo bar)))
+  (macrolet ((yolo (form)
+	       (with-output-to-string (str)
+		 (print form str))))
+    (yolo foo)))
+

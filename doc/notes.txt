@@ -182,3 +182,9 @@ global variables essentially
 
 ;;For deflazy, it defines a default node. But other nodes can be created
 ;;Like javascript React? does it have a default node?
+
+;;Only the deflazy singleton is interactive
+
+;;technical debt -> deflazy -> text-subsystem -> ncurses-clone-for-lem -> lem
+;;deflazy interactive is only useful for prototyping and doesn't scale.
+;;opengl, interactivity, simplicity, efficiency. Can't have it all
