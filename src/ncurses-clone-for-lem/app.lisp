@@ -60,6 +60,7 @@
   (setf text-sub:*block-width* w)
   (setf *glyph-height* h)
   (setf text-sub:*block-height* h)
+  (text-sub::block-dimension-change)
   (progn
     ;;[FIXME]Better way to organize this? as of now manually determining that
     ;;these two depend on the *block-height* and *block-width* variables
@@ -237,7 +238,6 @@
 			      c-array-columns
 			      c-array-lines
 			      :rgba :unsigned-byte arr)))))
-  
   (text-sub:with-text-shader (uniform)
     (gl:uniform-matrix-4fv
      (uniform :pmv)

@@ -13,7 +13,10 @@
 (in-package :deflazy)
 
 (defun singleton (sym)
-  (symbol-value (get-special-name sym)))
+  (let ((name (get-special-name sym)))
+    (if name
+	(symbol-value name)
+	(error "No default deflazy: ~a" sym))))
 
 (defun refresh (thing &optional (same-thread nil))
   ;;refresh symbol -> look it up

@@ -43,68 +43,25 @@
 ;;[FIXME] 256 by 256 size limit for texture
 (defparameter *text-data-height* 256)
 (defparameter *text-data-width* 256)
-(glhelp:deflazy-gl text-data ()
-  (make-texture-or-framebuffer
-   *text-data-what-type* *text-data-width* *text-data-height*))
+(glhelp:deflazy-gl
+ text-data ()
+ (make-texture-or-framebuffer
+  *text-data-what-type* *text-data-width* *text-data-height*))
 
-(deflazy:deflazy text-shader-source2 ()
-  '(:vs
-    "
-out vec2 texcoord_out;
-in vec4 position;
-in vec2 texcoord;
-uniform mat4 projection_model_view;
-void main () {
-gl_Position = projection_model_view * position;
-texcoord_out = texcoord;
-}"
-    :frag
-    "
-in vec2 texcoord_out;
-uniform sampler2D indirection;
-uniform sampler2D text_data;
-uniform vec4[400] color_font_info_atlas;
-uniform sampler2D font_texture;
-void main () {
-vec4 ind = texture2D(indirection, texcoord_out); //indirection
-vec4 raw = texture2D(text_data, ind.ba);
-ivec4 chardata = ivec4(255.0 * raw); //where the text changes go
-//convert a 4-bit number to a vec4 of 1.0's and 0.0's
-vec4 infodata = color_font_info_atlas[384 + chardata.a];
-vec2 offset = vec2(0.5, 0.5) * infodata.xy;
-float opacity = infodata.z;
-//font atlass coordinates
-vec4 font_data = color_font_info_atlas[256 + chardata.r]; 
-//bug workaround?
-vec4 pixcolor = texture2D(font_texture,offset+vec2(0.5,1.0)*mix(font_data.xy,font_data.zw,ind.rg));
-vec4 fin = mix(color_font_info_atlas[chardata.g],color_font_info_atlas[chardata.b],pixcolor);
-gl_FragColor.rgb = fin.rgb;
-gl_FragColor.a = opacity * fin.a;
-}"
-    :attributes
-    (("position" . 0) 
-     ("texcoord" . 2))
-    :uniforms
-    ((:pmv . "projection_model_view")
-     (indirection . "indirection")
-     ;;(attributedata (:fragment-shader attributeatlas))
-     (text-data . "text_data")
-     (color-font-info-data . "color_font_info_atlas")
-     (font-texture . "font_texture"))))
-
-(deflazy:deflazy font-png ()
-  (let ((array
-	 (img:load
-	  (sucle-temp:path "res/font.png"))))
-    (dobox ((width 0 (img:w array))
-	    (height 0 (img:h array)))
-	   (let ((value (aref array width height 0)))
-	     (setf (aref array width height 3) 255)
-	     (dotimes (i 3)
-	       (setf (aref array width height i) value))))
-    array))
-(glhelp:deflazy-gl font-texture (font-png)
-  (glhelp:wrap-opengl-texture (glhelp:create-opengl-texture-from-data font-png)))
+(glhelp:deflazy-gl
+ font-texture ()
+ (let ((font-png
+	(let ((array
+	       (img:load
+		(sucle-temp:path "res/font.png"))))
+	  (dobox ((width 0 (img:w array))
+		  (height 0 (img:h array)))
+		 (let ((value (aref array width height 0)))
+		   (setf (aref array width height 3) 255)
+		   (dotimes (i 3)
+		     (setf (aref array width height i) value))))
+	  array)))  
+   (glhelp:wrap-opengl-texture (glhelp:create-opengl-texture-from-data font-png))))
 
 (defparameter *trans* (sb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
 (defun retrans (x y &optional (trans *trans*))
@@ -138,7 +95,6 @@ gl_FragColor.a = opacity * fin.a;
        ;;Getting the indirection changes the opengl state to
        ;;a different shader, so do it outside
        (deflazy:getfnc 'indirection)
-       (deflazy:getfnc 'color-lookup)
        (let ((,program (deflazy:getfnc 'text-shader)))
 	 (glhelp:use-gl-program ,program)
 	 (glhelp:with-uniforms ,uniform-fun ,program
@@ -241,29 +197,67 @@ gl_FragColor.a = opacity * fin.a;
     arr))
 (write-to-color-lookup 'color-fun)
 (defun change-color-lookup (color-fun)
-  (deflazy:refresh 'color-lookup)
+  (deflazy:refresh 'text-shader)
   (write-to-color-lookup color-fun))
-(glhelp:deflazy-gl text-shader (text-shader-source2) 
-  (let ((shader (glhelp:create-gl-program2 text-shader-source2)))
-    (glhelp:use-gl-program shader)
-    (glhelp:with-uniforms uniform shader
+(glhelp:deflazy-gl
+ text-shader
+ () 
+ (let ((shader (glhelp:create-gl-program2
+		'(:vs
+		  "
+out vec2 texcoord_out;
+in vec4 position;
+in vec2 texcoord;
+uniform mat4 projection_model_view;
+void main () {
+gl_Position = projection_model_view * position;
+texcoord_out = texcoord;
+}"
+		  :frag
+		  "
+in vec2 texcoord_out;
+uniform sampler2D indirection;
+uniform sampler2D text_data;
+uniform vec4[400] color_font_info_atlas;
+uniform sampler2D font_texture;
+void main () {
+vec4 ind = texture2D(indirection, texcoord_out); //indirection
+vec4 raw = texture2D(text_data, ind.ba);
+ivec4 chardata = ivec4(255.0 * raw); //where the text changes go
+//convert a 4-bit number to a vec4 of 1.0's and 0.0's
+vec4 infodata = color_font_info_atlas[384 + chardata.a];
+vec2 offset = vec2(0.5, 0.5) * infodata.xy;
+float opacity = infodata.z;
+//font atlass coordinates
+vec4 font_data = color_font_info_atlas[256 + chardata.r]; 
+//bug workaround?
+vec4 pixcolor = texture2D(font_texture,offset+vec2(0.5,1.0)*mix(font_data.xy,font_data.zw,ind.rg));
+vec4 fin = mix(color_font_info_atlas[chardata.g],color_font_info_atlas[chardata.b],pixcolor);
+gl_FragColor.rgb = fin.rgb;
+gl_FragColor.a = opacity * fin.a;
+}"
+		  :attributes
+		  (("position" . 0) 
+		   ("texcoord" . 2))
+		  :uniforms
+		  ((:pmv . "projection_model_view")
+		   (indirection . "indirection")
+		   ;;(attributedata (:fragment-shader attributeatlas))
+		   (text-data . "text_data")
+		   (color-font-info-data . "color_font_info_atlas")
+		   (font-texture . "font_texture")))
+		)))
+   (glhelp:use-gl-program shader)
+   (glhelp:with-uniforms uniform shader
       (with-foreign-array (var *color-font-info-data* :float len)
 	(%gl:uniform-4fv (uniform 'color-font-info-data)
 			 (/ len 4)
 			 var))
-      #+nil
-      (with-foreign-array (var *attribute-bits* :float len)
-	(%gl:uniform-4fv (uniform 'attributedata)
-			 (/ len 4)
-			 var)))
-    shader))
-(glhelp:deflazy-gl color-lookup (text-shader)
-  (glhelp:use-gl-program text-shader)
-  (glhelp:with-uniforms uniform text-shader
-    (with-foreign-array (var *color-font-info-data* :float len)
+      (with-foreign-array (var *color-font-info-data* :float len)
       (%gl:uniform-4fv (uniform 'color-font-info-data)
 		       (/ len 4)
-		       var))))
+		       var)))
+    shader))
 
 (glhelp:deflazy-gl flat-shader ()
   (glhelp:create-opengl-shader 
@@ -345,9 +339,9 @@ gl_FragColor = pixcolor;
 (defparameter *block-height* 16.0)
 (defparameter *block-width* 8.0)
 ;;[FIXME]->use the new unchanged-feature in deflazy.
-(deflazy:deflazy block-w ()
-  *block-height*)
 (deflazy:deflazy block-h ()
+  *block-height*)
+(deflazy:deflazy block-w ()
   *block-width*)
 (defun block-dimension-change (&optional (w *block-width*) (h *block-height*))
   (unless (= (deflazy:getfnc 'block-h) h)
@@ -454,7 +448,8 @@ gl_FragColor = pixcolor;
 ;;;Round up to next power of two
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
-;#+nil
+					;#+nil
+;;#+nil
 (defun text-subsystem ()
 
   ;;variables
@@ -475,15 +470,18 @@ gl_FragColor = pixcolor;
   ;;deflazy
   (let*
       ((text-data (deflazy:lazgen text-data))
-       (text-shader-source2 (deflazy:lazgen text-shader-source2))
-       (font-png (deflazy:lazgen font-png))
-       (font-texture (deflazy:lazgen font-texture font-png))  ;;   
        (text-shader (deflazy:lazgen text-shader text-shader-source2))
-       (color-lookup (deflazy:lazgen color-lookup text-shader))
+       (font-texture (deflazy:lazgen font-texture font-png))  ;;   
+       
        (flat-shader (deflazy:lazgen flat-shader))
        (indirection (deflazy:lazgen indirection))
        (indirection-shader (deflazy:lazgen indirection-shader))
-       (fullscreen-quad (deflazy:lazgen fullscreen-quad)))))
+       (fullscreen-quad (deflazy:lazgen fullscreen-quad))))
+
+  text-data
+  font-texture
+  color-lookup
+  )
 
 
 #+nil
