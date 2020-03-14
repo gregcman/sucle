@@ -21,7 +21,9 @@
 
    #:%invalidate-node
    #:node
-   #:do-node-dependencies))
+   #:do-node-dependencies
+
+   #:%redefine-node))
 (in-package :dependency-graph)
 
 (struct-to-clos:struct->class
@@ -208,6 +210,37 @@
       (declare (ignorable k))
       (when (mutable-cell-difference v)
 	(return-from dirty-p t)))))
+
+;;;
+(defun %redefine-node (fun node dependencies &optional (name nil))
+  (with-locked-lock (node)
+    #+nil
+    (setf (dependencies-symbols node) deps)
+    (setf (node-name node) name)
+    ;;FIXME::Inelegant, way to update dependencies. Just eliminate
+    ;;all the old dependencies and rebuild.
+    
+    ;;Remove all current dependents
+    (do-node-dependencies node
+      (lambda (k v)
+	(declare (ignorable k))
+	(let ((observing (mutable-cell-observing v)))
+	  (remove-dependent node observing))
+	))
+    ;;Rebuild dependents
+    (map nil (lambda (x) (ensure-dependent node x))
+	 dependencies)
+    
+    #+nil
+    (let ((old-dependencies (node-dependencies node)))
+      #+nil
+      (map nil (lambda (x) (remove-dependent node x))
+	   (set-difference old-dependencies dependencies))
+      #+nil
+      (map nil (lambda (x) (ensure-dependent node x))
+	   (set-difference dependencies old-dependencies)))
+    (really-make-node fun dependencies node)
+    node))
 ;;;
 ;;[TODO] -> move to test file, documentation?
 #+nil

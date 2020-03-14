@@ -33,34 +33,7 @@
 			   node))
 		       deps))
 	(node (ensure-node name namespace)))
-    (dependency-graph:with-locked-lock (node)
-      #+nil
-      (setf (dependencies-symbols node) deps)
-      (setf (dependency-graph:node-name node) name)
-      ;;FIXME::Inelegant, way to update dependencies. Just eliminate
-      ;;all the old dependencies and rebuild.
-      
-      ;;Remove all current dependents
-      (dependency-graph:do-node-dependencies node
-	(lambda (k v)
-	  (declare (ignorable k))
-	  (let ((observing (dependency-graph::mutable-cell-observing v)))
-	    (dependency-graph:remove-dependent node observing))
-	  ))
-      ;;Rebuild dependents
-      (map nil (lambda (x) (dependency-graph:ensure-dependent node x))
-	   dependencies)
-      
-      #+nil
-      (let ((old-dependencies (dependency-graph:node-dependencies node)))
-	#+nil
-	(map nil (lambda (x) (dependency-graph:remove-dependent node x))
-	     (set-difference old-dependencies dependencies))
-	#+nil
-	(map nil (lambda (x) (dependency-graph:ensure-dependent node x))
-	     (set-difference dependencies old-dependencies)))
-      (dependency-graph:really-make-node fun dependencies node)
-      node)))
+    (dependency-graph:%redefine-node fun node dependencies name)))
 
 ;;;;convenience stuff below
 
@@ -92,10 +65,11 @@
   (with-named-node (node) id
 		   (dependency-graph:%get-value node)))
 
+#+nil
 (defun get-value-no-update (id &optional (namespace *namespace*))
   (with-named-node (node) id
 		   (dependency-graph:node-value node)))
-
+#+nil
 (defun invalidate-node (id &optional (namespace *namespace*))
   (with-named-node (node) id
 		   (dependency-graph:%invalidate-node node)))
@@ -121,7 +95,7 @@
 
 #+nil
 (defun print-dependents (name)
-  (map-dependents name #'print *stuff*))
+  (map-dependents name #'print))
 
 (defun map-dependents2 (name fun test &optional (namespace *namespace*))
   (with-named-node (node) name
@@ -142,27 +116,29 @@
   (defnode c (c) c))
 
 ;;;;;
-(defun %defnode (deps body)
-  (let ((lambda-args ())
-	(node-deps ()))
-    (dolist (item deps)
-      (if (symbolp item)
-	  (progn (push item lambda-args)
-		 (push item node-deps))
-	  (destructuring-bind (var dep) item
-	    (push var lambda-args)
-	    (push dep node-deps))))
-    (values `(lambda ,lambda-args ,@body)
-	    node-deps)))
+(utility:eval-always
+  (defun %defnode (deps body)
+    (let ((lambda-args ())
+	  (node-deps ()))
+      (dolist (item deps)
+	(if (symbolp item)
+	    (progn (push item lambda-args)
+		   (push item node-deps))
+	    (destructuring-bind (var dep) item
+	      (push var lambda-args)
+	      (push dep node-deps))))
+      (values `(lambda ,lambda-args ,@body)
+	      node-deps))))
 ;;;;;[FIXME]: clean this area up with dependency graph 
-(defvar *stuff* (make-hash-table :test 'eq))
 (defmacro deflazy (name (&rest deps) &rest gen-forms)
   `(eval-when (:load-toplevel :execute)
-     (let ((*namespace* *stuff*))
-       (refresh-new-node ',name)
-       ,(multiple-value-bind
-	 (fun node-deps) (%defnode deps gen-forms)
-	 `(redefine-node ,fun ',node-deps ',name)))))
+     (refresh-new-node ',name)
+     ,(multiple-value-bind
+	    (fun node-deps) (%defnode deps gen-forms)
+	`(redefine-node ,fun
+			',node-deps
+			;;,(cons 'list node-deps)
+			',name))))
 
 (defun ensure-node (name &optional (namespace *namespace*))
   (or (multiple-value-bind (node existsp)
@@ -174,7 +150,7 @@
 
 ;;;;queue node to be unloaded if it already has stuff in it 
 (defun refresh-new-node (name)
-  (let ((node (ensure-node name *stuff*)))
+  (let ((node (ensure-node name)))
     (unless (= 0 (dependency-graph:node-timestamp node))
       (refresh name))))
 
@@ -195,18 +171,17 @@
 	(clrhash *refresh*)))))
 
 (defun %refresh (name)
-  (let ((node (get-node name *stuff*)))
+  (let ((node (get-node name)))
     (when node
       (dependency-graph:touch-node node)
       (clean-and-invalidate-node node)
       (map-dependents2
        name
        #'clean-and-invalidate-node
-       #'dependency-graph:dirty-p
-       *stuff*))))
+       #'dependency-graph:dirty-p))))
 
 (defun getfnc (name)
-  (get-value name *stuff*))
+  (get-value name))
 
 (defgeneric cleanup-node-value (object))
 (defmethod cleanup-node-value ((object t))
@@ -226,5 +201,5 @@
 (deflazy what ()
   45)
 #+nil
-(deflazy foobar (what)
+(deflazy foobar ((what what))
   (print what))
