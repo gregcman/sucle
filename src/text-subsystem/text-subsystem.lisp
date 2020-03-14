@@ -36,24 +36,19 @@
   :texture-2d
   )
 (defparameter *text-data-type* nil)
+
+(defun make-texture-or-framebuffer (type w h)
+  (ecase type
+    (:framebuffer
+     (glhelp:make-gl-framebuffer w h))
+    (:texture-2d
+     (glhelp:wrap-opengl-texture
+      (glhelp:create-texture nil w h)))))
 (glhelp:deflazy-gl text-data ()
-  (setf *text-data-type* *text-data-what-type*)
+		   (setf *text-data-type* *text-data-what-type*)
   (let ((w *text-data-width*)
 	(h *text-data-height*))
-    (ecase *text-data-what-type*
-      (:framebuffer
-       (glhelp:make-gl-framebuffer w h))
-      (:texture-2d
-       (glhelp:wrap-opengl-texture
-	(glhelp:create-texture nil w h))))))
-#+nil
-(defun get-text-texture ()
-  ;;;;[FIXME] getfnc must go before, because it has side effects.
-  ;;;;are side effects and state unavoidable? a property of opengl?
-  (let ((value (deflazy:getfnc 'text-data)))
-    (ecase *text-data-type*
-      (:framebuffer (glhelp:texture value))
-      (:texture-2d (glhelp:handle value)))))
+    (make-texture-or-framebuffer *text-data-what-type* w h)))
 
 (deflazy:deflazy text-shader-source2 ()
   '(:vs
@@ -352,8 +347,6 @@ gl_FragColor = pixcolor;
 ;;;;;;;;;;;;;;;;
 (defparameter *block-height* 16.0)
 (defparameter *block-width* 8.0)
-;;(defparameter *indirection-width* 0)
-;;(defparameter *indirection-height* 0)
 ;;;;a framebuffer is faster and allows rendering to it if thats what you want
 ;;;;but a texture is easier to maintain. theres no -ext framebuffer madness,
 ;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
@@ -362,14 +355,17 @@ gl_FragColor = pixcolor;
   :framebuffer
   ;;:texture-2d
   )
-;;(defparameter *indirection-type* nil)
 (glhelp:deflazy-gl indirection ((w application:w)
 				(h application:h)
 				;;FIXME::these are not necessarily used,
 				;;but factor in. Be more like the
 				;;kenny-tilton cells engine?
 				indirection-shader
-				fullscreen-quad)		   
+				fullscreen-quad)
+		   ;;Careful dealing with deflazy and OpenGL.
+		   ;;Opengl is necessarily stateful, whereas deflazy
+		   ;;tries to be more functional. The clash
+		   ;;of the two breaks the abstraction.
   (let* ((upw (power-of-2-ceiling w))
 	 (uph (power-of-2-ceiling h))
 	 #+nil
@@ -385,24 +381,7 @@ gl_FragColor = pixcolor;
       (deflazy:refresh 'indirection t))
     
     ;;;refresh the indirection
-    ;;(deflazy:getfnc 'indirection) 
-    ;;(setf *indirection-type* *indirection-what-type*)
-    (let ((indirection 
-	   (ecase *indirection-what-type*
-	     (:framebuffer
-	      (glhelp:make-gl-framebuffer
-	       ;;*indirection-width*
-	       upw
-	       ;;*indirection-height*
-	       uph
-	       ))
-	     (:texture-2d
-	      (glhelp:wrap-opengl-texture
-	       (glhelp:create-texture nil
-				      ;;*indirection-width*
-				      upw
-				      ;;*indirection-height*
-				      uph))))))
+    (let ((indirection (make-texture-or-framebuffer *indirection-what-type* upw uph)))
       (etypecase indirection
 	(glhelp:gl-framebuffer
 	 (let ((refract indirection-shader))
@@ -462,41 +441,22 @@ gl_FragColor = pixcolor;
 		     (setf base (the fixnum (+ base 4))))))))
 	   (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))
       indirection)))
-#+nil
-(defun get-indirection-texture ()
-  (ecase *indirection-type*
-    (:framebuffer (glhelp:texture (deflazy:getfnc 'indirection)))
-    (:texture-2d (glhelp:handle (deflazy:getfnc 'indirection)))))
-
 ;;;Round up to next power of two
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
-;;;This is not an object per se.
-;;;It depends on the size of the window,
-;;;and on the size of each object block.
-#+nil
-(glhelp:deflazy-gl render-normal-text-indirection ()
-  )
-#+nil
+;#+nil
 (defun text-subsystem ()
 
   ;;variables
   *text-data-what-type*
-  *text-data-type*
   *terminal256color-lookup*
   *block-height*
   *block-width*
-  *indirection-width*
-  *indirection-height*
   *indirection-what-type*
-  ;;*indirection-type*
  
-
   ;;functions
-  ;;get-text-texture
   write-to-color-lookup
   change-color-lookup
-  get-indirection-texture
   
   ;;macro
   with-text-shader
@@ -512,12 +472,6 @@ gl_FragColor = pixcolor;
        (color-lookup (deflazy:lazgen color-lookup text-shader))
        (flat-shader (deflazy:lazgen flat-shader))
        (indirection (deflazy:lazgen indirection))
-       #+nil
-       (render-normal-text-indirection
-	(deflazy:lazgen
-	 render-normal-text-indirection
-	 (deflazy:singleton application:w)
-	 (deflazy:singleton application:h)))
        (indirection-shader (deflazy:lazgen indirection-shader))
        (fullscreen-quad (deflazy:lazgen fullscreen-quad)))))
 
