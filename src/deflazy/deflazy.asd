@@ -5,7 +5,8 @@
   :depends-on (#:utility
 	       #:bordeaux-threads
 	       #:uncommon-lisp
-	       #:trivia)
+	       ;;#:trivia
+	       )
   :components
   ((:file "dependency-graph")
    (:file "lazy-loading")))
