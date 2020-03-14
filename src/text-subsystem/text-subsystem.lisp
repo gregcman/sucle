@@ -14,18 +14,19 @@
    #:*block-height*
    #:*text-data-what-type*
    #:change-color-lookup
-   #:color-fun
-   #:render-normal-text-indirection
-   #:with-data-shader
    #:*text-data-width*
    #:*text-data-height*
    #:char-attribute
-   #:get-text-texture
+
    #:with-text-shader
    #:draw-fullscreen-quad
 
    #:text-data
-   #:indirection))
+   #:indirection
+   #:font-texture
+
+   #:text-shader
+   #:use-text-shader))
 (in-package #:text-sub)
 
 (defparameter *text-data-what-type*
@@ -43,10 +44,10 @@
 ;;[FIXME] 256 by 256 size limit for texture
 (defparameter *text-data-height* 256)
 (defparameter *text-data-width* 256)
-(glhelp:deflazy-gl
- text-data ()
- (make-texture-or-framebuffer
+(defun make-text-data ()
+  (make-texture-or-framebuffer
   *text-data-what-type* *text-data-width* *text-data-height*))
+(glhelp:deflazy-gl text-data () (make-text-data))
 
 (glhelp:deflazy-gl
  font-texture ()
@@ -63,11 +64,17 @@
 	  array)))  
    (glhelp:wrap-opengl-texture (glhelp:create-opengl-texture-from-data font-png))))
 
+;;Writing text to OpenGL via a framebuffer. disabled for now
+;;Its highly optimized, but is it solving a necessary problem?
+;;Disabled.
+#+nil
 (defparameter *trans* (sb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
+#+nil
 (defun retrans (x y &optional (trans *trans*))
   (setf (aref trans 12) (/ x 128.0)
 	(aref trans 13) (/ y 128.0))
   trans)
+#+nil
 (defmacro with-data-shader ((uniform-fun rebase-fun) &body body)
   (with-gensyms (program)
     `(let ((,program (deflazy:getfnc 'flat-shader)))
@@ -85,26 +92,6 @@
 		   (,uniform-fun :pmv)
 		   (retrans x y)
 		   nil)))
-	   ,@body)))))
-
-;;;;[FIXME] managing opengl state blows
-(defmacro with-text-shader ((uniform-fun) &body body)
-  (with-gensyms (program)
-    `(progn
-       ;;(deflazy:getfnc 'render-normal-text-indirection)
-       ;;Getting the indirection changes the opengl state to
-       ;;a different shader, so do it outside
-       (deflazy:getfnc 'indirection)
-       (let ((,program (deflazy:getfnc 'text-shader)))
-	 (glhelp:use-gl-program ,program)
-	 (glhelp:with-uniforms ,uniform-fun ,program
-	   (glhelp:set-uniforms-to-textures
-	    ((,uniform-fun 'indirection)
-	     (glhelp:texture-like (deflazy:getfnc 'indirection)))
-	    ((,uniform-fun 'font-texture)
-	     (glhelp:handle (deflazy:getfnc 'font-texture)))
-	    ((,uniform-fun 'text-data)
-	     (glhelp:texture-like (deflazy:getfnc 'text-data))))
 	   ,@body)))))
 
 (defun char-attribute (bold-p underline-p opaque-p)
@@ -448,6 +435,45 @@ gl_FragColor = pixcolor;
 ;;;Round up to next power of two
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
+;;;
+(defun use-text-shader
+    (&key
+       (pmv (load-time-value (nsb-cga:identity-matrix))
+	    ;;pmv-supplied-p
+	    )
+       (indirection (glhelp:texture-like
+		     (deflazy:getfnc 'indirection))
+		    ;;indirection-supplied-p
+		    )
+       (font-texture (glhelp:handle
+		      (deflazy:getfnc 'font-texture))
+		     ;;font-texture-supplied-p
+		     )
+       (text-data (glhelp:texture-like
+		   (deflazy:getfnc 'text-data))
+		  ;;text-data-supplied-p
+		  ))
+  (deflazy:getfnc 'indirection)
+  (let ((program (deflazy:getfnc 'text-shader)))
+    (glhelp:use-gl-program program)
+    (glhelp:with-uniforms
+     uniform-fun program
+     (glhelp::set-uniform-to-texture
+      (uniform-fun 'indirection)
+      indirection
+      0)
+     (glhelp::set-uniform-to-texture
+      (uniform-fun 'font-texture)
+      font-texture
+      1)
+     (glhelp::set-uniform-to-texture
+      (uniform-fun 'text-data)
+      text-data
+      2)
+     (gl:uniform-matrix-4fv
+      (uniform-fun :pmv)
+      pmv
+      nil))))
 					;#+nil
 ;;#+nil
 (defun text-subsystem ()

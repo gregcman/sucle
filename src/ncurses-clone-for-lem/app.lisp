@@ -238,20 +238,17 @@
 			      c-array-columns
 			      c-array-lines
 			      :rgba :unsigned-byte arr)))))
-  (text-sub:with-text-shader (uniform)
-    (gl:uniform-matrix-4fv
-     (uniform :pmv)
-     (load-time-value (nsb-cga:identity-matrix))
-     nil)   
-    (glhelp:bind-default-framebuffer)
-    (glhelp:set-render-area 0 0
-			    (deflazy:getfnc 'application:w)
-			    (deflazy:getfnc 'application:h))
-    #+nil
-    (progn
-      (gl:enable :blend)
-      (gl:blend-func :src-alpha :one-minus-src-alpha))
 
-    (text-sub:draw-fullscreen-quad)
-    ))
+
+  (text-sub:use-text-shader)
+  (glhelp:bind-default-framebuffer)
+  (glhelp:set-render-area 0 0
+			  (deflazy:getfnc 'application:w)
+			  (deflazy:getfnc 'application:h))
+  #+nil
+  (progn
+    (gl:enable :blend)
+    (gl:blend-func :src-alpha :one-minus-src-alpha))
+
+  (text-sub:draw-fullscreen-quad))
 
