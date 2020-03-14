@@ -38,15 +38,27 @@
   (error "no lazy load named as ~a" id))
 
 
-(defun refresh (name &optional (main-thread nil))
-  (let ((node (get-node name)))
-    (when node      
-      (%%refresh node main-thread))))
-(defun getfnc (id &optional (namespace *namespace*))
-  (with-named-node (node) id
-		   (dependency-graph:%get-value node)))
+(defun refresh (thing &optional (main-thread nil))
+  ;;refresh symbol -> look it up
+  ;;refresh node -> refresh node
+  (etypecase thing
+    (symbol
+     (let ((node (get-node thing)))
+       (when node      
+	 (%%refresh node main-thread))))
+    (dependency-graph:node
+     (%%refresh thing main-thread))))
+(defun getfnc (thing &optional (namespace *namespace*))
+  ;;getfnc symbol -> look it up
+  ;;getfnc node -> fulfill node
+  (etypecase thing
+    (symbol
+     (with-named-node (node) thing
+		      (dependency-graph:%get-value node)))
+    (dependency-graph:node
+     (dependency-graph:%get-value thing))))
 
-;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (utility:eval-always
   (defun %defnode (specification)
     ;;Convert a deflazy specification into a
@@ -100,9 +112,9 @@
 (defmacro deflazy (name (&rest deps) &body body)
   (multiple-value-bind (lambda-args dependencies tags) (%defnode deps)
     `(eval-when (:load-toplevel :execute)
-       (%deflazy ',name (lambda ,lambda-args ,@body) ',dependencies ',tags))))
+       (%deflazy (lambda ,lambda-args ,@body) ',dependencies ',tags ',name))))
 
-(defun %deflazy (name fun dependencies tags)
+(defun %deflazy (fun dependencies tags &optional name)
   (let
       ;;Make sure the node is in the namespace
       ((node
@@ -133,6 +145,52 @@
      name
      tags)
     node))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;essentially deflazy 2.0?
+;;No--- deflazy can be reevaluated, this 
+;;its not named, it pairs with defparameter
+(defmacro defdep (name (&rest pairs) &body body)
+  (let ((lambda-args (mapcar 'first pairs))
+	(dependencies (mapcar 'second pairs))
+	(fun-name
+	 ;;FIXME::safety through obscurity.
+	 ;;FIXME::pollutes the package?
+	 (utility:symbolicate2 (list "----defdep---" name))))
+    `(progn
+       (load-time-value
+	(defun ,fun-name ,lambda-args
+	  ,@body))
+       (%defdep ',fun-name (list ,@dependencies) ',lambda-args ',name))))
+(defun %defdep (fun dependencies tags &optional name)
+  (let
+      ;;Make the node
+      ((node (let ((new (make-instance 'dependency-graph:node)))
+	       (set-node name new)
+	       new)))
+    ;;Queue it for cleanup if it already exists
+    (refresh-old-node node)
+    (dependency-graph:%redefine-node fun node dependencies name tags)
+    node))
+
+;;;;Test
+(defun defdep-test (&optional what)
+  ;;Run this function in the repl, then
+  ;;redefine it here. 
+  (let* ((foo (defdep defdep-foo-test ((a 56)
+				       (b "hello"))
+		(let ((c (random 100000)))		  
+		  (list a b c)))))
+    (dotimes (i 10)
+      (unless what
+	(sleep 1))
+      (refresh foo t)
+      (print (getfnc foo)))
+    foo))
+
+;;(dependency-graph:dirty-p *bar*)
+;;(defparameter *bar* (defdep-test t))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;;;;Refreshing system
 ;;;;queue node to be unloaded if it already has stuff in it 

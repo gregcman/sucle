@@ -191,12 +191,14 @@
   (with-locked-lock (node)
     (setf (node-state node) nil)
     ;;The function that is called when the cell is fulfilled
-    (let ((mutable-cell (ensure-func node)))
+    (let ((mutable-cell (ensure-func node))
+	  (witness (etypecase func
+		     (function #'identity)
+		     (symbol #'symbol-function))))
       (setf (mutable-cell-observing mutable-cell) func
-	    (mutable-cell-observe mutable-cell)
-	    (etypecase func
-	      (function #'identity)
-	      (symbol #'symbol-function))))
+	    (mutable-cell-observe mutable-cell) witness
+	    (mutable-cell-snapshot-key mutable-cell) witness
+	    ))
     ;;Convert dependencies to mutable cells and store them
     ;;in the node
     (let ((count 0))
@@ -231,10 +233,6 @@
 (defun touch-node (node)
   (incf (node-timestamp node)))
 
-(defun %invalidate-node (node)
-  (touch-node node)
-  (setf (node-state node) nil))
-
 (defun dirty-p (node)
   ;;Iterate through all the dependencies,
   ;;if there is a difference detected,
@@ -243,7 +241,7 @@
     (lambda (k v)
       (declare (ignorable k))
       (when (mutable-cell-difference v)
-	(return-from dirty-p t)))))
+	(return-from dirty-p (values t v))))))
 
 ;;;
 (defun %redefine-node (fun node dependencies &optional name tags)
@@ -264,7 +262,9 @@
 	    (remove-dependent node observing)))
 	))
     ;;Rebuild dependents
-    (map nil (lambda (x) (ensure-dependent node x))
+    (map nil (lambda (x)
+	       (when (typep x 'node)
+		 (ensure-dependent node x)))
 	 dependencies)
     
     #+nil
@@ -280,18 +280,16 @@
 ;;;
 
 (defun %refresh (node)
-  (touch-node node)
-  (clean-and-invalidate-node node)
   (%map-dependents2
    node
    #'clean-and-invalidate-node
-   #'dependency-graph:dirty-p))
+   #'dirty-p))
 
 (defun %map-dependents2 (node fun test)
   (dependency-graph:with-locked-node (node nil)
-    (dolist (dependent (dependency-graph:node-dependents node))
-      (when (funcall test dependent)
-	(funcall fun dependent)
+    (when (funcall test node)
+      (funcall fun node)
+      (dolist (dependent (dependency-graph:node-dependents node))
 	(%map-dependents2 dependent fun test)))))
 
 (defgeneric cleanup-node-value (object))
@@ -305,6 +303,9 @@
   (when (node-state node)
     (cleanup-node node))
   (%invalidate-node node))
+(defun %invalidate-node (node)
+  (touch-node node)
+  (setf (node-state node) nil))
 
 ;;[TODO] -> move to test file, documentation?
 #+nil
