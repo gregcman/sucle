@@ -121,7 +121,7 @@
   (when window:*status*
     (quit))
   (window:update-control-state2)
-  (deflazy:flush-refreshes)
+  (dependency-graph:flush-refreshes)
   (window:update-display)
   (window:poll)
   (window:update-control-state))

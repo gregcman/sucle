@@ -27,7 +27,10 @@
    #:%refresh
    #:cleanup-node-value
 
-   #:get-mutable-cell-by-name))
+   #:get-mutable-cell-by-name
+   #:flush-refreshes
+   #:refresh-old-node
+   #:%%refresh))
 (in-package :dependency-graph)
 
 (struct-to-clos:struct->class
@@ -279,33 +282,77 @@
     node))
 ;;;
 
-(defun %refresh (node)
-  (%map-dependents2
-   node
-   #'clean-and-invalidate-node
-   #'dirty-p))
-
-(defun %map-dependents2 (node fun test)
-  (dependency-graph:with-locked-node (node nil)
-    (when (funcall test node)
-      (funcall fun node)
-      (dolist (dependent (dependency-graph:node-dependents node))
-	(%map-dependents2 dependent fun test)))))
+(defun %refresh (node &optional (value (node-value node)))
+  (clean-and-invalidate-node node value)
+  (labels ((%map-dependents2 (node fun test)
+	 ;;FIXME::first node is a special case???
+	 (dependency-graph:with-locked-node (node nil)
+	   (dolist (dependent (dependency-graph:node-dependents node))
+	     (when (funcall test dependent)
+	       (funcall fun dependent)
+	       (%map-dependents2 dependent fun test))))))
+    (%map-dependents2
+     node
+     #'clean-and-invalidate-node
+     #'dirty-p)))
 
 (defgeneric cleanup-node-value (object))
 (defmethod cleanup-node-value ((object t))
   (declare (ignorable object)))
-(defun cleanup-node (node)
-  (let ((value (dependency-graph:node-value node)))
-    (cleanup-node-value value)))
 
-(defun clean-and-invalidate-node (node)
-  (when (node-state node)
-    (cleanup-node node))
-  (%invalidate-node node))
-(defun %invalidate-node (node)
+(defun clean-and-invalidate-node (node &optional (value nil value-supplied-p))
+  ;;FIXME::real logging facilities?
+  ;;(format t "~% old node:~s" node)
+  (when (or (node-state node)
+	    ;;value-supplied-p means ignore
+	    ;;whatever happened to the node.
+	    value-supplied-p)
+    ;;(format t "~%-> cleaning")
+    ;;cleanup the node 
+    (let ((value (if value-supplied-p value
+		     (node-value node))))
+      (cleanup-node-value value)
+      (setf (node-value node)
+	    ;;FIXME -> is nil correct?
+	    nil)))
+  ;;invalidate it
   (touch-node node)
   (setf (node-state node) nil))
+;;;;
+
+
+;;;;Refreshing system
+;;;;queue node to be unloaded if it already has stuff in it 
+(defun refresh-old-node (node)
+  (when (not (zerop (dependency-graph:node-timestamp node)))
+    (%%refresh node)))
+
+(defparameter *refresh* (make-hash-table :test 'eq))
+(defparameter *refresh-lock* (bordeaux-threads:make-recursive-lock "refresh"))
+(defun %%refresh (node &key same-thread;; wait
+			 )
+  (cond
+    (same-thread
+     (%refresh node))
+    (t (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+	 (setf (gethash node *refresh*)
+	       (dependency-graph:node-value node)))
+       ;;Spin lock when wait is t
+       ;;FIXME::node values getting overwritten before node
+       ;;can be cleaned up
+       #+nil
+       (when wait
+	 (loop :while (gethash node *refresh*))))))
+;;This is a catch-all for OpenGL objects and everything. FIXME?
+(defun flush-refreshes ()
+  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+    (let ((length (hash-table-count *refresh*)))
+      (unless (zerop length)
+	(utility:dohash (node value) *refresh*
+			;;(declare (ignore value))
+			(dependency-graph:%refresh node value))
+	(clrhash *refresh*)))))
+;;;;
 
 ;;[TODO] -> move to test file, documentation?
 #+nil

@@ -3,8 +3,7 @@
   (:export
    #:getfnc
    #:deflazy
-   #:refresh
-   #:flush-refreshes))
+   #:refresh))
 
 (in-package :deflazy)
 ;;;;
@@ -38,16 +37,16 @@
   (error "no lazy load named as ~a" id))
 
 
-(defun refresh (thing &optional (main-thread nil))
+(defun refresh (thing &optional (same-thread nil))
   ;;refresh symbol -> look it up
   ;;refresh node -> refresh node
   (etypecase thing
     (symbol
      (let ((node (get-node thing)))
        (when node      
-	 (%%refresh node main-thread))))
+	 (dependency-graph:%%refresh node :same-thread same-thread))))
     (dependency-graph:node
-     (%%refresh thing main-thread))))
+     (dependency-graph:%%refresh thing :same-thread same-thread))))
 (defun getfnc (thing &optional (namespace *namespace*))
   ;;getfnc symbol -> look it up
   ;;getfnc node -> fulfill node
@@ -128,22 +127,23 @@
 	 (let ((new (make-instance 'dependency-graph:node)))
 	   (set-node name new)
 	   new))))
-    ;;Queue it for cleanup if it already exists
-    (refresh-old-node node)
-    (dependency-graph:%redefine-node
-     fun
-     node
-     (mapcar
-      (lambda (dep-name)
-	(multiple-value-bind (node existp) (get-node dep-name)
-	  (unless existp
-	    (error "node node named:~a ~%while loading name" dep-name))
-	  node))
-      dependencies
-      ;;,(cons 'list node-deps)
-      )
-     name
-     tags)
+    (dependency-graph:with-locked-lock (node)
+      ;;Queue it for cleanup if it already exists
+      (dependency-graph:refresh-old-node node)
+      (dependency-graph:%redefine-node
+       fun
+       node
+       (mapcar
+	(lambda (dep-name)
+	  (multiple-value-bind (node existp) (get-node dep-name)
+	    (unless existp
+	      (error "node node named:~a ~%while loading name" dep-name))
+	    node))
+	dependencies
+	;;,(cons 'list node-deps)
+	)
+       name
+       tags))
     node))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;essentially deflazy 2.0?
@@ -168,7 +168,7 @@
 	       (set-node name new)
 	       new)))
     ;;Queue it for cleanup if it already exists
-    (refresh-old-node node)
+    (dependency-graph:refresh-old-node node)
     (dependency-graph:%redefine-node fun node dependencies name tags)
     node))
 
@@ -191,28 +191,6 @@
 ;;(defparameter *bar* (defdep-test t))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-;;;;Refreshing system
-;;;;queue node to be unloaded if it already has stuff in it 
-(defun refresh-old-node (node)
-  (when (not (zerop (dependency-graph:node-timestamp node)))
-    (%%refresh node)))
-
-(defparameter *refresh* (make-hash-table :test 'eq))
-(defparameter *refresh-lock* (bordeaux-threads:make-recursive-lock "refresh"))
-(defun %%refresh (node &optional (main-thread nil))
-  (if main-thread
-      (dependency-graph:%refresh node)
-      (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
-	(setf (gethash node *refresh*) t))))
-(defun flush-refreshes ()
-  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
-    (let ((length (hash-table-count *refresh*)))
-      (unless (zerop length)
-	(utility:dohash (node value) *refresh*
-			(declare (ignore value))
-			(dependency-graph:%refresh node))
-	(clrhash *refresh*)))))
 ;;;;
 
 ;;;tests
