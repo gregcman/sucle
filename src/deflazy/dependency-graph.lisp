@@ -26,28 +26,18 @@
 
 (struct-to-clos:struct->class
  (defstruct node
-   (value nil)
-   (state ;fulfilled or unfulfilled
-    nil)
-   (timestamp ;last time fulfilled
-    0)
+   ;;The value
+   value
+   ;;Fulfilled or unfulfilled
+   state
+   ;;Last time fulfilled
+   (timestamp 0)
    (lock (bordeaux-threads:make-recursive-lock))
-   (lock-value nil)
-   
-   ;;(fun nil)
-   ;;(fun-old nil)
-   ;;(arguments nil)
-   #+nil
-   (dependency nil)
-   ;;(dependencies nil) 
-   ;;(dependencies-timestamps nil)
-
+   ;;T or NIL depending on whether its currently locked
+   lock-value
    (%data (make-hash-table :test 'eql))
-   
-   (dependents nil)
-   #+nil
-   (height ;height of node in dependency tree
-    nil)
+   ;;List of dependents
+   dependents
    (name "anon")))
 
 (defun node-data (node name)
@@ -86,6 +76,9 @@
 			       (mutable-cell-observing obj))))
 
 (defun mutable-cell-difference (cell &optional (new (mutable-cell-observing cell)))
+  ;;Detect whether there is a difference being observed
+  ;;and if so whether a change should occur.
+  ;;new is given as a parameter for debugging
   (let* ((new-snapshot (funcall (mutable-cell-snapshot-key cell) new))
 	 (un-changed (funcall
 		      (mutable-cell-un-changed cell)
@@ -95,26 +88,13 @@
      (not un-changed)
      new-snapshot)))
 (defun touch-mutable-cell (cell)
+  ;;Observe a change
   (multiple-value-bind (changed new-snapshot) (mutable-cell-difference cell)
     (when changed
       (setf (mutable-cell-snapshot cell) new-snapshot)
       (setf (mutable-cell-result cell)
 	    (funcall (mutable-cell-observe cell)
 		     (mutable-cell-observing cell))))))
-
-#+nil
-(defun log-difference (cell)
-  (print (multiple-value-list (mutable-cell-difference cell)))
-  (touch-mutable-cell cell)
-  (print cell)
-  (print (multiple-value-list (mutable-cell-difference cell))))
-#+nil
-(defun test3 ()
-  (let ((value (cons 1 2)))
-    (let ((cell (make-mutable-cell :value value :snapshot-key 'cdr)))
-      (log-difference cell)     
-      (incf (cdr value))
-      (log-difference cell))))
 
 ;;;;Locking
 (defmacro with-t (place &body body)
@@ -144,52 +124,30 @@
      (node-value node))
     (;;Node is 'unfulfilled' or dirty
      t
-     (with-locked-node (node (error "circular dependency: ~a" node))
-       ;;(let ((dependencies (node-dependencies node))))
-       (let ((args nil
-	       #+nil
-	       (map 'list
-		    #'%get-value
-		    dependencies)))
-	 ;;FIXME::arguments not saved
-	 ;;(setf (node-arguments node) args)
-	 ;;(print "here")
-	 (do-node-dependencies node
-	   (lambda (k v)
-	     (declare (ignore k))
-	     (touch-mutable-cell v)))
-	 ;;(print "ho")
+     (;;circular node is detected by detecting repeated locking of
+      ;;the same node.
+      with-locked-node (node (error "circular dependency: ~a" node))
+       ;;Update observables
+       (do-node-dependencies node
+	 (lambda (k v)
+	   (declare (ignore k))
+	   (touch-mutable-cell v)))
+       
+       (let (args)
+	 ;;Obtain arguments to send to function
 	 (let ((size (hash-table-count (node-%data node))))
 	   (dotimes (i (1- size))
 	     (push (mutable-cell-result (node-data node i))
 		   args))
 	   (setf args (nreverse args)))
-	 ;;(print "hey")
-	 #+nil
-	 ;;This should be updated by touch-mutable-cell
-	 (setf (node-dependencies-timestamps node)
-	       (map 'list
-		    #'node-timestamp
-		    dependencies))
-	 #+nil
-	 (update-node-height node)
+
+	 ;;apply function to collected arguments and clean up
 	 (let ((value (apply (mutable-cell-result (node-data node :function))
 			     args)))
 	   (prog1 value
 	     (setf (node-value node) value)
 	     (touch-node node)
-	     #+nil
-	     (setf (node-fun-old node)
-		   (node-fun node))
 	     (setf (node-state node) t))))))))
-
-#+nil
-(defun update-node-height (node)
-  (setf (node-height node)
-	(1+ (reduce #'max (node-dependencies node)
-		    :key
-		    #'height
-		    :initial-value 0))))
 
 (defun ensure-func (node)
   (let ((mutable-cell (node-data node :function)))
@@ -201,64 +159,38 @@
     mutable-cell))
 (defun really-make-node (func deps node)
   (with-locked-lock (node)
-    (let (;;(deps-same? (equal deps (node-dependencies node)))
-	  ;;FIXME
-	  ;;(fun-same? (eq (node-fun node) func))
-	  ;;(deps-len (list-length deps))
-	  )
-      #+nil
-      (when (zerop deps-len)
-	(setf (height node) 0))
-      #+nil ;;FIXME::arguments not saved
-      (setf (node-arguments node)
-	    (make-list deps-len))
-      #+nil
-      (setf (node-dependencies-timestamps node)
-	    (make-list deps-len :initial-element 0))
-      (unless nil
-	#+nil
-	(and deps-same?
-		   ;;fun-same?
-	     )
-	(setf (node-state node) nil))
-      
-      (let ((mutable-cell (ensure-func node)))
-	(setf (mutable-cell-observing mutable-cell)
-	      func))
-      #+nil
-      (unless fun-same?
-	)
-      #+nil
-      (unless deps-same?
-	(setf (node-dependencies node) deps))
-      (let ((count 0))
-	(dolist (dep deps)
-	  (let ((cell (make-mutable-cell :observing dep)))
-	    (typecase dep
-	      (node (setf (mutable-cell-snapshot-key cell)
-			  'node-timestamp)
-		    (setf (mutable-cell-observe cell)
-			  '%get-value)))
-	    (setf (node-data node count) cell)
-	    (incf count)
-	    ))))
+    (setf (node-state node) nil)
+    (let ((mutable-cell (ensure-func node)))
+      (setf (mutable-cell-observing mutable-cell)
+	    func))
+    (let ((count 0))
+      ;;funny thing with hash table storing numbers
+      (dolist (dep deps)
+	(let ((cell (make-mutable-cell :observing dep)))
+	  ;;Nodes are observed with timestamps and getting their value
+	  (typecase dep
+	    (node (setf (mutable-cell-snapshot-key cell)
+			'node-timestamp)
+		  (setf (mutable-cell-observe cell)
+			'%get-value)))
+	  (setf (node-data node count) cell)
+	  (incf count)
+	  )))
     node))
 
 (defun ensure-dependent (dependent dependency)
-  (typecase dependency
-    (node
-     (with-locked-lock (dependent)
-       (with-locked-lock (dependency)
-	 (symbol-macrolet ((place (node-dependents dependency)))
-	   (unless (find dependent place)
-	     (push dependent place))))))))
+  ;;dependency is a node
+  (with-locked-lock (dependent)
+    (with-locked-lock (dependency)
+      (symbol-macrolet ((place (node-dependents dependency)))
+	(unless (find dependent place)
+	  (push dependent place))))))
 (defun remove-dependent (dependent dependency)
-  (typecase dependency
-    (node
-     (with-locked-lock (dependent)
-       (with-locked-lock (dependency)
-	 (symbol-macrolet ((place (node-dependents dependency)))
-	   (setf place (delete dependent place))))))))
+  ;;dependency is a node
+  (with-locked-lock (dependent)
+    (with-locked-lock (dependency)
+      (symbol-macrolet ((place (node-dependents dependency)))
+	(setf place (delete dependent place))))))
 
 (defun touch-node (node)
   (incf (node-timestamp node)))
@@ -267,12 +199,7 @@
   (touch-node node)
   (setf (node-state node) nil))
 
-(defmacro any (&rest forms)
-  (nth (random (length forms)) forms))
-
 (defun dirty-p (node)
-  ;;FIXME::function
-  ;;(or (not (eq (node-fun node) (node-fun-old node))))
   ;;Iterate through all the dependencies,
   ;;if there is a difference detected,
   ;;then it is dirty.
@@ -280,21 +207,10 @@
     (lambda (k v)
       (declare (ignorable k))
       (when (mutable-cell-difference v)
-	(return-from dirty-p t))))
-  #+nil
-  (block nil
-    (do ((stamp (node-dependencies-timestamps node) (cdr stamp))
-	 (arg (node-dependencies node) (cdr arg)))
-	((not (any arg
-		   stamp))
-	 nil)
-	      ;;;iterate old timestamps and see if any differ now
-      (when (not (= (car stamp)
-		    (node-timestamp (car arg))))
-	(return t)))))
-
+	(return-from dirty-p t)))))
 ;;;
-
+;;[TODO] -> move to test file, documentation?
+#+nil
 "
 cell,promise,node:
 1. object
@@ -325,3 +241,16 @@ cell,promise,node:
 	     (:foo 4) (:bar 6)
 	     (:changed)
 	     (:snapshot-maker))
+#+nil
+(defun log-difference (cell)
+  (print (multiple-value-list (mutable-cell-difference cell)))
+  (touch-mutable-cell cell)
+  (print cell)
+  (print (multiple-value-list (mutable-cell-difference cell))))
+#+nil
+(defun test3 ()
+  (let ((value (cons 1 2)))
+    (let ((cell (make-mutable-cell :value value :snapshot-key 'cdr)))
+      (log-difference cell)     
+      (incf (cdr value))
+      (log-difference cell))))

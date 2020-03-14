@@ -241,13 +241,6 @@ gl_FragColor.a = opacity * fin.a;
 (defun change-color-lookup (color-fun)
   (deflazy:refresh 'color-lookup)
   (write-to-color-lookup color-fun))
-(glhelp:deflazy-gl color-lookup (text-shader)
-  (glhelp:use-gl-program text-shader)
-  (glhelp:with-uniforms uniform text-shader
-    (with-foreign-array (var *color-font-info-data* :float len)
-      (%gl:uniform-4fv (uniform 'color-font-info-data)
-		       (/ len 4)
-		       var))))
 (glhelp:deflazy-gl text-shader (text-shader-source2) 
   (let ((shader (glhelp:create-gl-program2 text-shader-source2)))
     (glhelp:use-gl-program shader)
@@ -262,6 +255,13 @@ gl_FragColor.a = opacity * fin.a;
 			 (/ len 4)
 			 var)))
     shader))
+(glhelp:deflazy-gl color-lookup (text-shader)
+  (glhelp:use-gl-program text-shader)
+  (glhelp:with-uniforms uniform text-shader
+    (with-foreign-array (var *color-font-info-data* :float len)
+      (%gl:uniform-4fv (uniform 'color-font-info-data)
+		       (/ len 4)
+		       var))))
 
 (glhelp:deflazy-gl flat-shader ()
   (glhelp:create-opengl-shader 

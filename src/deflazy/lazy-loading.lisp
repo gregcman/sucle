@@ -24,15 +24,14 @@
     (gethash id namespace))
   (defun set-node (id node &optional (namespace *namespace*))
     (setf (gethash id namespace) node)))
-(defun ensure-node (name &optional (namespace *namespace*))
-  (or (multiple-value-bind (node existsp)
-	  (get-node name)
-	(if existsp node nil))
-      (let ((new (make-instance 'dependency-graph:node)))
-	(set-node name new namespace)
-	new)))
 (defun redefine-node (fun deps name &optional (namespace *namespace*))
-  (let ((dependencies (mapcar (lambda (x) (ensure-node x namespace)) deps))
+  (let ((dependencies (mapcar
+		       (lambda (dep-name)
+			 (multiple-value-bind (node existp) (get-node dep-name)
+			   (unless existp
+			     (error "node node named:~a ~%while loading name" dep-name))
+			   node))
+		       deps))
 	(node (ensure-node name namespace)))
     (dependency-graph:with-locked-lock (node)
       #+nil
@@ -165,6 +164,14 @@
 	 (fun node-deps) (%defnode deps gen-forms)
 	 `(redefine-node ,fun ',node-deps ',name)))))
 
+(defun ensure-node (name &optional (namespace *namespace*))
+  (or (multiple-value-bind (node existsp)
+	  (get-node name)
+	(if existsp node nil))
+      (let ((new (make-instance 'dependency-graph:node)))
+	(set-node name new namespace)
+	new)))
+
 ;;;;queue node to be unloaded if it already has stuff in it 
 (defun refresh-new-node (name)
   (let ((node (ensure-node name *stuff*)))
@@ -214,8 +221,10 @@
   (dependency-graph:%invalidate-node node))
 
 ;;;tests
+;;[TODO] -> move to test file
+#+nil
 (deflazy what ()
   45)
-
+#+nil
 (deflazy foobar (what)
   (print what))
