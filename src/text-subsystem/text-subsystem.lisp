@@ -28,14 +28,10 @@
    #:indirection))
 (in-package #:text-sub)
 
-;;[FIXME] 256 by 256 size limit for texture
-(defparameter *text-data-height* 256)
-(defparameter *text-data-width* 256)
 (defparameter *text-data-what-type*
   ;;:framebuffer
   :texture-2d
   )
-(defparameter *text-data-type* nil)
 
 (defun make-texture-or-framebuffer (type w h)
   (ecase type
@@ -44,11 +40,12 @@
     (:texture-2d
      (glhelp:wrap-opengl-texture
       (glhelp:create-texture nil w h)))))
+;;[FIXME] 256 by 256 size limit for texture
+(defparameter *text-data-height* 256)
+(defparameter *text-data-width* 256)
 (glhelp:deflazy-gl text-data ()
-		   (setf *text-data-type* *text-data-what-type*)
-  (let ((w *text-data-width*)
-	(h *text-data-height*))
-    (make-texture-or-framebuffer *text-data-what-type* w h)))
+  (make-texture-or-framebuffer
+   *text-data-what-type* *text-data-width* *text-data-height*))
 
 (deflazy:deflazy text-shader-source2 ()
   '(:vs
@@ -347,6 +344,17 @@ gl_FragColor = pixcolor;
 ;;;;;;;;;;;;;;;;
 (defparameter *block-height* 16.0)
 (defparameter *block-width* 8.0)
+;;[FIXME]->use the new unchanged-feature in deflazy.
+(deflazy:deflazy block-w ()
+  *block-height*)
+(deflazy:deflazy block-h ()
+  *block-width*)
+(defun block-dimension-change (&optional (w *block-width*) (h *block-height*))
+  (unless (= (deflazy:getfnc 'block-h) h)
+    (deflazy:refresh 'block-h t))
+  (unless (= (deflazy:getfnc 'block-w) w)
+    (deflazy:refresh 'block-w t)))
+
 ;;;;a framebuffer is faster and allows rendering to it if thats what you want
 ;;;;but a texture is easier to maintain. theres no -ext framebuffer madness,
 ;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
@@ -357,6 +365,8 @@ gl_FragColor = pixcolor;
   )
 (glhelp:deflazy-gl indirection ((w application:w)
 				(h application:h)
+				block-w
+				block-h
 				;;FIXME::these are not necessarily used,
 				;;but factor in. Be more like the
 				;;kenny-tilton cells engine?
@@ -392,8 +402,8 @@ gl_FragColor = pixcolor;
 	      (load-time-value (sb-cga:identity-matrix))
 	      nil)
 	     (gl:uniformf (uniform 'size)
-			  (/ w *block-width*)
-			  (/ h *block-height*))))
+			  (/ w block-w)
+			  (/ h block-h))))
 	 (gl:disable :cull-face)
 	 (gl:disable :depth-test)
 	 (gl:disable :blend)
@@ -405,8 +415,8 @@ gl_FragColor = pixcolor;
 	(glhelp:gl-texture
 	 (gl:bind-texture :texture-2d (glhelp:handle indirection))
 	 (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
-	   (let* ((tempx (floatify (* upw *block-width*)))
-		  (tempy (floatify (* uph *block-height*)))
+	   (let* ((tempx (floatify (* upw block-w)))
+		  (tempy (floatify (* uph block-h)))
 		  (bazx (floatify (/ tempx w)))
 		  (bazy (floatify (/ tempy h)))
 		  (wfloat (floatify w))
