@@ -25,7 +25,9 @@
 
    #:%redefine-node
    #:%refresh
-   #:cleanup-node-value))
+   #:cleanup-node-value
+
+   #:get-mutable-cell-by-name))
 (in-package :dependency-graph)
 
 (struct-to-clos:struct->class
@@ -42,6 +44,8 @@
    (%data (make-hash-table :test 'eql))
    ;;List of dependents
    dependents
+   ;;For changing dependencies later
+   tags
    (name "anon")))
 
 (defun node-data (node name)
@@ -73,11 +77,17 @@
 ;;'observe' extracts the important data from the lisp object into 'result'
 ;;'unchanged' detects the difference
 ;;'snapshot' stores a reduced version to test whether there is a difference 
-(set-pprint-dispatch 'mutable-cell
-		     (lambda (stream obj)
-		       (format stream "snapshot:~s ~%value:~s"
-			       (mutable-cell-snapshot obj)
-			       (mutable-cell-observing obj))))
+(set-pprint-dispatch
+ 'mutable-cell
+ ;;Example taken from sb-cga/matrix.lisp
+ (lambda (stream obj)
+   (pprint-logical-block (stream nil)
+     (print-unreadable-object (obj stream :type nil :identity nil)
+       (format stream "snapshot:~s,"
+	       (mutable-cell-snapshot obj))
+       (pprint-newline :mandatory stream)
+       (format stream "value:~s"
+	       (mutable-cell-observing obj))))))
 
 (defun mutable-cell-difference (cell &optional (new (mutable-cell-observing cell)))
   ;;Detect whether there is a difference being observed
@@ -165,6 +175,10 @@
 	     (touch-node node)
 	     (setf (node-state node) t))))))))
 
+(defun get-mutable-cell-by-name (node name)
+  (let ((cell (assoc name (node-tags node))))
+    (node-data node (cdr cell))))
+
 (defun ensure-func (node)
   (let ((mutable-cell (node-data node :function)))
     (unless mutable-cell
@@ -232,8 +246,9 @@
 	(return-from dirty-p t)))))
 
 ;;;
-(defun %redefine-node (fun node dependencies &optional (name nil))
+(defun %redefine-node (fun node dependencies &optional name tags)
   (with-locked-lock (node)
+    (setf (node-tags node) tags)
     #+nil
     (setf (dependencies-symbols node) deps)
     (setf (node-name node) name)

@@ -23,20 +23,8 @@
     (gethash id namespace))
   (defun set-node (id node &optional (namespace *namespace*))
     (setf (gethash id namespace) node)))
-(defun redefine-node (fun deps name &optional (namespace *namespace*))
-  (let ((dependencies (mapcar
-		       (lambda (dep-name)
-			 (multiple-value-bind (node existp) (get-node dep-name)
-			   (unless existp
-			     (error "node node named:~a ~%while loading name" dep-name))
-			   node))
-		       deps))
-	(node (ensure-node name namespace)))
-    (dependency-graph:%redefine-node fun node dependencies name)))
 
 ;;;;convenience stuff below
-
-
 (defmacro with-named-node ((node-var &optional (namespace 'namespace))
 				       name &optional t-form
 					      (nil-form
@@ -46,19 +34,137 @@
        (if ,existsp
 	   ,t-form
 	   ,nil-form))))
-;;no longer keep track of node
-#+nil
-(defun remove-node (id &optional (namespace *namespace*))
-  (with-named-node
-      (node) id
-      (progn
-	(remhash id namespace)
-	(map nil
-	     (lambda (x) (remove-dependent node x))
-	     (dependencies node)))))
-
 (defun no-named-node (id)
   (error "no lazy load named as ~a" id))
+
+
+(defun refresh (name &optional (main-thread nil))
+  (let ((node (get-node name)))
+    (when node      
+      (%%refresh node main-thread))))
+(defun getfnc (id &optional (namespace *namespace*))
+  (with-named-node (node) id
+		   (dependency-graph:%get-value node)))
+
+;;;;;
+(utility:eval-always
+  (defun %defnode (specification)
+    ;;Convert a deflazy specification into a
+    ;;function and body.
+    (let (lambda-args
+	  node-deps
+	  tags
+	  (count 0))
+      (dolist (item specification)
+	(let (dep
+	      tag
+	      arg)
+	  
+	  (trivia:match
+	   item
+	   ((list* item adep)
+	    (when adep
+	      ;;(... baz)
+	      (setf dep (car adep)))
+	    
+	    (trivia:match
+	     item
+	     ((list* var a-tag)
+	      ;;((foo ...) ...)
+	      (setf arg var)
+	      (when a-tag
+		;;((foo bar) ...)
+		(setf tag (car a-tag))))
+	     ;;(foo ...)
+	     (_
+	      (setf arg item))))
+	   ;;foo
+	   (_
+	    (setf arg item
+		  dep item)))
+
+	  (push arg lambda-args)
+	  (push (or dep arg) node-deps)
+	  (when tag
+	    (push (cons tag count) tags)))
+	(incf count))
+      (values (nreverse lambda-args)
+	      (nreverse node-deps)
+	      tags))))
+#+nil
+(defun test-defnode ()
+  (print (multiple-value-list
+	  (%defnode '(foo bar (baz) ((yon qux)) (woo foobar) ((1 2) 3))))))
+
+;;;;;[FIXME]: clean this area up with dependency graph 
+(defmacro deflazy (name (&rest deps) &body body)
+  (multiple-value-bind (lambda-args dependencies tags) (%defnode deps)
+    `(eval-when (:load-toplevel :execute)
+       (%deflazy ',name (lambda ,lambda-args ,@body) ',dependencies ',tags))))
+
+(defun %deflazy (name fun dependencies tags)
+  (let
+      ;;Make sure the node is in the namespace
+      ((node
+	(or
+	 ;;It either exists
+	 (multiple-value-bind (node existsp) (get-node name)
+	   (if existsp
+	       node
+	       nil))
+	 ;;Otherwise make it
+	 (let ((new (make-instance 'dependency-graph:node)))
+	   (set-node name new)
+	   new))))
+    ;;Queue it for cleanup if it already exists
+    (refresh-old-node node)
+    (dependency-graph:%redefine-node
+     fun
+     node
+     (mapcar
+      (lambda (dep-name)
+	(multiple-value-bind (node existp) (get-node dep-name)
+	  (unless existp
+	    (error "node node named:~a ~%while loading name" dep-name))
+	  node))
+      dependencies
+      ;;,(cons 'list node-deps)
+      )
+     name
+     tags)
+    node))
+
+;;;;Refreshing system
+;;;;queue node to be unloaded if it already has stuff in it 
+(defun refresh-old-node (node)
+  (when (not (zerop (dependency-graph:node-timestamp node)))
+    (%%refresh node)))
+
+(defparameter *refresh* (make-hash-table :test 'eq))
+(defparameter *refresh-lock* (bordeaux-threads:make-recursive-lock "refresh"))
+(defun %%refresh (node &optional (main-thread nil))
+  (if main-thread
+      (dependency-graph:%refresh node)
+      (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+	(setf (gethash node *refresh*) t))))
+(defun flush-refreshes ()
+  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+    (let ((length (hash-table-count *refresh*)))
+      (unless (zerop length)
+	(utility:dohash (node value) *refresh*
+			(declare (ignore value))
+			(dependency-graph:%refresh node))
+	(clrhash *refresh*)))))
+;;;;
+
+;;;tests
+;;[TODO] -> move to test file
+#+nil
+(deflazy what ()
+  45)
+#+nil
+(deflazy foobar ((what what))
+  (print what))
 
 #+nil
 (defun get-value-no-update (id &optional (namespace *namespace*))
@@ -103,73 +209,22 @@
 (progn
   (remove-node 'c)
   (defnode c (c) c))
-
-;;;;;
-(utility:eval-always
-  (defun %defnode (deps body)
-    (let ((lambda-args ())
-	  (node-deps ()))
-      (dolist (item deps)
-	(if (symbolp item)
-	    (progn (push item lambda-args)
-		   (push item node-deps))
-	    (destructuring-bind (var dep) item
-	      (push var lambda-args)
-	      (push dep node-deps))))
-      (values `(lambda ,lambda-args ,@body)
-	      node-deps))))
-;;;;;[FIXME]: clean this area up with dependency graph 
-(defmacro deflazy (name (&rest deps) &rest gen-forms)
-  `(eval-when (:load-toplevel :execute)
-     (refresh-new-node ',name)
-     ,(multiple-value-bind
-	    (fun node-deps) (%defnode deps gen-forms)
-	`(redefine-node ,fun
-			',node-deps
-			;;,(cons 'list node-deps)
-			',name))))
-
-(defun ensure-node (name &optional (namespace *namespace*))
-  (or (multiple-value-bind (node existsp)
-	  (get-node name)
-	(if existsp node nil))
-      (let ((new (make-instance 'dependency-graph:node)))
-	(set-node name new namespace)
-	new)))
-
-;;;;queue node to be unloaded if it already has stuff in it 
-(defun refresh-new-node (name)
-  (let ((node (ensure-node name)))
-    (unless (= 0 (dependency-graph:node-timestamp node))
-      (refresh name))))
-
-(defparameter *refresh* (make-hash-table :test 'eq))
-(defparameter *refresh-lock* (bordeaux-threads:make-recursive-lock "refresh"))
-(defun refresh (name &optional (main-thread nil))
-  (let ((node (get-node name)))
-    (when node      
-      (if main-thread
-	  (dependency-graph:%refresh node)
-	  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
-	    (setf (gethash node *refresh*) t))))))
-(defun flush-refreshes ()
-  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
-    (let ((length (hash-table-count *refresh*)))
-      (unless (zerop length)
-	(utility:dohash (node value) *refresh*
-			(declare (ignore value))
-			(dependency-graph:%refresh node))
-	(clrhash *refresh*)))))
-
-(defun getfnc (id &optional (namespace *namespace*))
-  (with-named-node (node) id
-		   (dependency-graph:%get-value node)))
-
-;;;tests
-;;[TODO] -> move to test file
+;;no longer keep track of node
 #+nil
-(deflazy what ()
-  45)
-#+nil
-(deflazy foobar ((what what))
-  (print what))
+(defun remove-node (id &optional (namespace *namespace*))
+  (with-named-node
+      (node) id
+      (progn
+	(remhash id namespace)
+	(map nil
+	     (lambda (x) (remove-dependent node x))
+	     (dependencies node)))))
+
+(defun test90 ()
+  (deflazy foo () 34)
+  (deflazy bar () 47)
+  (deflazy test1 (foo ((bar :bar)))
+    (list foo bar))
+  (getfnc 'test1)
+  (dependency-graph:get-mutable-cell-by-name 
+   (get-node 'test1) :bar))
