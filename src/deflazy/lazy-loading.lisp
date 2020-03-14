@@ -35,16 +35,33 @@
   (let ((dependencies (mapcar (lambda (x) (ensure-node x namespace)) deps))
 	(node (ensure-node name namespace)))
     (dependency-graph:with-locked-lock (node)
+      #+nil
+      (setf (dependencies-symbols node) deps)
+      (setf (dependency-graph:node-name node) name)
+      ;;FIXME::Inelegant, way to update dependencies. Just eliminate
+      ;;all the old dependencies and rebuild.
+      
+      ;;Remove all current dependents
+      (dependency-graph:do-node-dependencies node
+	(lambda (k v)
+	  (declare (ignorable k))
+	  (let ((observing (dependency-graph::mutable-cell-observing v)))
+	    (dependency-graph:remove-dependent node observing))
+	  ))
+      ;;Rebuild dependents
+      (map nil (lambda (x) (dependency-graph:ensure-dependent node x))
+	   dependencies)
+      
+      #+nil
       (let ((old-dependencies (dependency-graph:node-dependencies node)))
 	#+nil
-	(setf (dependencies-symbols node) deps)
-	(setf (dependency-graph:node-name node) name)
 	(map nil (lambda (x) (dependency-graph:remove-dependent node x))
 	     (set-difference old-dependencies dependencies))
+	#+nil
 	(map nil (lambda (x) (dependency-graph:ensure-dependent node x))
-	     (set-difference dependencies old-dependencies))
-	(dependency-graph:really-make-node fun dependencies node)
-	node))))
+	     (set-difference dependencies old-dependencies)))
+      (dependency-graph:really-make-node fun dependencies node)
+      node)))
 
 ;;;;convenience stuff below
 
@@ -126,7 +143,18 @@
   (defnode c (c) c))
 
 ;;;;;
-
+(defun %defnode (deps body)
+  (let ((lambda-args ())
+	(node-deps ()))
+    (dolist (item deps)
+      (if (symbolp item)
+	  (progn (push item lambda-args)
+		 (push item node-deps))
+	  (destructuring-bind (var dep) item
+	    (push var lambda-args)
+	    (push dep node-deps))))
+    (values `(lambda ,lambda-args ,@body)
+	    node-deps)))
 ;;;;;[FIXME]: clean this area up with dependency graph 
 (defvar *stuff* (make-hash-table :test 'eq))
 (defmacro deflazy (name (&rest deps) &rest gen-forms)
@@ -134,7 +162,7 @@
      (let ((*namespace* *stuff*))
        (refresh-new-node ',name)
        ,(multiple-value-bind
-	 (fun node-deps) (dependency-graph:%defnode deps gen-forms)
+	 (fun node-deps) (%defnode deps gen-forms)
 	 `(redefine-node ,fun ',node-deps ',name)))))
 
 ;;;;queue node to be unloaded if it already has stuff in it 
@@ -184,3 +212,10 @@
   (when (dependency-graph:node-state node)
     (cleanup-node node))
   (dependency-graph:%invalidate-node node))
+
+;;;tests
+(deflazy what ()
+  45)
+
+(deflazy foobar (what)
+  (print what))
