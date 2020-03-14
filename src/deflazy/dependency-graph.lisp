@@ -283,6 +283,8 @@
 ;;;
 
 (defun %refresh (node &optional (value (node-value node)))
+  ;;[FIXME] May walk a single node exponential amount of times,
+  ;;because this is breadth first search!!!
   (clean-and-invalidate-node node value)
   (labels ((%map-dependents2 (node fun test)
 	 ;;FIXME::first node is a special case???
