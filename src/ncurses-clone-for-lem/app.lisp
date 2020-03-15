@@ -109,7 +109,9 @@
     (funcall ondraw)
     ;;;Copy the virtual screen to a c-array,
     ;;;then send the c-array to an opengl texture
-    (ncurses->gl (text-sub::port-data port) big-glyph-fun))
+    (ncurses->gl (text-sub::port-data port)
+		 :win ncurses-clone:*std-scr*
+		 :big-glyph-fun big-glyph-fun))
   (text-sub::draw-port port)
   (text-sub::destroy-port port)
   #+nil
@@ -125,13 +127,15 @@
 
     (text-sub:draw-fullscreen-quad)))
 
-(defun ncurses->gl (texture &optional (big-glyph-fun (constantly nil)))
+(defun ncurses->gl (texture &key 
+			      (win ncurses-clone:*std-scr*)
+			      (big-glyph-fun (constantly nil)))
   (let* ((c-array-lines
 	  (min text-sub:*text-data-height* ;do not send data larger than text data
-	       (+ 1 (ncurses-clone:stdscr-lines))))              ;width or height
+	       (+ 1 (ncurses-clone:win-lines win))))              ;width or height
 	 (c-array-columns
 	  (min text-sub:*text-data-width*
-	       (+ 1 (ncurses-clone:stdscr-columns))))
+	       (+ 1 (ncurses-clone:win-cols win))))
 	 (c-array-len (* 4
 			 c-array-columns
 			 c-array-lines)))
@@ -154,14 +158,14 @@
 	      (dotimes (i foox)
 		(blacken i bary)))))
 	
-	(let ((len (ncurses-clone:stdscr-lines)))
+	(let ((len (ncurses-clone:win-lines win)))
 	  (dotimes (i len)
-	    (let ((array (aref (ncurses-clone:win-data ncurses-clone:*std-scr*)
+	    (let ((array (aref (ncurses-clone:win-data win)
 			       (- len i 1)))
 		  (index 0))
 	      (block out
 		(do ()
-		    ((>= index (ncurses-clone:stdscr-columns)))
+		    ((>= index (ncurses-clone:win-cols win)))
 		  (let* ((glyph (aref array index)))
 
 		    ;;This occurs if the widechar is overwritten, but the placeholders still remain.
@@ -174,7 +178,7 @@
 
 		      ;;[FIXME]for some reason, when resizing really quickly,
 		      ;;this can get screwed up, so bail out
-		      (when (<= (+ 1 (ncurses-clone:stdscr-columns))
+		      (when (<= (+ 1 (ncurses-clone:win-cols win))
 				(+ width index))
 			(return-from out))
 		      
