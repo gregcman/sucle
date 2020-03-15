@@ -78,33 +78,35 @@
 (defun redraw-display ()
   (setf *redraw-display-p* t))
 
+(defun win->port (win)
+  (multiple-value-bind (x y) (window-pos win)
+    (multiple-value-bind (w h) (window-size win)
+      (text-sub::port x y w h))))
 (defun render
     (&key
+       (win ncurses-clone:*std-scr*)
+       (port (win->port win) port-supplied-p)
        (ondraw (lambda ()))
        (big-glyph-fun 'identity)
-       (update-data nil)
-       (win ncurses-clone:*std-scr*))
+       (update-data nil))
   ;;Make sure the virtual window has the correct specs
-  (let ((port
-	 ;;(text-sub::port 0 0 window::*width* window::*height*)
-	 ;;#+nil
-	 (multiple-value-bind (x y) (window-pos win)
-	   (multiple-value-bind (w h) (window-size win)
-	     (text-sub::port x y w h)))))
-    ;;FIXME::temporary-> because port is created and destroyed,
-    ;;it has no data. so always update
-    (when (or update-data
-	      ;;the port has not been written to,
-	      ;;so definitely write to it.
-	      (not (text-sub::port-sync port)))
-      (funcall ondraw)
-    ;;;Copy the virtual screen to a c-array,
-    ;;;then send the c-array to an opengl texture
-      (ncurses->gl (text-sub::port-data port)
-		   :win win
-		   :big-glyph-fun big-glyph-fun)
-      (setf (text-sub::port-sync port) t))
-    (text-sub::draw-port port)
+  (when (or update-data
+	    ;;the port has not been written to,
+	    ;;so definitely write to it.
+	    (not (text-sub::port-sync port)))
+    (funcall ondraw)
+    ;;Copy the virtual screen to a c-array,
+    ;;then send the c-array to an opengl texture
+    ;;While reading the virtual screen, save any special
+    ;;glyphs.
+    (ncurses->gl (text-sub::port-data port)
+		 :win win
+		 :big-glyph-fun big-glyph-fun)
+    (setf (text-sub::port-sync port) t))
+  (text-sub::draw-port port)
+  ;;Destroy the temporary port created for this function,
+  ;;not provided from elsewhere.
+  (unless port-supplied-p
     (text-sub::destroy-port port)))
 
 (defun ncurses->gl (texture &key 
