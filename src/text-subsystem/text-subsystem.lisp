@@ -556,10 +556,18 @@ gl_FragColor = pixcolor;
 
 (defun port-data (port)
   (glhelp:texture-like (deflazy:getfnc (port-text-data port))))
+(defun %port-indirection (port)
+  (glhelp:texture-like (deflazy:getfnc (port-indirection port))))
 
 (defun draw-port (port)
+  (gl:polygon-mode :front-and-back :fill)
+  (gl:disable :cull-face)
+  (gl:disable :depth-test)
+  (gl:disable :blend)
   (text-sub:use-text-shader :text-data
-			    (port-data port))
+			    (port-data port)
+			    :indirection
+			    (%port-indirection port))
   ;;[FIXME] unconfigurable? configuration good and bad
   (glhelp:bind-default-framebuffer)
   (glhelp:set-render-area

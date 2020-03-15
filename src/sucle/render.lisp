@@ -178,8 +178,8 @@ gl_FragColor = color;
   (defun color-grasses (terrain)
     (flet ((color ()
 	     (multiple-value-call #'foliage-color
-	       (values 255 0)
-	       #+nil
+	       ;;(values 255 0)
+	       ;;#+nil
 	       (oct-24-2018)
 	       )
 	     
@@ -439,6 +439,24 @@ gl_FragColor.rgb = color_out;
 ;;;;</RENDER>
 ;;;;************************************************************************;;;;
 ;;;;<CHUNK-RENDERING?>
+
+(progn
+  (defparameter *g/chunk-call-list* (make-hash-table :test 'equal))
+  (defun get-chunk-display-list (name)
+    (gethash name *g/chunk-call-list*))
+  (defun set-chunk-display-list (name list-num)
+    (setf (gethash name *g/chunk-call-list*) list-num))
+  (defun remove-chunk-display-list (name)
+    (remhash name *g/chunk-call-list*))
+  (defun reset-chunk-display-list ()
+    (clrhash *g/chunk-call-list*)))
+(defun remove-chunk-model (name)
+  ;;[FIXME]this calls opengl. Use a queue instead?
+  (multiple-value-bind (value existsp) (get-chunk-display-list name)
+    (when existsp
+      (destroy-chunk-gl-representation value)
+      (remove-chunk-display-list name))))
+
 ;;https://vertostudio.com/gamedev/?p=177
 (struct-to-clos:struct->class
  (defstruct chunk-gl-representation
@@ -464,7 +482,7 @@ gl_FragColor.rgb = color_out;
 	;;draw occlusion box here, get occlusion information from a box
 	(glhelp:slow-draw (chunk-gl-representation-occlusion-box value))
 	(gl:end-query :samples-passed)))))
-
+(defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
 (defun render-occlusion-queries (&optional (vec *call-lists*))
   (when *occlusion-culling-p*
     (gl:color-mask nil nil nil nil)
@@ -482,7 +500,7 @@ gl_FragColor.rgb = color_out;
 (defun destroy-chunk-gl-representation (chunk-gl-representation)
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
-(defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
+
 (defun get-chunks-to-draw ()
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
@@ -544,22 +562,7 @@ gl_FragColor.rgb = color_out;
   ;;(print (- (get-internal-real-time) a))
   )
 
-(progn
-  (defparameter *g/chunk-call-list* (make-hash-table :test 'equal))
-  (defun get-chunk-display-list (name)
-    (gethash name *g/chunk-call-list*))
-  (defun set-chunk-display-list (name list-num)
-    (setf (gethash name *g/chunk-call-list*) list-num))
-  (defun remove-chunk-display-list (name)
-    (remhash name *g/chunk-call-list*))
-  (defun reset-chunk-display-list ()
-    (clrhash *g/chunk-call-list*)))
-(defun remove-chunk-model (name)
-  ;;[FIXME]this calls opengl. Use a queue instead?
-  (multiple-value-bind (value existsp) (get-chunk-display-list name)
-    (when existsp
-      (destroy-chunk-gl-representation value)
-      (remove-chunk-display-list name))))
+
 
 (defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 

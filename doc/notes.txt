@@ -188,3 +188,5 @@ global variables essentially
 ;;technical debt -> deflazy -> text-subsystem -> ncurses-clone-for-lem -> lem
 ;;deflazy interactive is only useful for prototyping and doesn't scale.
 ;;opengl, interactivity, simplicity, efficiency. Can't have it all
+
+;;[FIXME] lem errors when resizing the window

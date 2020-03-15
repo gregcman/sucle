@@ -387,9 +387,8 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
      "light green")))
 
 (defun frame ()
-  (ncurses-clone-for-lem:render)
+  (ncurses-clone-for-lem:render :update-data t)
   (ncurses-clone-lem-view:redraw-view-after *view*)
-  (ncurses-clone-lem-view:update-display)
   (lem.term:with-attribute (:fg (aux) :bg (aux)
 				:underline
 				(zerop (random 3))

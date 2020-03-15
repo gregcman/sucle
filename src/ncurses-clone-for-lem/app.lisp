@@ -28,12 +28,12 @@
       (setf ncurses-clone:*virtual-window*
 	    (ncurses-clone:make-virtual-window)))))
 
-(defun window-size ()
-  (mapcar 'floor
-	  (list (* (ncurses-clone:stdscr-columns)
-		   *glyph-width*)
-		(* (ncurses-clone:stdscr-lines)
-		   *glyph-height*))))
+(defun window-size (&optional (win ncurses-clone::*std-scr*))
+  (values
+   (floor (* (ncurses-clone:win-cols win)
+	     *glyph-width*))
+   (floor (* (ncurses-clone:win-lines win)
+	     *glyph-height*))))
 
 (defun update-resize ()
   (setf *resized-p* t))
@@ -72,60 +72,29 @@
 (defun redraw-display ()
   (setf *redraw-display-p* t))
 
-
 (defun render
-    (&key (ondraw (lambda ())) (big-glyph-fun 'identity)
-     &aux
-       ;;(text-data (glhelp:texture-like (deflazy:getfnc 'text-sub:text-data)))
-       (port (text-sub::port 0 0 window::*width* window::*height*)))
+    (&key
+       (ondraw (lambda ()))
+       (big-glyph-fun 'identity)
+       (update-data nil)
+       (win ncurses-clone:*std-scr*))
   ;;Make sure the virtual window has the correct specs
-  (deflazy:getfnc 'virtual-window)
-  #+nil
-  (;;text-sub:with-data-shader (uniform rebase)
-   ;; (gl:clear :color-buffer-bit)
-   ;;   (gl:disable :depth-test)
-   #+nil
-   (rebase -128.0 -128.0))
-  #+nil
-  (gl:point-size 1.0)
-
-  ;;;;what? this is to replace (gl:with-primitives :points ...body)
-  ;;;; to find bug where resizing the lem window over and over causes crash
-  #+nil
-  (unwind-protect (progn
-		    (gl:begin :points)
-		    (opengl-immediate:mesh-vertex-color))
-    (gl:end))
-  ;;(glhelp:set-render-area 0 0 window:*width* window:*height*)
-  ;;(gl:clear-color 0.0 0.0 0.0 0.0)
-  ;;(gl:clear :color-buffer-bit)
-  (gl:polygon-mode :front-and-back :fill)
-  (gl:disable :cull-face)
-  (gl:disable :depth-test)
-  (gl:disable :blend)
-    
-  (when (or t ncurses-clone:*update-p*)
-    (setf ncurses-clone:*update-p* nil)
-    (funcall ondraw)
+  (let ((port
+	 ;;(text-sub::port 0 0 window::*width* window::*height*)
+	  ;;#+nil
+	 (multiple-value-bind (w h) (window-size win)
+	   (text-sub::port 0 0 w h))))
+    ;;FIXME::temporary-> because port is created and destroyed,
+    ;;it has no data. so always update
+    (when (or t update-data)
+      (funcall ondraw)
     ;;;Copy the virtual screen to a c-array,
     ;;;then send the c-array to an opengl texture
-    (ncurses->gl (text-sub::port-data port)
-		 :win ncurses-clone:*std-scr*
-		 :big-glyph-fun big-glyph-fun))
-  (text-sub::draw-port port)
-  (text-sub::destroy-port port)
-  #+nil
-  (progn
-    (text-sub:use-text-shader :text-data text-data)
-    (glhelp:set-render-area 0 0
-			    (deflazy:getfnc 'application:w)
-			    (deflazy:getfnc 'application:h))
-    #+nil
-    (progn
-      (gl:enable :blend)
-      (gl:blend-func :src-alpha :one-minus-src-alpha))
-
-    (text-sub:draw-fullscreen-quad)))
+      (ncurses->gl (text-sub::port-data port)
+		   :win win
+		   :big-glyph-fun big-glyph-fun))
+    (text-sub::draw-port port)
+    (text-sub::destroy-port port)))
 
 (defun ncurses->gl (texture &key 
 			      (win ncurses-clone:*std-scr*)

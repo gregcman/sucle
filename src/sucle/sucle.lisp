@@ -88,6 +88,7 @@
 			     '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
 			       ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 			     :test 'equal))))
+  (voxel-chunks:clearworld)
   (setf world:*world-directory* world)
   (setf world:*some-saves* working-dir) 
   (application:main
@@ -103,15 +104,17 @@
      (setf (entity-fly? *ent*) nil
 	   (entity-gravity? *ent*) t)
      ;;(our-load)
-     (let ((text-sub:*text-data-what-type* :framebuffer))
-       (window:set-vsync t)
-       (fps:set-fps 60)
-       (unwind-protect
-	    (loop
-	       (application:poll-app)
-	       (per-frame))
-	 (when world:*persist*
-	   (world:msave)))))))
+     (window:set-vsync t)
+     (fps:set-fps 60)
+     (ncurses-clone-for-lem:init)
+     (unwind-protect
+	  (loop
+	     (application:poll-app)
+	     ;;(application-example-hello-world::frame)
+	     (per-frame)
+	     )
+       (when world:*persist*
+	 (world:msave))))))
 
 ;;;;
 
@@ -221,7 +224,6 @@
 (defun per-frame ()
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
-
   ;;set the chunk center aroun the player
   (with-vec (x y z) ((player-position))
     (world:set-chunk-coordinate-center x y z))

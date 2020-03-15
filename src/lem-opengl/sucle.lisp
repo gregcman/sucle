@@ -3,7 +3,7 @@
 (defparameter *saved-session* nil)
 (defun input-loop (&optional (editor-thread lem-sucle::*editor-thread*))
   (setf application::*main-subthread-p* nil)
-  (destructuring-bind (width height) (window-size)
+  (multiple-value-bind (width height) (window-size)
     (application::main
      (lambda ()
        (init)
@@ -74,7 +74,8 @@
   (when *redraw-display-p*
     (setf *redraw-display-p* nil)
     (lem:redraw-display))
-    ;;Rendering. Comes after input handling because things could have changed
+  ;;Rendering. Comes after input handling because things could have changed
+  
   (render
    :ondraw
    (lambda ()
@@ -85,6 +86,11 @@
      (clrhash *some-data*))
    :big-glyph-fun
    'save-special-glyphs
+   :update-data
+   (cond (ncurses-clone:*update-p*
+	  (setf ncurses-clone:*update-p* nil)
+	  t)
+	 (t nil))
    ))
 (defparameter *some-data*
   nil

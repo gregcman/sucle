@@ -25,6 +25,7 @@
    #:alexandria  
    ;;for world-generation
    #:black-tie
+   #:ncurses-clone-for-lem
    )
   :serial t
   :components 
