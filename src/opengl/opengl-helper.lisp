@@ -142,7 +142,7 @@ not made in the current OpenGL context, so they are garbage"
 
 (defmethod dependency-graph:cleanup-node-value ((object gl-object))
   (when (alive-p object)
-    ;;(format t "cleaning~a" object)
+    ;;(format t "~%cleaning:~a" object)
     (gl-delete* object)))
 
 (defmacro with-gl-context ((gl-proc-address) &body body)

@@ -190,3 +190,13 @@ global variables essentially
 ;;opengl, interactivity, simplicity, efficiency. Can't have it all
 
 ;;[FIXME] lem errors when resizing the window
+;;[TODO]:create a menu, now that text can be better drawn to the screen
+;;inventory finally?
+;;q- quit
+;;b- back
+;;h- help
+;;n- next
+;;p- previous
+
+;;web-browser like?
+;;[FIXME]::Resizing after a while with the new 'port' causes a memory error. why?

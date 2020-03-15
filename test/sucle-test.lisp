@@ -376,6 +376,11 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
    :height 512
    :title "Draw random text to the screen"))
 
+(defun frame ()
+  (things)
+  (when (window:button :key :pressed #\Escape)
+    (application:quit)))
+
 (defun aux ()
   (alexandria:random-elt
    '("green"
@@ -388,8 +393,7 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
      "light blue"
      "light green")))
 
-(defun frame ()
-  (ncurses-clone-for-lem:render :update-data t :win *view*)
+(defun things ()
   (lem.term:with-attribute (:fg (aux) :bg (aux)
 				:underline
 				(zerop (random 3))
@@ -407,5 +411,6 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
 	(1 #())
 	(2 (code-char (random 2000)))
 	(3 (list (random 100)))))))
-  (when (window:button :key :pressed #\Escape)
-    (application:quit)))
+  (ncurses-clone-for-lem:render :update-data t :win *view*))
+
+

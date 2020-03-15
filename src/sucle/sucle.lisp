@@ -351,7 +351,32 @@
   (render-crosshairs)
 
   (complete-render-tasks)
-  (dispatch-mesher-to-dirty-chunks))
+  (dispatch-mesher-to-dirty-chunks)
+  
+  (when (window:button :key :pressed #\r)
+    (toggle *show-things*))
+  (when *show-things*
+    (things)))
+
+;;Ripped from sucle-test essentially.
+(defparameter *show-things* t)
+(defparameter *view*
+  (ncurses-clone:ncurses-newwin 5 50 0 0))
+(defun things ()
+  (lem.term:with-attribute (:fg "black" :bg "white"
+				:underline
+				nil
+				:bold
+				nil
+				:reverse
+				t)
+    (ncurses-clone:ncurses-mvwaddstr 
+     *view*
+     (random 5)
+     0
+     (string-downcase
+      (prin1-to-string (local-time:now)))))
+  (ncurses-clone-for-lem:render :update-data t :win *view*))
 
 (defparameter *sky-color*
   (mapcar 'utility:byte/255 '(255 255 255))
