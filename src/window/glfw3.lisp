@@ -261,23 +261,39 @@
 	      (:mouse
 	       :mouse)))))
 
-(defmacro mouseval (identifier)
-  (etypecase identifier
-    (keyword
-     (aref *mouse-array*
-	   (substitute-foreign-enum-value "MOUSE-BUTTON" identifier)))
-    (integer
-     (aref *mouse-array* (1- identifier)))))
-(defmacro keyval (identifier)
-  (etypecase identifier
-    (keyword
-     (aref *key-array*
-	   (substitute-foreign-enum-value "KEY" identifier)))
-    (character
-     (char-code (char-upcase identifier)))
-    (integer
-     (char-code (digit-char identifier)))))
-
+;;Cache the translation from lisp object to key enum.
+;;This saves time from symbol mangling.
+;;Also mouseval and keyval were macros before, but why?
+(defparameter *mouse-enum-cache* (make-hash-table :test 'eql))
+(defparameter *key-enum-cache* (make-hash-table :test 'eql))
+(defun mouseval (identifier)
+  (multiple-value-bind (item existp) (gethash identifier *mouse-enum-cache*)
+    (cond (existp item)
+	  (t
+	   (let ((new
+		  (etypecase identifier
+		    (keyword
+		     (aref *mouse-array*
+			   (substitute-foreign-enum-value "MOUSE-BUTTON" identifier)))
+		    (integer
+		     (aref *mouse-array* (1- identifier))))))
+	     (setf (gethash identifier *mouse-enum-cache*) new)
+	     new)))))
+(defun keyval (identifier)
+  (multiple-value-bind (item existp) (gethash identifier *key-enum-cache*)
+    (cond (existp item)
+	  (t
+	   (let ((new
+		  (etypecase identifier
+		    (keyword
+		     (aref *key-array*
+			   (substitute-foreign-enum-value "KEY" identifier)))
+		    (character
+		     (char-code (char-upcase identifier)))
+		    (integer
+		     (char-code (digit-char identifier))))))
+	     (setf (gethash identifier *key-enum-cache*) new)
+	     new)))))
 
 (defconstant +shift+ 1)
 (defconstant +control+ 2)
