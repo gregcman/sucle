@@ -362,6 +362,8 @@
 			(dependency-graph:%refresh node value))
 	(clrhash *refresh*)))))
 
+#+nil
+;;FIXME::This is wrong?
 (defun annihilate (node)
   (remove-all-dependents node)
   (remove-all-dependencies node)

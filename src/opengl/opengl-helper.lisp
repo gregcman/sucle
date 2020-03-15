@@ -121,8 +121,9 @@
   (slot-makunbound obj 'handle))
 
 (defun alive-p (obj)
-  (eq *gl-context*
-      (context obj)))
+  (and (eq *gl-context*
+	   (context obj))
+       (slot-boundp obj 'handle)))
 
 ;;;;</PARENT OBJECT>
 ;;;;************************************************************************;;;;
@@ -215,7 +216,8 @@ not made in the current OpenGL context, so they are garbage"
   (when (i-delete-p vao)
     (gl:delete-buffers (list (index-buffer vao)))))
 (defmethod gl-delete* ((obj vao))
-  (delete-vao obj))
+  (when (alive-p obj)
+    (delete-vao obj)))
 
 (defmacro bind-to-array-buffer ((vertex-buffer) &body body)
   `(progn
@@ -410,7 +412,8 @@ just put together a new vao"
 (defclass gl-list (gl-object)
   ())
 (defmethod gl-delete* ((obj gl-list))
-  (gl:delete-lists (handle obj) 1))
+  (when (alive-p obj)
+    (gl:delete-lists (handle obj) 1)))
 ;;;
 (defmacro with-gl-list (&body body)
   (let ((list-sym (gensym)))
@@ -432,7 +435,8 @@ just put together a new vao"
 (defclass gl-texture (gl-object)
   ())
 (defmethod gl-delete* ((obj gl-texture))
-  (gl:delete-texture (handle obj)))
+  (when (alive-p obj)
+    (gl:delete-texture (handle obj))))
 ;;;
 (defun wrap-opengl-texture (texture)
   (make-instance
@@ -526,7 +530,8 @@ just put together a new vao"
     inst))
 
 (defmethod gl-delete* ((obj gl-framebuffer))
-  (destroy-gl-framebuffer obj))
+  (when (alive-p obj)
+    (destroy-gl-framebuffer obj)))
 (defun destroy-gl-framebuffer (gl-framebuffer)
   (gl:delete-renderbuffers (list (depth gl-framebuffer)))
   (gl:delete-framebuffers (list (handle gl-framebuffer)))
@@ -609,7 +614,8 @@ just put together a new vao"
   (gl:use-program (handle src)))
 
 (defmethod gl-delete* ((obj gl-program))
-  (gl:delete-program (handle obj)))
+  (when (alive-p obj)
+    (gl:delete-program (handle obj))))
 ;;;;
 (defun set-uniform-to-texture (uniform-location texture num)
   (gl:uniformi uniform-location num)

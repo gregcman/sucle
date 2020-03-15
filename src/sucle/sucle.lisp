@@ -356,10 +356,11 @@
   (when (window:button :key :pressed #\r)
     (toggle *show-things*))
   (when *show-things*
-    (things)))
+    (dotimes (x 1)
+      (things))))
 
 ;;Ripped from sucle-test essentially.
-(defparameter *show-things* t)
+(defparameter *show-things* nil)
 (defparameter *view*
   (ncurses-clone:ncurses-newwin 5 50 0 0))
 (defun things ()

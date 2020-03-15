@@ -200,3 +200,7 @@ global variables essentially
 
 ;;web-browser like?
 ;;[FIXME]::Resizing after a while with the new 'port' causes a memory error. why?
+;;level select
+;;render flat images
+;;memory error? because I pkilled sbcl? or opengl not being cleaned up correctly?
+;;Deflazy fixme::when redefining deflazy with more or less arguments, creates errors

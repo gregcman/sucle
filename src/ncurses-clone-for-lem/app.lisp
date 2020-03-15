@@ -82,13 +82,31 @@
   (multiple-value-bind (x y) (window-pos win)
     (multiple-value-bind (w h) (window-size win)
       (text-sub::port x y w h))))
+
+(defparameter *default-port-create* ncurses-clone:*std-scr*)
+(glhelp:deflazy-gl
+ default-port ()
+ ;;(print "changing port")
+ (win->port *default-port-create*))
 (defun render
     (&key
        (win ncurses-clone:*std-scr*)
-       (port (win->port win) port-supplied-p)
+       (port (deflazy:getfnc 'default-port) port-supplied-p)
        (ondraw (lambda ()))
        (big-glyph-fun 'identity)
        (update-data nil))
+  (when (not port-supplied-p)
+    ;;If no port supplied, just use the default port
+    (when (or (/= (ncurses-clone:win-cols win)
+		  (/ (text-sub::port-w port) *glyph-width*))
+	      (/= (ncurses-clone:win-lines win)
+		  (/ (text-sub::port-h port) *glyph-height*)))
+      ;;If the default port differs than ethe window in terms of
+      ;;dimensions, reset the port to the correct dimensions.
+      (setf *default-port-create* win)
+      (deflazy:refresh 'default-port t)
+      (setf port (deflazy:getfnc 'default-port))))
+  
   ;;Make sure the virtual window has the correct specs
   (when (or update-data
 	    ;;the port has not been written to,
@@ -103,11 +121,7 @@
 		 :win win
 		 :big-glyph-fun big-glyph-fun)
     (setf (text-sub::port-sync port) t))
-  (text-sub::draw-port port)
-  ;;Destroy the temporary port created for this function,
-  ;;not provided from elsewhere.
-  (unless port-supplied-p
-    (text-sub::destroy-port port)))
+  (text-sub::draw-port port))
 
 (defun ncurses->gl (texture &key 
 			      (win ncurses-clone:*std-scr*)

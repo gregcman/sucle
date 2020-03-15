@@ -246,7 +246,7 @@ gl_FragColor.a = opacity * fin.a;
 		       (/ len 4)
 		       var)))
     shader))
-
+#+nil
 (glhelp:deflazy-gl flat-shader ()
   (glhelp:create-opengl-shader 
    "
@@ -270,6 +270,7 @@ gl_FragColor = value_out;
 
 
 ;;;;;;;;;;;;;;;;;;;;
+#+nil
 (glhelp:deflazy-gl indirection-shader ()
   (glhelp:create-opengl-shader
    "
@@ -342,8 +343,8 @@ gl_FragColor = pixcolor;
 ;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
 ;;;;pattern to put in it.
 (defparameter *indirection-what-type*
-  :framebuffer
-  ;;:texture-2d
+  ;;:framebuffer
+  :texture-2d
   )
 (glhelp:deflazy-gl indirection ((w application:w)
 				(h application:h)
@@ -352,8 +353,9 @@ gl_FragColor = pixcolor;
 				;;FIXME::these are not necessarily used,
 				;;but factor in. Be more like the
 				;;kenny-tilton cells engine?
-				indirection-shader
-				fullscreen-quad)
+				;;indirection-shader
+				;;fullscreen-quad
+				)
 		   ;;Careful dealing with deflazy and OpenGL.
 		   ;;Opengl is necessarily stateful, whereas deflazy
 		   ;;tries to be more functional. The clash
@@ -375,6 +377,7 @@ gl_FragColor = pixcolor;
     ;;;refresh the indirection
     (let ((indirection (make-texture-or-framebuffer *indirection-what-type* upw uph)))
       (etypecase indirection
+	#+nil
 	(glhelp:gl-framebuffer
 	 (let ((refract indirection-shader))
 	   (glhelp:use-gl-program refract)
@@ -396,43 +399,52 @@ gl_FragColor = pixcolor;
 	 (glhelp:slow-draw fullscreen-quad))
 	(glhelp:gl-texture
 	 (gl:bind-texture :texture-2d (glhelp:handle indirection))
-	 (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
-	   (let* ((tempx (floatify (* upw block-w)))
-		  (tempy (floatify (* uph block-h)))
-		  (bazx (floatify (/ tempx w)))
-		  (bazy (floatify (/ tempy h)))
-		  (wfloat (floatify w))
-		  (hfloat (floatify h)))
-	     (progn
-	      ;;with-unsafe-speed
-	       ;;[FIXME] nonportably declares things to be fixnums for speed
-	       ;;The x and y components are independent of each other, so instead of
-	       ;;computing x and y per point, compute once per x value or v value.
-	       (dotimes (x (the fixnum upw))
-		 (let* ((tex-x (+ 0.5 (floatify x)))
-			(barx (floor (* 255.0 (/ (mod tex-x bazx)
-						 bazx))))
-			(foox (floor (/ (* wfloat tex-x)
-					tempx)))
-			(base (the fixnum (* 4 x)))
-			(delta (the fixnum (* 4 upw))))
-		   (dotimes (y (the fixnum uph))
+	 (cffi:with-foreign-object (data :uint8 (* upw uph 4))
+	   (let* (;;tempx and tempy
+		  (uph2 (the fixnum (* 2 uph)))
+		  (upw2 (the fixnum (* 2 upw)))
+		  (tempx (* upw2 block-w))
+		  (tempy (* uph2 block-h))
+		  )
+	     ;;[FIXME] nonportably declares things to be fixnums for speed
+	     ;;The x and y components are independent of each other, so instead of
+	     ;;computing x and y per point, compute once per x value or v value.
+	     ;;[FIXME]Optmize?
+	     (loop :for x :from 0 :below upw2 :by 2 :do
+		(let* ((tex-x (* w (+ 1 x)))
+		       (mod-tex-x-tempx (mod tex-x tempx))
+		       (barx (foobar (* 255 mod-tex-x-tempx) tempx))
+		       (foox (/ (- tex-x mod-tex-x-tempx) tempx))
+		       (base (* 2 x))
+		       (delta (* 2 upw2)))
+		  (declare (type fixnum base)
+			   (type (unsigned-byte 8) barx foox)
+			   (optimize (speed 3) (safety 0)))
+		  (loop :repeat (the fixnum uph) :do
+		     ;;y
 		     (setf (cffi:mem-ref data :uint8 (+ base 0)) barx
 			   (cffi:mem-ref data :uint8 (+ base 2)) foox)
 		     (setf base (the fixnum (+ base delta))))))
-	       (dotimes (y (the fixnum uph))
-		 (let* ((tex-y (+ 0.5 (floatify y)))			
-			(bary (floor (* 255.0 (/ (mod tex-y bazy)
-						 bazy))))			
-			(fooy (floor (/ (* hfloat tex-y)
-					tempy)))
-			(base (the fixnum (* 4 (the fixnum (* upw y))))))
-		   (dotimes (x upw)
+	     (loop :for y :from 0 :below uph2 :by 2 :do
+		(let* ((tex-y (* h (+ 1 y)))
+		       (mod-tex-y-tempy (mod tex-y tempy))
+		       (bary (foobar (* 255 mod-tex-y-tempy) tempy))	
+		       (fooy (/ (- tex-y mod-tex-y-tempy) tempy))
+		       (base (* upw2 y)))
+		  (declare (type fixnum base)
+			   (type (unsigned-byte 8) bary fooy)
+			   (optimize (speed 3) (safety 0)))		      
+		  (loop :repeat (the fixnum upw) :do
+		     ;;x
 		     (setf (cffi:mem-ref data :uint8 (+ base 1)) bary
 			   (cffi:mem-ref data :uint8 (+ base 3)) fooy)
-		     (setf base (the fixnum (+ base 4))))))))
+		     (setf base (the fixnum (+ base 4)))))))
 	   (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))
       indirection)))
+(defun foobar (x y)
+  ;;(floor (/ x y)) <- equivalent
+  (/ (- x (mod x y)) y)
+  )
 ;;;Round up to next power of two
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
@@ -539,12 +551,20 @@ gl_FragColor = pixcolor;
    sync))
 
 (defun port (&optional (x 0) (y 0) (w 100) (h 100))
-  (make-port :text-data (deflazy:lazgen text-data (deflazy:singleton 'glhelp:gl-context))
-	     :indirection (deflazy:dlaz
-			   (apply 'indirection w h *block-width* *block-height*
-				  (deflazy:singleton 'indirection-shader)
-				  (deflazy:singleton 'fullscreen-quad)
-				  (deflazy:singleton 'glhelp:gl-context)
+  (make-port :text-data (;;deflazy:lazgen
+			    text-data
+			    (deflazy:getfnc
+				(deflazy:singleton 'glhelp:gl-context)))
+	     :indirection (progn ;;deflazy:dlaz
+			    (apply 'indirection w h *block-width* *block-height*
+				   #+nil
+				  (deflazy:getfnc
+				      (deflazy:singleton 'indirection-shader))
+				  #+nil
+				  (deflazy:getfnc
+				      (deflazy:singleton 'fullscreen-quad))
+				  (deflazy:getfnc
+				      (deflazy:singleton 'glhelp:gl-context))
 				  ()))
 	     :x x
 	     :y y
@@ -552,23 +572,34 @@ gl_FragColor = pixcolor;
 	     :h h))
 
 (defun destroy-port (port)
-  (dependency-graph:annihilate (port-text-data port))
-  (dependency-graph:annihilate (port-indirection port)))
+  (;;dependency-graph:annihilate
+   glhelp::gl-delete*
+   (port-text-data port))
+  (;;dependency-graph:annihilate
+   glhelp::gl-delete*
+   (port-indirection port)))
+(defmethod dependency-graph:cleanup-node-value ((obj port))
+  (destroy-port obj))
 
 (defun port-data (port)
-  (glhelp:texture-like (deflazy:getfnc (port-text-data port))))
+  (glhelp:texture-like (progn ;;deflazy:getfnc
+			   (port-text-data port))))
 (defun %port-indirection (port)
-  (glhelp:texture-like (deflazy:getfnc (port-indirection port))))
+  (glhelp:texture-like (progn ;;deflazy:getfnc
+			   (port-indirection port))))
 
 (defun draw-port (port)
-  (gl:polygon-mode :front-and-back :fill)
-  (gl:disable :cull-face)
-  (gl:disable :depth-test)
-  (gl:disable :blend)
-  (text-sub:use-text-shader :text-data
-			    (port-data port)
-			    :indirection
-			    (%port-indirection port))
+  (let (;;indirection fulfilled before anything else
+	;;because it has side effects in OpenGL
+	(indirection (%port-indirection port)))
+    (gl:polygon-mode :front-and-back :fill)
+    (gl:disable :cull-face)
+    (gl:disable :depth-test)
+    (gl:disable :blend)
+    (text-sub:use-text-shader :text-data
+			      (port-data port)
+			      :indirection
+			      indirection))
   ;;[FIXME] unconfigurable? configuration good and bad
   (glhelp:bind-default-framebuffer)
   (glhelp:set-render-area
