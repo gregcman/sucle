@@ -14,19 +14,16 @@
 (defparameter *glyph-width* 8.0)
 
 (defparameter *resized-p* nil)
-(deflazy:deflazy virtual-window ((w application:w) (h application:h))
-  (setf *resized-p* t)
-  (let ((new-columns (floor w *glyph-width*))
-	(new-lines (floor h *glyph-height*)))
-    ;;(ncurses-clone:reset-standard-screen)
+
+(defun maybe-resize-and-resize-stdscr ()
+  (let ((new-columns (floor (deflazy:getfnc 'application:w) *glyph-width*))
+	(new-lines (floor (deflazy:getfnc 'application:h) *glyph-height*)))
     (ncurses-clone:with-virtual-window-lock
-      (ncurses-clone:ncurses-wresize
-       ncurses-clone:*std-scr*
-       new-lines
-       new-columns)
-      #+nil
-      (setf ncurses-clone:*virtual-window*
-	    (ncurses-clone:make-virtual-window)))))
+      (when (ncurses-clone:ncurses-wresize
+	     ncurses-clone:*std-scr*
+	     new-lines
+	     new-columns)
+	(update-resize)))))
 
 (defun window-size (&optional (win ncurses-clone::*std-scr*))
   (values
@@ -48,6 +45,7 @@
   (set-glyph-dimensions 8 16)
   (setf text-sub:*text-data-what-type* :texture-2d)
   (update-resize)
+  (maybe-resize-and-resize-stdscr)
   (text-sub:change-color-lookup
    ;;'text-sub:color-fun
    'lem.term:color-fun
@@ -72,7 +70,7 @@
      'text-sub:indirection
      ;;'text-sub:render-normal-text-indirection
      )
-    (deflazy:refresh 'virtual-window)))
+    (maybe-resize-and-resize-stdscr)))
 
 (defparameter *redraw-display-p* nil)
 (defun redraw-display ()

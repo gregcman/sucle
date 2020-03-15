@@ -407,13 +407,17 @@
 	(win-y win) y))
 
 (defun ncurses-wresize (win height width)
-  (setf (win-lines win) height
-	(win-cols win) width)
-  (let ((old-data (win-data win))
-	(new-grid (make-grid height width)))
-    (transfer-data old-data new-grid)
-    (setf (win-data win)
-	  new-grid)))
+  (cond ((or (/= (win-lines win) height)
+	     (/= (win-cols win) width))
+	 (setf (win-lines win) height
+	       (win-cols win) width)
+	 (let ((old-data (win-data win))
+	       (new-grid (make-grid height width)))
+	   (transfer-data old-data new-grid)
+	   (setf (win-data win)
+		 new-grid))
+	 t)
+	(t nil)))
 
 #+nil
 (defparameter *mouse-enabled-p* nil)

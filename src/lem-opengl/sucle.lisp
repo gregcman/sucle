@@ -46,7 +46,7 @@
 	(when window::*status*
 	  ;;(bt:thread-alive-p editor-thread)
 	  (throw out-token nil))
-	(deflazy:getfnc 'ncurses-clone-for-lem::virtual-window)
+	(ncurses-clone-for-lem::maybe-resize-and-resize-stdscr)
 	(when *resized-p*
 	  (setf *resized-p* nil)
 	  (lem:send-event :resize)
