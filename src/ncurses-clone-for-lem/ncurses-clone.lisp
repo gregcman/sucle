@@ -47,6 +47,8 @@
 
    #:win-cols
    #:win-lines
+   #:win-x
+   #:win-y
    #:stdscr-columns
    #:stdscr-lines))
 (in-package :ncurses-clone)

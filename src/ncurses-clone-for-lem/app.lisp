@@ -34,6 +34,12 @@
 	     *glyph-width*))
    (floor (* (ncurses-clone:win-lines win)
 	     *glyph-height*))))
+(defun window-pos (&optional (win ncurses-clone::*std-scr*))
+  (values
+   (floor (* (ncurses-clone:win-x win)
+	     *glyph-width*))
+   (floor (* (ncurses-clone:win-y win)
+	     *glyph-height*))))
 
 (defun update-resize ()
   (setf *resized-p* t))
@@ -81,18 +87,23 @@
   ;;Make sure the virtual window has the correct specs
   (let ((port
 	 ;;(text-sub::port 0 0 window::*width* window::*height*)
-	  ;;#+nil
-	 (multiple-value-bind (w h) (window-size win)
-	   (text-sub::port 0 0 w h))))
+	 ;;#+nil
+	 (multiple-value-bind (x y) (window-pos win)
+	   (multiple-value-bind (w h) (window-size win)
+	     (text-sub::port x y w h)))))
     ;;FIXME::temporary-> because port is created and destroyed,
     ;;it has no data. so always update
-    (when (or t update-data)
+    (when (or update-data
+	      ;;the port has not been written to,
+	      ;;so definitely write to it.
+	      (not (text-sub::port-sync port)))
       (funcall ondraw)
     ;;;Copy the virtual screen to a c-array,
     ;;;then send the c-array to an opengl texture
       (ncurses->gl (text-sub::port-data port)
 		   :win win
-		   :big-glyph-fun big-glyph-fun))
+		   :big-glyph-fun big-glyph-fun)
+      (setf (text-sub::port-sync port) t))
     (text-sub::draw-port port)
     (text-sub::destroy-port port)))
 

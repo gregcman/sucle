@@ -535,7 +535,8 @@ gl_FragColor = pixcolor;
    x
    y
    w
-   h))
+   h
+   sync))
 
 (defun port (&optional (x 0) (y 0) (w 100) (h 100))
   (make-port :text-data (deflazy:lazgen text-data (deflazy:singleton 'glhelp:gl-context))
@@ -573,10 +574,8 @@ gl_FragColor = pixcolor;
   (glhelp:set-render-area
    (port-x port)
    (port-y port)
-   (+ (port-x port)
-      (port-w port))
-   (+ (port-y port)
-      (port-h port)))
+   (port-w port)
+   (port-h port))
   #+nil
   (progn
     (gl:enable :blend)
