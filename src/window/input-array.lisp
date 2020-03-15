@@ -75,24 +75,21 @@
 ;;;;</INPUT ARRAY>
 ;;;;************************************************************************;;;;
 
-(defmacro button (type state button
-		  &optional (control-state *control-state* control-state-supplied-p))
-  ;;[FIXME]pair allowed-button-states and allowed-button-types with the
-  ;;quoted lists below
-  (let ((allowed-button-states '(:down :pressed :released :repeat))
-	(allowed-button-types '(:mouse :key)))
-    (assert (member type allowed-button-types)
-	    nil "Wanted one of:state:~s~%Got:~s" allowed-button-types type)
-    (assert (member state allowed-button-states)
-	    nil "Wanted one of:type:~s~%Got:~s" allowed-button-states state)
-    (mapc (lambda (keystate keyfun)
-	    (when (eq state keystate)
-	      (mapc (lambda (keytype keyfun2)
-		      (when (eq type keytype)
-			(return-from button `(,keyfun (,keyfun2 ,button)
-						      ,@(when control-state-supplied-p
-							  (list control-state))))))
-		    allowed-button-types
-		    '(mouseval keyval))))
-	  allowed-button-states
-	  '(skey-p skey-j-p skey-j-r skey-j-p-or-repeat))))
+(defun button (type state button
+		  &optional (control-state *control-state*))
+  (let ((allowed-button-states
+	 '((:repeat . skey-j-p-or-repeat)
+	   (:released . skey-j-r)
+	   (:pressed . skey-j-p)
+	   (:down . skey-p)))
+	(allowed-button-types
+	 '((:key . keyval)
+	   (:mouse . mouseval))))
+    (let ((checkfun (cdr (assoc state allowed-button-states))))
+      (if (not checkfun)
+	  (error "Wanted one of:type:~s~%Got:~s" allowed-button-states state)
+	  (let ((typefun (cdr (assoc type allowed-button-types))))
+	    (if (not typefun)		
+		(error "Wanted one of:state:~s~%Got:~s" allowed-button-types type)
+		(funcall checkfun (funcall typefun button)
+			 control-state)))))))
