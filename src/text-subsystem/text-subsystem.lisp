@@ -26,7 +26,8 @@
    #:font-texture
 
    #:text-shader
-   #:use-text-shader))
+   #:use-text-shader
+   #:submit-text-data))
 (in-package #:text-sub)
 
 (defparameter *text-data-what-type*
@@ -475,7 +476,7 @@ gl_FragColor = pixcolor;
       pmv
       nil))))
 					;#+nil
-;;#+nil
+#+nil
 (defun text-subsystem ()
 
   ;;variables
@@ -507,6 +508,7 @@ gl_FragColor = pixcolor;
   text-data
   font-texture
   color-lookup
+  indirection
   )
 
 
@@ -517,3 +519,59 @@ gl_FragColor = pixcolor;
 		 (print form str))))
     (yolo foo)))
 
+(defun submit-text-data
+    (arr c-array-columns c-array-lines
+     &optional (texture (glhelp:texture-like (deflazy:getfnc 'text-sub:text-data))))
+  (gl:bind-texture :texture-2d texture)
+  (gl:tex-sub-image-2d :texture-2d 0 0 0
+		       c-array-columns
+		       c-array-lines
+		       :rgba :unsigned-byte arr))
+
+(struct-to-clos:struct->class
+ (defstruct port
+   text-data
+   indirection
+   x
+   y
+   w
+   h))
+
+(defun port (&optional (x 0) (y 0) (w 100) (h 100))
+  (make-port :text-data (deflazy:lazgen text-data (deflazy:singleton 'glhelp:gl-context))
+	     :indirection (deflazy:dlaz
+			   (apply 'indirection w h *block-width* *block-height*
+				  (deflazy:singleton 'indirection-shader)
+				  (deflazy:singleton 'fullscreen-quad)
+				  (deflazy:singleton 'glhelp:gl-context)
+				  ()))
+	     :x x
+	     :y y
+	     :w w
+	     :h h))
+
+(defun destroy-port (port)
+  (dependency-graph:annihilate (port-text-data port))
+  (dependency-graph:annihilate (port-indirection port)))
+
+(defun port-data (port)
+  (glhelp:texture-like (deflazy:getfnc (port-text-data port))))
+
+(defun draw-port (port)
+  (text-sub:use-text-shader :text-data
+			    (port-data port))
+  ;;[FIXME] unconfigurable? configuration good and bad
+  (glhelp:bind-default-framebuffer)
+  (glhelp:set-render-area
+   (port-x port)
+   (port-y port)
+   (+ (port-x port)
+      (port-w port))
+   (+ (port-y port)
+      (port-h port)))
+  #+nil
+  (progn
+    (gl:enable :blend)
+    (gl:blend-func :src-alpha :one-minus-src-alpha))
+
+  (text-sub:draw-fullscreen-quad))

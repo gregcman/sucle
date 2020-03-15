@@ -30,7 +30,9 @@
    #:get-mutable-cell-by-name
    #:flush-refreshes
    #:refresh-old-node
-   #:%%refresh))
+   #:%%refresh
+
+   #:annihilate))
 (in-package :dependency-graph)
 
 (struct-to-clos:struct->class
@@ -246,6 +248,17 @@
       (when (mutable-cell-difference v)
 	(return-from dirty-p (values t v))))))
 
+(defun remove-all-dependencies (node)
+  (do-node-dependencies node
+    (lambda (k v)
+      (declare (ignorable k))
+      (let ((observing (mutable-cell-observing v)))
+	(when (typep observing 'node)
+	  (remove-dependent node observing)))
+      )))
+(defun remove-all-dependents (node)
+  (dolist (dependent (node-dependents node))
+    (remove-dependent dependent node)))
 ;;;
 (defun %redefine-node (fun node dependencies &optional name tags)
   (with-locked-lock (node)
@@ -257,13 +270,7 @@
     ;;all the old dependencies and rebuild.
     
     ;;Remove all current dependents
-    (do-node-dependencies node
-      (lambda (k v)
-	(declare (ignorable k))
-	(let ((observing (mutable-cell-observing v)))
-	  (when (typep observing 'node)
-	    (remove-dependent node observing)))
-	))
+    (remove-all-dependencies node)
     ;;Rebuild dependents
     (map nil (lambda (x)
 	       (when (typep x 'node)
@@ -354,6 +361,14 @@
 			;;(declare (ignore value))
 			(dependency-graph:%refresh node value))
 	(clrhash *refresh*)))))
+
+(defun annihilate (node)
+  (remove-all-dependents node)
+  (remove-all-dependencies node)
+  (clrhash (node-%data node))
+  (clean-and-invalidate-node node)
+  (setf (node-tags node) nil
+	(node-value node) nil))
 ;;;;
 
 ;;[TODO] -> move to test file, documentation?

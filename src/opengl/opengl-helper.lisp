@@ -9,6 +9,7 @@
    #:with-gl-context
    
    #:deflazy-gl
+   #:gl-context
    
    #:handle
    #:alive-p

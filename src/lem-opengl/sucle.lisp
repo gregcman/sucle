@@ -46,9 +46,11 @@
 	(when window::*status*
 	  ;;(bt:thread-alive-p editor-thread)
 	  (throw out-token nil))
+	(deflazy:getfnc 'ncurses-clone-for-lem::virtual-window)
 	(when *resized-p*
 	  (setf *resized-p* nil)
-	  (lem:send-event :resize))
+	  (lem:send-event :resize)
+	  (redraw-display))
 	(scroll-event)
 	(input-events)
 	;;#+nil
@@ -72,8 +74,7 @@
   (when *redraw-display-p*
     (setf *redraw-display-p* nil)
     (lem:redraw-display))
-
-  ;;Rendering. Comes after input handling because things could have changed
+    ;;Rendering. Comes after input handling because things could have changed
   (render
    :ondraw
    (lambda ()
