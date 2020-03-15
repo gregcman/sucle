@@ -15,15 +15,26 @@
 
 (defparameter *resized-p* nil)
 
-(defun maybe-resize-and-resize-stdscr ()
-  (let ((new-columns (floor (deflazy:getfnc 'application:w) *glyph-width*))
-	(new-lines (floor (deflazy:getfnc 'application:h) *glyph-height*)))
-    (ncurses-clone:with-virtual-window-lock
-      (when (ncurses-clone:ncurses-wresize
-	     ncurses-clone:*std-scr*
-	     new-lines
-	     new-columns)
-	(update-resize)))))
+(defun screen-in-blocks (&optional
+			   (w (deflazy:getfnc 'application:w))
+			   (h (deflazy:getfnc 'application:h)))
+  (values
+   ;;columns
+   (floor w *glyph-width*)
+   ;;rows
+   (floor h *glyph-height*)))
+
+(defun maybe-resize-and-resize-stdscr (&optional
+					 (w (deflazy:getfnc 'application:w))
+					 (h (deflazy:getfnc 'application:h)))
+  (ncurses-clone:with-virtual-window-lock
+    (when
+	(multiple-value-bind (c r) (screen-in-blocks w h)
+	  (ncurses-clone:ncurses-wresize
+	   ncurses-clone:*std-scr*
+	   r
+	   c))
+      (update-resize))))
 
 (defun window-size (&optional (win ncurses-clone::*std-scr*))
   (values
@@ -81,6 +92,11 @@
     (multiple-value-bind (w h) (window-size win)
       (text-sub::port x y w h))))
 
+(defun update-port-pos (port win)
+  (multiple-value-bind (x y) (window-pos win)
+    (setf (text-sub::port-x port) x
+	  (text-sub::port-y port) y)))
+
 (defparameter *default-port-create* ncurses-clone:*std-scr*)
 (glhelp:deflazy-gl
  default-port ()
@@ -119,6 +135,7 @@
 		 :win win
 		 :big-glyph-fun big-glyph-fun)
     (setf (text-sub::port-sync port) t))
+  (update-port-pos port win)
   (text-sub::draw-port port))
 
 (defun ncurses->gl (texture &key 
@@ -254,3 +271,24 @@
        texture
        ;;text-data
        ))))
+
+;;like CSS themes
+;;however, CSS only divides horizontally
+(defun frame-increment
+    ;;Divide the 
+    (&optional
+       (w (deflazy:getfnc 'application:w))
+       (h (deflazy:getfnc 'application:h))
+       (divisions 12))
+  (multiple-value-bind (cols rows) (screen-in-blocks w h)
+    (let ((x-increment (floor cols divisions))
+	  (y-increment (floor rows divisions)))
+      (values x-increment y-increment))))
+
+(defun easy-frame (x y width height &optional (win ncurses-clone:*std-scr*))
+  (multiple-value-bind (xinc yinc) (frame-increment)
+    (setf (ncurses-clone:win-x win) (* x xinc)
+	  (ncurses-clone:win-y win) (* y yinc))
+    (ncurses-clone:ncurses-wresize win
+				   (* height yinc)
+				   (* width xinc))))

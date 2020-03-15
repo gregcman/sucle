@@ -364,6 +364,7 @@
 (defparameter *view*
   (ncurses-clone:ncurses-newwin 5 50 0 0))
 (defun things ()
+  (ncurses-clone-for-lem::easy-frame 1 1 10 10 *view*)
   (lem.term:with-attribute (:fg "black" :bg "white"
 				:underline
 				nil
@@ -373,7 +374,7 @@
 				t)
     (ncurses-clone:ncurses-mvwaddstr 
      *view*
-     (random 5)
+     (random (ncurses-clone:win-lines *view*))
      0
      (string-downcase
       (prin1-to-string (local-time:now)))))

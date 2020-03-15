@@ -204,3 +204,5 @@ global variables essentially
 ;;render flat images
 ;;memory error? because I pkilled sbcl? or opengl not being cleaned up correctly?
 ;;Deflazy fixme::when redefining deflazy with more or less arguments, creates errors
+;;FIXME:have different character width and height for text-subsystem and ncurses-clone
+;;Open Sucle with a menu instead of black screen
