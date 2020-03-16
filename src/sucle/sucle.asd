@@ -26,6 +26,7 @@
    ;;for world-generation
    #:black-tie
    #:ncurses-clone-for-lem
+   #:livesupport
    )
   :serial t
   :components 

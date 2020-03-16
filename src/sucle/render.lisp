@@ -566,6 +566,7 @@ gl_FragColor.rgb = color_out;
 
 (defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 
+#+nil
 (defun call-with-world-meshing-lparallel (fun)
   (sucle-mp:with-initialize-multiprocessing
     (funcall fun)))

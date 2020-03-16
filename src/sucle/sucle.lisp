@@ -54,67 +54,130 @@
    8.0))
 ;;;;</BOXES?>
 
-(defparameter *with-functions*
-  #+nil
-  (list
-   (lambda (x)
-     (print 34)
-     (unwind-protect 
-	  (funcall x)
-       (print 2))))
-  (list
-   'call-with-world-meshing-lparallel))
-(defun run-with (fun)
-  (flet ((nest (with-fun cont)
-	   (lambda ()
-	     (funcall with-fun cont))))
-    (dolist (with-fun *with-functions*)
-      (setf fun (nest with-fun fun))))
-  fun)
-
-(defun start (&optional
-		(world
-		 ;;"first/"
-		 ;;#+nil
-		 ;;"test/"
-		 "other/"
-		 ;;"third/"
-		 ;;"ridikulisp/"
-		 )
-		(working-dir
-		 (sucle-temp:path "save/")
-		 #+nil
-		 (cdr (assoc (machine-instance) 
-			     '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-			       ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-			     :test 'equal))))
-  (voxel-chunks:clearworld)
+(defun configure-world-path
+    (&optional
+       (world
+	;;"first/"
+	;;#+nil
+	;;"test/"
+	"other/"
+	;;"third/"
+	;;"ridikulisp/"
+	)
+       (working-dir
+	(sucle-temp:path "save/")
+	#+nil
+	(cdr (assoc (machine-instance) 
+		    '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
+		      ("nootboke" . #P"/home/terminal256/Documents/saves/"))
+		    :test 'equal))))
   (setf world:*world-directory* world)
-  (setf world:*some-saves* working-dir) 
-  (application:main
-   *sucle-app-function*
-   :width (floor (* 80 text-sub:*block-width*))
-   :height (floor (* 25 text-sub:*block-height*))
+  (setf world:*some-saves* working-dir))
+(defun start ()
+  (configure-world-path)
+  (enter 'sucle-app))
+(defun sucle-app ()
+  #+nil
+  (setf (entity-fly? *ent*) nil
+	(entity-gravity? *ent*) t)
+    ;;(our-load)
+  (window:set-vsync t)
+  (fps:set-fps 60)
+  (ncurses-clone-for-lem:init)
+  (push-mode 'menu-mode-per-frame)
+  (voxel-chunks:clearworld)
+  (sucle-mp:with-initialize-multiprocessing
+   (unwind-protect (default-loop)	  
+     (when world:*persist*
+       (world:msave)))))
+
+(defun test23 ()
+  (labels ((app-entry ()
+	     (push-mode #'app)
+	     (default-loop))
+	   (app ()
+	     (when (window:button :key :repeat #\u)
+	       (print "going up!")
+	       (subapp #'app-entry))
+	     (when (window:button :key :repeat #\m)
+	       (print "another mode")
+	       (app-entry))
+	     (when (window:button :key :repeat #\n)
+	       (print "removing mode")
+	       ;;FIXME::will this pop too many modes?
+	       ;(pop-mode)
+	       )
+	     (when (window:button :key :repeat #\q)
+	       (print "quitting")
+	       (application:quit))
+	     (when (window:button :key :pressed #\p)
+	       (let ((*print-circle* t))
+		 (print *per-frame*)))))
+    (enter #'app-entry)))
+
+;;;;
+(defun enter (&optional (app 'default-per-frame))
+  (reset-per-frame)
+  (subapp app)
+  (start-window))
+
+(defun start-window ()
+  (application:main 'default-loop
+   :width (* 80 8)
+   :height (* 25 16)
    :title ""))
 
-(defparameter *sucle-app-function*
-  (run-with
-   (lambda ()
-     #+nil
-     (setf (entity-fly? *ent*) nil
-	   (entity-gravity? *ent*) t)
-     ;;(our-load)
-     (window:set-vsync t)
-     (fps:set-fps 60)
-     (ncurses-clone-for-lem:init)
-     (unwind-protect
-	  (loop
-	     (application:poll-app)
-	     ;;(application-example-hello-world::frame)
-	     (per-frame)
-	     )
-       (when world:*persist*
-	 (world:msave))))))
+(defun default-loop ()
+  (loop
+     (application:poll-app)
+     (per-frame)))
+
+(defun subapp (fun)
+  ;;The application is both a mode
+  ;;and a means of quitting.
+  (labels ((this-function ()
+	     ;;(print "running")
+	     (unwind-protect (application::with-quit-token ()
+			       (funcall fun))
+	       ;;Pop this function off the execution stack.
+	       (let ((popped nil))
+		 (loop :named out :do
+		    (let ((obj (pop-mode)))
+		      (push obj popped)
+		      (when (eq #'this-function obj)
+			(return-from out))))
+		 ;;(format t "popped ~a" (length popped))
+		 ))))
+    (push-mode #'this-function)))
+
+(defun default-per-frame ()
+  ;;Do nothing, except quit
+  (application:quit))
+;;This is a circular list with one element.
+;;So if you keep popping the mode,
+;;nothing happens.
+(defun circular-per-frame ()
+  (let ((cell (list 'default-per-frame)))
+    (setf (cdr cell) cell)
+    cell))
+(defun reset-per-frame ()
+  (setf *per-frame* (circular-per-frame)))
+(defparameter *per-frame* (circular-per-frame))
+(defun per-frame ()
+  (funcall (car *per-frame*)))
+(defun push-mode (mode)
+  (etypecase mode
+    ;;mode is either a function
+    (function t)
+    ;;or a symbol with a 
+    (symbol
+     (assert (fboundp mode) nil "Symbol:~a is function unbound" mode)))
+  (push mode *per-frame*))
+(defun pop-mode ()
+  (pop *per-frame*))
+(defun switch-mode (mode)
+  (pop-mode)
+  (push-mode mode))
 
 ;;;;
 
@@ -221,17 +284,18 @@
 (defparameter *session* nil)
 (defparameter *game-ticks-per-iteration* 0)
 (defparameter *fraction-for-fps* 0.0)
-(defun per-frame ()
+(defun sucle-per-frame ()
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
   ;;set the chunk center aroun the player
   (with-vec (x y z) ((player-position))
     (world:set-chunk-coordinate-center x y z))
-  
+  (livesupport:update-repl-link)
   (application:on-session-change *session*
     (world:load-world t))
   (when (window:button :key :pressed :escape)
-    (application:quit))
+    (window:get-mouse-out)
+    (pop-mode))
   (when (window:button :key :pressed #\e)
     (window:toggle-mouse-capture)
     ;;Flush changes to the mouse so
@@ -351,34 +415,93 @@
   (render-crosshairs)
 
   (complete-render-tasks)
-  (dispatch-mesher-to-dirty-chunks)
-  
-  (when (window:button :key :pressed #\r)
-    (toggle *show-things*))
-  (when *show-things*
-    (dotimes (x 1)
-      (things))))
+  (dispatch-mesher-to-dirty-chunks))
+
 
 ;;Ripped from sucle-test essentially.
-(defparameter *show-things* nil)
 (defparameter *view*
   (ncurses-clone:ncurses-newwin 5 50 0 0))
-(defun things ()
+(defun menu-mode-per-frame ()
   (ncurses-clone-for-lem::easy-frame 1 1 10 10 *view*)
-  (lem.term:with-attribute (:fg "black" :bg "white"
-				:underline
-				nil
-				:bold
-				nil
-				:reverse
-				t)
-    (ncurses-clone:ncurses-mvwaddstr 
-     *view*
-     (random (ncurses-clone:win-lines *view*))
-     0
-     (string-downcase
-      (prin1-to-string (local-time:now)))))
+  (simulate-menu *menu*)
   (ncurses-clone-for-lem:render :update-data t :win *view*))
+
+(defun draw-string (str x y
+		    &key (view *view*) (fg "white") (bg "black")
+		      (underline nil) (bold nil) (reverse nil))
+  (lem.term:with-attribute
+      (:fg fg :bg bg :underline underline :bold bold :reverse reverse)
+    (ncurses-clone:ncurses-mvwaddstr view y x str)))
+
+;;;;MENU
+;;-> inspired by html dom?
+(defvar *current-menu-data*)
+(defvar *menu-height*)
+(defvar *menu-width*)
+(defun simulate-menu (&optional (menu *menu*))
+  ;;do buttons
+  (let
+      ;;give buttons access to the DOM
+      ((*current-menu-data* (menu-data menu))
+       (*menu-height* (ncurses-clone:win-lines *view*))
+       (*menu-width* (ncurses-clone:win-cols *view*)))
+    (dolist (button (menu-buttons menu))
+      (when (apply 'window:button (car button))
+	(funcall (cdr button)))))
+  ;;do items
+  (let ((menu-data (menu-data menu)))
+    (dolist (item menu-data)
+      (apply 'draw-string (cdr item)))))
+(defun menu-buttons (&optional (menu *menu*))
+  (first menu))
+(defun menu-data (&optional (menu *menu*))
+  (second menu))
+(defparameter *menu*
+  `(;;keys bound to functions
+    (((:key :pressed #\f) .
+      ,(lambda () (print "Paying Respects")))
+     ((:key :pressed #\q) .
+      ,(lambda () (application:quit)))
+     ((:key :pressed #\Escape) .
+      ,(lambda () (application:quit)))
+     ((:key :pressed #\s) .
+      ,(lambda ()
+	 (push-mode 'sucle-per-frame)))
+     ((:key :pressed #\c) .
+      ,(lambda ()
+	 (print "Clearing...")
+	 (let ((clear (assoc :clear *current-menu-data*)))
+	   (setf (second clear)
+		 (with-output-to-string (str)
+		   (let ((clearstr
+			  (make-string *menu-width*
+				       :initial-element #\space)))
+		     (dotimes (y *menu-height*)
+		       (terpri str)
+		       (write-string clearstr str))))))))
+     ((:key :released #\c) .
+      ,(lambda ()
+	 (print "Clearing Done!")
+	 (let ((clear (assoc :clear *current-menu-data*)))
+	   (setf (second clear)
+		 "")))))
+    ;;data to render
+    ((:hello
+      "
+Press s to start the game
+
+Press c to clear
+
+Press h for help
+
+Press F to pay respects [not really]
+
+Press q/escape to quit
+" 4 4 :bold t)
+     ;;(:hello "world" 8 16 :fg "green" :bg "red" :reverse t :bold t)
+     (:clear "" 0 0  :bold t))
+    ()))
+;;;MENU
 
 (defparameter *sky-color*
   (mapcar 'utility:byte/255 '(255 255 255))

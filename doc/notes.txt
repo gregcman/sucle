@@ -206,3 +206,7 @@ global variables essentially
 ;;Deflazy fixme::when redefining deflazy with more or less arguments, creates errors
 ;;FIXME:have different character width and height for text-subsystem and ncurses-clone
 ;;Open Sucle with a menu instead of black screen
+
+;;combine lem, sucle, and menu system under one roof?
+;;separate menu, application per-frame controller
+;;cl-steamworks?
