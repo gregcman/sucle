@@ -26,3 +26,5 @@
 
 (foo 1 2 3)
  hello world?
+
+(sucle::subapp 'sucle::sucle-app)

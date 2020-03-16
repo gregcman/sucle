@@ -5,56 +5,54 @@
   (lem-paredit-mode:paredit-forward n))
 ;;https://www.gnu.org/software/emacs/manual/html_node/elisp/Interactive-Codes.html
 ;;This is what "p" and "r" are for?
-(defun start-lem ()
+(defun configure-lem ()
+  (lem:add-hook lem:*find-file-hook*
+		(lambda (buffer)
+		  (when (eq (lem:buffer-major-mode buffer) 'lem-lisp-mode:lisp-mode)
+		    (lem:change-buffer-mode buffer 'lem-paredit-mode:paredit-mode t))))
+  (setf lem.term::*ansi-color-names-vector*
+	;;from misterioso
+	(mapcar 'lem:parse-color
+		(remove-duplicates '("#2d3743" "#ff4242" "#74af68" "#dbdb95"
+				     "#34cae2" "#008b8b" "#00ede1" "#e1e1e0"
+				     ;;above were from ansi-color-names-vector
+				     ;;https://github.com/jwiegley/emacs-release/blob/master/etc/themes/misterioso-theme.el
+				     "#878787" "#eeeeec" "#415160" "#2d4948"
+				     "#212931" "#729fcf" "#23d7d7" "#ffad29"
+				     "#e67128")
+				   :test 'string=)))
+  (lem.term::regen-color-array)
+  (progn
+    (define-sacred-keys)
+    ;;(define-other-keys)
+    (lem:define-key lem:*global-keymap* "C-/" 'lem:undo)
+    (lem:define-key lem.language-mode:*language-mode-keymap* "Tab" 'indent-region-or-otherwise)
+    (lem:define-key lem:*global-keymap* "Tab" 'indent-region-or-otherwise)
+    (lem:define-key lem-paredit-mode:*paredit-mode-keymap* "C-k" 'lem:kill-sexp)
+    (lem:define-key lem-lisp-mode:*lisp-mode-keymap* "C-k" 'lem:kill-sexp)
+    (lem:define-key lem-paredit-mode:*paredit-mode-keymap* ")" 'forward2)
+    (lem:define-key lem.listener-mode:*listener-mode-keymap* "C-Down"
+      'lem.listener-mode:listener-next-input)
+    (lem:define-key lem.listener-mode:*listener-mode-keymap* "C-Up"
+      'lem.listener-mode:listener-prev-input)
+    (lem:define-key lem:*global-keymap* "Return"
+      'lem.language-mode:newline-and-indent)
+    (lem::clear-all-attribute-cache)))
+(defun run-lem-thread ()
   (let ((lem::*in-the-editor* nil))
-    ;;(lem:main nil)
-    ;;#+nil
-    (lem:add-hook lem:*find-file-hook*
-		  (lambda (buffer)
-		    (when (eq (lem:buffer-major-mode buffer) 'lem-lisp-mode:lisp-mode)
-		      (lem:change-buffer-mode buffer 'lem-paredit-mode:paredit-mode t))))
-    (setf lem.term::*ansi-color-names-vector*
-	  ;;from misterioso
-	  (mapcar 'lem:parse-color
-		  (remove-duplicates '("#2d3743" "#ff4242" "#74af68" "#dbdb95"
-				       "#34cae2" "#008b8b" "#00ede1" "#e1e1e0"
-				       ;;above were from ansi-color-names-vector
-				       ;;https://github.com/jwiegley/emacs-release/blob/master/etc/themes/misterioso-theme.el
-				       "#878787" "#eeeeec" "#415160" "#2d4948"
-				       "#212931" "#729fcf" "#23d7d7" "#ffad29"
-				       "#e67128")
-				     :test 'string=)))
-    (lem.term::regen-color-array)
-    (progn
-      (define-sacred-keys)
-      ;;(define-other-keys)
-      (lem:define-key lem:*global-keymap* "C-/" 'lem:undo)
-      (lem:define-key lem.language-mode:*language-mode-keymap* "Tab" 'indent-region-or-otherwise)
-      (lem:define-key lem:*global-keymap* "Tab" 'indent-region-or-otherwise)
-      (lem:define-key lem-paredit-mode:*paredit-mode-keymap* "C-k" 'lem:kill-sexp)
-      (lem:define-key lem-lisp-mode:*lisp-mode-keymap* "C-k" 'lem:kill-sexp)
-      (lem:define-key lem-paredit-mode:*paredit-mode-keymap* ")" 'forward2)
-      (lem:define-key lem.listener-mode:*listener-mode-keymap* "C-Down"
-	'lem.listener-mode:listener-next-input)
-      (lem:define-key lem.listener-mode:*listener-mode-keymap* "C-Up"
-	'lem.listener-mode:listener-prev-input)
-      (lem:define-key lem:*global-keymap* "Return"
-	'lem.language-mode:newline-and-indent)
-      (progn
-	;;FIXME::where to put this?
-	(lem::clear-all-attribute-cache)
-	#+nil
-	(ncurses-clone::reset-ncurses-color-pairs)
-	#+nil
-	(lem.term::reset-color-pair))
-      (lem:lem)
-      (lem:send-event
-       (lambda ()
-	 (lem:find-file (merge-pathnames "other/example.lisp"
-					 (asdf:system-source-directory :lem-opengl)))
-	 (lem-paredit-mode:paredit-mode)
-	 (lem:load-theme "misterioso"))))
-    (lem-sucle::input-loop)))
+    (lem:lem)))
+
+(defun start-lem ()
+  (configure-lem)
+  (run-lem-thread)
+    
+  (lem:send-event
+   (lambda ()
+     (lem:find-file (merge-pathnames "other/example.lisp"
+				     (asdf:system-source-directory :lem-opengl)))
+     (lem-paredit-mode:paredit-mode)
+     (lem:load-theme "misterioso")))
+  (sucle::enter 'lem-opengl-app))
 
 (in-package :lem-user)
 

@@ -210,3 +210,5 @@ global variables essentially
 ;;combine lem, sucle, and menu system under one roof?
 ;;separate menu, application per-frame controller
 ;;cl-steamworks?
+;;lem-lisp-mode has a *wait-message-thread* -> does this cause the game to stall?
+;;grep -r "\-thread\*"

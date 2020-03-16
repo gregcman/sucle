@@ -118,7 +118,7 @@
 
 ;;;;
 (defun enter (&optional (app 'default-per-frame))
-  (reset-per-frame)
+  (reset-per-frame-and-stack)
   (subapp app)
   (start-window))
 
@@ -173,9 +173,12 @@
 ;;This is a circular list with one element.
 ;;So if you keep popping the mode,
 ;;nothing happens.
-
+(defun reset-per-frame-and-stack ()
+  (reset-per-frame)
+  (reset-app-stack))
 (defun reset-per-frame ()
-  (setf *per-frame* *null-per-frame*)
+  (setf *per-frame* *null-per-frame*))
+(defun reset-app-stack ()
   (setf *app-stack* *null-app-stack*))
 (defun per-frame ()
   (funcall (car *per-frame*)))

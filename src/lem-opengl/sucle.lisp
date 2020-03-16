@@ -1,51 +1,39 @@
 (in-package :lem-sucle)
 
 (defparameter *saved-session* nil)
-(defun input-loop (&optional (editor-thread lem-sucle::*editor-thread*))
-  (setf application::*main-subthread-p* nil)
-  (multiple-value-bind (width height) (window-size)
-    (application::main
-     (lambda ()
-       (init)
-       (block out
-	 (handler-case
-	     (let ((out-token (list "good" "bye")))
-	       (catch out-token
-		 (loop
-		    (livesupport:update-repl-link)
-		    (livesupport:continuable
-		      (per-frame editor-thread out-token)))))
-	   (exit-editor (c) (return-from out c)))))
-     :width width
-     :height height
-     :title "lem is an editor for Common Lisp"
-     :resizable t)))
 
+(defun lem-opengl-app ()
+  (sucle::push-mode 'per-frame2)
+  (init)
+  (block out
+    (handler-case (sucle::default-loop)
+      (exit-editor (c) (return-from out c)))))
 
 (defparameter *last-scroll* 0)
 (defparameter *scroll-difference* 0)
 (defparameter *scroll-speed* 5)
 (defparameter *run-sucle* nil)
-(defun per-frame (editor-thread out-token)
+(defun per-frame2 ()
+  (livesupport:update-repl-link)
+  (livesupport:continuable
+    (per-frame)))
+
+(defun per-frame (&optional (editor-thread lem-sucle::*editor-thread*))
   (declare (ignorable editor-thread))
   (application::on-session-change *saved-session*
     (window::set-vsync t))
-  (application:poll-app)
   (when *run-sucle*
-    (unwind-protect
-	 (application::with-quit-token ()
-	   (funcall sucle::*sucle-app-function*))
-      (setf *run-sucle* nil)
-      (window:get-mouse-out)))
+    (sucle::subapp 'sucle::sucle-app)
+    (setf *run-sucle* nil))
   (let ((newscroll (floor window::*scroll-y*)))
     (setf *scroll-difference* (- newscroll *last-scroll*))
     (setf *last-scroll* newscroll))
   
   (handler-case
       (progn
-	(when window::*status*
+	(when nil
 	  ;;(bt:thread-alive-p editor-thread)
-	  (throw out-token nil))
+	  (application::quit))
 	(ncurses-clone-for-lem::maybe-resize-and-resize-stdscr)
 	(when *resized-p*
 	  (setf *resized-p* nil)
