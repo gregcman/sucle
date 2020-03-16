@@ -105,14 +105,15 @@
 	     (when (window:button :key :repeat #\n)
 	       (print "removing mode")
 	       ;;FIXME::will this pop too many modes?
-	       ;(pop-mode)
+	       (pop-mode)
 	       )
 	     (when (window:button :key :repeat #\q)
 	       (print "quitting")
 	       (application:quit))
 	     (when (window:button :key :pressed #\p)
 	       (let ((*print-circle* t))
-		 (print *per-frame*)))))
+		 (print *per-frame*)
+		 (print *app-stack*)))))
     (enter #'app-entry)))
 
 ;;;;
@@ -131,23 +132,39 @@
   (loop
      (application:poll-app)
      (per-frame)))
+;;Popping the last node of the stack is equivalent to quitting,
+;;because of the default-per-frame that quits app.
+
+;;A subapp is like a copy of the app,
+;;glfw3 window and all, within the app?
+
+(defun unit-circular-list (item)
+  (let ((cell (list item)))
+    (setf (cdr cell) cell)
+    cell))
+(defun circular-per-frame ()
+  (unit-circular-list 'default-per-frame))
+(defparameter *null-per-frame* (circular-per-frame))
+(defparameter *null-app-stack* (unit-circular-list *null-per-frame*))
+(defparameter *per-frame* *null-per-frame*)
+(defparameter *app-stack* *null-app-stack*)
+(defun save-modes-to-app-stack ()
+  (push *per-frame* *app-stack*)
+  (reset-per-frame))
+(defun restore-modes-to-app-stack ()
+  (setf *per-frame* (pop *app-stack*)))
 
 (defun subapp (fun)
   ;;The application is both a mode
   ;;and a means of quitting.
   (labels ((this-function ()
 	     ;;(print "running")
-	     (unwind-protect (application::with-quit-token ()
-			       (funcall fun))
-	       ;;Pop this function off the execution stack.
-	       (let ((popped nil))
-		 (loop :named out :do
-		    (let ((obj (pop-mode)))
-		      (push obj popped)
-		      (when (eq #'this-function obj)
-			(return-from out))))
-		 ;;(format t "popped ~a" (length popped))
-		 ))))
+	     (unwind-protect
+		  (progn (save-modes-to-app-stack)
+		    (application::with-quit-token ()
+		      (funcall fun)))
+	       (restore-modes-to-app-stack)
+	       (pop-mode))))
     (push-mode #'this-function)))
 
 (defun default-per-frame ()
@@ -156,13 +173,10 @@
 ;;This is a circular list with one element.
 ;;So if you keep popping the mode,
 ;;nothing happens.
-(defun circular-per-frame ()
-  (let ((cell (list 'default-per-frame)))
-    (setf (cdr cell) cell)
-    cell))
+
 (defun reset-per-frame ()
-  (setf *per-frame* (circular-per-frame)))
-(defparameter *per-frame* (circular-per-frame))
+  (setf *per-frame* *null-per-frame*)
+  (setf *app-stack* *null-app-stack*))
 (defun per-frame ()
   (funcall (car *per-frame*)))
 (defun push-mode (mode)
@@ -421,6 +435,8 @@
 ;;Ripped from sucle-test essentially.
 (defparameter *view*
   (ncurses-clone:ncurses-newwin 5 50 0 0))
+(defun menu-app ()
+  (default-loop))
 (defun menu-mode-per-frame ()
   (ncurses-clone-for-lem::easy-frame 1 1 10 10 *view*)
   (simulate-menu *menu*)
@@ -464,6 +480,10 @@
       ,(lambda () (application:quit)))
      ((:key :pressed #\Escape) .
       ,(lambda () (application:quit)))
+     ((:key :pressed #\p) .
+      ,(lambda () (pop-mode)))
+     ((:key :pressed #\o) .
+      ,(lambda () (push-mode 'menu-mode-per-frame)))
      ((:key :pressed #\s) .
       ,(lambda ()
 	 (push-mode 'sucle-per-frame)))
