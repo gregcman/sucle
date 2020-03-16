@@ -189,12 +189,12 @@ gl_FragColor = color;
 	     #+nil
 	     (let ((value (random 256)))
 	       (foliage-color value (random (1+ value))))))
-      (modify-greens 80 192 :color
+      (modify-greens 5 12 :color
 		     (color)
 		    
 		     ;(foliage-color 255 0)
 		     :terrain terrain)
-      (modify-greens 0 240 :color
+      (modify-greens 0 15 :color
 		     (color)
 		     
 		     ;(foliage-color 255 0)
@@ -210,19 +210,21 @@ gl_FragColor = color;
   (defun modify-greens (xpos ypos
 			&key
 			  (color #(0 0 0 0))
-			  (terrain (error "no image"))
-			  (height 256)
-			  (texheight 16))
-    ;;#+nil
-    (setf xpos (* 2 xpos)
-	  ypos (* 2 ypos)
-	  height (* 2 height)
-	  texheight (* 2 texheight))
-    (dobox ((x xpos (+ texheight xpos))
-	    (y ypos (+ texheight ypos)))
-	   ((lambda (vecinto other)
-	      (map-into vecinto (lambda (a b) (truncate (* a b) height)) vecinto other))
-	    (getapixel (- (- height 1) y) x terrain) color))))
+			  (terrain (error "no image")))
+    (let* (;;Assume texture is a square grid of squares
+	   (size (round (sqrt (/ (array-total-size terrain) 4))))
+	   (cell-size (/ size 16)))
+ 
+      (setf xpos (* xpos cell-size)
+	    ypos (* ypos cell-size))
+      (dobox ((x xpos (+ cell-size xpos))
+	      (y ypos (+ cell-size ypos)))
+	     (let ((vecinto (getapixel (- (- size 1) y)
+				       x terrain)))
+	       (map-into vecinto (lambda (a b)
+				   (truncate (* a b) 256))
+			 vecinto
+			 color))))))
 
 (defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
   (let ((denominator (+ (*

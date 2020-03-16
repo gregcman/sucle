@@ -212,3 +212,8 @@ global variables essentially
 ;;cl-steamworks?
 ;;lem-lisp-mode has a *wait-message-thread* -> does this cause the game to stall?
 ;;grep -r "\-thread\*"
+
+;;double jump
+;;wacky world generation
+;;minecraft integration?
+;;sqlite database for storing objects
