@@ -92,32 +92,28 @@
      (when world:*persist*
        (world:msave)))))
 
-(defun test23 ()
-  (labels ((app-entry ()
-	     (push-mode #'app)
-	     (default-loop))
-	   (app ()
-	     (when (window:button :key :repeat #\u)
-	       (print "going up!")
-	       (subapp #'app-entry))
-	     (when (window:button :key :repeat #\m)
-	       (print "another mode")
-	       (app-entry))
-	     (when (window:button :key :repeat #\n)
-	       (print "removing mode")
-	       ;;FIXME::will this pop too many modes?
-	       (pop-mode)
-	       )
-	     (when (window:button :key :repeat #\q)
-	       (print "quitting")
-	       (application:quit))
-	     (when (window:button :key :pressed #\p)
-	       (let ((*print-circle* t))
-		 (print *per-frame*)
-		 (print *app-stack*)))))
-    (enter #'app-entry)))
-
 ;;;;
+
+#+nil
+(defun start ()
+  (application:main
+   (lambda ()
+     (call-with-world-meshing-lparallel 
+      (lambda ()
+	(loop
+	   (application:poll-app)
+	   (per-frame)))))
+   :width 720
+   :height 480
+   :title "conceptually simple block game"))
+#+nil
+(defun load-world-again (name)
+  (setf world:*persist* nil)
+  (setf world:*world-directory* name)
+  (load-world t))
+
+
+;;;;************************************************************************;;;;
 (defun enter (&optional (app 'default-per-frame))
   (reset-per-frame-and-stack)
   (subapp app)
@@ -197,80 +193,71 @@
   (pop-mode)
   (push-mode mode))
 
-;;;;
-
-#+nil
-(defun start ()
-  (application:main
-   (lambda ()
-     (call-with-world-meshing-lparallel 
-      (lambda ()
-	(loop
-	   (application:poll-app)
-	   (per-frame)))))
-   :width 720
-   :height 480
-   :title "conceptually simple block game"))
-#+nil
-(defun load-world-again (name)
-  (setf world:*persist* nil)
-  (setf world:*world-directory* name)
-  (load-world t))
+;;test
+(defun test-for-modes ()
+  (labels ((app-entry ()
+	     (push-mode #'app)
+	     (default-loop))
+	   (app ()
+	     (when (window:button :key :repeat #\u)
+	       (print "going up!")
+	       (subapp #'app-entry))
+	     (when (window:button :key :repeat #\m)
+	       (print "another mode")
+	       (app-entry))
+	     (when (window:button :key :repeat #\n)
+	       (print "removing mode")
+	       ;;FIXME::will this pop too many modes?
+	       (pop-mode)
+	       )
+	     (when (window:button :key :repeat #\q)
+	       (print "quitting")
+	       (application:quit))
+	     (when (window:button :key :pressed #\p)
+	       (let ((*print-circle* t))
+		 (print *per-frame*)
+		 (print *app-stack*)))))
+    (enter #'app-entry)))
 
 ;;;;************************************************************************;;;;
 
+(defparameter *raw-mouse-x* 0.0d0)
+(defparameter *raw-mouse-y* 0.0d0)
+(defun cursor-motion-difference
+    (&optional (x window:*mouse-x*) (y window:*mouse-y*))
+  ;;Return the difference in position of the last time the
+  ;;cursor was observed.
+  ;;*raw-mouse-x* and *raw-mouse-y* hold the last value
+  ;;of the cursor.
+  (multiple-value-prog1
+      (values (- x *raw-mouse-x*)
+	      (- y *raw-mouse-y*))
+    (setf *raw-mouse-x* x
+	  *raw-mouse-y* y)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;************************************************************************;;;;
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
+(defparameter *mouse-x* 0.0d0)
+(defparameter *mouse-y* 0.0d0)
+(defparameter *lerp-mouse-x* 0.0d0)
+(defparameter *lerp-mouse-y* 0.0d0)
+(defun update-moused (clamp &optional (smoothing-factor 1.0))
+  (multiple-value-bind (dx dy) (cursor-motion-difference)
+    (let ((x (+ *mouse-x* dx))
+	  (y (+ *mouse-y* dy)))
+      ;;So looking straight up stops.
+      (when (> y clamp)
+	(setf y clamp))
+      ;;So looking straight down stops
+      (let ((negative (- clamp)))
+	(when (< y negative)
+	  (setf y negative)))
+      (setf *mouse-x* x)
+      (setf *mouse-y* y)))
+  ;;*lerp-mouse-x* and *lerp-mouse-y* are used
+  ;;for camera smoothing with the framerate.
+  (setf *lerp-mouse-x* (alexandria:lerp smoothing-factor *lerp-mouse-x* *mouse-x*))
+  (setf *lerp-mouse-y* (alexandria:lerp smoothing-factor *lerp-mouse-y* *mouse-y*)))
 (defparameter *mouse-multiplier* 0.002617)
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
-(defun moused (&optional (data (load-time-value (cons 0.0d0 0.0d0))))
-  (multiple-value-bind (x y) (values window:*mouse-x* window:*mouse-y*)
-    (multiple-value-prog1
-	(values (- x (car data))
-		(- y (cdr data)))
-	(setf (car data) x
-	      (cdr data) y))))
-(progn
-  (defparameter *tmouse-x* 0.0d0)
-  (defparameter *tmouse-y* 0.0d0)
-  (defparameter *prev-tmouse-x* 0.0d0)
-  (defparameter *prev-tmouse-y* 0.0d0)
-  (defparameter *lerp-mouse-x* 0.0d0)
-  (defparameter *lerp-mouse-y* 0.0d0)
-  (defparameter *lerp-mouse-x0* 0.0d0)
-  (defparameter *lerp-mouse-y0* 0.0d0)
-  (defun update-moused (clamp &optional (smoothing-factor 1.0))
-    (multiple-value-bind (dx dy) (moused)
-      (let ((x (+ *tmouse-x* dx))
-	    (y (+ *tmouse-y* dy)))
-	(when (> y clamp)
-	  (setf y clamp))
-	(let ((negative (- clamp)))
-	  (when (< y negative)
-	    (setf y negative)))
-	(setf *prev-tmouse-x* *tmouse-x*)
-	(setf *prev-tmouse-y* *tmouse-y*)
-	(setf *tmouse-x* x)
-	(setf *tmouse-y* y)
-	(setf *lerp-mouse-x0* (alexandria:lerp smoothing-factor
-					      *prev-tmouse-x*;;*lerp-mouse-x*
-					      *tmouse-x*))
-	(setf *lerp-mouse-y0* (alexandria:lerp smoothing-factor
-					      *prev-tmouse-y*;;*lerp-mouse-y*
-					      *tmouse-y*))
-	(let ((smoothing-factor2 1.0))
-	  (setf *lerp-mouse-x* (alexandria:lerp smoothing-factor2
-						*lerp-mouse-x*
-						*lerp-mouse-x0*))
-	  (setf *lerp-mouse-y* (alexandria:lerp smoothing-factor2
-						*lerp-mouse-y*
-						*lerp-mouse-y0*)))))))
 
 (defun unit-pitch-yaw (pitch yaw &optional (result (sb-cga:vec 0.0 0.0 0.0)))
   (let ((cos-pitch (cos pitch)))
@@ -297,8 +284,11 @@
   (setf (camera-matrix:camera-frustum-far camera) (* 1024.0 256.0))
   (camera-matrix:update-matrices camera))
 
+;;;;************************************************************************;;;;
 ;;emacs-like modes
 (defparameter *active-modes* ())
+(defun reset-all-modes ()
+  (setf *active-modes* nil))
 (defun enable-mode (mode)
   (pushnew mode *active-modes* :test 'equal))
 (defun disable-mode (mode)
@@ -309,7 +299,7 @@
   (if p
       (enable-mode mode)
       (disable-mode mode)))
-;;;
+;;;;************************************************************************;;;;
 
 (defparameter *last-session* nil)
 (defparameter *session* nil)
@@ -324,6 +314,7 @@
     (world:set-chunk-coordinate-center x y z))
   (livesupport:update-repl-link)
   (application:on-session-change *session*
+    (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
     (world:load-world t))
@@ -350,8 +341,6 @@
   (when (mode-enabled-p :god-mode)
     (run-buttons *god-keys*))
   (when (mode-enabled-p :movement-mode)
-    ;;FIXME -> select-block-with-scroll-wheel should use events instead?
-    (select-block-with-scroll-wheel)
     ;;Set the sneaking state
     (setf (entity-sneak? *ent*)
 	  (cond
@@ -449,7 +438,7 @@
   (complete-render-tasks)
   (dispatch-mesher-to-dirty-chunks))
 
-
+;;;;************************************************************************;;;;
 ;;Ripped from sucle-test essentially.
 (defparameter *view*
   (ncurses-clone:ncurses-newwin 5 50 0 0))
@@ -545,6 +534,7 @@ Press q/escape to quit
      (:clear "" 0 0  :bold t))
     ()))
 ;;;MENU
+;;;;************************************************************************;;;;
 (defparameter *sky-color*
   (mapcar 'utility:byte/255
 	  ;;'(0 0 0)
@@ -573,14 +563,7 @@ Press q/escape to quit
      (aref pos 1)
      (aref pos 2))))
 
-(defparameter *blockid* 1)
-(defun select-block-with-scroll-wheel ()
-  (setf *blockid*
-	(let ((seq
-	       #(3 13 12 24 1 2 18 17 20 5 89)))
-	  (elt seq (mod (round window:*scroll-y*)
-			(length seq))))))
-
+(defparameter *blockid* (block-data:lookup :planks))
 
 (defparameter *ent* nil)
 (defparameter *ticks* 0)
@@ -652,7 +635,9 @@ Press q/escape to quit
 	;;Flush changes to the mouse so
 	;;moving the mouse while not captured does not
 	;;affect the camera
-	(moused)))))
+	;;FIXME::not implemented.
+	;;(moused)
+	))))
 (defparameter *god-keys*
   `(;;Toggle noclip with 'v'
     ((:key :pressed #\v) .
@@ -748,3 +733,14 @@ Press q/escape to quit
     *sky-color2*
     *sky-color*)
 ;;;;
+#+nil
+(defun select-block-with-scroll-wheel ()
+  (setf *blockid*
+	(let ((seq
+	       #(3 13 12 24 1 2 18 17 20 5 89)))
+	  (elt seq (mod (round window:*scroll-y*)
+			(length seq))))))
+
+;;FIXME -> select-block-with-scroll-wheel should use events instead?
+#+nil
+(select-block-with-scroll-wheel)
