@@ -82,7 +82,7 @@
    ;;:running = in the process of running
    ;;:aborted = aborted from the running function
    ;;:killed = killed from a separate thread
-   ;;:completed = finished normally
+   ;;:complete = finished normally
    (status nil)
    ;;Turn on the lock with 'with-locked-job-task while modifiying this task's values
    (lock (bordeaux-threads:make-recursive-lock))

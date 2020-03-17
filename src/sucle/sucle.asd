@@ -25,16 +25,21 @@
    #:alexandria  
    ;;for world-generation
    #:black-tie
-   )
+   #:ncurses-clone-for-lem
+   #:livesupport
+
+   #:sqlite)
   :serial t
   :components 
   (
    (:file "queue")
    (:file "voxel-chunks")
    (:file "package")
+   (:file "util")
    ;;(:file "block-light") ;;light propogation
    (:file "mesher")
    (:file "block-data")
+   (:file "database")
    (:file "world")
    (:file "extra")
    (:file "physics")

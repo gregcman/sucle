@@ -51,15 +51,9 @@
   (lem.term:term-set-background color-name))
 
 (defun display-width ()
-  (max 5
-       ncurses-clone:*columns*
-       ;;charms/ll:*cols*
-       ))
+  (max 5 (ncurses-clone:stdscr-columns)))
 (defun display-height ()
-  (max 3
-       ncurses-clone:*lines*
-       ;;charms/ll:*lines*
-       ))
+  (max 3 (ncurses-clone:stdscr-lines)))
 (defun make-view (x y width height use-modeline)
   (flet ((newwin (nlines ncols begin-y begin-x main-screen)
            (declare (ignore main-screen))

@@ -1,8 +1,6 @@
 (defpackage #:ncurses-clone
   (:use #:cl)
   (:export
-   #:*columns*
-   #:*lines*
    #:with-virtual-window-lock
    #:ncurses-wresize
    #:*std-scr*
@@ -45,7 +43,14 @@
    #:ncurses-vline
    #:ncurses-move
    #:print-virtual-window
-   #:with-attributes))
+   #:with-attributes
+
+   #:win-cols
+   #:win-lines
+   #:win-x
+   #:win-y
+   #:stdscr-columns
+   #:stdscr-lines))
 (in-package :ncurses-clone)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -344,27 +349,15 @@
 ;;;;The virtual window
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defparameter *columns* 80)
-(defparameter *lines* 25)
+(defparameter *std-scr* (ncurses-newwin 25 80 0 0))
+(defun stdscr-columns ()
+  (ncurses-clone:win-cols ncurses-clone:*std-scr*))
+(defun stdscr-lines ()
+  (ncurses-clone:win-lines ncurses-clone:*std-scr*))
 
-(defparameter *std-scr* (ncurses-newwin *lines* *columns* 0 0))
-
-#+nil
-(defun make-virtual-window ()
-  (let ((array (make-array *lines*)))
-    (dotimes (i (length array))
-      (setf (aref array i)
-	    (make-array *columns*
-			:initial-element *clear-glyph*)))
-    array))
-#+nil
-(defparameter *virtual-window* (make-virtual-window))
 (defparameter *virtual-window-lock* (bt:make-recursive-lock))
 (defun set-virtual-window (x y value)
-  (setf (ref-grid x y (win-data *std-scr*)) value)
-  #+nil
-  (setf (aref (aref *virtual-window* y) x)
-	value))
+  (setf (ref-grid x y (win-data *std-scr*)) value))
 
 (defmacro with-virtual-window-lock (&body body)
   `(bt:with-recursive-lock-held (*virtual-window-lock*)
@@ -414,13 +407,17 @@
 	(win-y win) y))
 
 (defun ncurses-wresize (win height width)
-  (setf (win-lines win) height
-	(win-cols win) width)
-  (let ((old-data (win-data win))
-	(new-grid (make-grid height width)))
-    (transfer-data old-data new-grid)
-    (setf (win-data win)
-	  new-grid)))
+  (cond ((or (/= (win-lines win) height)
+	     (/= (win-cols win) width))
+	 (setf (win-lines win) height
+	       (win-cols win) width)
+	 (let ((old-data (win-data win))
+	       (new-grid (make-grid height width)))
+	   (transfer-data old-data new-grid)
+	   (setf (win-data win)
+		 new-grid))
+	 t)
+	(t nil)))
 
 #+nil
 (defparameter *mouse-enabled-p* nil)

@@ -14,32 +14,37 @@
    #:update-matrices))
 (in-package #:camera-matrix)
 
-(defstruct camera
-  (vec-position (sb-cga:vec 0.0 0.0 0.0) :type sb-cga:vec)
+(struct-to-clos:struct->class 
+ (defstruct camera
+   (vec-position (sb-cga:vec 0.0 0.0 0.0) :type sb-cga:vec)
 
-  (vec-up (sb-cga:vec 0.0 1.0 0.0) :type sb-cga:vec)
-  (vec-forward (sb-cga:vec 1.0 0.0 0.0) :type sb-cga:vec)
+   (vec-up (sb-cga:vec 0.0 1.0 0.0) :type sb-cga:vec)
+   (vec-forward (sb-cga:vec 1.0 0.0 0.0) :type sb-cga:vec)
 
-  (vec-noitisop (sb-cga:vec 0.0 0.0 0.0) :type sb-cga:vec) ;;;the negative of position
-  (matrix-player (sb-cga:identity-matrix)) ;;positional information of camera
-  (matrix-view (sb-cga:identity-matrix))		    ;;view matrix
-  (matrix-projection (sb-cga:identity-matrix))	    ;;projection matrix
-  (matrix-projection-view (sb-cga:identity-matrix)) ;;projection * view matrix
-  (matrix-projection-view-player (sb-cga:identity-matrix))
-  
-  (fov (coerce (/ pi 2.0) 'single-float) :type single-float)
+   (vec-noitisop (sb-cga:vec 0.0 0.0 0.0) :type sb-cga:vec) ;;;the negative of position
+   (matrix-player (sb-cga:identity-matrix)) ;;positional information of camera
+   (matrix-view (sb-cga:identity-matrix))		    ;;view matrix
+   (matrix-projection (sb-cga:identity-matrix))	    ;;projection matrix
+   (matrix-projection-view (sb-cga:identity-matrix)) ;;projection * view matrix
+   (matrix-projection-view-player (sb-cga:identity-matrix))
+   
+   (fov (coerce (/ pi 2.0) 'single-float) :type single-float)
 
-  (aspect-ratio 1.0 :type single-float)
-  (frustum-near 0.0078125 :type single-float)
-  (frustum-far 128.0 :type single-float))
+   (aspect-ratio 1.0 :type single-float)
+   (frustum-near 0.0078125 :type single-float)
+   (frustum-far 128.0 :type single-float)
+
+   ;;The normals of each plane.
+   ;;one is vec-forward, another -vec-forward
+   planes))
 
 (defun projection-matrix (result camera)
-  (let ((fovy (camera-fov camera))
+  (let ((half-fovy (* 0.5 (camera-fov camera)))
 	(aspect (camera-aspect-ratio camera))
 	(near (camera-frustum-near camera))
 	(far (camera-frustum-far camera)))
-    (let ((cot (/ (cos (/ fovy 2.0))
-		  (sin (/ fovy 2.0)))))
+    (let ((cot (/ (cos half-fovy)
+		  (sin half-fovy))))
       (let ((sum (+ far near))
 	    (difference (- near far)))
 	;;[FIXME]necessary?

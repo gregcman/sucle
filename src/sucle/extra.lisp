@@ -80,7 +80,7 @@
   (let ((miny
 	 (aabbcc:aabb-miny
 	  (entity-aabb *ent*))))
-    (with-vec (x y z) ((player-position))
+    (with-vec (x y z) ((player-position *ent*))
       (values (floor x)
 	      (1- (floor (+ miny y)))
 	      (floor z)))))
@@ -184,7 +184,7 @@
 	  *x*
 	  *y*
 	  *z*
-	  (nick :glass;:planks
+	  (nick :grass
 		))))
 (defun get-chunk (x y z)
   (multiple-value-bind (x y z) (voxel-chunks:chunk-coordinates-from-block-coordinates x y z)

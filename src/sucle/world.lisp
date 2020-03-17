@@ -78,23 +78,46 @@
 (defun world-path (&optional (path *world-directory*) (base-dir *some-saves*))
   (utility:rebase-path path base-dir))
 
-(defun savechunk (chunk position &optional (path (world-path)))
+(defun savechunk (chunk position &optional (path (world-path))
+				   )
+  (declare (ignorable path))
   ;;[FIXME]undocumented swizzling and multiplication by 16, as well as loadchunk
   (let ((filename (convert-object-to-filename (chunk-coordinate-to-filename position))))
     ;;(format t "~%Saving chunk ~a" filename)
-    (sucle-serialize:save
-     (merge-pathnames
-      filename
-      path)
-     (list
-      (voxel-chunks:chunk-data chunk)))))
+    (let ((data
+	   (sucle-serialize::encode-zlib-conspack-payload 
+	    (list
+	     (voxel-chunks:chunk-data chunk)))))
+      (database::with-open-database2
+	(;;sucle-serialize:save
+	 database::add
+	 (progn
+	   ;;merge-pathnames
+	   filename
+	   ;;path
+	   )
+	 data)))))
 
-(defun loadchunk (chunk-coordinates &optional (path (world-path)))
-  (let ((data
-	 (sucle-serialize:load
-	  (merge-pathnames (convert-object-to-filename
-			    (chunk-coordinate-to-filename chunk-coordinates))
-			   path))))
+(defun newload (file-name)
+  (let ((stuff (database::retreive file-name)))
+    (when stuff
+      (sucle-serialize::decode-zlib-conspack-payload stuff))))
+
+(defun loadchunk (chunk-coordinates &optional (path (world-path))
+				      )
+  (declare (ignorable path))
+  (let* ((the-path
+	  (progn
+	    ;;merge-pathnames
+	    (convert-object-to-filename
+	     (chunk-coordinate-to-filename chunk-coordinates))
+	    ;;path
+	    ))
+	 (data
+	  (database::with-open-database2
+	    (;;sucle-serialize:load
+	     newload
+	     the-path))))
     (case (length data)
       (0
        ;;if data is nil, just load an empty chunk
@@ -436,14 +459,20 @@
 		)
 	       (t
 		;;otherwise, if there is a preexisting file, destroy it
-		(let ((chunk-save-file
-		       ;;[FIXME]bad api?
-		       (merge-pathnames
-			(convert-object-to-filename (chunk-coordinate-to-filename key))
-			(world-path))))
-		  (let ((file-exists-p (probe-file chunk-save-file)))
-		    (when file-exists-p
-		      (delete-file chunk-save-file)))))))
+		(let ((name (convert-object-to-filename (chunk-coordinate-to-filename key))))
+		  (database::with-open-database2
+		    (database::delete-entry name))
+		  #+nil
+		  (let ((chunk-save-file
+			 ;;[FIXME]bad api?
+			 (merge-pathnames
+			  name
+			  (world-path))))
+		    
+		    #+nil
+		    (let ((file-exists-p (probe-file chunk-save-file)))
+		      (when file-exists-p
+			(delete-file chunk-save-file))))))))
 	   :data job-key
 	   :callback (lambda (job-task)
 		       (declare (ignorable job-task))
@@ -490,33 +519,37 @@
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
-		  (let* ((job-key (car (sucle-mp:job-task-data job-task)))
-			 (key (cdr job-key))
-			 (chunk
-			  (cdr (sucle-mp:job-task-data job-task))))
-		    ;;[FIXME]? locking is not necessary if the callback runs in the
-		    ;;same thread as the code which changes the chunk-array and *chunks* ?
-		    (cond
-		      ((eq chunk :skipping)
-		       ;;(format t "~%chunk skipped loading, ")
-		       )
-		      (t
+		  (cond
+		    ((eq :complete (sucle-mp::job-task-status job-task))
+		     (let* ((job-key (car (sucle-mp:job-task-data job-task)))
+			    (key (cdr job-key))
+			    (chunk
+			     (cdr (sucle-mp:job-task-data job-task))))
+		       ;;[FIXME]? locking is not necessary if the callback runs in the
+		       ;;same thread as the code which changes the chunk-array and *chunks* ?
 		       (cond
-			 ((and (not (voxel-chunks:empty-chunk-p chunk)) (not (space-for-new-chunk-p key)))
-			  (format t "~%OMG? ~a chunk already exists" key))
-			 (t 
-			  (progn
-			    (apply #'voxel-chunks:remove-chunk-from-chunk-array key)
-			    (voxel-chunks:set-chunk-at key chunk))
-			  ;;(format t "~%making chunk ~a" key)
-
-			  ;;(voxel-chunks:set-chunk-at key new-chunk)
-
+			 ((eq chunk :skipping)
+			  ;;(format t "~%chunk skipped loading, ")
+			  )
+			 (t
 			  (cond
-			    ((voxel-chunks:empty-chunk-p chunk)
-			     ;;(background-generation key)
-			     )
-			    (t (dirty-push-around key))))))))
+			    ((and (not (voxel-chunks:empty-chunk-p chunk))
+				  (not (space-for-new-chunk-p key)))
+			     (format t "~%OMG? ~a chunk already exists" key))
+			    (t 
+			     (progn
+			       (apply #'voxel-chunks:remove-chunk-from-chunk-array key)
+			       (voxel-chunks:set-chunk-at key chunk))
+			     ;;(format t "~%making chunk ~a" key)
+
+			     ;;(voxel-chunks:set-chunk-at key new-chunk)
+
+			     (cond
+			       ((voxel-chunks:empty-chunk-p chunk)
+				;;(background-generation key)
+				)
+			       (t (dirty-push-around key)))))))))
+		    (t (print "job task bad")))
 		  (sucle-mp:remove-unique-task-key job-key)
 		  (decf *load-jobs*)))
      (incf *load-jobs*))))

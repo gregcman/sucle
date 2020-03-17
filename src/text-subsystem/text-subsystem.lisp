@@ -14,107 +14,68 @@
    #:*block-height*
    #:*text-data-what-type*
    #:change-color-lookup
-   #:color-fun
-   #:render-normal-text-indirection
-   #:with-data-shader
    #:*text-data-width*
    #:*text-data-height*
    #:char-attribute
-   #:get-text-texture
+
    #:with-text-shader
-   #:draw-fullscreen-quad))
+   #:draw-fullscreen-quad
+
+   #:text-data
+   #:indirection
+   #:font-texture
+
+   #:text-shader
+   #:use-text-shader
+   #:submit-text-data))
 (in-package #:text-sub)
 
-;;[FIXME] 256 by 256 size limit for texture
-(defparameter *text-data-height* 256)
-(defparameter *text-data-width* 256)
 (defparameter *text-data-what-type*
   ;;:framebuffer
   :texture-2d
   )
-(defparameter *text-data-type* nil)
-(glhelp:deflazy-gl text-data ()
-  (setf *text-data-type* *text-data-what-type*)
-  (let ((w *text-data-width*)
-	(h *text-data-height*))
-    (ecase *text-data-what-type*
-      (:framebuffer
-       (glhelp:make-gl-framebuffer w h))
-      (:texture-2d
-       (glhelp:wrap-opengl-texture
-	(glhelp:create-texture nil w h))))))
-(defun get-text-texture ()
-  ;;;;[FIXME] getfnc must go before, because it has side effects.
-  ;;;;are side effects and state unavoidable? a property of opengl?
-  (let ((value (deflazy:getfnc 'text-data)))
-    (ecase *text-data-type*
-      (:framebuffer (glhelp:texture value))
-      (:texture-2d (glhelp:handle value)))))
 
-(deflazy:deflazy text-shader-source2 ()
-  '(:vs
-    "
-out vec2 texcoord_out;
-in vec4 position;
-in vec2 texcoord;
-uniform mat4 projection_model_view;
-void main () {
-gl_Position = projection_model_view * position;
-texcoord_out = texcoord;
-}"
-    :frag
-    "
-in vec2 texcoord_out;
-uniform sampler2D indirection;
-uniform sampler2D text_data;
-uniform vec4[400] color_font_info_atlas;
-uniform sampler2D font_texture;
-void main () {
-vec4 ind = texture2D(indirection, texcoord_out); //indirection
-vec4 raw = texture2D(text_data, ind.ba);
-ivec4 chardata = ivec4(255.0 * raw); //where the text changes go
-//convert a 4-bit number to a vec4 of 1.0's and 0.0's
-vec4 infodata = color_font_info_atlas[384 + chardata.a];
-vec2 offset = vec2(0.5, 0.5) * infodata.xy;
-float opacity = infodata.z;
-//font atlass coordinates
-vec4 font_data = color_font_info_atlas[256 + chardata.r]; 
-//bug workaround?
-vec4 pixcolor = texture2D(font_texture,offset+vec2(0.5,1.0)*mix(font_data.xy,font_data.zw,ind.rg));
-vec4 fin = mix(color_font_info_atlas[chardata.g],color_font_info_atlas[chardata.b],pixcolor);
-gl_FragColor.rgb = fin.rgb;
-gl_FragColor.a = opacity * fin.a;
-}"
-    :attributes
-    (("position" . 0) 
-     ("texcoord" . 2))
-    :uniforms
-    ((:pmv . "projection_model_view")
-     (indirection . "indirection")
-     ;;(attributedata (:fragment-shader attributeatlas))
-     (text-data . "text_data")
-     (color-font-info-data . "color_font_info_atlas")
-     (font-texture . "font_texture"))))
+(defun make-texture-or-framebuffer (type w h)
+  (ecase type
+    (:framebuffer
+     (glhelp:make-gl-framebuffer w h))
+    (:texture-2d
+     (glhelp:wrap-opengl-texture
+      (glhelp:create-texture nil w h)))))
+;;[FIXME] 256 by 256 size limit for texture
+(defparameter *text-data-height* 256)
+(defparameter *text-data-width* 256)
+(defun make-text-data ()
+  (make-texture-or-framebuffer
+  *text-data-what-type* *text-data-width* *text-data-height*))
+(glhelp:deflazy-gl text-data () (make-text-data))
 
-(deflazy:deflazy font-png ()
-  (let ((array
-	 (img:load
-	  (sucle-temp:path "res/font.png"))))
-    (dobox ((width 0 (img:w array))
-	    (height 0 (img:h array)))
-	   (let ((value (aref array width height 0)))
-	     (setf (aref array width height 3) 255)
-	     (dotimes (i 3)
-	       (setf (aref array width height i) value))))
-    array))
-(glhelp:deflazy-gl font-texture (font-png)
-  (glhelp:wrap-opengl-texture (glhelp:create-opengl-texture-from-data font-png)))
+(glhelp:deflazy-gl
+ font-texture ()
+ (let ((font-png
+	(let ((array
+	       (img:load
+		(sucle-temp:path "res/font.png"))))
+	  (dobox ((width 0 (img:w array))
+		  (height 0 (img:h array)))
+		 (let ((value (aref array width height 0)))
+		   (setf (aref array width height 3) 255)
+		   (dotimes (i 3)
+		     (setf (aref array width height i) value))))
+	  array)))  
+   (glhelp:wrap-opengl-texture (glhelp:create-opengl-texture-from-data font-png))))
 
+;;Writing text to OpenGL via a framebuffer. disabled for now
+;;Its highly optimized, but is it solving a necessary problem?
+;;Disabled.
+#+nil
 (defparameter *trans* (sb-cga:scale* (/ 1.0 128.0) (/ 1.0 128.0) 1.0))
+#+nil
 (defun retrans (x y &optional (trans *trans*))
   (setf (aref trans 12) (/ x 128.0)
 	(aref trans 13) (/ y 128.0))
   trans)
+#+nil
 (defmacro with-data-shader ((uniform-fun rebase-fun) &body body)
   (with-gensyms (program)
     `(let ((,program (deflazy:getfnc 'flat-shader)))
@@ -133,21 +94,6 @@ gl_FragColor.a = opacity * fin.a;
 		   (retrans x y)
 		   nil)))
 	   ,@body)))))
-
-;;;;[FIXME] managing opengl state blows
-(defmacro with-text-shader ((uniform-fun) &body body)
-  (with-gensyms (program)
-    `(progn
-         (deflazy:getfnc 'render-normal-text-indirection)
-	 (deflazy:getfnc 'color-lookup)
-	 (let ((,program (deflazy:getfnc 'text-shader)))
-	   (glhelp:use-gl-program ,program)
-	   (glhelp:with-uniforms ,uniform-fun ,program
-	     (glhelp:set-uniforms-to-textures
-	      ((,uniform-fun 'indirection) (get-indirection-texture))
-	      ((,uniform-fun 'font-texture) (glhelp:handle (deflazy:getfnc 'font-texture)))
-	      ((,uniform-fun 'text-data) (get-text-texture)))
-	     ,@body)))))
 
 (defun char-attribute (bold-p underline-p opaque-p)
   (logior
@@ -239,30 +185,68 @@ gl_FragColor.a = opacity * fin.a;
     arr))
 (write-to-color-lookup 'color-fun)
 (defun change-color-lookup (color-fun)
-  (deflazy:refresh 'color-lookup)
+  (deflazy:refresh 'text-shader)
   (write-to-color-lookup color-fun))
-(glhelp:deflazy-gl color-lookup (text-shader)
-  (glhelp:use-gl-program text-shader)
-  (glhelp:with-uniforms uniform text-shader
-    (with-foreign-array (var *color-font-info-data* :float len)
-      (%gl:uniform-4fv (uniform 'color-font-info-data)
-		       (/ len 4)
-		       var))))
-(glhelp:deflazy-gl text-shader (text-shader-source2) 
-  (let ((shader (glhelp:create-gl-program2 text-shader-source2)))
-    (glhelp:use-gl-program shader)
-    (glhelp:with-uniforms uniform shader
+(glhelp:deflazy-gl
+ text-shader
+ () 
+ (let ((shader (glhelp:create-gl-program2
+		'(:vs
+		  "
+out vec2 texcoord_out;
+in vec4 position;
+in vec2 texcoord;
+uniform mat4 projection_model_view;
+void main () {
+gl_Position = projection_model_view * position;
+texcoord_out = texcoord;
+}"
+		  :frag
+		  "
+in vec2 texcoord_out;
+uniform sampler2D indirection;
+uniform sampler2D text_data;
+uniform vec4[400] color_font_info_atlas;
+uniform sampler2D font_texture;
+void main () {
+vec4 ind = texture2D(indirection, texcoord_out); //indirection
+vec4 raw = texture2D(text_data, ind.ba);
+ivec4 chardata = ivec4(255.0 * raw); //where the text changes go
+//convert a 4-bit number to a vec4 of 1.0's and 0.0's
+vec4 infodata = color_font_info_atlas[384 + chardata.a];
+vec2 offset = vec2(0.5, 0.5) * infodata.xy;
+float opacity = infodata.z;
+//font atlass coordinates
+vec4 font_data = color_font_info_atlas[256 + chardata.r]; 
+//bug workaround?
+vec4 pixcolor = texture2D(font_texture,offset+vec2(0.5,1.0)*mix(font_data.xy,font_data.zw,ind.rg));
+vec4 fin = mix(color_font_info_atlas[chardata.g],color_font_info_atlas[chardata.b],pixcolor);
+gl_FragColor.rgb = fin.rgb;
+gl_FragColor.a = opacity * fin.a;
+}"
+		  :attributes
+		  (("position" . 0) 
+		   ("texcoord" . 2))
+		  :uniforms
+		  ((:pmv . "projection_model_view")
+		   (indirection . "indirection")
+		   ;;(attributedata (:fragment-shader attributeatlas))
+		   (text-data . "text_data")
+		   (color-font-info-data . "color_font_info_atlas")
+		   (font-texture . "font_texture")))
+		)))
+   (glhelp:use-gl-program shader)
+   (glhelp:with-uniforms uniform shader
       (with-foreign-array (var *color-font-info-data* :float len)
 	(%gl:uniform-4fv (uniform 'color-font-info-data)
 			 (/ len 4)
 			 var))
-      #+nil
-      (with-foreign-array (var *attribute-bits* :float len)
-	(%gl:uniform-4fv (uniform 'attributedata)
-			 (/ len 4)
-			 var)))
+      (with-foreign-array (var *color-font-info-data* :float len)
+      (%gl:uniform-4fv (uniform 'color-font-info-data)
+		       (/ len 4)
+		       var)))
     shader))
-
+#+nil
 (glhelp:deflazy-gl flat-shader ()
   (glhelp:create-opengl-shader 
    "
@@ -284,110 +268,9 @@ gl_FragColor = value_out;
      ("value" 3))
    '((:pmv "projection_model_view"))))
 
-;;;;;;;;;;;;;;;;
-(defparameter *block-height* 16.0)
-(defparameter *block-width* 8.0)
-(defparameter *indirection-width* 0)
-(defparameter *indirection-height* 0)
-;;;;a framebuffer is faster and allows rendering to it if thats what you want
-;;;;but a texture is easier to maintain. theres no -ext framebuffer madness,
-;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
-;;;;pattern to put in it.
-(defparameter *indirection-what-type*
-  :framebuffer
-  ;;:texture-2d
-  )
-(defparameter *indirection-type* nil)
-(glhelp:deflazy-gl indirection ()
-  (setf *indirection-type* *indirection-what-type*)
-  (ecase *indirection-what-type*
-    (:framebuffer
-     (glhelp:make-gl-framebuffer
-		   *indirection-width*
-		   *indirection-height*))
-    (:texture-2d
-     (glhelp:wrap-opengl-texture
-      (glhelp:create-texture nil
-			      *indirection-width*
-			      *indirection-height*)))))
-(defun get-indirection-texture ()
-  (ecase *indirection-type*
-    (:framebuffer (glhelp:texture (deflazy:getfnc 'indirection)))
-    (:texture-2d (glhelp:handle (deflazy:getfnc 'indirection)))))
-
-;;;Round up to next power of two
-(defun power-of-2-ceiling (n)
-  (ash 1 (ceiling (log n 2))))
-(glhelp:deflazy-gl render-normal-text-indirection ((w application:w) (h application:h))
-  (let* ((upw (power-of-2-ceiling w))
-	 (uph (power-of-2-ceiling h))
-	 (need-to-update-size
-	  (not (and (= *indirection-width* upw)
-		    (= *indirection-height* uph)))))
-    (when need-to-update-size
-      (setf *indirection-width* upw
-	    *indirection-height* uph)
-      (deflazy:refresh 'indirection t))
-    (deflazy:getfnc 'indirection) ;;;refresh the indirection
-    (ecase *indirection-type*
-      (:framebuffer
-       (let ((refract (deflazy:getfnc 'indirection-shader)))
-	 (glhelp:use-gl-program refract)
-	 (glhelp:with-uniforms uniform refract
-	   (gl:uniform-matrix-4fv
-	    (uniform :pmv)
-	    (load-time-value (sb-cga:identity-matrix))
-	    nil)
-	   (gl:uniformf (uniform 'size)
-			(/ w *block-width*)
-			(/ h *block-height*))))
-       (gl:disable :cull-face)
-       (gl:disable :depth-test)
-       (gl:disable :blend)
-       (glhelp:set-render-area 0 0 upw uph)
-       (gl:bind-framebuffer :framebuffer (glhelp:handle (deflazy:getfnc 'indirection)))
-       (gl:clear :color-buffer-bit)
-       (gl:clear :depth-buffer-bit)
-       (glhelp:slow-draw (deflazy:getfnc 'fullscreen-quad)))
-      (:texture-2d
-       (gl:bind-texture :texture-2d (get-indirection-texture))
-       (cffi:with-foreign-objects ((data :uint8 (* upw uph 4)))
-	 (let* ((tempx (floatify (* upw *block-width*)))
-		(tempy (floatify (* uph *block-height*)))
-		(bazx (floatify (/ tempx w)))
-		(bazy (floatify (/ tempy h)))
-		(wfloat (floatify w))
-		(hfloat (floatify h)))
-	   (with-unsafe-speed
-	     ;;[FIXME] nonportably declares things to be fixnums for speed
-	     ;;The x and y components are independent of each other, so instead of
-	     ;;computing x and y per point, compute once per x value or v value.
-	     (dotimes (x (the fixnum upw))
-	       (let* ((tex-x (+ 0.5 (floatify x)))
-		      (barx (floor (* 255.0 (/ (mod tex-x bazx)
-					       bazx))))
-		      (foox (floor (/ (* wfloat tex-x)
-				      tempx)))
-		      (base (the fixnum (* 4 x)))
-		      (delta (the fixnum (* 4 upw))))
-		 (dotimes (y (the fixnum uph))
-		   (setf (cffi:mem-ref data :uint8 (+ base 0)) barx
-			 (cffi:mem-ref data :uint8 (+ base 2)) foox)
-		   (setf base (the fixnum (+ base delta))))))
-	     (dotimes (y (the fixnum uph))
-	       (let* ((tex-y (+ 0.5 (floatify y)))			
-		      (bary (floor (* 255.0 (/ (mod tex-y bazy)
-					       bazy))))			
-		      (fooy (floor (/ (* hfloat tex-y)
-				      tempy)))
-		      (base (the fixnum (* 4 (the fixnum (* upw y))))))
-		 (dotimes (x upw)
-		   (setf (cffi:mem-ref data :uint8 (+ base 1)) bary
-			 (cffi:mem-ref data :uint8 (+ base 3)) fooy)
-		   (setf base (the fixnum (+ base 4))))))))
-	 (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))))
 
 ;;;;;;;;;;;;;;;;;;;;
+#+nil
 (glhelp:deflazy-gl indirection-shader ()
   (glhelp:create-opengl-shader
    "
@@ -440,3 +323,293 @@ gl_FragColor = pixcolor;
 
 (defun draw-fullscreen-quad ()
   (glhelp:slow-draw (deflazy:getfnc 'fullscreen-quad)))
+
+;;;;;;;;;;;;;;;;
+(defparameter *block-height* 16.0)
+(defparameter *block-width* 8.0)
+;;[FIXME]->use the new unchanged-feature in deflazy.
+(deflazy:deflazy block-h ()
+  *block-height*)
+(deflazy:deflazy block-w ()
+  *block-width*)
+(defun block-dimension-change (&optional (w *block-width*) (h *block-height*))
+  (unless (= (deflazy:getfnc 'block-h) h)
+    (deflazy:refresh 'block-h t))
+  (unless (= (deflazy:getfnc 'block-w) w)
+    (deflazy:refresh 'block-w t)))
+
+;;;;a framebuffer is faster and allows rendering to it if thats what you want
+;;;;but a texture is easier to maintain. theres no -ext framebuffer madness,
+;;;;no fullscreen quad, no shader. just an opengl texture and a char-grid
+;;;;pattern to put in it.
+(defparameter *indirection-what-type*
+  ;;:framebuffer
+  :texture-2d
+  )
+(glhelp:deflazy-gl indirection ((w application:w)
+				(h application:h)
+				block-w
+				block-h
+				;;FIXME::these are not necessarily used,
+				;;but factor in. Be more like the
+				;;kenny-tilton cells engine?
+				;;indirection-shader
+				;;fullscreen-quad
+				)
+		   ;;Careful dealing with deflazy and OpenGL.
+		   ;;Opengl is necessarily stateful, whereas deflazy
+		   ;;tries to be more functional. The clash
+		   ;;of the two breaks the abstraction.
+  (let* ((upw (power-of-2-ceiling w))
+	 (uph (power-of-2-ceiling h))
+	 #+nil
+	 (need-to-update-size
+	  (not (and (= *indirection-width* upw)
+		    (= *indirection-height* uph)))))
+    ;;[FIXME] The size of the indirection texture does not
+    ;;need to be updated if the power of twos align.
+    #+nil
+    (when need-to-update-size
+      (setf *indirection-width* upw
+	    *indirection-height* uph)
+      (deflazy:refresh 'indirection t))
+    
+    ;;;refresh the indirection
+    (let ((indirection (make-texture-or-framebuffer *indirection-what-type* upw uph)))
+      (etypecase indirection
+	#+nil
+	(glhelp:gl-framebuffer
+	 (let ((refract indirection-shader))
+	   (glhelp:use-gl-program refract)
+	   (glhelp:with-uniforms uniform refract
+	     (gl:uniform-matrix-4fv
+	      (uniform :pmv)
+	      (load-time-value (sb-cga:identity-matrix))
+	      nil)
+	     (gl:uniformf (uniform 'size)
+			  (/ w block-w)
+			  (/ h block-h))))
+	 (gl:disable :cull-face)
+	 (gl:disable :depth-test)
+	 (gl:disable :blend)
+	 (glhelp:set-render-area 0 0 upw uph)
+	 (gl:bind-framebuffer :framebuffer (glhelp:handle indirection))
+	 (gl:clear :color-buffer-bit)
+	 (gl:clear :depth-buffer-bit)
+	 (glhelp:slow-draw fullscreen-quad))
+	(glhelp:gl-texture
+	 (gl:bind-texture :texture-2d (glhelp:handle indirection))
+	 (cffi:with-foreign-object (data :uint8 (* upw uph 4))
+	   (let* (;;tempx and tempy
+		  (uph2 (the fixnum (* 2 uph)))
+		  (upw2 (the fixnum (* 2 upw)))
+		  (tempx (* upw2 block-w))
+		  (tempy (* uph2 block-h))
+		  )
+	     ;;[FIXME] nonportably declares things to be fixnums for speed
+	     ;;The x and y components are independent of each other, so instead of
+	     ;;computing x and y per point, compute once per x value or v value.
+	     ;;[FIXME]Optmize?
+	     (loop :for x :from 0 :below upw2 :by 2 :do
+		(let* ((tex-x (* w (+ 1 x)))
+		       (mod-tex-x-tempx (mod tex-x tempx))
+		       (barx (foobar (* 255 mod-tex-x-tempx) tempx))
+		       (foox (/ (- tex-x mod-tex-x-tempx) tempx))
+		       (base (* 2 x))
+		       (delta (* 2 upw2)))
+		  (declare (type fixnum base)
+			   (type (unsigned-byte 8) barx foox)
+			   (optimize (speed 3) (safety 0)))
+		  (loop :repeat (the fixnum uph) :do
+		     ;;y
+		     (setf (cffi:mem-ref data :uint8 (+ base 0)) barx
+			   (cffi:mem-ref data :uint8 (+ base 2)) foox)
+		     (setf base (the fixnum (+ base delta))))))
+	     (loop :for y :from 0 :below uph2 :by 2 :do
+		(let* ((tex-y (* h (+ 1 y)))
+		       (mod-tex-y-tempy (mod tex-y tempy))
+		       (bary (foobar (* 255 mod-tex-y-tempy) tempy))	
+		       (fooy (/ (- tex-y mod-tex-y-tempy) tempy))
+		       (base (* upw2 y)))
+		  (declare (type fixnum base)
+			   (type (unsigned-byte 8) bary fooy)
+			   (optimize (speed 3) (safety 0)))		      
+		  (loop :repeat (the fixnum upw) :do
+		     ;;x
+		     (setf (cffi:mem-ref data :uint8 (+ base 1)) bary
+			   (cffi:mem-ref data :uint8 (+ base 3)) fooy)
+		     (setf base (the fixnum (+ base 4)))))))
+	   (gl:tex-image-2d :texture-2d 0 :rgba upw uph 0 :rgba :unsigned-byte data))))
+      indirection)))
+(defun foobar (x y)
+  ;;(floor (/ x y)) <- equivalent
+  (/ (- x (mod x y)) y)
+  )
+;;;Round up to next power of two
+(defun power-of-2-ceiling (n)
+  (ash 1 (ceiling (log n 2))))
+;;;
+(defun use-text-shader
+    (&key
+       (pmv (load-time-value (nsb-cga:identity-matrix))
+	    ;;pmv-supplied-p
+	    )
+       (indirection (glhelp:texture-like
+		     (deflazy:getfnc 'indirection))
+		    ;;indirection-supplied-p
+		    )
+       (font-texture (glhelp:handle
+		      (deflazy:getfnc 'font-texture))
+		     ;;font-texture-supplied-p
+		     )
+       (text-data (glhelp:texture-like
+		   (deflazy:getfnc 'text-data))
+		  ;;text-data-supplied-p
+		  ))
+  (deflazy:getfnc 'indirection)
+  (let ((program (deflazy:getfnc 'text-shader)))
+    (glhelp:use-gl-program program)
+    (glhelp:with-uniforms
+     uniform-fun program
+     (glhelp::set-uniform-to-texture
+      (uniform-fun 'indirection)
+      indirection
+      0)
+     (glhelp::set-uniform-to-texture
+      (uniform-fun 'font-texture)
+      font-texture
+      1)
+     (glhelp::set-uniform-to-texture
+      (uniform-fun 'text-data)
+      text-data
+      2)
+     (gl:uniform-matrix-4fv
+      (uniform-fun :pmv)
+      pmv
+      nil))))
+					;#+nil
+#+nil
+(defun text-subsystem ()
+
+  ;;variables
+  *text-data-what-type*
+  *terminal256color-lookup*
+  *block-height*
+  *block-width*
+  *indirection-what-type*
+ 
+  ;;functions
+  write-to-color-lookup
+  change-color-lookup
+  
+  ;;macro
+  with-text-shader
+  with-data-shader
+  
+  ;;deflazy
+  (let*
+      ((text-data (deflazy:lazgen text-data))
+       (text-shader (deflazy:lazgen text-shader text-shader-source2))
+       (font-texture (deflazy:lazgen font-texture font-png))  ;;   
+       
+       (flat-shader (deflazy:lazgen flat-shader))
+       (indirection (deflazy:lazgen indirection))
+       (indirection-shader (deflazy:lazgen indirection-shader))
+       (fullscreen-quad (deflazy:lazgen fullscreen-quad))))
+
+  text-data
+  font-texture
+  color-lookup
+  indirection
+  )
+
+
+#+nil
+(symbol-macrolet ((foo (foo bar)))
+  (macrolet ((yolo (form)
+	       (with-output-to-string (str)
+		 (print form str))))
+    (yolo foo)))
+
+(defun submit-text-data
+    (arr c-array-columns c-array-lines
+     &optional (texture (glhelp:texture-like (deflazy:getfnc 'text-sub:text-data))))
+  (gl:bind-texture :texture-2d texture)
+  (gl:tex-sub-image-2d :texture-2d 0 0 0
+		       c-array-columns
+		       c-array-lines
+		       :rgba :unsigned-byte arr))
+
+(struct-to-clos:struct->class
+ (defstruct port
+   text-data
+   indirection
+   x
+   y
+   w
+   h
+   sync))
+
+(defun port (&optional (x 0) (y 0) (w 100) (h 100))
+  (make-port :text-data (;;deflazy:lazgen
+			    text-data
+			    (deflazy:getfnc
+				(deflazy:singleton 'glhelp:gl-context)))
+	     :indirection (progn ;;deflazy:dlaz
+			    (apply 'indirection w h *block-width* *block-height*
+				   #+nil
+				  (deflazy:getfnc
+				      (deflazy:singleton 'indirection-shader))
+				  #+nil
+				  (deflazy:getfnc
+				      (deflazy:singleton 'fullscreen-quad))
+				  (deflazy:getfnc
+				      (deflazy:singleton 'glhelp:gl-context))
+				  ()))
+	     :x x
+	     :y y
+	     :w w
+	     :h h))
+
+(defun destroy-port (port)
+  (;;dependency-graph:annihilate
+   glhelp::gl-delete*
+   (port-text-data port))
+  (;;dependency-graph:annihilate
+   glhelp::gl-delete*
+   (port-indirection port)))
+(defmethod dependency-graph:cleanup-node-value ((obj port))
+  (destroy-port obj))
+
+(defun port-data (port)
+  (glhelp:texture-like (progn ;;deflazy:getfnc
+			   (port-text-data port))))
+(defun %port-indirection (port)
+  (glhelp:texture-like (progn ;;deflazy:getfnc
+			   (port-indirection port))))
+
+(defun draw-port (port)
+  (let (;;indirection fulfilled before anything else
+	;;because it has side effects in OpenGL
+	(indirection (%port-indirection port)))
+    (gl:polygon-mode :front-and-back :fill)
+    (gl:disable :cull-face)
+    (gl:disable :depth-test)
+    (gl:disable :blend)
+    (text-sub:use-text-shader :text-data
+			      (port-data port)
+			      :indirection
+			      indirection))
+  ;;[FIXME] unconfigurable? configuration good and bad
+  (glhelp:bind-default-framebuffer)
+  (glhelp:set-render-area
+   (port-x port)
+   (port-y port)
+   (port-w port)
+   (port-h port))
+  #+nil
+  (progn
+    (gl:enable :blend)
+    (gl:blend-func :src-alpha :one-minus-src-alpha))
+
+  (text-sub:draw-fullscreen-quad))

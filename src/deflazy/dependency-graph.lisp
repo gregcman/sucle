@@ -1,89 +1,133 @@
 (defpackage :dependency-graph
   (:use #:cl)
   (:export
-   #:*namespace*
-   #:%defnode
-   #:redefine-node
-   #:ensure-node
-   #:timestamp
+   
+   #:node-timestamp
+   #:node-value
+   #:node-state
+   #:node-dependents
+   #:node-dependencies
+   #:node-name
    #:touch-node
-   #:map-dependents2
+
+   #:remove-dependent
+   #:ensure-dependent
+   #:really-make-node
+
+   #:with-locked-lock
+   #:with-locked-node
    #:dirty-p
-   #:get-value
-   #:value
-   #:state
+   #:%get-value
+
    #:%invalidate-node
-   #:get-node))
+   #:node
+   #:do-node-dependencies
+
+   #:%redefine-node
+   #:%refresh
+   #:cleanup-node-value
+
+   #:get-mutable-cell-by-name
+   #:flush-refreshes
+   #:refresh-old-node
+   #:%%refresh
+
+   #:annihilate))
 (in-package :dependency-graph)
 
-(defclass node ()
-  ((state ;fulfilled or unfulfilled
-    :accessor state
-    :initform nil)
-   (timestamp ;last time fulfilled
-    :accessor timestamp
-    :initform 0)
-   (value
-    :accessor value
-    :initform nil)
-   (fun 
-    :accessor fun
-    :initform nil)
-   (fun-old
-    :accessor fun-old
-    :initform nil)
-   (arguments
-    :accessor arguments
-    :initform nil)
-   #+nil
-   (dependencies-symbols
-    :accessor dependencies-symbols
-    :initform nil)
-   (dependencies 
-    :accessor dependencies
-    :initform nil) 
-   (dependencies-timestamps
-    :accessor dependencies-timestamps
-    :initform nil)
-   (lock
-    :accessor lock
-    :initform (bordeaux-threads:make-recursive-lock))
-   (lock-value
-    :accessor lock-value
-    :initform nil)
-   (dependents
-    :accessor dependents
-    :initform nil)
-   #+nil
-   (height ;height of node in dependency tree
-    :accessor height
-    :initform nil)
-   (name 
-    :accessor name
-    :initform "anon")))
+(struct-to-clos:struct->class
+ (defstruct node
+   ;;The value
+   value
+   ;;Fulfilled or unfulfilled
+   state
+   ;;Last time fulfilled
+   (timestamp 0)
+   (lock (bordeaux-threads:make-recursive-lock))
+   ;;T or NIL depending on whether its currently locked
+   lock-value
+   (%data (make-hash-table :test 'eql))
+   ;;List of dependents
+   dependents
+   ;;For changing dependencies later
+   tags
+   (name "anon")))
+
+(defun node-data (node name)
+  (gethash name (node-%data node)))
+(defun (setf node-data) (new node name)
+  (setf (gethash name (node-%data node)) new))
+(defun do-node-dependencies (node fun)
+  (let ((hash (node-%data node)))
+    (utility:dohash (k v) hash
+		    (funcall fun k v))))
 
 (set-pprint-dispatch
  'node
  (lambda (stream node)
-   (write (name node) :stream stream :escape nil :case :downcase)))
+   (write (node-name node) :stream stream :escape nil :case :downcase)))
 
-(defvar *namespace* (make-hash-table :test 'eq))
+(struct-to-clos:struct->class
+ ;;more like mutable-observation-cell
+ (defstruct mutable-cell
+   result
+   observing
+   (snapshot nil) ;;what new values are tested against to see if they times this cell was written to
+   (un-changed 'equal)
+   (snapshot-key 'identity)
+   (observe 'identity)
+   ;;(funcall changed? (funcall snapshot-key value) snapshot)
+   ))
+;;observing a lisp object for changes
+;;'observe' extracts the important data from the lisp object into 'result'
+;;'unchanged' detects the difference
+;;'snapshot' stores a reduced version to test whether there is a difference 
+(set-pprint-dispatch
+ 'mutable-cell
+ ;;Example taken from sb-cga/matrix.lisp
+ (lambda (stream obj)
+   (pprint-logical-block (stream nil)
+     (print-unreadable-object (obj stream :type nil :identity nil)
+       (format stream "snapshot:~s,"
+	       (mutable-cell-snapshot obj))
+       (pprint-newline :mandatory stream)
+       (format stream "value:~s"
+	       (mutable-cell-observing obj))))))
 
-(progn
-  (defun get-node (id &optional (namespace *namespace*))
-    (gethash id namespace))
-  (defun set-node (id node &optional (namespace *namespace*))
-    (setf (gethash id namespace) node)))
+(defun mutable-cell-difference (cell &optional (new (mutable-cell-observing cell)))
+  ;;Detect whether there is a difference being observed
+  ;;and if so whether a change should occur.
+  ;;new is given as a parameter for debugging
+  (let* ((new-snapshot (funcall (mutable-cell-snapshot-key cell) new))
+	 (un-changed (funcall
+		      (mutable-cell-un-changed cell)
+		      (mutable-cell-snapshot cell)
+		      new-snapshot)))
+    (values
+     (not un-changed)
+     new-snapshot)))
+(defun touch-mutable-cell (cell)
+  ;;Observe a change
+  (multiple-value-bind (changed new-snapshot) (mutable-cell-difference cell)
+    (when changed
+      (setf (mutable-cell-snapshot cell) new-snapshot)
+      (setf (mutable-cell-result cell)
+	    (funcall (mutable-cell-observe cell)
+		     (mutable-cell-observing cell))))))
 
+;;Permanently prevent a mutable cell from updating anymore
+;;Keep in mind when used in conjuction with node,
+;;that the dependents have to be updated with (remove-dependent observing)
+(defun sterilize-mutable-cell (cell)
+  (let ((result (mutable-cell-result cell))
+	(observing (mutable-cell-observing cell)))
+    (setf (mutable-cell-observing cell) result
+	  (mutable-cell-snapshot cell) result
+	  (mutable-cell-un-changed cell) (load-time-value (constantly t))
+	  (mutable-cell-snapshot-key cell) 'identity
+	  (mutable-cell-observe cell) 'identity)))
 
-(defun ensure-node (name &optional (namespace *namespace*))
-  (or (multiple-value-bind (node existsp)
-	  (get-node name)
-	(if existsp node nil))
-      (let ((new (make-instance 'node)))
-	(set-node name new namespace)
-	new)))
-
+;;;;Locking
 (defmacro with-t (place &body body)
   `(unwind-protect
 	(progn
@@ -91,207 +135,286 @@
 	  ,@body)
      (setf ,place nil)))
 (defmacro with-locked-node ((node &optional else) &body body)
-  `(with-locked-lock (node)
-     (if (lock-value ,node)
-	 ,else
-	 (with-t (lock-value ,node)
-	   ,@body))))
+  (utility:once-only (node)
+    `(with-locked-lock (,node)
+       (if (node-lock-value ,node)
+	   ,else
+	   (with-t (node-lock-value ,node)
+	     ,@body)))))
 
 (defmacro with-locked-lock ((node) &body body)
-  `(bordeaux-threads:with-recursive-lock-held ((lock ,node))
+  `(bordeaux-threads:with-recursive-lock-held ((node-lock ,node))
      ,@body))
+;;;;
 
 (defun %get-value (node)
-  (if (state node)
-      (value node)
-      (with-locked-node (node (error "circular dependency: ~a" node))
-	(let ((dependencies (dependencies node)))
-	  (let ((args (map-into (arguments node)
-				#'%get-value
-				dependencies)))
-	    (map-into (dependencies-timestamps node)
-		      #'timestamp
-		      dependencies)
-	    #+nil
-	    (update-node-height node)
-	    (let ((value (apply (fun node)
-				args)))
-	      (prog1 value
-		(setf (value node) value)
-		(touch-node node)
-		(setf (fun-old node)
-		      (fun node))
-		(setf (state node) t))))))))
+  "fulfill a promise of the node"
+  (cond
+    (;;Node is 'fulfilled already'
+     (node-state node)
+     (node-value node))
+    (;;Node is 'unfulfilled' or dirty
+     t
+     (;;circular node is detected by detecting repeated locking of
+      ;;the same node.
+      with-locked-node (node (error "circular dependency: ~a" node))
+       ;;Update observables
+       (do-node-dependencies node
+	 (lambda (k v)
+	   (declare (ignore k))
+	   (touch-mutable-cell v)))
+       
+       (let (args)
+	 ;;Obtain arguments to send to function
+	 (let ((size (hash-table-count (node-%data node))))
+	   (dotimes (i (1- size))
+	     (push (mutable-cell-result (node-data node i))
+		   args))
+	   (setf args (nreverse args)))
 
-#+nil
-(defun update-node-height (node)
-  (setf (height node)
-	(1+ (reduce #'max (dependencies node)
-		    :key
-		    #'height
-		    :initial-value 0))))
+	 ;;apply function to collected arguments and clean up
+	 (let ((value (apply (mutable-cell-result (node-data node :function))
+			     args)))
+	   (prog1 value
+	     (setf (node-value node) value)
+	     (touch-node node)
+	     (setf (node-state node) t))))))))
 
-(defun make-node (func deps node)
+(defun get-mutable-cell-by-name (node name)
+  (let ((cell (assoc name (node-tags node))))
+    (node-data node (cdr cell))))
+
+(defun ensure-func (node)
+  (let ((mutable-cell (node-data node :function)))
+    (unless mutable-cell
+      (let ((new (make-mutable-cell)))
+	(setf (node-data node :function)
+	      new)
+	(setf mutable-cell new)))
+    mutable-cell))
+(defun really-make-node (func deps node)
   (with-locked-lock (node)
-    (with-slots (state fun dependencies) node
-      (let ((deps-same? (equal deps dependencies))
-	    (fun-same? (eq fun func))
-	    (deps-len (list-length deps)))
-	#+nil
-	(when (zerop deps-len)
-	  (setf (height node) 0))
-	(setf (arguments node)
-	      (make-list deps-len))
-	(setf (dependencies-timestamps node)
-	      (make-list deps-len :initial-element 0))
-	(unless (and deps-same?
-		     fun-same?)
-	  (setf state nil))
-	(unless fun-same?
-	  (setf fun func))
-	(unless deps-same?
-	  (setf dependencies deps))))
+    (setf (node-state node) nil)
+    ;;The function that is called when the cell is fulfilled
+    (let ((mutable-cell (ensure-func node))
+	  (witness (etypecase func
+		     (function #'identity)
+		     (symbol #'symbol-function))))
+      (setf (mutable-cell-observing mutable-cell) func
+	    (mutable-cell-observe mutable-cell) witness
+	    (mutable-cell-snapshot-key mutable-cell) witness
+	    ))
+    ;;Convert dependencies to mutable cells and store them
+    ;;in the node
+    (let ((count 0))
+      ;;funny thing with hash table storing numbers
+      (dolist (dep deps)
+	(let ((cell (make-mutable-cell :observing dep)))
+	  ;;Nodes are observed with timestamps and getting their value
+	  (typecase dep
+	    (node (setf (mutable-cell-snapshot-key cell)
+			'node-timestamp)
+		  (setf (mutable-cell-observe cell)
+			'%get-value)))
+	  (setf (node-data node count) cell)
+	  (incf count)
+	  )))
     node))
 
 (defun ensure-dependent (dependent dependency)
+  ;;dependency is a node
   (with-locked-lock (dependent)
     (with-locked-lock (dependency)
-      (symbol-macrolet ((place (dependents dependency)))
+      (symbol-macrolet ((place (node-dependents dependency)))
 	(unless (find dependent place)
 	  (push dependent place))))))
 (defun remove-dependent (dependent dependency)
+  ;;dependency is a node
   (with-locked-lock (dependent)
     (with-locked-lock (dependency)
-      (symbol-macrolet ((place (dependents dependency)))
+      (symbol-macrolet ((place (node-dependents dependency)))
 	(setf place (delete dependent place))))))
 
-(defun redefine-node (fun deps name &optional (namespace *namespace*))
-  (let ((dependencies (mapcar (lambda (x) (ensure-node x namespace)) deps))
-	(node (ensure-node name namespace)))
-    (with-locked-lock (node)
-      (let ((old-dependencies (dependencies node)))
-	#+nil
-	(setf (dependencies-symbols node) deps)
-	(setf (name node) name)
-	(map nil (lambda (x) (remove-dependent node x)) (set-difference old-dependencies dependencies))
-	(map nil (lambda (x) (ensure-dependent node x)) (set-difference dependencies old-dependencies))
-	(make-node fun dependencies node)
-	node))))
-
-(defun %defnode (deps body)
-  (let ((lambda-args ())
-	(node-deps ()))
-    (dolist (item deps)
-      (if (symbolp item)
-	  (progn (push item lambda-args)
-		 (push item node-deps))
-	  (destructuring-bind (var dep) item
-	    (push var lambda-args)
-	    (push dep node-deps))))
-    (values `(lambda ,lambda-args ,@body)
-	    node-deps)))
-
 (defun touch-node (node)
-  (incf (timestamp node)))
-
-(defun %invalidate-node (node)
-  (with-slots ((state state)) node
-    (touch-node node)
-    (setf state nil)))
-
-(defmacro any (&rest forms)
-  (nth (random (length forms)) forms))
+  (incf (node-timestamp node)))
 
 (defun dirty-p (node)
-  (with-slots (dependencies-timestamps dependencies fun fun-old) node
-    (or (not (eq fun fun-old))
-	(block nil
-	  (do ((stamp dependencies-timestamps (cdr stamp))
-	       (arg dependencies (cdr arg)))
-	      ((not (any arg
-			 stamp))
-	       nil)
-	      ;;;iterate old timestamps and see if any differ now
-	    (when (not (= (car stamp)
-			  (timestamp (car arg))))
-	      (return t)))))))
+  ;;Iterate through all the dependencies,
+  ;;if there is a difference detected,
+  ;;then it is dirty.
+  (do-node-dependencies node
+    (lambda (k v)
+      (declare (ignorable k))
+      (when (mutable-cell-difference v)
+	(return-from dirty-p (values t v))))))
 
-;;;;convenience stuff below
+(defun remove-all-dependencies (node)
+  (do-node-dependencies node
+    (lambda (k v)
+      (declare (ignorable k))
+      (let ((observing (mutable-cell-observing v)))
+	(when (typep observing 'node)
+	  (remove-dependent node observing)))
+      )))
+(defun remove-all-dependents (node)
+  (dolist (dependent (node-dependents node))
+    (remove-dependent dependent node)))
+;;;
+(defun %redefine-node (fun node dependencies &optional name tags)
+  (with-locked-lock (node)
+    (setf (node-tags node) tags)
+    #+nil
+    (setf (dependencies-symbols node) deps)
+    (setf (node-name node) name)
+    ;;FIXME::Inelegant, way to update dependencies. Just eliminate
+    ;;all the old dependencies and rebuild.
+    
+    ;;Remove all current dependents
+    (remove-all-dependencies node)
+    ;;Rebuild dependents
+    (map nil (lambda (x)
+	       (when (typep x 'node)
+		 (ensure-dependent node x)))
+	 dependencies)
+    
+    #+nil
+    (let ((old-dependencies (node-dependencies node)))
+      #+nil
+      (map nil (lambda (x) (remove-dependent node x))
+	   (set-difference old-dependencies dependencies))
+      #+nil
+      (map nil (lambda (x) (ensure-dependent node x))
+	   (set-difference dependencies old-dependencies)))
+    (really-make-node fun dependencies node)
+    node))
+;;;
+
+(defun %refresh (node &optional (value (node-value node)))
+  ;;[FIXME] May walk a single node exponential amount of times,
+  ;;because this is breadth first search!!!
+  (clean-and-invalidate-node node value)
+  (labels ((%map-dependents2 (node fun test)
+	 ;;FIXME::first node is a special case???
+	 (dependency-graph:with-locked-node (node nil)
+	   (dolist (dependent (dependency-graph:node-dependents node))
+	     (when (funcall test dependent)
+	       (funcall fun dependent)
+	       (%map-dependents2 dependent fun test))))))
+    (%map-dependents2
+     node
+     #'clean-and-invalidate-node
+     #'dirty-p)))
+
+(defgeneric cleanup-node-value (object))
+(defmethod cleanup-node-value ((object t))
+  (declare (ignorable object)))
+
+(defun clean-and-invalidate-node (node &optional (value nil value-supplied-p))
+  ;;FIXME::real logging facilities?
+  ;;(format t "~% old node:~s" node)
+  (when (or (node-state node)
+	    ;;value-supplied-p means ignore
+	    ;;whatever happened to the node.
+	    value-supplied-p)
+    ;;(format t "~%-> cleaning")
+    ;;cleanup the node 
+    (let ((value (if value-supplied-p value
+		     (node-value node))))
+      (cleanup-node-value value)
+      (setf (node-value node)
+	    ;;FIXME -> is nil correct?
+	    nil)))
+  ;;invalidate it
+  (touch-node node)
+  (setf (node-state node) nil))
+;;;;
 
 
-(defmacro with-named-node ((node-var &optional (namespace 'namespace))
-				       name &optional t-form
-					      (nil-form
-					       `(no-named-node ,name)))
-  (let ((existsp (gensym)))
-    `(multiple-value-bind (,node-var ,existsp) (get-node ,name ,namespace)
-       (if ,existsp
-	   ,t-form
-	   ,nil-form))))
-;;no longer keep track of node
+;;;;Refreshing system
+;;;;queue node to be unloaded if it already has stuff in it 
+(defun refresh-old-node (node)
+  (when (not (zerop (dependency-graph:node-timestamp node)))
+    (%%refresh node)))
+
+(defparameter *refresh* (make-hash-table :test 'eq))
+(defparameter *refresh-lock* (bordeaux-threads:make-recursive-lock "refresh"))
+(defun %%refresh (node &key same-thread;; wait
+			 )
+  (cond
+    (same-thread
+     (%refresh node))
+    (t (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+	 (setf (gethash node *refresh*)
+	       (dependency-graph:node-value node)))
+       ;;Spin lock when wait is t
+       ;;FIXME::node values getting overwritten before node
+       ;;can be cleaned up
+       #+nil
+       (when wait
+	 (loop :while (gethash node *refresh*))))))
+;;This is a catch-all for OpenGL objects and everything. FIXME?
+(defun flush-refreshes ()
+  (bordeaux-threads:with-recursive-lock-held (*refresh-lock*)
+    (let ((length (hash-table-count *refresh*)))
+      (unless (zerop length)
+	(utility:dohash (node value) *refresh*
+			;;(declare (ignore value))
+			(dependency-graph:%refresh node value))
+	(clrhash *refresh*)))))
+
 #+nil
-(defun remove-node (id &optional (namespace *namespace*))
-  (with-named-node
-      (node) id
-      (progn
-	(remhash id namespace)
-	(map nil
-	     (lambda (x) (remove-dependent node x))
-	     (dependencies node)))))
+;;FIXME::This is wrong?
+(defun annihilate (node)
+  (remove-all-dependents node)
+  (remove-all-dependencies node)
+  (clrhash (node-%data node))
+  (clean-and-invalidate-node node)
+  (setf (node-tags node) nil
+	(node-value node) nil))
+;;;;
 
-(defun no-named-node (id)
-  (error "no lazy load named as ~a" id))
-
-(defun get-value (id &optional (namespace *namespace*))
-  (with-named-node (node) id
-		   (%get-value node)))
-
-(defun get-value-no-update (id &optional (namespace *namespace*))
-  (with-named-node (node) id
-		   (value node)))
-
-(defun invalidate-node (id &optional (namespace *namespace*))
-  (with-named-node (node) id
-		   (%invalidate-node node)))
-
+;;[TODO] -> move to test file, documentation?
 #+nil
-(defun %map-dependents (node fun)
-  (with-locked-node (node nil)
-    (dolist (dependent (dependents node))
-      (funcall fun dependent)
-      (%map-dependents dependent fun))))
+"
+cell,promise,node:
+1. object
+-- place can be mutable
+2. dependencies
+-- name [optional], previous, timestamp, new, onchange
+-- 
 
-(defun %map-dependents2 (node fun test)
-  (with-locked-node (node nil)
-    (dolist (dependent (dependents node))
-      (when (funcall test dependent)
-	(funcall fun dependent)
-	(%map-dependents2 dependent fun test)))))
-
+- dependencies, with names
+- snapshots of dependencies
+- check whether those dependencies differ per snapshot [or not, just look at timestamp]
+- 
+"
 #+nil
-(defun map-dependents (name fun &optional (namespace *namespace*))
-  (with-named-node (node) name
-		   (%map-dependents node fun)))
-
+(defparameter *node-generator*
+  (deflambda (a b c &key (other (get-node 'foo)) &optional (a b c))))
 #+nil
-(defun print-dependents (name)
-  (map-dependents name #'print *stuff*))
-
-(defun map-dependents2 (name fun test &optional (namespace *namespace*))
-  (with-named-node (node) name
-		   (%map-dependents2 node fun test)))
-
+(invoke-node *node-generator* 4 ..other node.. 6 :other nil );;;???
 #+nil
-(defmacro defnode (name deps &body body)
-  (multiple-value-bind (fun node-deps) (%defnode deps body)
-    `(reload-node ,fun ',node-deps ',name)))
+(deplambda (&key (name default delta) (foo 4 '=) (bar "what" 'string=)))
 #+nil
-(progn
-  (defnode b () (print 2893))
-  (defnode a (b) (* b b)))
-
+(make-node-from-prototype *)
+;;each deplambda has a cached value?
 #+nil
-(progn
-  (remove-node 'c)
-  (defnode c (c) c))
-
+(invoke-node * (:function (lambda ()
+			    (get :foo)
+			    (get :bar)))
+	     (:foo 4) (:bar 6)
+	     (:changed)
+	     (:snapshot-maker))
+#+nil
+(defun log-difference (cell)
+  (print (multiple-value-list (mutable-cell-difference cell)))
+  (touch-mutable-cell cell)
+  (print cell)
+  (print (multiple-value-list (mutable-cell-difference cell))))
+#+nil
+(defun test3 ()
+  (let ((value (cons 1 2)))
+    (let ((cell (make-mutable-cell :value value :snapshot-key 'cdr)))
+      (log-difference cell)     
+      (incf (cdr value))
+      (log-difference cell))))

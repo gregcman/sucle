@@ -261,23 +261,39 @@
 	      (:mouse
 	       :mouse)))))
 
-(defmacro mouseval (identifier)
-  (etypecase identifier
-    (keyword
-     (aref *mouse-array*
-	   (substitute-foreign-enum-value "MOUSE-BUTTON" identifier)))
-    (integer
-     (aref *mouse-array* (1- identifier)))))
-(defmacro keyval (identifier)
-  (etypecase identifier
-    (keyword
-     (aref *key-array*
-	   (substitute-foreign-enum-value "KEY" identifier)))
-    (character
-     (char-code (char-upcase identifier)))
-    (integer
-     (char-code (digit-char identifier)))))
-
+;;Cache the translation from lisp object to key enum.
+;;This saves time from symbol mangling.
+;;Also mouseval and keyval were macros before, but why?
+(defparameter *mouse-enum-cache* (make-hash-table :test 'eql))
+(defparameter *key-enum-cache* (make-hash-table :test 'eql))
+(defun mouseval (identifier)
+  (multiple-value-bind (item existp) (gethash identifier *mouse-enum-cache*)
+    (cond (existp item)
+	  (t
+	   (let ((new
+		  (etypecase identifier
+		    (keyword
+		     (aref *mouse-array*
+			   (substitute-foreign-enum-value "MOUSE-BUTTON" identifier)))
+		    (integer
+		     (aref *mouse-array* (1- identifier))))))
+	     (setf (gethash identifier *mouse-enum-cache*) new)
+	     new)))))
+(defun keyval (identifier)
+  (multiple-value-bind (item existp) (gethash identifier *key-enum-cache*)
+    (cond (existp item)
+	  (t
+	   (let ((new
+		  (etypecase identifier
+		    (keyword
+		     (aref *key-array*
+			   (substitute-foreign-enum-value "KEY" identifier)))
+		    (character
+		     (char-code (char-upcase identifier)))
+		    (integer
+		     (char-code (digit-char identifier))))))
+	     (setf (gethash identifier *key-enum-cache*) new)
+	     new)))))
 
 (defconstant +shift+ 1)
 (defconstant +control+ 2)
@@ -456,30 +472,40 @@ for the current implementation."
 	  *alt* (logtest +alt+ mods)
 	  *super* (logtest +super+ mods))))
 
+
+(defparameter *defaults*  
+  '(:title "window"
+    :width 1
+    :height 1
+    :resizable nil))
+
 (defmacro with-window (window-keys &body body)
-  (alexandria:with-gensyms (window)
-   `(let ((,window (funcall #'%glfw:create-window
-			   (getf 
-			    ,window-keys
-			    :width )
-			   (getf 
-			    ,window-keys
-			    :height )
-			   (getf 
-			    ,window-keys
-			    :title )
-			   (getf 
-			    ,window-keys
-			    :monitor )
-			   (getf 
-			    ,window-keys
-			    :shared ))))
-      (unwind-protect
-	   (progn
-	     (let ((*window* ,window))
-	       (%glfw:make-context-current ,window)
-	       ,@body))
-	(%glfw:destroy-window ,window)))))
+  (alexandria:with-gensyms (window extra)
+    (alexandria:once-only (window-keys)
+      `(let* ((,extra (append ,window-keys *defaults*))
+	      (,window
+	       (%glfw:create-window
+		(getf 
+		 ,extra
+		 :width)
+		(getf 
+		 ,extra
+		 :height)
+		(getf 
+		 ,extra
+		 :title)
+		(getf 
+		 ,extra
+		 :monitor)
+		(getf 
+		 ,extra
+		 :shared))))
+	 (unwind-protect
+	      (progn
+		(let ((*window* ,window))
+		  (%glfw:make-context-current ,window)
+		  ,@body))
+	   (%glfw:destroy-window ,window))))))
 
 (defparameter *window* nil)
 ;;Graphics calls on OS X must occur in the main thread
@@ -494,26 +520,23 @@ for the current implementation."
   (%glfw:set-cursor-pos-callback window (cffi:get-callback 'cursor-callback))
   (%glfw:set-drop-callback window (cffi:get-callback 'drop-callback))
   )
-(defun wrapper (func &optional (params
-				'(:title "window"
-				  :width 1
-				  :height 1
-				  :resizable nil)))
-  (with-float-traps-saved-and-masked
-    (load-the-glfw-library)
-    (glfw:with-init ()
-      (init)
-      (glfw:with-window-hints
-	    ;;[FIXME]better interface?
-	    ((%glfw:+resizable+ (if (getf params :resizable)
-				    %glfw:+true+
-				    %glfw:+false+)))
-	(with-window params
-	  (set-callbacks)
-	  (setf (values *width*
-			*height*)
-		(get-window-size))
-	  (funcall func))))))
+(defmacro wrapper (args &body body)
+  (alexandria:once-only (args)
+    `(with-float-traps-saved-and-masked
+       (load-the-glfw-library)
+       (glfw:with-init ()
+	 (init)
+	 (glfw:with-window-hints
+	     ;;[FIXME]better interface?
+	     ((%glfw:+resizable+ (if (getf ,args :resizable)
+				     %glfw:+true+
+				     %glfw:+false+)))
+	   (with-window ,args
+	     (set-callbacks)
+	     (setf (values *width*
+			   *height*)
+		   (get-window-size))
+	     ,@body))))))
 
 (defun get-mouse-out ()
   (%glfw:set-input-mode *window*  %glfw:+cursor+ %glfw:+cursor-normal+))

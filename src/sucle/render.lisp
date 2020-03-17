@@ -178,8 +178,8 @@ gl_FragColor = color;
   (defun color-grasses (terrain)
     (flet ((color ()
 	     (multiple-value-call #'foliage-color
-	       (values 255 0)
-	       #+nil
+	       ;;(values 255 0)
+	       ;;#+nil
 	       (oct-24-2018)
 	       )
 	     
@@ -189,12 +189,12 @@ gl_FragColor = color;
 	     #+nil
 	     (let ((value (random 256)))
 	       (foliage-color value (random (1+ value))))))
-      (modify-greens 80 192 :color
+      (modify-greens 5 12 :color
 		     (color)
 		    
 		     ;(foliage-color 255 0)
 		     :terrain terrain)
-      (modify-greens 0 240 :color
+      (modify-greens 0 15 :color
 		     (color)
 		     
 		     ;(foliage-color 255 0)
@@ -210,19 +210,21 @@ gl_FragColor = color;
   (defun modify-greens (xpos ypos
 			&key
 			  (color #(0 0 0 0))
-			  (terrain (error "no image"))
-			  (height 256)
-			  (texheight 16))
-    ;;#+nil
-    (setf xpos (* 2 xpos)
-	  ypos (* 2 ypos)
-	  height (* 2 height)
-	  texheight (* 2 texheight))
-    (dobox ((x xpos (+ texheight xpos))
-	    (y ypos (+ texheight ypos)))
-	   ((lambda (vecinto other)
-	      (map-into vecinto (lambda (a b) (truncate (* a b) height)) vecinto other))
-	    (getapixel (- (- height 1) y) x terrain) color))))
+			  (terrain (error "no image")))
+    (let* (;;Assume texture is a square grid of squares
+	   (size (round (sqrt (/ (array-total-size terrain) 4))))
+	   (cell-size (/ size 16)))
+ 
+      (setf xpos (* xpos cell-size)
+	    ypos (* ypos cell-size))
+      (dobox ((x xpos (+ cell-size xpos))
+	      (y ypos (+ cell-size ypos)))
+	     (let ((vecinto (getapixel (- (- size 1) y)
+				       x terrain)))
+	       (map-into vecinto (lambda (a b)
+				   (truncate (* a b) 256))
+			 vecinto
+			 color))))))
 
 (defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
   (let ((denominator (+ (*
@@ -279,9 +281,18 @@ gl_FragColor = color;
    (glhelp:create-opengl-texture-from-data modified-terrain-png)))
 (defparameter *position-attr* 0)
 (defparameter *texcoord-attr* 2)
+
+(defparameter *shader-version* 120)
+(defun test-all-shader-versions ()
+  (dolist (x glhelp::*version-data*)
+    (setf *shader-version* (second x))
+    (deflazy:refresh 'blockshader nil)
+    (sleep 0.5)))
+
 (glhelp:deflazy-gl blockshader ()
-  (glhelp:create-opengl-shader
-   "
+  (let ((glhelp::*glsl-version* *shader-version*))
+    (glhelp:create-opengl-shader
+     "
 out float color_out;
 out vec2 texcoord_out;
 out float fogratio_out;
@@ -305,11 +316,11 @@ texcoord_out = texcoord;
 
 float distance = 
 //distance(position.xyz,vec3(0.0));
-//distance(camera_pos.xyz, position.xyz);
-max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
+distance(camera_pos.xyz, position.xyz);
+//max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
 fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
 }"
-   "
+     "
 in vec2 texcoord_out;
 in float color_out;
 uniform sampler2D sampler;
@@ -317,22 +328,24 @@ in float fogratio_out;
 uniform vec3 fogcolor;
 
 void main () {
-vec4 pixdata = texture2D(sampler,texcoord_out.xy);
+vec4 pixdata = 
+//vec4(1.0);
+texture2D(sampler,texcoord_out.xy);
 vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
-if (pixdata.a == 0.0){discard;}
+//if (pixdata.a == 0.0){discard;}
 gl_FragColor.rgb = temp; 
 }"
-   `(("position" ,*position-attr*) 
-     ("texcoord" ,*texcoord-attr*)
-     ("blocklight" 4)
-     ("skylight" 5))
-   '((:pmv "projection_model_view")
-     (:fogcolor "fogcolor")
-     (:foglet "foglet")
-     (:aratio "aratio")
-     (:camera-pos "camera_pos")
-     (:sampler "sampler")
-     (:time "time"))))
+     `(("position" ,*position-attr*) 
+       ("texcoord" ,*texcoord-attr*)
+       ("blocklight" 4)
+       ("skylight" 5))
+     '((:pmv "projection_model_view")
+       (:fogcolor "fogcolor")
+       (:foglet "foglet")
+       (:aratio "aratio")
+       (:camera-pos "camera_pos")
+       (:sampler "sampler")
+       (:time "time")))))
 
 ;;;
 
@@ -370,8 +383,8 @@ gl_FragColor.rgb = color_out;
   (gl:polygon-mode :front-and-back :line)
   (gl:line-width 2)
   ;;[FIXME]render the fist again
-  (when (fister-exists fist)
-    (let ((selected-block (fister-selected-block fist)))
+  (when (fist-exists fist)
+    (let ((selected-block (fist-selected-block fist)))
       (with-vec (a b c) (selected-block)
 	(let ((iterator (scratch-buffer:my-iterator)))
 	  (let ((times (draw-aabb a b c *selected-block-aabb* iterator)))
@@ -428,6 +441,24 @@ gl_FragColor.rgb = color_out;
 ;;;;</RENDER>
 ;;;;************************************************************************;;;;
 ;;;;<CHUNK-RENDERING?>
+
+(progn
+  (defparameter *g/chunk-call-list* (make-hash-table :test 'equal))
+  (defun get-chunk-display-list (name)
+    (gethash name *g/chunk-call-list*))
+  (defun set-chunk-display-list (name list-num)
+    (setf (gethash name *g/chunk-call-list*) list-num))
+  (defun remove-chunk-display-list (name)
+    (remhash name *g/chunk-call-list*))
+  (defun reset-chunk-display-list ()
+    (clrhash *g/chunk-call-list*)))
+(defun remove-chunk-model (name)
+  ;;[FIXME]this calls opengl. Use a queue instead?
+  (multiple-value-bind (value existsp) (get-chunk-display-list name)
+    (when existsp
+      (destroy-chunk-gl-representation value)
+      (remove-chunk-display-list name))))
+
 ;;https://vertostudio.com/gamedev/?p=177
 (struct-to-clos:struct->class
  (defstruct chunk-gl-representation
@@ -453,7 +484,7 @@ gl_FragColor.rgb = color_out;
 	;;draw occlusion box here, get occlusion information from a box
 	(glhelp:slow-draw (chunk-gl-representation-occlusion-box value))
 	(gl:end-query :samples-passed)))))
-
+(defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
 (defun render-occlusion-queries (&optional (vec *call-lists*))
   (when *occlusion-culling-p*
     (gl:color-mask nil nil nil nil)
@@ -471,7 +502,7 @@ gl_FragColor.rgb = color_out;
 (defun destroy-chunk-gl-representation (chunk-gl-representation)
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
-(defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
+
 (defun get-chunks-to-draw ()
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
@@ -533,25 +564,11 @@ gl_FragColor.rgb = color_out;
   ;;(print (- (get-internal-real-time) a))
   )
 
-(progn
-  (defparameter *g/chunk-call-list* (make-hash-table :test 'equal))
-  (defun get-chunk-display-list (name)
-    (gethash name *g/chunk-call-list*))
-  (defun set-chunk-display-list (name list-num)
-    (setf (gethash name *g/chunk-call-list*) list-num))
-  (defun remove-chunk-display-list (name)
-    (remhash name *g/chunk-call-list*))
-  (defun reset-chunk-display-list ()
-    (clrhash *g/chunk-call-list*)))
-(defun remove-chunk-model (name)
-  ;;[FIXME]this calls opengl. Use a queue instead?
-  (multiple-value-bind (value existsp) (get-chunk-display-list name)
-    (when existsp
-      (destroy-chunk-gl-representation value)
-      (remove-chunk-display-list name))))
+
 
 (defparameter *finished-mesh-tasks* (lparallel.queue:make-queue))
 
+#+nil
 (defun call-with-world-meshing-lparallel (fun)
   (sucle-mp:with-initialize-multiprocessing
     (funcall fun)))
@@ -580,21 +597,21 @@ gl_FragColor.rgb = color_out;
 			(b uv)
 			(c dark))
 		     (glhelp:create-vao-or-display-list-from-specs
-		      ;;glhelp:create-gl-list-from-specs
 		      (:quads len)
 		      ((*texcoord-attr* (uv) (uv))
 		       (4 (dark) (dark) (dark) (dark))
-			   ;;;zero always comes last?
 		       (5 (dark) (dark) (dark) (dark))
+		       ;;[FIXME]zero always comes last for display lists?
+		       ;;have to figure this out manually?
 		       (*position-attr* (xyz) (xyz) (xyz) 1.0))))))
 		(occlusion-box	 
 		 (multiple-value-bind (x y z) (voxel-chunks:unhashfunc coords)
 		   (let ((*iterator* (scratch-buffer:my-iterator)))
-		      (let ((times
-			     (draw-aabb x y z
-					(load-time-value
-					 (let ((foo *chunk-query-buffer-size*))
-					   (aabbcc:make-aabb
+		     (let ((times
+			    (draw-aabb x y z
+				       (load-time-value
+					(let ((foo *chunk-query-buffer-size*))
+					  (aabbcc:make-aabb
 					    :minx (- 0.0 foo)
 					    :miny (- 0.0 foo)
 					    :minz (- 0.0 foo)
@@ -605,11 +622,10 @@ gl_FragColor.rgb = color_out;
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
 			  (:quads times)
-			  (;;why???
-			   (*texcoord-attr* 0.06 0.06)
-			   (4 0.0 0.0 0.0 0.0)
-			   ;;zero always comes last?
-			   (5 0.0 0.0 0.0 0.0)
+			  (;;Query objects don't need the other attributes
+			   ;;(*texcoord-attr* 0.06 0.06)
+			   ;;(4 0.0 0.0 0.0 0.0)
+			   ;;(5 0.0 0.0 0.0 0.0)
 			   (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))))
 	    (set-chunk-display-list
 	     coords
@@ -790,3 +806,8 @@ Note:limits the amount of background jobs and pending lisp objects."
 	       (return-from submit-mesh-tasks)))))))
 ;;;;<CHUNK-RENDERING?>
 ;;;;************************************************************************;;;;
+
+
+;;;Frustum culling
+;;;http://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm
+

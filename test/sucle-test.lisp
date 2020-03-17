@@ -226,7 +226,7 @@ gl_FragColor.xyz = color_out;
 
 (defpackage #:test5
   (:use :cl)
-  (:export #:start))
+  (:export #:start #:change-image))
 (in-package #:test5)
 
 (defun start ()
@@ -359,20 +359,27 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
   
 (defpackage :application-example-hello-world
   (:use #:cl)
-  (:export #:start))
+  (:export #:start)
+  (:nicknames #:aehw))
 (in-package :application-example-hello-world)
 
-(defparameter *view* (ncurses-clone-lem-view:make-view 0 0 58 30 nil))
+(defparameter *view*
+  (ncurses-clone:ncurses-newwin 20 80 10 10))
 
 (defun start ()
   (application:main
    (lambda ()
-     (ncurses-clone-for-lem:init)
+     (ncurses-clone-for-lem:init) ;;Only necessary to change the color palette.
      (loop (application:poll-app)
 	(frame)))
    :width 512
    :height 512
    :title "Draw random text to the screen"))
+
+(defun frame ()
+  (things)
+  (when (window:button :key :pressed #\Escape)
+    (application:quit)))
 
 (defun aux ()
   (alexandria:random-elt
@@ -386,10 +393,7 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
      "light blue"
      "light green")))
 
-(defun frame ()
-  (ncurses-clone-for-lem:render)
-  (ncurses-clone-lem-view:redraw-view-after *view*)
-  (ncurses-clone-lem-view:update-display)
+(defun things ()
   (lem.term:with-attribute (:fg (aux) :bg (aux)
 				:underline
 				(zerop (random 3))
@@ -397,9 +401,9 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
 				(zerop (random 4))
 				:reverse
 				(zerop (random 2)))
-    (ncurses-clone-lem-view:print-into-view
+    (ncurses-clone:ncurses-mvwaddstr 
      *view*
-     (random 50)
+     (random 20)
      (random 50)
      (prin1-to-string
       (case (random 4)
@@ -407,5 +411,6 @@ gl_FragColor = texture2D(sampler,texcoord_out.xy);
 	(1 #())
 	(2 (code-char (random 2000)))
 	(3 (list (random 100)))))))
-  (when (window:button :key :pressed #\Escape)
-    (application:quit)))
+  (ncurses-clone-for-lem:render :update-data t :win *view*))
+
+

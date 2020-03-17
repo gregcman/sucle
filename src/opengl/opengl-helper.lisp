@@ -9,6 +9,7 @@
    #:with-gl-context
    
    #:deflazy-gl
+   #:gl-context
    
    #:handle
    #:alive-p
@@ -48,7 +49,11 @@
    
    #:slow-draw
    #:slow-delete
-   ))
+
+   #:gl-framebuffer
+   #:gl-texture
+
+   #:texture-like))
 (in-package :glhelp)
 ;;;;************************************************************************;;;;
 ;;;;<CONTENTS>
@@ -116,8 +121,9 @@
   (slot-makunbound obj 'handle))
 
 (defun alive-p (obj)
-  (eq *gl-context*
-      (context obj)))
+  (and (eq *gl-context*
+	   (context obj))
+       (slot-boundp obj 'handle)))
 
 ;;;;</PARENT OBJECT>
 ;;;;************************************************************************;;;;
@@ -135,8 +141,9 @@ not made in the current OpenGL context, so they are garbage"
      (declare (ignorable gl-context))
      ,@gen-forms))
 
-(defmethod deflazy:cleanup-node-value ((object gl-object))
+(defmethod dependency-graph:cleanup-node-value ((object gl-object))
   (when (alive-p object)
+    ;;(format t "~%cleaning:~a" object)
     (gl-delete* object)))
 
 (defmacro with-gl-context ((gl-proc-address) &body body)
@@ -209,7 +216,8 @@ not made in the current OpenGL context, so they are garbage"
   (when (i-delete-p vao)
     (gl:delete-buffers (list (index-buffer vao)))))
 (defmethod gl-delete* ((obj vao))
-  (delete-vao obj))
+  (when (alive-p obj)
+    (delete-vao obj)))
 
 (defmacro bind-to-array-buffer ((vertex-buffer) &body body)
   `(progn
@@ -404,7 +412,8 @@ just put together a new vao"
 (defclass gl-list (gl-object)
   ())
 (defmethod gl-delete* ((obj gl-list))
-  (gl:delete-lists (handle obj) 1))
+  (when (alive-p obj)
+    (gl:delete-lists (handle obj) 1)))
 ;;;
 (defmacro with-gl-list (&body body)
   (let ((list-sym (gensym)))
@@ -426,7 +435,8 @@ just put together a new vao"
 (defclass gl-texture (gl-object)
   ())
 (defmethod gl-delete* ((obj gl-texture))
-  (gl:delete-texture (handle obj)))
+  (when (alive-p obj)
+    (gl:delete-texture (handle obj))))
 ;;;
 (defun wrap-opengl-texture (texture)
   (make-instance
@@ -520,7 +530,8 @@ just put together a new vao"
     inst))
 
 (defmethod gl-delete* ((obj gl-framebuffer))
-  (destroy-gl-framebuffer obj))
+  (when (alive-p obj)
+    (destroy-gl-framebuffer obj)))
 (defun destroy-gl-framebuffer (gl-framebuffer)
   (gl:delete-renderbuffers (list (depth gl-framebuffer)))
   (gl:delete-framebuffers (list (handle gl-framebuffer)))
@@ -603,7 +614,8 @@ just put together a new vao"
   (gl:use-program (handle src)))
 
 (defmethod gl-delete* ((obj gl-program))
-  (gl:delete-program (handle obj)))
+  (when (alive-p obj)
+    (gl:delete-program (handle obj))))
 ;;;;
 (defun set-uniform-to-texture (uniform-location texture num)
   (gl:uniformi uniform-location num)
@@ -768,6 +780,8 @@ gl_FragColor = pixcolor;
 			       (setf (cdr (cdr (cdr (cdr (cdr ast)))))
 				     nil)))
 			   (unless (> version 120)
+			     ;;(print shader-type)
+			     ;;(format t "before~s" type-qualifiers)
 			     (when (member :in type-qualifiers)
 			       (replace-qualifer
 				(ecase shader-type
@@ -780,6 +794,7 @@ gl_FragColor = pixcolor;
 				 #+nil
 				 (:frag (add-qualifier "varying"))
 				 (:vs (replace-qualifer "varying" :out))))
+			     ;;(format t "after~s" type-qualifiers)
 			     #+nil ;;[FIXME] varying does not occur
 			     (when (member :varying type-qualifiers))))))))
 		 (walk-next ast)))))))
@@ -988,3 +1003,7 @@ gl_FragColor = pixcolor;
 ;;;;</VIEWPORT>
 ;;;;************************************************************************;;;;
 
+(defun texture-like (thing)
+  (etypecase thing
+    (gl-framebuffer (glhelp:texture thing))
+    (gl-texture (glhelp:handle thing))))

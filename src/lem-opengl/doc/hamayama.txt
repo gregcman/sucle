@@ -1,0 +1,72 @@
+Taken from: https://gist.github.com/Hamayama/71ba25e9567b64ca855a5b8f7439add5
+
+< verification of lem's OpenGL front-end>
+
+
+(1)environment
+OS : Windows 8.1 (64bit)
+Development environment: MSYS2/MinGW-w64 (64bit) (gcc version 7.3.0 (Rev2, Built by MSYS2 project))
+
+(2)installation
+pacman-S mingw-w64-x86_64-glfw
+ros install terminal625/utility
+ros install terminal625/sucle
+  After the execution of、
+https://github.com/cxxxr/lem/pull/355
+  Copy the opengl folder to the frontends folder of the lem、
+  frontends/opengl/term.remove `#+win32 (charms/ll:use-default-colors)` from line 513 of lisp
+
+(3) start-up
+create lem-opengl based on lem-ncurses
+ros-Q-m lem-opengl-L sbcl-bin -- $USERPROFILE/.roswell / bin/lem-opengl
+
+(4) confirmation
+Start-up-allowed
+Exit - yes
+  When you exit the app, you will see a lot of the following
+    NIL :LEFT-CONTROL key unimplemented:LEFT-CONTROL key unimplemented ...
+Screen display → yes
+  The display is fast!!
+  The color looks a little strange.。。(←It was a misunderstanding mod the color of modeline is sometimes strange)
+Screen resize → disable
+Screen maximization → not available
+This is a great app.
+Key input → US specification?
+  C-space → C-`
+  C-shift - " → C-space
+  shift -" → @
+  shift-& → ^
+  shift -' &
+  shift - ( *
+  shift -) → (
+  shift-0 → )
+  shift-- → _
+  shift-~ → +
+  shift - \ → none
+  shift -@ → {
+  shift - [→ }
+  shift -; → :
+  shift -: "
+  shift-] → |
+  shift -/→?
+  shift-backslash → none
+  ^ → =
+  \ → None
+  @ → [
+  [ ]
+  : → '
+  ]- >Backslash
+  Backslash = no
+Japanese input → not available
+This is a great app, but it needs a lot of work.
+This is a great app, but it needs a lot of work.
+Move cursor by mouse → enable
+Copy&paste by mouse → not available
+Scrollable by wheel
+In C-x 2, you can divide the screen vertically.
+In C-x 3, you can divide the screen horizontally.
+  There is no display of the dividing line, and the garbage remains there
+Move the dividing line with the mouse
+
+
+(2018-12-16)(2018-12-17)
