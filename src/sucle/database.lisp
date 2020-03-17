@@ -114,12 +114,15 @@
 
 (defun retreive (filename &optional (table *documents*))
   ;;(format t "~%existence-test ~s" filename)
-  (when (does-file-exist filename)
-    ;;(format t "~%retrieving ~s" filename)
-    (execute-single *db*
-		    (format nil "select content from ~a where filename = ?" 
-			    (error-scrub table))
-		    filename)))
+  ;;[FIXME]only loading one chunk at a time?
+  ;;bottleneck? bug with cl-sqlite library?
+  (with-locked-db (*database*)
+    (when (does-file-exist filename)
+      ;;(format t "~%retrieving ~s" filename)
+      (execute-single *db*
+		      (format nil "select content from ~a where filename = ?" 
+			      (error-scrub table))
+		      filename))))
 
 (defun delete-entry (filename &optional (table *documents*))
   (execute-non-query *db*

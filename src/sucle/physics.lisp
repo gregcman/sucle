@@ -65,7 +65,7 @@
   (case blockid
     (3 *slab-aabb*)
     (t *block-aabb*)))
-
+#+nil
 (defparameter *dirtying2* nil)
 (defun collide-fucks (px py pz vx vy vz aabb)
   (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
@@ -76,6 +76,7 @@
       (declare (ignorable contact))
       (let ((blockid (world:getblock x y z)))
 	(when (block-data:data blockid :hard)
+	  #+nil
 	  (when *dirtying2*
 	    (world:plain-setblock x y z (1+ (random 5)) 0))
 	  (let ((blockaabb (block-to-block-aabb blockid)))
@@ -103,7 +104,7 @@
     (values
      (collapse-touch vx vy vz)
      min-ratio)))
-
+#+nil
 (defparameter *dirtying* nil)
 (defun a-contact-fun (px py pz aabb)
   (let ((acc #b000000))
@@ -111,6 +112,7 @@
       (declare (ignorable contact-var))
       (let ((blockid (world:getblock mx my mz)))
 	(when (block-data:data blockid :hard)
+	  #+nil
 	  (when *dirtying*
 	    (world:plain-setblock mx my mz (1+ (random 5)) 0))
 	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
@@ -151,7 +153,7 @@
 	  (mass (pointmass-mass pointmass))
 	  (force (pointmass-force pointmass)))
       (fill force 0.0)
-      (let* ((contact-state (if (and noclip (not *dirtying*))
+      (let* ((contact-state (if noclip ;;(and noclip (not *dirtying*))
 				#b000000
 				(with-vec (px py pz) (pos)
 				  (funcall contact-handler px py pz aabb))))

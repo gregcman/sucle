@@ -217,3 +217,13 @@ global variables essentially
 ;;wacky world generation
 ;;minecraft integration?
 ;;sqlite database for storing objects
+;;Use a logging facility?
+
+world generation
+- terrain
+physics
+- multiple things moving about
+fancier graphics
+
+why am I so against using existing libraries?
+;;die if I fall too far

@@ -533,7 +533,8 @@
 			  )
 			 (t
 			  (cond
-			    ((and (not (voxel-chunks:empty-chunk-p chunk)) (not (space-for-new-chunk-p key)))
+			    ((and (not (voxel-chunks:empty-chunk-p chunk))
+				  (not (space-for-new-chunk-p key)))
 			     (format t "~%OMG? ~a chunk already exists" key))
 			    (t 
 			     (progn
