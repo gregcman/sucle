@@ -184,7 +184,7 @@
 	  *x*
 	  *y*
 	  *z*
-	  (nick :glass;:planks
+	  (nick :grass
 		))))
 (defun get-chunk (x y z)
   (multiple-value-bind (x y z) (voxel-chunks:chunk-coordinates-from-block-coordinates x y z)
