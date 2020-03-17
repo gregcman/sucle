@@ -383,8 +383,8 @@ gl_FragColor.rgb = color_out;
   (gl:polygon-mode :front-and-back :line)
   (gl:line-width 2)
   ;;[FIXME]render the fist again
-  (when (fister-exists fist)
-    (let ((selected-block (fister-selected-block fist)))
+  (when (fist-exists fist)
+    (let ((selected-block (fist-selected-block fist)))
       (with-vec (a b c) (selected-block)
 	(let ((iterator (scratch-buffer:my-iterator)))
 	  (let ((times (draw-aabb a b c *selected-block-aabb* iterator)))

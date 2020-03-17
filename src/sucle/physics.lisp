@@ -18,15 +18,6 @@
 (define-modify-macro logiorf (&rest args) logior)
 ;;;end math modify macros
 
-
-(defun collide-world2 (aabb-gen-fnc x y z dx dy dz aabb)
-  (multiple-value-bind (new-x new-y new-z xyzclamp)
-      (step-motion aabb-gen-fnc
-		   x y z dx dy dz aabb)
-    (values new-x new-y new-z
-	    (if (logtest #b100 xyzclamp) 0 dx)
-	    (if (logtest #b010 xyzclamp) 0 dy)
-	    (if (logtest #b001 xyzclamp) 0 dz))))
 (defun step-motion (get-collision-data px py pz vx vy vz aabb)
   (let ((dead-axis #b000) ;;axis which are zeroed
 	(clamp #b000)) ;;the final clamping value for each axis
@@ -62,12 +53,13 @@
   (let ((the-block (world:getblock x y z)))
     (block-to-block-aabb the-block)))
 (defun block-to-block-aabb (blockid)
+  ;;FIXME :use defmethod on objects?
   (case blockid
     (3 *slab-aabb*)
     (t *block-aabb*)))
 #+nil
 (defparameter *dirtying2* nil)
-(defun collide-fucks (px py pz vx vy vz aabb)
+(defun entity-collision (px py pz vx vy vz aabb)
   (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
     ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
     ;;also check "intersecting shell blocks?"
@@ -106,7 +98,7 @@
      min-ratio)))
 #+nil
 (defparameter *dirtying* nil)
-(defun a-contact-fun (px py pz aabb)
+(defun find-blocks-in-contact-with (px py pz aabb)
   (let ((acc #b000000))
     (aabbcc:get-blocks-around (px py pz aabb) (mx my mz contact-var)
       (declare (ignorable contact-var))
@@ -139,6 +131,7 @@
 		world-collision-fun
 		aabb &optional
 		       (temp-vec *temp-vec*))
+  ;;[FIXME] This function is a total mess, a nightmare?
   (declare (optimize (debug 3))
 	   (ignorable is-sneaking))
   (step-pointmass pointmass)
@@ -269,76 +262,82 @@
 		      0.0))))
 	  (setf (entity-contact entity) contact-state))
 	(modify nsb-cga:%vec/ force (* (* *ticks-per-second*
-					  *ticks-per-second* 0.5) mass))
+					  *ticks-per-second* 0.5)
+				       mass))
 	(modify nsb-cga:%vec+ vel force)
-	(contact-handle contact-state vel))
-      (let ((fun (if noclip
-		     (lambda (&rest args)
+	(contact-handle
+	 vel
+	 (logtest contact-state #b100000)
+	 (logtest contact-state #b010000)
+	 (logtest contact-state #b001000)
+	 (logtest contact-state #b000100)
+	 (logtest contact-state #b000010)
+	 (logtest contact-state #b000001)))
+      (let ((aabb-gen-fnc
+	     (if noclip
+		 (lambda (&rest args)
 		       (declare (ignore args))
 		       (values #b000 1.0))
 		     (progn
 		       world-collision-fun))))
 	(with-vec (vx vy vz) (vel symbol-macrolet)
 	  (with-vec (px py pz) (pos symbol-macrolet)
-	    (multiple-value-bind (a b c d e f)
-		(collide-world2
-		 fun
-		 px py pz vx vy vz aabb)
-	      (let ((a (floatify a))
-		    (b (floatify b))
-		    (c (floatify c))
-		    (d (floatify d))
-		    (e (floatify e))
-		    (f (floatify f)))		
-		(setf (values px py pz vx vy vz)
-		      (values a b c d e f))))))))))
+	    (multiple-value-bind (new-x new-y new-z xyzclamp)
+		(step-motion aabb-gen-fnc px py pz vx vy vz aabb)
+	      ;;Update the position and velocity, after taking into
+	      ;;account the collision data.
+	      (psetf px (floatify new-x)
+		     py (floatify new-y)
+		     pz (floatify new-z)
+		     vx (floatify (if (logtest #b100 xyzclamp) 0 vx))
+		     vy (floatify (if (logtest #b010 xyzclamp) 0 vy))
+		     vz (floatify (if (logtest #b001 xyzclamp) 0 vz))))))))))
 
-(defun contact-handle (acc vel)
-  (multiple-value-bind (i+ i- j+ j- k+ k-)
-      (values (logtest acc #b100000)
-	      (logtest acc #b010000)
-	      (logtest acc #b001000)
-	      (logtest acc #b000100)
-	      (logtest acc #b000010)
-	      (logtest acc #b000001))
-    (with-vec (xvel yvel zvel) (vel symbol-macrolet)
-      (etouq 
-       (cons
-	'progn
-	(mapcar
-	 (lambda (args)
-	   (apply
-	    (lambda (axis plus minus)
-	      (alexandria:with-gensyms (var)
-		`(let ((,var ,axis))
-		   (when (or (and (plusp ,var) ,plus)
-			     (and (minusp ,var) ,minus))
-		     (setf ,axis 0.0)))))
-	    args))
-	 '((xvel i+ i-)
-	   (yvel j+ j-)
-	   (zvel k+ k-))))))))
+(defun contact-handle (velocity i+ i- j+ j- k+ k-)
+  ;;velocity is a 3 float array.
+  ;;If we are moving along an axis, but the contact
+  ;;state says that direction is obstructed, then
+  ;;set the physical motion along that direction to 0
+  (with-vec (xvel yvel zvel) (velocity symbol-macrolet)
+    (when (or (and (plusp xvel) i+)
+	      (and (minusp xvel) i-))
+      (setf xvel 0.0))
+    (when (or (and (plusp yvel) j+)
+	      (and (minusp yvel) j-))
+      (setf yvel 0.0))
+    (when (or (and (plusp zvel) k+)
+	      (and (minusp zvel) k-))
+      (setf zvel 0.0))))
 
+;;[FIXME] how to do this better? CLOS?
 (struct-to-clos:struct->class
  (defstruct entity
-   particle ;;center of mass
-   neck ;;
-   hips ;; walking direction
-   aabb 
-   contact ;;touching each side
-   fly?
+   ;;The center of mass
+   particle
+   ;;The values which ultimately determine the pitch/yaw of the camera
+   neck
+   ;;The walking direction. Used for WASD controls
+   hips
+   ;;The bounding box used in physical calculation.
+   aabb
+   ;;Bitfield representing whether or not each side is being
+   ;;touched.
+   contact
+   
+   collision-fun
+   contact-fun
+
    gravity?
+   fly?
    clip?
+
    jump?
    sneak?
-   collision-fun
-   contact-fun))
+   ))
 
-
-
-(defun gentity ()
-  (make-entity :collision-fun 'collide-fucks
-	       :contact-fun 'a-contact-fun
+(defun create-entity ()
+  (make-entity :collision-fun 'entity-collision
+	       :contact-fun 'find-blocks-in-contact-with
 	       :particle (make-pointmass)
 	       :neck (make-necking)
 	       :aabb *player-aabb*
@@ -350,7 +349,7 @@
 	       :jump? nil
 	       :sneak? nil))
 
-(defun physentity (entity)
+(defun run-physics-for-entity (entity)
   (physics
    entity
    (necking-yaw (entity-neck entity))
@@ -365,20 +364,19 @@
    (entity-collision-fun entity)
    (entity-aabb entity)))
 
-
-
 (struct-to-clos:struct->class
- (defstruct fister
+ (defstruct fist
    (selected-block (vector 0 0 0))
    (normal-block (vector 0 0 0))
    (exists nil)
-   (position (vector 0 0 0))
-   fun))
+   (position (vector 0 0 0))))
 
-(defun standard-fist (fist px py pz vx vy vz)
-  (multiple-value-bind (xyzclamp frac x y z) (funcall (fister-fun fist) px py pz vx vy vz *fist-aabb*)
+(defun standard-fist (px py pz vx vy vz &optional (fist (make-fist)))
+  (multiple-value-bind (xyzclamp frac x y z)
+      (fist-trace px py pz vx vy vz)
     (cond ((= #b000 xyzclamp)
-	   (setf (fister-exists fist) nil))
+	   ;;The raycasted fist did not run into anything solid.
+	   (setf (fist-exists fist) nil))
 	  (t
 	   (macrolet ((setvec3d (vec x y z)
 			(let ((a (gensym)))
@@ -389,31 +387,29 @@
 	     (let ((a (+ px (* frac vx)))
 		   (b (+ py (* frac vy)))
 		   (c (+ pz (* frac vz))))
-	       
-	       (setvec3d (fister-selected-block fist)
-			 x
-			 y
-			 z)
-	       (setvec3d (fister-position fist)
-			 a 
-			 b
-			 c)
+	       ;;The block that it is collided with
+	       (setvec3d (fist-selected-block fist) x y z)
+	       ;;The resulting location of the fist
+	       (setvec3d (fist-position fist) a b c)
 	       (let ((dx 0)
 		     (dy 0)
 		     (dz 0))
+		 ;;Only choose one direction, don't have a fist
+		 ;;end up on the corner!!
 		 (cond ((logtest xyzclamp #b100)
 			(setf dx (if (plusp vx) 1 -1)) 0)
 		       ((logtest xyzclamp #b010)
 			(setf dy (if (plusp vy) 1 -1)) 0)
 		       ((logtest xyzclamp #b001)
 			(setf dz (if (plusp vz) 1 -1)) 0))
-		 (setvec3d (fister-normal-block fist)
+		 (setvec3d (fist-normal-block fist)
 			   (- x dx)
 			   (- y dy)
 			   (- z dz)))))
-	   (setf (fister-exists fist) t)))))
+	   (setf (fist-exists fist) t))))
+  fist)
 
-(defun collide-fucks2 (px py pz vx vy vz aabb)
+(defun fist-trace (px py pz vx vy vz &optional (aabb *fist-aabb*))
   (block first-block
     (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
 	(x y z contact)
@@ -430,10 +426,6 @@
 	  (unless (zerop type)
 	    (return-from first-block (values type minimum x y z))))))
     #b000))
-(defun gen-fister ()
-  (let ((fist (make-fister)))
-    (setf (fister-fun fist) #'collide-fucks2)
-    fist))
 
 (struct-to-clos:struct->class
  (defstruct necking

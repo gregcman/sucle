@@ -86,6 +86,7 @@
   (ncurses-clone-for-lem:init)
   (push-mode 'menu-mode-per-frame)
   (voxel-chunks:clearworld)
+  (setf *ent* (create-entity))
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (default-loop)	  
      (when world:*persist*
@@ -263,7 +264,7 @@
 	(setf *lerp-mouse-y0* (alexandria:lerp smoothing-factor
 					      *prev-tmouse-y*;;*lerp-mouse-y*
 					      *tmouse-y*))
-	(let ((smoothing-factor2 0.9))
+	(let ((smoothing-factor2 1.0))
 	  (setf *lerp-mouse-x* (alexandria:lerp smoothing-factor2
 						*lerp-mouse-x*
 						*lerp-mouse-x0*))
@@ -314,6 +315,7 @@
 (defparameter *session* nil)
 (defparameter *game-ticks-per-iteration* 0)
 (defparameter *fraction-for-fps* 0.0)
+(defparameter *fist* nil)
 (defun sucle-per-frame ()
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
@@ -342,8 +344,7 @@
   (with-vec (px py pz) ((player-position))
     (with-vec (vx vy vz) ((sb-cga:vec* (camera-matrix:camera-vec-forward *camera*)
 				       (* -1.0 *reach*)))
-      (standard-fist *fist* px py pz vx vy vz)))
-  (set-mode-if :fist-mode (fister-exists *fist*))
+      (setf *fist* (standard-fist px py pz vx vy vz))))
   (when (mode-enabled-p :fist-mode)
     (run-buttons *fist-keys*))
   (when (mode-enabled-p :god-mode)
@@ -364,21 +365,31 @@
     ;;Set the direction with WASD
     (setf
      (entity-hips *ent*)
-     (control:wasd-mover
-      (window:button :key :down #\w)
-      (window:button :key :down #\a)
-      (window:button :key :down #\s)
-      (window:button :key :down #\d))) 
+     (let ((x 0)
+	   (y 0))
+       (when (window:button :key :down #\w)
+	 (decf x))
+       (when (window:button :key :down #\a)
+	 (decf y))
+       (when (window:button :key :down #\s)
+	 (incf x))
+       (when (window:button :key :down #\d)
+	 (incf y))
+       ;;[FIXME]
+       ;;This used to be cached and had its own function in
+       ;;the control.asd
+       (if (and (zerop x)
+		(zerop y))
+	   nil			   
+	   (floatify (atan y x)))))
     ;;update the internal mouse state
     ;;taking into consideration fractions
-    (update-moused
-     *mouse-multiplier-aux*
-     ;;[FIXME]is this formula correct?
-     (/ (+ *fraction-for-fps*
-	   *game-ticks-per-iteration*)
-	(+ *game-ticks-per-iteration* 1))))
+    (update-moused *mouse-multiplier-aux* 1.0))
   (when (mode-enabled-p :normal-mode)
+    ;;[FIXME] because this runs after update-moused, the camera swivels
+    ;;unecessarily.
     (run-buttons *normal-keys*))
+
   ;;Run the game ticks
 
   ;;FIXME:: run fps:tick if resuming from being paused.
@@ -388,7 +399,7 @@
      (incf *ticks*)
      (setf *time-of-day* 1.0)
      ;;run the physics
-     (physentity *ent*)))
+     (run-physics-for-entity *ent*)))
 
   ;;Calculate the camera position from
   ;;the past, current position of the player and the frame fraction
@@ -419,13 +430,14 @@
   (update-camera *camera*)
   (draw-to-default-area)
   ;;this also clears the depth and color buffer.
-  (apply #'render-sky (the-sky-color))
-  (use-chunk-shader
-   :camera *camera*
-   :sky-color *sky-color-foo*
-   :time-of-day *time-of-day*
-   :fog-ratio *fog-ratio*
-   )
+  (let ((color (the-sky-color)))
+    (apply #'render-sky color)
+    (use-chunk-shader
+     :camera *camera*
+     :sky-color color
+     :time-of-day *time-of-day*
+     :fog-ratio *fog-ratio*
+     ))
   (render-chunks)
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
@@ -533,52 +545,45 @@ Press q/escape to quit
      (:clear "" 0 0  :bold t))
     ()))
 ;;;MENU
-#+nil
 (defparameter *sky-color*
-  (mapcar 'utility:byte/255 '(255 255 255))
-  )
-(defparameter *sky-color2*
-  ;;(mapcar 'utility:byte/255 '(0 0 0))
-  (mapcar 'utility:byte/255 '(173 204 255))
-  )
-;;(defun rad-deg (rad))
-(defun deg-rad (deg)
-  (* deg (load-time-value (utility:floatify (/ pi 180)))))
-
-(defparameter *sun-direction* (unit-pitch-yaw (deg-rad 90) (deg-rad 0)))
-(defparameter *sky-color-foo* '(0.0 0.0 0.0))
-(defun neck-angle ()
-  (/ (+ 1.0
-	(-
-	 (sb-cga:dot-product
-	  (sb-cga:normalize (camera-matrix:camera-vec-forward *camera*))
-	  (sb-cga:normalize *sun-direction*))))
-     2.0))
+  (mapcar 'utility:byte/255
+	  ;;'(0 0 0)
+	  '(173 204 255)))
 (defun the-sky-color ()
-  (map-into *sky-color-foo*
-	    (lambda (x)
-	      (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
-	    *sky-color2*
-	    #+nil
-	    (mapcar 
-	     (lambda (a0 a1)
-	       (expt (alexandria:lerp (neck-angle) a0 a1) 0.5))
-	     *sky-color2*
-	     *sky-color*)))
+  (mapcar 
+   (lambda (x)
+     (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
+   *sky-color*))
 
 ;;;
 
-(defparameter *ent* (gentity))
-(defparameter *fist* (gen-fister))
-(defparameter *swinging* nil)
-(defparameter *ticks* 0)
+;;;detect more entities
+;;;detect block types?
+(defun not-occupied (x y z &optional (ent *ent*))
+  (let ((aabb (entity-aabb ent))
+	(pos (pointmass-position
+	      (entity-particle ent))))
+    (aabbcc:aabb-not-overlap
+     (pos-to-block-aabb x y z)
+     (floatify x)
+     (floatify y)
+     (floatify z)
+     aabb
+     (aref pos 0)
+     (aref pos 1)
+     (aref pos 2))))
 
+(defparameter *blockid* 1)
 (defun select-block-with-scroll-wheel ()
   (setf *blockid*
 	(let ((seq
 	       #(3 13 12 24 1 2 18 17 20 5 89)))
 	  (elt seq (mod (round window:*scroll-y*)
 			(length seq))))))
+
+
+(defparameter *ent* nil)
+(defparameter *ticks* 0)
 
 (defun player-position ()
   (let* ((player-pointmass (entity-particle *ent*))
@@ -599,26 +604,39 @@ Press q/escape to quit
       (nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))))
 
 
+(defparameter *reach* 5.0)
+
+;;;;Default punching and placing blocks
+(defparameter *left-fist-fnc* 'destroy-block-at)
+(defun destroy-block-at (x y z)
+  ;;(blocksound x y z)
+  (world:plain-setblock x y z (block-data:lookup :air) 15))
+(defparameter *right-fist-fnc* 'place-block-at)
+(defun place-block-at (x y z &optional (blockval *blockid*))
+  (when (not-occupied x y z)
+    ;;(blocksound x y z)
+    (world:plain-setblock x y z blockval (block-data:data blockval :light))))
+;;;;x
 (defparameter *x* 0)
 (defparameter *y* 0)
 (defparameter *z* 0)
-(defparameter *reach* 5.0)
-
 (defparameter *fist-keys*
   `(((:mouse :pressed :left) . 
      ,(lambda ()
-	(with-vec (a b c) ((fister-selected-block *fist*))
-	  (let ((*x* a)
-		(*y* b)
-		(*z* c))
-	    (funcall *left-fist-fnc* a b c)))))
+	(when (fist-exists *fist*)
+	  (with-vec (a b c) ((fist-selected-block *fist*))
+	    (let ((*x* a)
+		  (*y* b)
+		  (*z* c))
+	      (funcall *left-fist-fnc* a b c))))))
     ((:mouse :pressed :right) .
-     ,(lambda () 
-	      (with-vec (a b c) ((fister-normal-block *fist*))
-		(let ((*x* a)
-		      (*y* b)
-		      (*z* c))
-		  (funcall *right-fist-fnc* a b c)))))))
+     ,(lambda ()
+	(when (fist-exists *fist*)
+	  (with-vec (a b c) ((fist-normal-block *fist*))
+	    (let ((*x* a)
+		  (*y* b)
+		  (*z* c))
+	      (funcall *right-fist-fnc* a b c))))))))
 (defparameter *normal-keys*
   `(((:key :pressed #\p) .
      ,(lambda () (update-world-vao)))
@@ -644,42 +662,7 @@ Press q/escape to quit
      ,(lambda () (toggle (entity-fly? *ent*))
 	      (toggle (entity-gravity? *ent*))))))
 
-;;;detect more entities
-;;;detect block types?
-(defun not-occupied (x y z &optional (ent *ent*))
-  (let ((aabb (entity-aabb ent))
-	(pos (pointmass-position
-	      (entity-particle ent))))
-    (aabbcc:aabb-not-overlap
-     (pos-to-block-aabb x y z)
-     (floatify x)
-     (floatify y)
-     (floatify z)
-     aabb
-     (aref pos 0)
-     (aref pos 1)
-     (aref pos 2))))
-
-(defun destroy-block-at (x y z)
-  ;;(blocksound x y z)
-  (world:plain-setblock x y z (block-data:lookup :air) 15))
-
-(defparameter *blockid* 1)
-
-(defun place-block-at (x y z &optional (blockval *blockid*))
-  (when (not-occupied x y z)
-    (world:plain-setblock
-     x
-     y
-     z
-     blockval
-     (block-data:data blockval :light))
-    ;;(blocksound x y z)
-    ))
-
-
-(defparameter *left-fist-fnc* 'destroy-block-at)
-(defparameter *right-fist-fnc* 'place-block-at)
+;;(defparameter *swinging* nil)
 #+nil
 (progn
   (defparameter *big-fist-fun* (constantly nil))
@@ -724,20 +707,44 @@ Press q/escape to quit
   #+nil
   (progn
     (when (window:button :mouse :pressed :middle)
-      (with-vec (a b c) ((fister-selected-block *fist*))
+      (with-vec (a b c) ((fist-selected-block *fist*))
 	(let ((*x* a)
 	      (*y* b)
 	      (*z* c))
 	  (funcall *middle-fist-fnc* a b c))))
     (when (window:button :mouse :pressed :4)
-      (with-vec (a b c) ((fister-selected-block *fist*))
+      (with-vec (a b c) ((fist-selected-block *fist*))
 	(let ((*x* a)
 	      (*y* b)
 	      (*z* c))
 	  (funcall *4-fist-fnc* a b c))))
     (when (window:button :mouse :pressed :5)
-      (with-vec (a b c) ((fister-selected-block *fist*))
+      (with-vec (a b c) ((fist-selected-block *fist*))
 	(let ((*x* a)
 	      (*y* b)
 	      (*z* c))
 	  (funcall *5-fist-fnc* a b c)))))
+
+;;;; Changing the color of the sky based on which way we're looking.
+#+nil
+(defun deg-rad (deg)
+  (* deg (load-time-value (utility:floatify (/ pi 180)))))
+#+nil
+(defparameter *sun-direction* (unit-pitch-yaw (deg-rad 90) (deg-rad 0)))
+#+nil
+(defparameter *sky-color-foo* '(0.0 0.0 0.0))
+#+nil
+(defun neck-angle ()
+  (/ (+ 1.0
+	(-
+	 (sb-cga:dot-product
+	  (sb-cga:normalize (camera-matrix:camera-vec-forward *camera*))
+	  (sb-cga:normalize *sun-direction*))))
+     2.0))
+   #+nil
+   (mapcar 
+    (lambda (a0 a1)
+      (expt (alexandria:lerp (neck-angle) a0 a1) 0.5))
+    *sky-color2*
+    *sky-color*)
+;;;;

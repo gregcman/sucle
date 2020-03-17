@@ -227,3 +227,4 @@ fancier graphics
 
 why am I so against using existing libraries?
 ;;die if I fall too far
+;;use clos for objects and inheritance instead of structs?
