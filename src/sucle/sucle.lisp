@@ -85,8 +85,6 @@
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
   (push-mode 'menu-mode-per-frame)
-  (voxel-chunks:clearworld)
-  (setf *ent* (create-entity))
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (default-loop)	  
      (when world:*persist*
@@ -260,14 +258,15 @@
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
 (defun neck-values ()
   (values
-   (floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
+   (floatify (* *lerp-mouse-x* *mouse-multiplier*))
    (floatify (* *lerp-mouse-y* *mouse-multiplier*))))
 
 (defun unit-pitch-yaw (pitch yaw &optional (result (sb-cga:vec 0.0 0.0 0.0)))
+  (setf yaw (- yaw))
   (let ((cos-pitch (cos pitch)))
     (with-vec (x y z) (result symbol-macrolet)
       (setf x (* cos-pitch (sin yaw))
-	    y (sin pitch)
+	    y (- (sin pitch))
 	    z (* cos-pitch (cos yaw)))))
   result)
 
@@ -293,6 +292,7 @@
 (defparameter *game-ticks-per-iteration* 0)
 (defparameter *fraction-for-fps* 0.0)
 (defparameter *fist* nil)
+(defparameter *entities* nil)
 (defparameter *ent* nil)
 (defparameter *reach* 5.0)
 (defparameter *fov* (floatify (* pi (/ 85 180))))
@@ -307,19 +307,23 @@
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
   ;;set the chunk center aroun the player
-  (mvc 'world:set-chunk-coordinate-center (spread (player-position *ent*)))
   (livesupport:update-repl-link)
   (application:on-session-change *session*
+    (voxel-chunks:clearworld)
+    (setf *entities* (loop :repeat 10 :collect (create-entity)))
+    (setf *ent* (elt *entities* 0))
+    (mvc 'world:set-chunk-coordinate-center (spread (entity-position *ent*)))
     ;;Controller?
     (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
     ;;Model
+    ;;FIXME::this depends on the position of entity.
     (world:load-world t)
     ;;Rendering/view?
     (reset-chunk-display-list)
     (update-world-vao))
-  
+  (mvc 'world:set-chunk-coordinate-center (spread (entity-position *ent*)))
   ;;Polling
   ;;Physics
   ;;Rendering Chunks
@@ -335,10 +339,10 @@
   ;;Calculate what bocks are selected etc..
   (setf *fist*
 	(mvc 'standard-fist
-	     (spread (player-position *ent*))
+	     (spread (entity-position *ent*))
 	     (spread (sb-cga:vec*
 		      (camera-matrix:camera-vec-forward *camera*)
-		      (* -1.0 *reach*)))))
+		      *reach*))))
   (when (mode-enabled-p :fist-mode)
     (run-buttons *fist-keys*))
   (when (mode-enabled-p :god-mode)
@@ -360,11 +364,11 @@
      (let ((x 0)
 	   (y 0))
        (when (window:button :key :down #\w)
+	 (incf x))
+       (when (window:button :key :down #\s)
 	 (decf x))
        (when (window:button :key :down #\a)
 	 (decf y))
-       (when (window:button :key :down #\s)
-	 (incf x))
        (when (window:button :key :down #\d)
 	 (incf y))
        ;;[FIXME]
@@ -381,6 +385,9 @@
     ;;[FIXME] because this runs after update-moused, the camera swivels
     ;;unecessarily.
     (run-buttons *normal-keys*))
+  (let ((number-key (control:num-key-jp :pressed)))
+    (when number-key
+      (setf *ent* (elt *entities* number-key))))
   
   ;;Set the pitch and yaw of the player based on the
   ;;mouse position
@@ -413,6 +420,9 @@
      :time-of-day *time-of-day*
      :fog-ratio *fog-ratio*
      ))
+  (map nil
+       'render-entity
+       *entities*)
   (render-chunks)
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
@@ -420,31 +430,35 @@
   (use-solidshader *camera*)
   (render-fist *fist*)
   (gl:line-width 10.0)
-  (mvc 'draw-line 0 0 0 (spread '(200 200 200)))
+  (map nil
+       (lambda (ent)
+	 (let ((*camera* (camera-matrix:make-camera)))
+	   (sync_entity->camera ent *camera*)
+	   (render-camera *camera*)))
+       *entities*)
+  (render-units)
+  ;;(mvc 'render-line 0 0 0 (spread '(200 200 200)))
   (render-crosshairs)
-
+  
   (complete-render-tasks)
   (dispatch-mesher-to-dirty-chunks))
 
-(defun draw-line (x0 y0 z0 x1 y1 z1 &optional (r 0.2) (g 0.0) (b 1.0))
-  (floatf x0 y0 z0 x1 y1 z1)
-  (let ((thing
-	 (let ((*iterator* (scratch-buffer:my-iterator)))
-	   (scratch-buffer:bind-out* ((*iterator* fun))
-	     (fun x0 y0 z0)
-	     (fun x1 y1 z1))
-	   (scratch-buffer:flush-bind-in*
-	       ((*iterator* xyz))
-	     (glhelp:create-vao-or-display-list-from-specs
-	      (:lines 2)
-	      (;;Query objects don't need the other attributes
-	       ;;(*texcoord-attr* 0.06 0.06)
-	       ;;(4 0.0 0.0 0.0 0.0)
-	       ;;(5 0.0 0.0 0.0 0.0)
-	       (3 r g b 1.0)
-	       (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))
-    (glhelp:slow-draw thing)
-    (glhelp:slow-delete thing)))
+(defun render-camera (camera)
+  (mapc (lambda (arg)
+	  (mvc 'render-line-dx
+	       (spread (camera-matrix:camera-vec-position camera))
+	       (spread (map 'list
+			    (lambda (x)
+			      (* x 10))
+			    arg))))
+	(camera-matrix::camera-edges camera)))
+(defun render-units (&optional (foo 100))
+  ;;X is red
+  (mvc 'render-line 0 0 0 foo 0 0 (spread #(1.0 0.0 0.0)))
+  ;;Y is green
+  (mvc 'render-line 0 0 0 0 foo 0 (spread #(0.0 1.0 0.0)))
+  ;;Z is blue
+  (mvc 'render-line 0 0 0 0 0 foo (spread #(0.0 0.0 1.0))))
 
 (defun sync_entity->camera (entity camera)
   ;;FIXME:this lumps in generating the other cached camera values,
@@ -460,7 +474,7 @@
    (let ((particle (entity-particle entity)))
      (if (and (not (entity-fly? entity))
 	      (eql 0 (entity-sneak? entity)))
-	 (translate-pointmass particle 0.0 0.125 0.0)
+	 (translate-pointmass particle 0.0 -0.125 0.0)
 	 particle))
    camera
    *fraction-for-fps*)
@@ -468,8 +482,9 @@
   ;;FIXME::these values are
   (set-camera-values
    camera
-   (/ (floatify window:*width*)
-      (floatify window:*height*))
+   (/ (floatify window:*height*)
+      (floatify window:*width*)
+      )
    *fov*
    (* 1024.0 256.0))
   (camera-matrix:update-matrices camera)
@@ -485,7 +500,12 @@
     (let ((vec (camera-matrix:camera-vec-position camera)))
       (nsb-cga:%vec-lerp vec prev curr fraction))))
 (defun sync_neck->camera (neck camera)
-  (unit-pitch-yaw (necking-pitch neck) (necking-yaw neck)
+  #+nil
+  (print (list (necking-pitch neck)
+	       (necking-yaw neck)))
+  ;;(print)
+  (unit-pitch-yaw (necking-pitch neck)
+		  (necking-yaw neck)
 		  (camera-matrix:camera-vec-forward camera)))
 
 ;;;;************************************************************************;;;;

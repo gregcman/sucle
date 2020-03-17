@@ -281,6 +281,8 @@ gl_FragColor = color;
    (glhelp:create-opengl-texture-from-data modified-terrain-png)))
 (defparameter *position-attr* 0)
 (defparameter *texcoord-attr* 2)
+;;FIXME::some standard to this? nvidia?
+(defparameter *color-attr* 3)
 
 (defparameter *shader-version* 120)
 (defun test-all-shader-versions ()
@@ -376,6 +378,7 @@ gl_FragColor.rgb = color_out;
 	 (small (- 0.0 offset))
 	 (large (+ 1.0 offset)))
     (create-aabb large large large small small small)))
+;;'render-' type functions write to OpenGL.
 
 (defun render-fist (&optional (fist *fist*))
   (gl:disable :blend)
@@ -384,26 +387,46 @@ gl_FragColor.rgb = color_out;
   (gl:line-width 2)
   ;;[FIXME]render the fist again
   (when (fist-exists fist)
-    (let ((selected-block (fist-selected-block fist)))
-      (with-vec (a b c) (selected-block)
-	(let ((iterator (scratch-buffer:my-iterator)))
-	  (let ((times (draw-aabb a b c *selected-block-aabb* iterator)))
-	    (declare (type fixnum times)
-		     (optimize (speed 3) (safety 0)))
-	    ;;mesh-fist-box
-	    (let ((box
-		   (let ((n 0.06))
-		     ;;[FIXME]why use this *iterator*?
-		     (scratch-buffer:flush-bind-in* ((iterator xyz))		    
-		       (glhelp:create-vao-or-display-list-from-specs
-			(:quads times)
-			((3 n n n)
-			 (*position-attr* (xyz) (xyz) (xyz))))
-		       ))))
-	      (glhelp:slow-draw box)
-	      (glhelp:slow-delete box)
-	      )))
-	))))
+    (mvc 'render-aabb-at *selected-block-aabb* (spread (fist-selected-block fist)))))
+(defun render-entity (entity)
+  (mvc 'render-aabb-at
+       (entity-aabb entity)
+       (spread (entity-position entity))))
+(defun render-aabb-at (aabb x y z &optional (r 0.1) (g 0.1) (b 0.1))
+  (let ((iterator (scratch-buffer:my-iterator)))
+    (let ((times (draw-aabb x y z aabb iterator)))
+      (declare (type fixnum times)
+	       (optimize (speed 3) (safety 0)))
+      ;;mesh-fist-box
+      (let ((box
+	     ;;[FIXME]why use this *iterator*?
+	     ;;inefficient: creates an iterator, and an opengl object, renders its,
+	     ;;just to delete it on the same frame
+	     (scratch-buffer:flush-bind-in* ((iterator xyz))		    
+	       (glhelp:create-vao-or-display-list-from-specs
+		(:quads times)
+		((*color-attr* r g b)
+		 (*position-attr* (xyz) (xyz) (xyz))))
+	       )))
+	(glhelp:slow-draw box)
+	(glhelp:slow-delete box)))))
+(defun render-line-dx (x0 y0 z0 dx dy dz &optional (r 0.2) (g 0.0) (b 1.0))
+  (render-line x0 y0 z0 (+ x0 dx) (+ y0 dy) (+ z0 dz) r g b))
+(defun render-line (x0 y0 z0 x1 y1 z1 &optional (r 0.2) (g 0.0) (b 1.0))
+  (floatf x0 y0 z0 x1 y1 z1)
+  (let ((thing
+	 (let ((iterator (scratch-buffer:my-iterator)))
+	   (scratch-buffer:bind-out* ((iterator fun))
+	     (fun x0 y0 z0)
+	     (fun x1 y1 z1))
+	   (scratch-buffer:flush-bind-in*
+	       ((iterator xyz))
+	     (glhelp:create-vao-or-display-list-from-specs
+	      (:lines 2)
+	      ((*color-attr* r g b 1.0)
+	       (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))
+    (glhelp:slow-draw thing)
+    (glhelp:slow-delete thing)))
 #+nil
 (defun render-chunk-outline ()
   (draw-aabb

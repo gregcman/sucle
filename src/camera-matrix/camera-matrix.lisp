@@ -34,9 +34,13 @@
    (frustum-near 0.0078125 :type single-float)
    (frustum-far 128.0 :type single-float)
 
+   (cam-up (sb-cga:vec 0.0 1.0 0.0) :type sb-cga:vec)
+   (cam-right (sb-cga:vec 0.0 0.0 1.0) :type sb-cga:vec)
+   
    ;;The normals of each plane.
    ;;one is vec-forward, another -vec-forward
-   planes))
+   planes
+   edges))
 
 (defun projection-matrix (result camera)
   (let ((half-fovy (* 0.5 (camera-fov camera)))
@@ -49,21 +53,44 @@
 	    (difference (- near far)))
 	;;[FIXME]necessary?
 	(nsb-cga:%matrix result 
-			 (/ cot aspect) 0.0 0.0 0.0
+			 (* cot aspect) 0.0 0.0 0.0
 			 0.0 cot 0.0 0.0
 			 0.0 0.0 (/ sum difference) (/ (* 2.0 far near) difference)
 			 0.0 0.0 -1.0 0.0)))))
 
+(defun calculate-frustum-edge-vectors (camera)
+  (let* ((half-fovx (* 0.5 (camera-fov camera)))
+	 (half-fovy (* half-fovx (camera-aspect-ratio camera)))
+	 (forward (camera-vec-forward camera))
+	 (up (camera-cam-up camera))
+	 (right (camera-cam-right camera)))
+    (let ((x (nsb-cga:rotate-around up half-fovx))
+	  (-x (nsb-cga:rotate-around up (- half-fovx)))
+	  (y (nsb-cga:rotate-around right half-fovy))
+	  (-y (nsb-cga:rotate-around right (- half-fovy))))
+      (setf
+       (camera-edges camera)
+       (list
+	;;forward
+	;;(nsb-cga:vec* forward -1.0)
+	(nsb-cga:transform-point forward (sb-cga:matrix* x y))
+	(nsb-cga:transform-point forward (sb-cga:matrix* -x y))
+	(nsb-cga:transform-point forward (sb-cga:matrix* -x -y))
+	(nsb-cga:transform-point forward (sb-cga:matrix* x -y)))))))
+#+nil
+(nsb-cga:cross-product
+ (nsb-cga:vec 1.0 0.0 0.0)
+ (nsb-cga:vec 0.0 1.0 0.0))
+
 (defun relative-lookat (result relative-target up)
   (let ((camright (sb-cga:cross-product up relative-target)))
-    (declare (dynamic-extent camright))
     (sb-cga:%normalize camright camright)
     (let ((camup (sb-cga:cross-product relative-target camright)))
-      (declare (dynamic-extent camup))
-      (get-lookat result
-		  camright
-		  camup
-		  relative-target))))
+      (sb-cga:%normalize camup camup)
+      (values
+       (get-lookat result camright camup relative-target)
+       camright
+       camup))))
 
 (defun get-lookat (result right up direction)
   (let ((rx (aref right 0))
@@ -91,12 +118,20 @@
 	(forward (camera-vec-forward camera))
 	(up (camera-vec-up camera)))
     (projection-matrix projection-matrix camera)
-    (relative-lookat view-matrix forward up)
+    (multiple-value-bind (a right up)
+	(relative-lookat view-matrix
+			 (nsb-cga:vec* forward -1.0)
+			 up)
+      (declare (ignorable a))
+      (setf (camera-cam-up camera) up
+	    (camera-cam-right camera) right))
     (nsb-cga:%matrix* projection-view-matrix projection-matrix view-matrix)
-    (let ((cev (camera-vec-noitisop camera)))
-      (nsb-cga:%vec* cev (camera-vec-position camera) -1.0)
+    (let ((cev (camera-vec-noitisop camera))
+	  (position (camera-vec-position camera)))
+      (nsb-cga:%vec* cev position -1.0)
       (nsb-cga:%translate player-matrix cev))
-    (nsb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))
+    (nsb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix))
+  (calculate-frustum-edge-vectors camera))
 
 
 ;;;

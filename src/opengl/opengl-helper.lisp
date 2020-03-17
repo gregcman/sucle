@@ -853,17 +853,38 @@ gl_FragColor = pixcolor;
 	  (foo 5 3))))
     array))
 
+(utility:eval-always
+ (defun %cache-vertex-attrib-f* (&optional
+				   (forms
+				    '((a foo bar 42)
+				      (to-cache 1.0 2.0 3.0)
+				      (calculation (xyz) (xyz) (xyz)))))
+   (let* ((rests (mapcar 'cdr forms))
+	  (firsts (mapcar 'car forms))
+	  (syms (loop :repeat (length forms) :collect (gensym))))
+     (values
+      (mapcar (lambda (sym first)
+		(list sym first))
+	      syms
+	      firsts)
+      (mapcar (lambda (sym rest)
+		(list* sym rest))
+	      syms
+	      rests)))))
+
 ;;[FIXME]rename from gl-list to display-list?
-(defmacro create-gl-list-from-specs ((type times) form)
+(defmacro create-gl-list-from-specs ((type times) forms)
   (utility:with-gensyms (fixed-times fixed-type)
     ;;[FIXME] the prefix "fix" is unrelated for fixed-type,fixed-times vs fixnum
-    `(let ((,fixed-type ,type)
-	   (,fixed-times ,times))
-       (declare (type fixnum ,fixed-times))
-       (with-gl-list
-	 (gl:with-primitives ,fixed-type
-	   (loop :repeat ,fixed-times :do 
-	      (vertex-attrib-f* ,form)))))))
+    (multiple-value-bind (let-args fixed-form) (%cache-vertex-attrib-f* forms)
+      `(let ((,fixed-type ,type)
+	     (,fixed-times ,times))
+	 (declare (type fixnum ,fixed-times))
+	 (with-gl-list
+	   (gl:with-primitives ,fixed-type
+	     (let ,let-args
+	       (loop :repeat ,fixed-times :do 
+		  (vertex-attrib-f* ,fixed-form)))))))))
 
 (defparameter *quad-to-triangle-index-buffer-quad-count*
   ;;the number of quads in a 16x16x16 chunk if each block has 6 faces showing.
