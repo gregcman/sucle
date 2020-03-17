@@ -258,6 +258,10 @@
   (setf *lerp-mouse-y* (alexandria:lerp smoothing-factor *lerp-mouse-y* *mouse-y*)))
 (defparameter *mouse-multiplier* 0.002617)
 (defparameter *mouse-multiplier-aux* (/ (* 0.5 pi 0.9999) *mouse-multiplier*))
+(defun neck-values ()
+  (values
+   (floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
+   (floatify (* *lerp-mouse-y* *mouse-multiplier*))))
 
 (defun unit-pitch-yaw (pitch yaw &optional (result (sb-cga:vec 0.0 0.0 0.0)))
   (let ((cos-pitch (cos pitch)))
@@ -275,14 +279,6 @@
    :frustum-near (/ 1.0 8.0)))
 (defparameter *fog-ratio* 0.75)
 (defparameter *time-of-day* 1.0)
-
-(defun update-camera (&optional (camera *camera*))
-  (setf (camera-matrix:camera-aspect-ratio camera)
-	(/ (floatify window:*width*)
-	   (floatify window:*height*)))
-  (setf (camera-matrix:camera-fov camera) *fov*)
-  (setf (camera-matrix:camera-frustum-far camera) (* 1024.0 256.0))
-  (camera-matrix:update-matrices camera))
 
 ;;;;************************************************************************;;;;
 ;;emacs-like modes
@@ -390,24 +386,10 @@
      ;;run the physics
      (run-physics-for-entity *ent*)))
 
-  ;;Calculate the camera position from
-  ;;the past, current position of the player and the frame fraction
-  (set-camera-position *fraction-for-fps*)
   ;;Set the pitch and yaw of the player based on the
   ;;mouse position
-  (setf (necking-yaw (entity-neck *ent*))
-	(floatify (- (* *lerp-mouse-x* *mouse-multiplier*)))
-	(necking-pitch (entity-neck *ent*))
-	(floatify (* *lerp-mouse-y* *mouse-multiplier*)))
-  ;;Set the direction of the camera based on the
-  ;;pitch and yaw of the player
-  (unit-pitch-yaw 
-   (necking-pitch (entity-neck *ent*))
-   (necking-yaw (entity-neck *ent*))
-   (camera-matrix:camera-vec-forward *camera*))
-  
-  (modify-camera-position-for-sneak)
-  
+  (mvc 'set-neck-values (entity-neck *ent*) (neck-values))
+
   ;;load or unload chunks around the player who may have moved
   (world:load-world)
   ;;render chunks and such
@@ -415,8 +397,9 @@
   (application:on-session-change *last-session*
     (reset-chunk-display-list)
     (update-world-vao))
-  ;;update the camera
-  (update-camera *camera*)
+
+  (sync_entity->camera *ent* *camera*)
+  
   (draw-to-default-area)
   ;;this also clears the depth and color buffer.
   (let ((color (the-sky-color)))
@@ -433,10 +416,74 @@
   ;;selected block and crosshairs
   (use-solidshader *camera*)
   (render-fist *fist*)
+  (gl:line-width 10.0)
+  (mvc 'draw-line 0 0 0 (spread '(200 200 200)))
   (render-crosshairs)
 
   (complete-render-tasks)
   (dispatch-mesher-to-dirty-chunks))
+
+(defun draw-line (x0 y0 z0 x1 y1 z1 &optional (r 0.2) (g 0.0) (b 1.0))
+  (floatf x0 y0 z0 x1 y1 z1)
+  (let ((thing
+	 (let ((*iterator* (scratch-buffer:my-iterator)))
+	   (scratch-buffer:bind-out* ((*iterator* fun))
+	     (fun x0 y0 z0)
+	     (fun x1 y1 z1))
+	   (scratch-buffer:flush-bind-in*
+	       ((*iterator* xyz))
+	     (glhelp:create-vao-or-display-list-from-specs
+	      (:lines 2)
+	      (;;Query objects don't need the other attributes
+	       ;;(*texcoord-attr* 0.06 0.06)
+	       ;;(4 0.0 0.0 0.0 0.0)
+	       ;;(5 0.0 0.0 0.0 0.0)
+	       (3 r g b 1.0)
+	       (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))
+    (glhelp:slow-draw thing)
+    (glhelp:slow-delete thing)))
+
+(defun sync_entity->camera (entity camera)
+  ;;FIXME:this lumps in generating the other cached camera values,
+  ;;and the generic used configuration, such as aspect ratio and fov.
+  
+  ;;Set the direction of the camera based on the
+  ;;pitch and yaw of the player
+  (sync_neck->camera (entity-neck entity) camera)
+  ;;Calculate the camera position from
+  ;;the past, current position of the player and the frame fraction
+  (sync_particle->camera
+   ;;modify the camera for sneaking
+   (let ((particle (entity-particle entity)))
+     (if (and (not (entity-fly? entity))
+	      (eql 0 (entity-sneak? entity)))
+	 (translate-pointmass particle 0.0 0.125 0.0)
+	 particle))
+   camera
+   *fraction-for-fps*)
+  ;;update the camera
+  ;;FIXME::these values are
+  (set-camera-values
+   camera
+   (/ (floatify window:*width*)
+      (floatify window:*height*))
+   *fov*
+   (* 1024.0 256.0))
+  (camera-matrix:update-matrices camera)
+  ;;return the camera, in case it was created.
+  (values camera))
+(defun set-camera-values (camera aspect-ratio fov frustum-far)
+  (setf (camera-matrix:camera-aspect-ratio camera) aspect-ratio)
+  (setf (camera-matrix:camera-fov camera) fov)
+  (setf (camera-matrix:camera-frustum-far camera) frustum-far))
+(defun sync_particle->camera (particle camera fraction)
+  (let* ((prev (pointmass-position-old particle))
+	 (curr (pointmass-position particle)))
+    (let ((vec (camera-matrix:camera-vec-position camera)))
+      (nsb-cga:%vec-lerp vec prev curr fraction))))
+(defun sync_neck->camera (neck camera)
+  (unit-pitch-yaw (necking-pitch neck) (necking-yaw neck)
+		  (camera-matrix:camera-vec-forward camera)))
 
 ;;;;************************************************************************;;;;
 ;;Ripped from sucle-test essentially.
@@ -550,18 +597,16 @@ Press q/escape to quit
 ;;;detect more entities
 ;;;detect block types?
 (defun not-occupied (x y z &optional (ent *ent*))
-  (let ((aabb (entity-aabb ent))
-	(pos (pointmass-position
-	      (entity-particle ent))))
-    (aabbcc:aabb-not-overlap
-     (pos-to-block-aabb x y z)
-     (floatify x)
-     (floatify y)
-     (floatify z)
-     aabb
-     (aref pos 0)
-     (aref pos 1)
-     (aref pos 2))))
+  (let ((aabb (pos-to-block-aabb x y z)))
+    (floatf x y z)
+    (mvc 'aabbcc:aabb-not-overlap
+	 aabb
+	 x y z
+	 (entity-aabb ent)
+	 (spread
+	  ;;position
+	  (pointmass-position
+	   (entity-particle ent))))))
 
 (defparameter *blockid* (block-data:lookup :planks))
 
@@ -572,54 +617,35 @@ Press q/escape to quit
   (let* ((player-pointmass (entity-particle *ent*))
 	 (curr (pointmass-position player-pointmass)))
     curr))
-(defun player-position-old ()
-  (let* ((player-pointmass (entity-particle *ent*))
-	 (prev (pointmass-position-old player-pointmass)))
-    prev))
-
-(defun set-camera-position (fraction)
-  (let ((vec (camera-matrix:camera-vec-position *camera*)))
-    (nsb-cga:%vec-lerp vec (player-position-old) (player-position) fraction)))
-(defun modify-camera-position-for-sneak ()
-  (let ((vec (camera-matrix:camera-vec-position *camera*)))
-    (when (and (not (entity-fly? *ent*))
-	       (eql 0 (entity-sneak? *ent*)))
-      (nsb-cga:%vec- vec vec (load-time-value (nsb-cga:vec 0.0 0.125 0.0))))))
-
 
 (defparameter *reach* 5.0)
 
+(defparameter *x* 0)
+(defparameter *y* 0)
+(defparameter *z* 0)
 ;;;;Default punching and placing blocks
 (defparameter *left-fist-fnc* 'destroy-block-at)
-(defun destroy-block-at (x y z)
+(defun destroy-block-at (&optional (x *x*) (y *y*) (z *z*))
   ;;(blocksound x y z)
   (world:plain-setblock x y z (block-data:lookup :air) 15))
 (defparameter *right-fist-fnc* 'place-block-at)
-(defun place-block-at (x y z &optional (blockval *blockid*))
+(defun place-block-at (&optional (x *x*) (y *y*) (z *z*) (blockval *blockid*))
   (when (not-occupied x y z)
     ;;(blocksound x y z)
     (world:plain-setblock x y z blockval (block-data:data blockval :light))))
 ;;;;x
-(defparameter *x* 0)
-(defparameter *y* 0)
-(defparameter *z* 0)
+
 (defparameter *fist-keys*
   `(((:mouse :pressed :left) . 
      ,(lambda ()
 	(when (fist-exists *fist*)
-	  (with-vec (a b c) ((fist-selected-block *fist*))
-	    (let ((*x* a)
-		  (*y* b)
-		  (*z* c))
-	      (funcall *left-fist-fnc* a b c))))))
+	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
+	    (funcall *left-fist-fnc*)))))
     ((:mouse :pressed :right) .
      ,(lambda ()
 	(when (fist-exists *fist*)
-	  (with-vec (a b c) ((fist-normal-block *fist*))
-	    (let ((*x* a)
-		  (*y* b)
-		  (*z* c))
-	      (funcall *right-fist-fnc* a b c))))))))
+	  (multiple-value-bind (*x* *y* *z*) (spread (fist-normal-block *fist*))
+	    (funcall *right-fist-fnc*)))))))
 (defparameter *normal-keys*
   `(((:key :pressed #\p) .
      ,(lambda () (update-world-vao)))

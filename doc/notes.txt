@@ -229,3 +229,27 @@ why am I so against using existing libraries?
 ;;die if I fall too far
 ;;use clos for objects and inheritance instead of structs?
 ;;clean up sucle::physics
+;;frustum culling, so chunks don't flicker in and out of existence
+;;when turning the camera
+;;mario like-thwomp
+;;double jump, dash, ledge grab, hat in time celeste
+;;shell, button, kick, stomp
+;;wind? spikes? heat? metal balls? springs?
+;;spritesheet, not necessarily a square grid of squares?
+;;The third person?
+;;minecraft colored-wool like blocks -> dokucraft grass?
+
+;;currently each chunk is an array of element type t.
+;;thats 64 bits on x64 machines, 32 bits on others.
+;;maybe special types can be special-cased. or is this a
+premature optimization?
+
+#( 16-bit data ...)
+16 * 16 * 16 ->12 bits 4 bit type
+;;punching block hardness?
+;;your head should be spinning, you should feel very small.
+
+frustum culling
+- update camera view planes
+;;too many side effects in sucle main loop
+;;make sure all lisp objects can be used functionally?

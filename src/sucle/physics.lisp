@@ -148,8 +148,9 @@
       (fill force 0.0)
       (let* ((contact-state (if noclip ;;(and noclip (not *dirtying*))
 				#b000000
-				(with-vec (px py pz) (pos)
-				  (funcall contact-handler px py pz aabb))))
+				(mvc contact-handler
+				     (spread pos)
+				     aabb)))
 	     (vel-length (nsb-cga:vec-length vel))
 	     (total-speed (* *ticks-per-second* vel-length))
 	     (old-onground (logtest (entity-contact entity) #b000100)))
@@ -431,6 +432,9 @@
  (defstruct necking
    (yaw 0.0)
    (pitch 0.0)))
+(defun set-neck-values (neck yaw pitch)
+  (setf (necking-yaw neck) yaw
+	(necking-pitch neck) pitch))
 
 (struct-to-clos:struct->class
  (defstruct pointmass
@@ -439,9 +443,27 @@
    (velocity (nsb-cga:vec 0.0 0.0 0.0))
    (force (nsb-cga:vec 0.0 0.0 0.0))
    (mass 1.0)))
+(defun copy-pointmass (p)
+  (make-pointmass
+   :position (nsb-cga:copy-vec (pointmass-position p))
+   :position-old (nsb-cga:copy-vec (pointmass-position-old p))
+   :velocity (pointmass-velocity p)
+   :force (pointmass-force p)
+   :mass (pointmass-mass p)))
 (defun step-pointmass (p)
   (let ((old (pointmass-position-old p))
 	(curr (pointmass-position p)))
     (nsb-cga:%copy-vec old curr)))
+(defun translate-pointmass (p dx dy dz)
+  (let* ((new-p (copy-pointmass p))
+	 (prev (pointmass-position-old new-p))
+	 (curr (pointmass-position new-p))
+	 ;;FIXME::uses a throwaway vec?
+	 (translation (nsb-cga:vec dx dy dz)))
+    ;;FIXME:does this do anything? garbage collection?
+    (declare (dynamic-extent translation))
+    (nsb-cga:%vec+ prev prev translation)
+    (nsb-cga:%vec+ curr curr translation)
+    new-p))
 ;;;;</PHYSICS>
 ;;;;************************************************************************;;;;

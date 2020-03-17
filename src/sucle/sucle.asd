@@ -35,6 +35,7 @@
    (:file "queue")
    (:file "voxel-chunks")
    (:file "package")
+   (:file "util")
    ;;(:file "block-light") ;;light propogation
    (:file "mesher")
    (:file "block-data")
