@@ -80,7 +80,7 @@
   (let ((miny
 	 (aabbcc:aabb-miny
 	  (entity-aabb *ent*))))
-    (with-vec (x y z) ((player-position))
+    (with-vec (x y z) ((player-position *ent*))
       (values (floor x)
 	      (1- (floor (+ miny y)))
 	      (floor z)))))

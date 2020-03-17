@@ -335,6 +335,10 @@
    jump?
    sneak?
    ))
+(defun entity-position (entity)
+  (let* ((player-pointmass (entity-particle entity))
+	 (curr (pointmass-position player-pointmass)))
+    curr))
 
 (defun create-entity ()
   (make-entity :collision-fun 'entity-collision

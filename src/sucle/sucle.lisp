@@ -271,15 +271,6 @@
 	    z (* cos-pitch (cos yaw)))))
   result)
 
-;;;;
-(defparameter *fov* (* (floatify pi) (/ 85 180)))
-(defparameter *camera*
-  (camera-matrix:make-camera
-   :frustum-far (* 256.0)
-   :frustum-near (/ 1.0 8.0)))
-(defparameter *fog-ratio* 0.75)
-(defparameter *time-of-day* 1.0)
-
 ;;;;************************************************************************;;;;
 ;;emacs-like modes
 (defparameter *active-modes* ())
@@ -297,23 +288,37 @@
       (disable-mode mode)))
 ;;;;************************************************************************;;;;
 
-(defparameter *last-session* nil)
 (defparameter *session* nil)
+(defparameter *ticks* 0)
 (defparameter *game-ticks-per-iteration* 0)
 (defparameter *fraction-for-fps* 0.0)
 (defparameter *fist* nil)
+(defparameter *ent* nil)
+(defparameter *reach* 5.0)
+(defparameter *fov* (floatify (* pi (/ 85 180))))
+(defparameter *camera*
+  (camera-matrix:make-camera
+   :frustum-far (* 256.0)
+   :frustum-near (/ 1.0 8.0)))
+(defparameter *fog-ratio* 0.75)
+(defparameter *time-of-day* 1.0)
+
 (defun sucle-per-frame ()
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
   ;;set the chunk center aroun the player
-  (with-vec (x y z) ((player-position))
-    (world:set-chunk-coordinate-center x y z))
+  (mvc 'world:set-chunk-coordinate-center (spread (player-position *ent*)))
   (livesupport:update-repl-link)
   (application:on-session-change *session*
+    ;;Controller?
     (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
-    (world:load-world t))
+    ;;Model
+    (world:load-world t)
+    ;;Rendering/view?
+    (reset-chunk-display-list)
+    (update-world-vao))
   
   ;;Polling
   ;;Physics
@@ -328,10 +333,12 @@
   ;;physics
 
   ;;Calculate what bocks are selected etc..
-  (with-vec (px py pz) ((player-position))
-    (with-vec (vx vy vz) ((sb-cga:vec* (camera-matrix:camera-vec-forward *camera*)
-				       (* -1.0 *reach*)))
-      (setf *fist* (standard-fist px py pz vx vy vz))))
+  (setf *fist*
+	(mvc 'standard-fist
+	     (spread (player-position *ent*))
+	     (spread (sb-cga:vec*
+		      (camera-matrix:camera-vec-forward *camera*)
+		      (* -1.0 *reach*)))))
   (when (mode-enabled-p :fist-mode)
     (run-buttons *fist-keys*))
   (when (mode-enabled-p :god-mode)
@@ -374,6 +381,10 @@
     ;;[FIXME] because this runs after update-moused, the camera swivels
     ;;unecessarily.
     (run-buttons *normal-keys*))
+  
+  ;;Set the pitch and yaw of the player based on the
+  ;;mouse position
+  (mvc 'set-neck-values (entity-neck *ent*) (neck-values))
 
   ;;Run the game ticks
 
@@ -386,18 +397,10 @@
      ;;run the physics
      (run-physics-for-entity *ent*)))
 
-  ;;Set the pitch and yaw of the player based on the
-  ;;mouse position
-  (mvc 'set-neck-values (entity-neck *ent*) (neck-values))
-
   ;;load or unload chunks around the player who may have moved
   (world:load-world)
   ;;render chunks and such
   ;;handle chunk meshing
-  (application:on-session-change *last-session*
-    (reset-chunk-display-list)
-    (update-world-vao))
-
   (sync_entity->camera *ent* *camera*)
   
   (draw-to-default-area)
@@ -605,21 +608,9 @@ Press q/escape to quit
 	 (entity-aabb ent)
 	 (spread
 	  ;;position
-	  (pointmass-position
-	   (entity-particle ent))))))
+	  (entity-position ent)))))
 
 (defparameter *blockid* (block-data:lookup :planks))
-
-(defparameter *ent* nil)
-(defparameter *ticks* 0)
-
-(defun player-position ()
-  (let* ((player-pointmass (entity-particle *ent*))
-	 (curr (pointmass-position player-pointmass)))
-    curr))
-
-(defparameter *reach* 5.0)
-
 (defparameter *x* 0)
 (defparameter *y* 0)
 (defparameter *z* 0)
