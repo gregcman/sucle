@@ -254,3 +254,7 @@ frustum culling
 ;;too many side effects in sucle main loop
 ;;make sure all lisp objects can be used functionally?
 [TODO] optimization -> don't frustum check each chunk, do it in columns.
+
+;;database multiple worlds
+;;chunk manager
+;;chunk cursors -> chunk array?

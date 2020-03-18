@@ -104,12 +104,6 @@
    :width 720
    :height 480
    :title "conceptually simple block game"))
-#+nil
-(defun load-world-again (name)
-  (setf world:*persist* nil)
-  (setf world:*world-directory* name)
-  (load-world t))
-
 
 ;;;;************************************************************************;;;;
 (defun enter (&optional (app 'default-per-frame))
@@ -452,7 +446,7 @@
 	       (sync_entity->camera ent *camera*)
 	       (render-camera *camera*))))
 	 *entities*))
-  #+nil
+  ;#+nil
   (progn
     (gl:line-width 10.0)
     (render-chunk-outlines))

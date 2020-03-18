@@ -273,7 +273,7 @@
 					  *ticks-per-second* 0.5)
 				       mass))
 	(modify nsb-cga:%vec+ vel force)
-	(contact-handle
+	(nullify-velocity-where-obstructed
 	 vel
 	 (logtest contact-state #b100000)
 	 (logtest contact-state #b010000)

@@ -66,58 +66,76 @@
 ;;;;<PERSIST-WORLD>
 (in-package #:world)
 
-;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
-;;And have chunk loading in another file?
+
+;;CRUD implementation for map from lisp_obj -> lisp_obj
+;;create, read, update, delete
+;;- slqlite database
+;;- pile of files
 
 ;;world loading code below?
 (defun convert-object-to-filename (obj)
-  (format nil "~s" obj))
-
+  (with-standard-io-syntax
+    ;;FIXME::what about circular data structures?
+    (format nil "~s" obj)))
+;;;;SQLITE + sucle-serialize
+(defun crud_create_sqlite (lisp-object data)
+  ;;FIXME:update creates a row regardless, so update
+  ;;is the real create.
+  (crud_update_sqlite lisp-object data))
+(defun crud_read_sqlite (lisp-object)
+  (let* ((file-name (convert-object-to-filename lisp-object))
+	 (stuff
+	  (database::with-open-database2
+	    (database::retreive file-name))))
+    (when stuff
+      (sucle-serialize::decode-zlib-conspack-payload stuff))))
+(defun crud_update_sqlite (lisp-object data)
+  (database::with-open-database2
+    (database::add
+     (convert-object-to-filename lisp-object)
+     (sucle-serialize::encode-zlib-conspack-payload data))))
+(defun crud_delete_sqlite (lisp-object)
+  (database::with-open-database2
+    (database::delete-entry (convert-object-to-filename lisp-object))))
+;;;;sucle-serialize
 (defparameter *some-saves* nil)
 (defparameter *world-directory* nil)
 (defun world-path (&optional (path *world-directory*) (base-dir *some-saves*))
   (utility:rebase-path path base-dir))
 
-(defun savechunk (chunk position &optional (path (world-path))
-				   )
-  (declare (ignorable path))
-  ;;[FIXME]undocumented swizzling and multiplication by 16, as well as loadchunk
-  (let ((filename (convert-object-to-filename (chunk-coordinate-to-filename position))))
-    ;;(format t "~%Saving chunk ~a" filename)
-    (let ((data
-	   (sucle-serialize::encode-zlib-conspack-payload 
-	    (list
-	     (voxel-chunks:chunk-data chunk)))))
-      (database::with-open-database2
-	(;;sucle-serialize:save
-	 database::add
-	 (progn
-	   ;;merge-pathnames
-	   filename
-	   ;;path
-	   )
-	 data)))))
+(defun crud_create_file-pile (lisp-object data)
+  (crud_update_file-pile lisp-object data))
+(defun crud_read_file-pile (lisp-object &optional (path (world-path)))
+  (sucle-serialize:load
+   (merge-pathnames
+    (convert-object-to-filename
+     lisp-object)
+    path)))
+(defun crud_update_file-pile (lisp-object data &optional (path (world-path)))
+  (ensure-directories-exist path)
+  (sucle-serialize:save
+   (merge-pathnames (convert-object-to-filename lisp-object) path)
+   (sucle-serialize::encode-zlib-conspack-payload data)))
+(defun crud_delete_file-pile (lisp-object &optional (path (world-path)))
+  (let* ((name (convert-object-to-filename lisp-object))
+	 (chunk-save-file (merge-pathnames name path))
+	 (file-exists-p (probe-file chunk-save-file)))
+    (when file-exists-p
+      (delete-file chunk-save-file))))
+;;;;************************************************************************;;;;
 
-(defun newload (file-name)
-  (let ((stuff (database::retreive file-name)))
-    (when stuff
-      (sucle-serialize::decode-zlib-conspack-payload stuff))))
+;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
+;;And have chunk loading in another file?
 
-(defun loadchunk (chunk-coordinates &optional (path (world-path))
-				      )
-  (declare (ignorable path))
-  (let* ((the-path
-	  (progn
-	    ;;merge-pathnames
-	    (convert-object-to-filename
-	     (chunk-coordinate-to-filename chunk-coordinates))
-	    ;;path
-	    ))
-	 (data
-	  (database::with-open-database2
-	    (;;sucle-serialize:load
-	     newload
-	     the-path))))
+(defun savechunk (chunk position)
+  (crud_update_sqlite position (list (voxel-chunks:chunk-data chunk)))
+  ;;(crud_update_file-pile position (list (voxel-chunks:chunk-data chunk)))
+  )
+
+(defun loadchunk (chunk-coordinates)
+  (let* ((data
+	  ;;(crud_read_file-pile (chunk-coordinate-to-filename chunk-coordinates))
+	  (crud_read_sqlite (chunk-coordinate-to-filename chunk-coordinates))))
     (case (length data)
       (0
        ;;if data is nil, just load an empty chunk
@@ -404,24 +422,20 @@
       (unload-extra-chunks))))
 
 (defun unload-extra-chunks ()
-  (let ((to-unload
-	 ;;[FIXME]get a timer library? metering?
-	 (;;time
-	  progn
-	  (progn ;;(print "getting unloadable chunks")
-		 (get-unloadable-chunks)))))
+  (let (to-unload)
+    ;;[FIXME]get a timer library? metering?
+    (print "getting unloadable chunks")
+    (setf to-unload (get-unloadable-chunks))
     ;;(print (length to-unload))
-    (;;time
-     progn
-      (progn ;;(print "unloading the chunks")
-	(dolist (chunk to-unload)
-	  (chunk-unload chunk))))))
+    (print "unloading the chunks")
+    (dolist (chunk to-unload)
+      (chunk-unload chunk))))
 
-(defun chunk-unload (key &key (path (world-path)))
+(defun chunk-unload (key)
   (let ((chunk (voxel-chunks:obtain-chunk-from-chunk-key key nil)))
     (cond
       (chunk
-       (chunk-save chunk :path path)
+       (chunk-save chunk)
        (dirty-push key)
        ;;remove from the chunk-array
        (voxel-chunks:with-chunk-key-coordinates (x y z)
@@ -433,7 +447,7 @@
       (t nil))))
 
 (defparameter *persist* t)
-(defun chunk-save (chunk &key (path (world-path)))
+(defun chunk-save (chunk)
   (when (not *persist*)
     (return-from chunk-save))
   (cond
@@ -454,25 +468,14 @@
 	     (cond
 	       (worth-saving
 		;;write the chunk to disk if its worth saving
-		(savechunk chunk key path)
+		(savechunk chunk key)
 		;;(format t "~%saved chunk ~s" key)
 		)
 	       (t
 		;;otherwise, if there is a preexisting file, destroy it
-		(let ((name (convert-object-to-filename (chunk-coordinate-to-filename key))))
-		  (database::with-open-database2
-		    (database::delete-entry name))
-		  #+nil
-		  (let ((chunk-save-file
-			 ;;[FIXME]bad api?
-			 (merge-pathnames
-			  name
-			  (world-path))))
-		    
-		    #+nil
-		    (let ((file-exists-p (probe-file chunk-save-file)))
-		      (when file-exists-p
-			(delete-file chunk-save-file))))))))
+		(crud_delete_sqlite (chunk-coordinate-to-filename key))
+		;;(crud_delete_file-pile (chunk-coordinate-to-filename key))
+		)))
 	   :data job-key
 	   :callback (lambda (job-task)
 		       (declare (ignorable job-task))
@@ -498,7 +501,7 @@
 (defun space-for-new-chunk-p (key)
   (voxel-chunks:empty-chunk-p (voxel-chunks:get-chunk-at key)))
 
-(defun chunk-load (key &optional (path (world-path)))
+(defun chunk-load (key)
   ;;[FIXME]using chunk-coordinate-to-filename before
   ;;running loadchunk is a bad api?
   #+nil
@@ -515,7 +518,7 @@
 	      (cond ((not (space-for-new-chunk-p key))
 		     ;;(format t "~%WTF? ~a chunk already exists" key)
 		     :skipping)
-		    (t (loadchunk key path)))))
+		    (t (loadchunk key)))))
       :data (cons job-key "")
       :callback (lambda (job-task)
 		  (declare (ignorable job-task))
@@ -560,16 +563,12 @@
 ;;*dirty-chunks*
 ;;*achannel*
 
-   ;;#:msave
-   ;;#:save-world
+;;#:msave
+;;#:save-world
 
-(defun msave (&optional (path *world-directory*))
-  (let ((newpath (world-path path)))
-    (ensure-directories-exist newpath)
-    (save-world newpath)))
-(defun save-world (&optional (path (world-path)))
+(defun msave ()
   (loop :for chunk :being :the :hash-values :of  voxel-chunks:*chunks* :do
-     (chunk-save chunk :path path)))
+     (chunk-save chunk)))
 
 #+nil
 (defun mload (&optional (path *world-directory*))
