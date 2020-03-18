@@ -85,6 +85,7 @@
   (multiple-value-bind (shown hidden overridden) (draw-world)
     (declare (ignorable shown hidden overridden))
     ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
+    #+nil
     (when (not (zerop overridden))
       (print overridden))
     ;;#+nil
@@ -497,15 +498,14 @@ gl_FragColor.rgb = color_out;
    ;;When the chunk pops into the frustum,
    ;;override queries and draw regardless.
    (draw-override 0)))
-(defparameter *occlusion-culling-p* nil;;t
-  )
+(defparameter *occlusion-culling-p* t)
 (defun set-chunk-gl-representation-visible (value)
   (setf (chunk-gl-representation-occlusion-state value) :visible)
   (setf (chunk-gl-representation-occluded value) nil))
 (defun set-chunk-gl-representation-hidden (value)
   (setf (chunk-gl-representation-occlusion-state value) :hidden)
   (setf (chunk-gl-representation-occluded value) t)
-  (setf (chunk-gl-representation-draw-override value) nil))
+  (setf (chunk-gl-representation-draw-override value) 0))
 (defun render-occlusion-query (value)
   (let ((query (chunk-gl-representation-occlusion-query value)))
     (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))

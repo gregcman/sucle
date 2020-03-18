@@ -71,12 +71,40 @@
 ;;create, read, update, delete
 ;;- slqlite database
 ;;- pile of files
+(defclass crud () ((path :initarg :path :accessor path)))
+(defparameter *implementation* nil)
+(defgeneric crud_create (lisp-object data crud))
+(defgeneric crud_read (lisp-object crud))
+(defgeneric crud_update (lisp-object data crud))
+(defgeneric crud_delete (lisp-object crud))
+(defun crud-create (lisp-object data)
+  (crud_create lisp-object data *implementation*))
+(defun crud-read (lisp-object)
+  (crud_read lisp-object *implementation*))
+(defun crud-update (lisp-object data)
+  (crud_update lisp-object data *implementation*))
+(defun crud-delete (lisp-object)
+  (crud_delete lisp-object *implementation*))
 
 ;;world loading code below?
 (defun convert-object-to-filename (obj)
   (with-standard-io-syntax
     ;;FIXME::what about circular data structures?
     (format nil "~s" obj)))
+
+(defclass crud-sqlite (crud) ())
+(defmethod crud_create (name data (impl crud-sqlite))
+  (let ((database::*database* (path impl)))
+    (crud_create_sqlite name data)))
+(defmethod crud_read (name (impl crud-sqlite))
+  (let ((database::*database* (path impl)))
+    (crud_read_sqlite name)))
+(defmethod crud_update (name data (impl crud-sqlite))
+  (let ((database::*database* (path impl)))
+    (crud_update_sqlite name data)))
+(defmethod crud_delete (name (impl crud-sqlite))
+  (let ((database::*database* (path impl)))
+    (crud_delete_sqlite name)))
 ;;;;SQLITE + sucle-serialize
 (defun crud_create_sqlite (lisp-object data)
   ;;FIXME:update creates a row regardless, so update
@@ -98,63 +126,86 @@
   (database::with-open-database2
     (database::delete-entry (convert-object-to-filename lisp-object))))
 ;;;;sucle-serialize
-(defparameter *some-saves* nil)
-(defparameter *world-directory* nil)
-(defun world-path (&optional (path *world-directory*) (base-dir *some-saves*))
-  (utility:rebase-path path base-dir))
-
+(defclass crud-file-pile (crud) ())
+(defparameter *path* nil)
+(defmethod crud_create (name data (impl crud-file-pile))
+  (let ((*path* (path impl)))
+    (crud_create_file-pile name data)))
+(defmethod crud_read (name (impl crud-file-pile))
+  (let ((*path* (path impl)))
+    (crud_read_file-pile name)))
+(defmethod crud_update (name data (impl crud-file-pile))
+  (let ((*path* (path impl)))
+    (crud_update_file-pile name data)))
+(defmethod crud_delete (name (impl crud-file-pile))
+  (let ((*path* (path impl)))
+    (crud_delete_file-pile name)))
 (defun crud_create_file-pile (lisp-object data)
   (crud_update_file-pile lisp-object data))
-(defun crud_read_file-pile (lisp-object &optional (path (world-path)))
+(defun crud_read_file-pile (lisp-object &aux (path *path*))	 
   (sucle-serialize:load
    (merge-pathnames
     (convert-object-to-filename
      lisp-object)
     path)))
-(defun crud_update_file-pile (lisp-object data &optional (path (world-path)))
-  (ensure-directories-exist path)
-  (sucle-serialize:save
-   (merge-pathnames (convert-object-to-filename lisp-object) path)
-   (sucle-serialize::encode-zlib-conspack-payload data)))
-(defun crud_delete_file-pile (lisp-object &optional (path (world-path)))
+(defun crud_update_file-pile (lisp-object data &aux (path *path*))
+  (ensure-directories-exist
+   (uiop:pathname-directory-pathname path))
+  (let ((file-path (merge-pathnames (convert-object-to-filename lisp-object) path)))
+    (sucle-serialize:save file-path data)))
+(defun crud_delete_file-pile (lisp-object &aux (path *path*))
   (let* ((name (convert-object-to-filename lisp-object))
 	 (chunk-save-file (merge-pathnames name path))
 	 (file-exists-p (probe-file chunk-save-file)))
     (when file-exists-p
       (delete-file chunk-save-file))))
+
+;;;
+(defun detect-crud-path (path)
+  (if (uiop:file-pathname-p path)
+      ;;A sqlite database is a singular file.
+      'crud-sqlite
+      'crud-file-pile))
+(defun make-crud-from-path (path)
+  (make-instance (detect-crud-path path) :path path))
+(defun use-crud-from-path (path)
+  (setf *implementation* (make-crud-from-path path)))
 ;;;;************************************************************************;;;;
 
 ;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
 ;;And have chunk loading in another file?
 
 (defun savechunk (chunk position)
-  (crud_update_sqlite position (list (voxel-chunks:chunk-data chunk)))
-  ;;(crud_update_file-pile position (list (voxel-chunks:chunk-data chunk)))
-  )
+  (crud-update (chunk-coordinate-to-filename position)
+	       (voxel-chunks:chunk-data chunk)))
 
 (defun loadchunk (chunk-coordinates)
-  (let* ((data
-	  ;;(crud_read_file-pile (chunk-coordinate-to-filename chunk-coordinates))
-	  (crud_read_sqlite (chunk-coordinate-to-filename chunk-coordinates))))
-    (case (length data)
-      (0
-       ;;if data is nil, just load an empty chunk
-       (voxel-chunks:with-chunk-key-coordinates (x y z) chunk-coordinates
-	 (voxel-chunks:create-chunk x y z :type :empty)))
+  (let* ((data (crud-read (chunk-coordinate-to-filename chunk-coordinates))))
+    (flet ((make-data (data)
+	     (let ((chunk-data (coerce data '(simple-array t (*)))))
+	       (assert (= 4096 (length chunk-data))
+		       nil
+		       "offending chunk ~a"
+		       chunk-coordinates)
+	       (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates data))))
+      (typecase data
+	(list
+	 (ecase (length data)
+	   (0
+	    ;;if data is nil, just load an empty chunk
+	    (voxel-chunks:with-chunk-key-coordinates (x y z) chunk-coordinates
+						     (voxel-chunks:create-chunk x y z :type :empty)))
 
-      (3 ;;[FIXME]does this even work?
-       (destructuring-bind (blocks light sky) data
-	 (let ((len (length blocks)))
-	   (let ((new (make-array len)))
-	     (dotimes (i len)
-	       (setf (aref new i)
-		     (blockify (aref blocks i)  (aref light i) (aref sky i))))
-	     (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates new)))))
-      (1
-       (destructuring-bind (objdata) data
-	 (voxel-chunks:make-chunk-from-key-and-data
-	  chunk-coordinates
-	  (coerce objdata '(simple-array t (*)))))))))
+	   (3 ;;[FIXME]does this even work?
+	    (destructuring-bind (blocks light sky) data
+	      (let ((len (length blocks)))
+		(let ((new (make-array len)))
+		  (dotimes (i len)
+		    (setf (aref new i)
+			  (blockify (aref blocks i)  (aref light i) (aref sky i))))
+		  (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates new)))))
+	   (1 (make-data (car data)))))
+	(otherwise (make-data data))))))
 
 ;;The world is saved as a directory full of files named (x y z) in block coordinates, with
 ;;x and y swizzled
@@ -473,8 +524,7 @@
 		)
 	       (t
 		;;otherwise, if there is a preexisting file, destroy it
-		(crud_delete_sqlite (chunk-coordinate-to-filename key))
-		;;(crud_delete_file-pile (chunk-coordinate-to-filename key))
+		(crud-delete (chunk-coordinate-to-filename key))
 		)))
 	   :data job-key
 	   :callback (lambda (job-task)

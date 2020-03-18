@@ -421,3 +421,6 @@
     (not (every (lambda (x) (eql x empty-space))
 		(chunk-data chunk)))))
 
+
+;;database implementation
+;

@@ -53,38 +53,40 @@
    ;;1.5
    8.0))
 ;;;;</BOXES?>
-
-(defun configure-world-path
+(defparameter *some-saves* nil)
+(defparameter *world-directory* nil)
+(defun world-path
     (&optional
        (world
 	;;"first/"
 	;;#+nil
 	;;"test/"
-	"other/"
+	;;"other/"
 	;;"third/"
+	"terrarium2/"
 	;;"ridikulisp/"
 	)
        (working-dir
-	(sucle-temp:path "save/")
-	#+nil
+	;;(sucle-temp:path "save/")
+	;;#+nil
 	(cdr (assoc (machine-instance) 
 		    '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
 		      ("nootboke" . #P"/home/terminal256/Documents/saves/"))
 		    :test 'equal))))
-  (setf world:*world-directory* world)
-  (setf world:*some-saves* working-dir))
+  (utility:rebase-path world working-dir))
 (defun start ()
-  (configure-world-path)
   (enter 'sucle-app))
+
 (defun sucle-app ()
   #+nil
   (setf (entity-fly? *ent*) nil
 	(entity-gravity? *ent*) t)
-    ;;(our-load)
+  ;;(our-load)
   (window:set-vsync t)
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
   (push-mode 'menu-mode-per-frame)
+  (world::use-crud-from-path (world-path))
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (default-loop)	  
      (when world:*persist*
@@ -446,11 +448,11 @@
 	       (sync_entity->camera ent *camera*)
 	       (render-camera *camera*))))
 	 *entities*))
-  ;#+nil
+  #+nil
   (progn
     (gl:line-width 10.0)
     (render-chunk-outlines))
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (render-units))
