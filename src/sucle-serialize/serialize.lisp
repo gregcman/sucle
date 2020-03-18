@@ -37,20 +37,26 @@
 	  (if (= 1 (length things))
 	      (car things)
 	      (nreverse things)))))))
+(defmacro with-safe-io (&body body)
+  `(with-standard-io-syntax
+     (let ((*package* (load-time-value (find-package :cl)))
+	   (*read-eval* nil))
+       ,@body)))
 
 (defun safer-read (&optional (stream *standard-input*)
 		     (eof-error-p nil) (eof-value nil) (recursive-p nil))
-  (with-standard-io-syntax
-    (let ((*package* (load-time-value (find-package :cl))))
-      (let ((*read-eval* nil))
-	(read stream eof-error-p eof-value recursive-p)))))
+  (with-safe-io
+    (read stream eof-error-p eof-value recursive-p)))
 (defun safer-print (object &optional (stream *standard-output*))
-  (with-standard-io-syntax
-    (let ((*package* (load-time-value (find-package :cl))))
-      (let ((*read-eval* nil)
-	    (*print-circle* t)
-	    (*print-readably* t))
-	(print object stream)))))
+  (with-safe-io
+    (let ((*print-circle* t)
+	  (*print-readably* t))
+      (print object stream))))
+(defun safer-write (object &optional (stream *standard-output*))
+  (with-safe-io
+    (let ((*print-circle* t)
+	  (*print-readably* t))
+      (write object :stream stream))))
  
 ;;File format
 ;;https://www.cs.cmu.edu/Groups/AI/html/cltl/clm/node191.html

@@ -60,15 +60,15 @@
        (world
 	;;"first/"
 	;;#+nil
-	;;"test/"
+	"test/"
 	;;"other/"
 	;;"third/"
-	"terrarium2/"
+	;;"terrarium2/"
 	;;"ridikulisp/"
 	)
        (working-dir
-	;;(sucle-temp:path "save/")
-	;;#+nil
+	(sucle-temp:path "save/")
+	#+nil
 	(cdr (assoc (machine-instance) 
 		    '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
 		      ("nootboke" . #P"/home/terminal256/Documents/saves/"))

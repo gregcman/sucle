@@ -52,7 +52,7 @@
 
 (defmethod lispobj-dispatch ((obj symbol))
   *empty-space*)
-
+ 
 
 #+nil
 (defun test ()
@@ -87,10 +87,10 @@
   (crud_delete lisp-object *implementation*))
 
 ;;world loading code below?
-(defun convert-object-to-filename (obj)
-  (with-standard-io-syntax
+(defun convert-object-to-filename (&optional (obj '(0 1 2 'obj :cl)))
+  (with-output-to-string (str)
     ;;FIXME::what about circular data structures?
-    (format nil "~s" obj)))
+    (sucle-serialize::safer-write obj str)))
 
 (defclass crud-sqlite (crud) ())
 (defmethod crud_create (name data (impl crud-sqlite))
@@ -140,25 +140,71 @@
 (defmethod crud_delete (name (impl crud-file-pile))
   (let ((*path* (path impl)))
     (crud_delete_file-pile name)))
+;;[FIXME]:can possibly create filenames that are illegal.
+;;use base64 instead? how to mix the two?
+;;
+(defun string-base64 (string)
+  (cl-base64:string-to-base64-string string :uri t))
+(defun base64-string (string)
+  (cl-base64:base64-string-to-string string :uri t))
+(defun commentify (&optional (string "test"))
+  (concatenate 'string ";" string))
+(defun un-commentify (&optional (string ";test"))
+  (subseq string 1 (length string)))
+(defparameter *junk* '(4/5 "foo/bar.../baz" 3))
+;;FIXME: 'check-' functions get highlighted red in emacs
+(defun %check-safe-string
+    (lispobj
+     &optional
+       (directory "")
+       &aux
+       (pathname (convert-object-to-filename lispobj))
+       (path (merge-pathnames pathname directory))
+       (base64-path (merge-pathnames (commentify (string-base64 pathname))
+				     directory)))
+  ;;FIXME::This probably won't work on windows.
+  ;;https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
+  
+  ;;Check that they both point to files in same directory
+  ;;If they are, then it is safe
+  (if (equal (pathname-directory base64-path)
+	     (pathname-directory path))
+      (values path base64-path)
+      (values nil base64-path)))
+
 (defun crud_create_file-pile (lisp-object data)
   (crud_update_file-pile lisp-object data))
-(defun crud_read_file-pile (lisp-object &aux (path *path*))	 
-  (sucle-serialize:load
-   (merge-pathnames
-    (convert-object-to-filename
-     lisp-object)
-    path)))
+(defun crud_read_file-pile (lisp-object &aux (path *path*))
+  (multiple-value-bind (file-path base64) (%check-safe-string lisp-object path)
+    ;;if both are valid, prefer the base64 one.
+    ;;if only base64 is valid, just use that.  
+    (sucle-serialize:load
+     (cond (file-path
+	    (if (probe-file base64)
+		base64
+		file-path))
+	   (t base64)))))
 (defun crud_update_file-pile (lisp-object data &aux (path *path*))
   (ensure-directories-exist
    (uiop:pathname-directory-pathname path))
-  (let ((file-path (merge-pathnames (convert-object-to-filename lisp-object) path)))
-    (sucle-serialize:save file-path data)))
+  ;;Don't use the old format, just the base64 one.
+  (multiple-value-bind (file-path base64) (%check-safe-string lisp-object path)
+    (declare (ignore file-path))
+    (sucle-serialize:save base64 data)))
 (defun crud_delete_file-pile (lisp-object &aux (path *path*))
-  (let* ((name (convert-object-to-filename lisp-object))
-	 (chunk-save-file (merge-pathnames name path))
-	 (file-exists-p (probe-file chunk-save-file)))
-    (when file-exists-p
-      (delete-file chunk-save-file))))
+  ;;Delete the base64 version, and the regular version, if they exist.
+  ;;FIXME:reads from the disk, slow? FIXME: use OPTIMIZE rather than FIXME?
+  (multiple-value-bind (file-path base64) (%check-safe-string lisp-object path)
+    (when (and file-path (probe-file file-path))
+      (delete-file file-path))
+    (when (probe-file base64)
+      (delete-file base64))))
+
+#+nil
+"U28/PHA+VGhpcyA0LCA1LCA2LCA3LCA4LCA5LCB6LCB7LCB8LCB9IHRlc3RzIEJhc2U2NCBlbmNv
+ZGVyLiBTaG93IG1lOiBALCBBLCBCLCBDLCBELCBFLCBGLCBHLCBILCBJLCBKLCBLLCBMLCBNLCBO
+LCBPLCBQLCBRLCBSLCBTLCBULCBVLCBWLCBXLCBYLCBZLCBaLCBbLCBcLCBdLCBeLCBfLCBgLCBh
+LCBiLCBjLCBkLCBlLCBmLCBnLCBoLCBpLCBqLCBrLCBsLCBtLCBuLCBvLCBwLCBxLCByLCBzLg=="
 
 ;;;
 (defun detect-crud-path (path)

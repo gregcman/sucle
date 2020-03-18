@@ -15,7 +15,6 @@
    #:nsb-cga
    #:camera-matrix
    #:quads
-   #:sucle-serialize
    #:sucle-multiprocessing
    #:aabbcc ;;for occlusion culling 
    #:image-utility
@@ -28,7 +27,9 @@
    #:ncurses-clone-for-lem
    #:livesupport
 
-   #:sqlite)
+   #:sucle-serialize
+   #:sqlite
+   #:cl-base64)
   :serial t
   :components 
   (
