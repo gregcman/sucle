@@ -60,8 +60,8 @@
        (world
 	;;"first/"
 	;;#+nil
-	"test/"
-	;;"other/"
+	;;"test/"
+	"other/"
 	;;"third/"
 	;;"terrarium2/"
 	;;"ridikulisp/"
@@ -86,7 +86,7 @@
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
   (push-mode 'menu-mode-per-frame)
-  (world::use-crud-from-path (world-path))
+  (crud:use-crud-from-path (world-path))
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (default-loop)	  
      (when world:*persist*

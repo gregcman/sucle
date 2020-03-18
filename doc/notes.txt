@@ -258,3 +258,11 @@ frustum culling
 ;;database multiple worlds
 ;;chunk manager
 ;;chunk cursors -> chunk array?
+
+;;menu
+;;startup
+
+;;new asdf system -> crud
+;;- database
+;;- sucle-serialize
+;;used emacs-narrow-to-region

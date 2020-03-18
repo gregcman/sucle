@@ -26,10 +26,8 @@
    #:black-tie
    #:ncurses-clone-for-lem
    #:livesupport
-
-   #:sucle-serialize
-   #:sqlite
-   #:cl-base64)
+   
+   #:crud)
   :serial t
   :components 
   (
@@ -40,7 +38,6 @@
    ;;(:file "block-light") ;;light propogation
    (:file "mesher")
    (:file "block-data")
-   (:file "database")
    (:file "world")
    (:file "extra")
    (:file "physics")

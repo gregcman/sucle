@@ -6,7 +6,9 @@
 (progn (ql:quickload :sqlite)
        ;;(ql:quickload :sxql)
        )
-(defparameter *database* (sucle-temp:path "data.db"))
+(defparameter *database* nil
+  ;;(sucle-temp:path "data.db")
+  )
 (defun new-connection ()
   (connect *database*))
 (defvar *db* ;;(new-connection)
@@ -25,7 +27,7 @@
 (defun release-handle (handle)
   (lparallel.queue:push-queue handle *handles*))
 (defmacro with-open-database2 (&body body)
-  (utility:with-gensyms (handle)
+  (alexandria:with-gensyms (handle)
     `(let* ((,handle (get-handle))
 	    (*db* ,handle))
        (unwind-protect (locally
