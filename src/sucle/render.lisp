@@ -73,14 +73,14 @@
       (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
 	(glhelp:handle (deflazy:getfnc 'terrain)))))))
-(defun render-chunks ()  
+(defun render-chunks (camera)  
   (gl:enable :depth-test)
   (gl:enable :cull-face)
   (gl:disable :blend)
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
   (gl:front-face :ccw)
-  (get-chunks-to-draw)
+  (get-chunks-to-draw camera)
   ;#+nil
   (progn;;multiple-value-bind (shown hidden)
       (draw-world)
@@ -490,7 +490,8 @@ gl_FragColor.rgb = color_out;
    occluded
    (occlusion-state :init
 		    ) ;;:hidden, visible, waiting, :init
-   occlusion-box))
+   occlusion-box
+   aabb))
 (defparameter *occlusion-culling-p* t)
 (defun set-chunk-gl-representation-visible (value)
   (setf (chunk-gl-representation-occlusion-state value) :visible)
@@ -517,22 +518,25 @@ gl_FragColor.rgb = color_out;
     (gl:color-mask t t t t)
     (gl:depth-mask t)))
 
-(defun create-chunk-gl-representation (display-list occlusion-box)
+(defun create-chunk-gl-representation (display-list occlusion-box aabb)
   (make-chunk-gl-representation
    :call-list display-list
    :occlusion-query (car (gl:gen-queries 1))
-   :occlusion-box occlusion-box))
+   :occlusion-box occlusion-box
+   :aabb aabb))
 (defun destroy-chunk-gl-representation (chunk-gl-representation)
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 
-(defun get-chunks-to-draw ()
+(defun get-chunks-to-draw (camera)
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
     (let* ((foo (+ 1 world:*chunk-radius*)))
       (dohash (key value) *g/chunk-call-list*
 	      ;;(declare (ignore key))
-	      (when (> (the fixnum foo) (the fixnum (world:blocky-chunk-distance key)))
+	      (when (and (> (the fixnum foo)
+			    (the fixnum (world:blocky-chunk-distance key)))
+			 (box-in-frustum camera (chunk-gl-representation-aabb value)))
 		(vector-push-extend value vec))))
     vec))
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
@@ -652,7 +656,20 @@ gl_FragColor.rgb = color_out;
 			   (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))))
 	    (set-chunk-display-list
 	     coords
-	     (create-chunk-gl-representation display-list occlusion-box))))))))
+	     (create-chunk-gl-representation
+	      display-list occlusion-box
+	      (voxel-chunks:with-chunk-key-coordinates (x y z) coords
+		(floatf x y z)
+		(setf x (* x (floatify voxel-chunks:*chunk-size-x*)))
+		(setf y (* y (floatify voxel-chunks:*chunk-size-y*)))
+		(setf z (* z (floatify voxel-chunks:*chunk-size-z*)))
+		(aabbcc:make-aabb
+		 :minx x
+		 :miny y
+		 :minz z
+		 :maxx (+ (floatify voxel-chunks:*chunk-size-x*) x)
+		 :maxy (+ (floatify voxel-chunks:*chunk-size-y*) y)
+		 :maxz (+ (floatify voxel-chunks:*chunk-size-z*) z)))))))))))
 
 
 (defun draw-aabb (x y z aabb &optional (iterator *iterator*))
@@ -833,4 +850,36 @@ Note:limits the amount of background jobs and pending lisp objects."
 
 ;;;Frustum culling
 ;;;http://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm
+(defun box-in-frustum (camera aabb)
+  (let ((planes (camera-matrix::camera-planes camera))
+	(camera-position (camera-matrix::camera-vec-position camera)))
+    (dolist (plane planes)
+      (let ((out 0))
+	(call-aabb-corners
+	 (lambda (x y z)
+	   (when (< 0.0
+		    (nsb-cga:dot-product
+		     (nsb-cga:vec-
+		      camera-position
+		      (nsb-cga:vec x y z))
+		     plane))
+	     (incf out)))
+	 aabb)
+	(when (= out 8)
+	  (return-from box-in-frustum nil)))))
+  (values t))
 
+(defun call-aabb-corners
+    (&optional
+       (fun (lambda (&rest rest) (print rest)))
+		       (aabb *player-aabb*))
+  (labels ((x (x)
+	     (y x (aabbcc:aabb-miny aabb))
+	     (y x (aabbcc:aabb-maxy aabb)))
+	   (y (x y)
+	     (z x y (aabbcc:aabb-minz aabb))
+	     (z x y (aabbcc:aabb-maxz aabb)))
+	   (z (x y z)
+	     (funcall fun x y z)))
+    (x (aabbcc:aabb-minx aabb))
+    (x (aabbcc:aabb-maxx aabb))))

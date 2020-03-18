@@ -420,28 +420,54 @@
      :time-of-day *time-of-day*
      :fog-ratio *fog-ratio*
      ))
+  #+nil
   (map nil
-       'render-entity
+       (lambda (ent)
+	 (unless (eq ent *ent*)
+	   (render-entity ent)))
        *entities*)
-  (render-chunks)
+  (render-chunks
+   #+nil
+   (let ((ent (elt *entities* 0))
+	 (camera (camera-matrix:make-camera)))
+     (sync_entity->camera ent camera)
+     camera)
+   *camera*
+   )
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
   ;;selected block and crosshairs
   (use-solidshader *camera*)
   (render-fist *fist*)
-  (gl:line-width 10.0)
-  (map nil
-       (lambda (ent)
-	 (let ((*camera* (camera-matrix:make-camera)))
-	   (sync_entity->camera ent *camera*)
-	   (render-camera *camera*)))
-       *entities*)
-  (render-units)
+  #+nil
+  (progn
+    (gl:line-width 10.0)
+    (map nil
+	 (lambda (ent)
+	   (let ((*camera* (camera-matrix:make-camera)))
+	     (sync_entity->camera ent *camera*)
+	     (render-camera *camera*)))
+	 *entities*))
+  #+nil
+  (progn
+    (gl:line-width 10.0)
+    (render-chunk-outlines))
+  #+nil
+  (progn
+    (gl:line-width 10.0)
+    (render-units))
   ;;(mvc 'render-line 0 0 0 (spread '(200 200 200)))
   (render-crosshairs)
   
   (complete-render-tasks)
   (dispatch-mesher-to-dirty-chunks))
+
+(defun render-chunk-outlines ()
+  (dohash (k chunk) *g/chunk-call-list*
+	  (declare (ignorable v))
+	  (render-aabb-at
+	   (chunk-gl-representation-aabb chunk)
+	   0.0 0.0 0.0)))
 
 (defun render-camera (camera)
   (mapc (lambda (arg)
@@ -449,9 +475,18 @@
 	       (spread (camera-matrix:camera-vec-position camera))
 	       (spread (map 'list
 			    (lambda (x)
-			      (* x 10))
+			      (* x 100))
 			    arg))))
-	(camera-matrix::camera-edges camera)))
+	(camera-matrix::camera-edges camera))
+  (mapc (lambda (arg)
+	  (mvc 'render-line-dx
+	       (spread (camera-matrix:camera-vec-position camera))
+	       (spread (map 'list
+			    (lambda (x)
+			      (* x 100))
+			    arg))
+	       0.99 0.8 0.0))
+	(camera-matrix::camera-planes camera)))
 (defun render-units (&optional (foo 100))
   ;;X is red
   (mvc 'render-line 0 0 0 foo 0 0 (spread #(1.0 0.0 0.0)))
