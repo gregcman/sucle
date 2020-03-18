@@ -76,6 +76,7 @@
     (setf
      (camera-edges camera)
      (list
+      ;;FIXME:optimize, does this create a lot of garbage?
       ;;(nsb-cga:vec+ forward vec-x+)
       ;;(nsb-cga:vec+ forward vec-x-)
       ;;(nsb-cga:vec+ forward vec-y+)

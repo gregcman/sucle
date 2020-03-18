@@ -82,14 +82,14 @@
   (gl:front-face :ccw)
   (get-chunks-to-draw camera)
   ;#+nil
-  (progn;;multiple-value-bind (shown hidden)
-      (draw-world)
+  (multiple-value-bind (shown hidden overridden) (draw-world)
+    (declare (ignorable shown hidden overridden))
     ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
+    (when (not (zerop overridden))
+      (print overridden))
+    ;;#+nil
     #+nil
-    (let ((total
-	   (hash-table-count *g/chunk-call-list*)
-	    #+nil
-	    (+ hidden shown)))
+    (let ((total (hash-table-count *g/chunk-call-list*)))
       (unless (zerop total)
 	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
 
@@ -491,14 +491,21 @@ gl_FragColor.rgb = color_out;
    (occlusion-state :init
 		    ) ;;:hidden, visible, waiting, :init
    occlusion-box
-   aabb))
-(defparameter *occlusion-culling-p* t)
+   aabb
+   
+   in-frustum-p
+   ;;When the chunk pops into the frustum,
+   ;;override queries and draw regardless.
+   (draw-override 0)))
+(defparameter *occlusion-culling-p* nil;;t
+  )
 (defun set-chunk-gl-representation-visible (value)
   (setf (chunk-gl-representation-occlusion-state value) :visible)
   (setf (chunk-gl-representation-occluded value) nil))
 (defun set-chunk-gl-representation-hidden (value)
   (setf (chunk-gl-representation-occlusion-state value) :hidden)
-  (setf (chunk-gl-representation-occluded value) t))
+  (setf (chunk-gl-representation-occluded value) t)
+  (setf (chunk-gl-representation-draw-override value) nil))
 (defun render-occlusion-query (value)
   (let ((query (chunk-gl-representation-occlusion-query value)))
     (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
@@ -532,15 +539,32 @@ gl_FragColor.rgb = color_out;
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
     (let* ((foo (+ 1 world:*chunk-radius*)))
-      (dohash (key value) *g/chunk-call-list*
-	      ;;(declare (ignore key))
-	      (when (and (> (the fixnum foo)
-			    (the fixnum (world:blocky-chunk-distance key)))
-			 (box-in-frustum camera (chunk-gl-representation-aabb value)))
-		(vector-push-extend value vec))))
+      (dohash
+	  (key value) *g/chunk-call-list*
+	  ;;(declare (ignore key))
+	  
+	  (when
+	      ;;Pass the broad distance test
+	      (> (the fixnum foo)
+		 (the fixnum (world:blocky-chunk-distance key)))
+	    (symbol-macrolet
+		  ((inside-frustum-p
+		    (chunk-gl-representation-in-frustum-p value)))
+	      (let ((frustum-state (box-in-frustum camera (chunk-gl-representation-aabb value)))
+		    (old-frustum-state inside-frustum-p))
+		(when (and (not old-frustum-state)
+			   frustum-state)
+		  ;;It just came into view, so definitely render it.
+		  (setf (chunk-gl-representation-draw-override value) 2))
+
+		;;FIXME: only necessary to write on change, but whatever.
+		(setf inside-frustum-p frustum-state)
+		(when frustum-state
+		  (vector-push-extend value vec)))))))
     vec))
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
-						  (count-actually-drawn 0))
+						  (count-actually-drawn 0)
+						  (count-overridden 0))
   #+nil
   (declare (optimize (speed 3) (safety 0))
 	   (type fixnum count-actually-drawn count-occluded-by-query))
@@ -556,37 +580,52 @@ gl_FragColor.rgb = color_out;
 		  ;;[FIXME]bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
 		  (let ((result (gl:get-query-object query :query-result)))		      
 		    (case result
-		      (0 (set-chunk-gl-representation-hidden value))
-		      (otherwise (set-chunk-gl-representation-visible value)))))))
+		      (0
+		       (set-chunk-gl-representation-hidden value)
+		       ;;The draw-override lasts a few cycles.
+		       (decf (chunk-gl-representation-draw-override value)))
+		      (otherwise
+		       (set-chunk-gl-representation-visible value)
+		       ;;Known visible, cancel the override
+		       (setf (chunk-gl-representation-draw-override value) 0)))))))
 	     (t (set-chunk-gl-representation-visible value)))
-       ;;      (gl:call-list (chunk-gl-representation-occlusion-box value))
-       
-       (cond
-	 ((not (chunk-gl-representation-occluded value)) ;;not occluded = visible
-	  (incf count-actually-drawn)
-	  (let ((query (chunk-gl-representation-occlusion-query value)))
+       ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
+       (let ((overridden-p
+	      (and *occlusion-culling-p*
+		   (plusp (chunk-gl-representation-draw-override value)))))
+	 (cond
+	   ((or
+	     ;;Regular visible
+	     (not (chunk-gl-representation-occluded value))
+	     ;;queries enabled and overridden
+	     overridden-p)
+	    ;;not occluded = visible
+	    (incf count-actually-drawn)	    
 	    (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
 	      (cond
 		((and *occlusion-culling-p*
 		      (not (eq occlusion-state :waiting)))
-		 ;;get occlusion information from regular chunk drawing
-		 (setf occlusion-state :waiting)
-		 (gl:begin-query :samples-passed query)
-		 ;;draw occlusion box here
-		 ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
-		 (glhelp:slow-draw display-list)
-		 (gl:end-query :samples-passed))
+		 (let ((query (chunk-gl-representation-occlusion-query value)))
+		   ;;get occlusion information from regular chunk drawing
+		   (setf occlusion-state :waiting)
+		   (gl:begin-query :samples-passed query)
+		   ;;draw occlusion box here
+		   ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
+		   (glhelp:slow-draw display-list)
+		   (gl:end-query :samples-passed)))
 		(t
-		 (glhelp:slow-draw display-list)))))
-	  ;;(gl:call-list display-list)
-	  )
-	 (t ;;(print "WHAT?")
-	  (incf count-occluded-by-query)
-	  ;;(gl:call-list display-list)
-	  ))))
+		 (glhelp:slow-draw display-list))))
+	    ;;(gl:call-list display-list)
+	    (when overridden-p
+	      (incf count-overridden)))
+	   (t ;;(print "WHAT?")
+	    (incf count-occluded-by-query)
+	    ;;(gl:call-list display-list)
+	    )))))
   (values
    count-actually-drawn
-   count-occluded-by-query)
+   count-occluded-by-query
+   count-overridden)
   ;;(gl:call-lists vec)
   ;;(print (- (get-internal-real-time) a))
   )

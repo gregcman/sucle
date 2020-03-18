@@ -302,8 +302,11 @@
    :frustum-near (/ 1.0 8.0)))
 (defparameter *fog-ratio* 0.75)
 (defparameter *time-of-day* 1.0)
+;;Frames are for graphical frames, as in framerate.
+;;(defparameter *frames* 0)
 
 (defun sucle-per-frame ()
+  ;;(incf *frames*)
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
   ;;set the chunk center aroun the player
@@ -420,33 +423,34 @@
      :time-of-day *time-of-day*
      :fog-ratio *fog-ratio*
      ))
-  #+nil
+  ;;#+nil
   (map nil
        (lambda (ent)
 	 (unless (eq ent *ent*)
 	   (render-entity ent)))
        *entities*)
   (render-chunks
-   #+nil
+   ;;#+nil
    (let ((ent (elt *entities* 0))
 	 (camera (camera-matrix:make-camera)))
      (sync_entity->camera ent camera)
      camera)
-   *camera*
+   ;;*camera*
    )
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
   ;;selected block and crosshairs
   (use-solidshader *camera*)
   (render-fist *fist*)
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (map nil
 	 (lambda (ent)
-	   (let ((*camera* (camera-matrix:make-camera)))
-	     (sync_entity->camera ent *camera*)
-	     (render-camera *camera*)))
+	   (when (eq ent (elt *entities* 0))
+	     (let ((*camera* (camera-matrix:make-camera)))
+	       (sync_entity->camera ent *camera*)
+	       (render-camera *camera*))))
 	 *entities*))
   #+nil
   (progn
