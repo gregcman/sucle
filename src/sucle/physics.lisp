@@ -55,15 +55,26 @@
   (declare (ignore args))
   (values #b000 1.0))
 
+;;Is will the block being placed overlap with the
+;;given entity?
+(defun not-occupied (x y z &optional (ent *ent*))
+  (let ((aabb (pos-to-block-aabb x y z)))
+    (floatf x y z)
+    (mvc 'aabbcc:aabb-not-overlap
+	 aabb
+	 x y z
+	 (entity-aabb ent)
+	 (spread
+	  ;;position
+	  (entity-position ent)))))
 
 (defun pos-to-block-aabb (x y z)
   (let ((the-block (world:getblock x y z)))
     (block-to-block-aabb the-block)))
 (defun block-to-block-aabb (blockid)
+  (declare (ignore blockid))
   ;;FIXME :use defmethod on objects?
-  (case blockid
-    (3 *slab-aabb*)
-    (t *block-aabb*)))
+  *block-aabb*)
 #+nil
 (defparameter *dirtying2* nil)
 (defun entity-collision (px py pz vx vy vz aabb)

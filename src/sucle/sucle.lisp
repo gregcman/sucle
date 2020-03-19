@@ -1,4 +1,3 @@
-
 (in-package :sucle)
 
 ;;;;************************************************************************;;;;
@@ -16,10 +15,6 @@
 (defparameter *block-aabb*
   ;;;;1x1x1 cube
   (create-aabb 1.0 1.0 1.0 0.0 0.0 0.0))
-
-(defparameter *slab-aabb*
-  ;;;;slab
-  (create-aabb 1.0  #+nil 0.5 1.0 1.0 0.0 0.0 0.0))
 
 ;;;;[FIXME]The point of this is to reduce the amount of bits to store the hitbox.
 ;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
@@ -46,12 +41,56 @@
 		  0.0
 		  0.0
 		  0.0))))
+(defparameter *start-menu*
+  `(;;keys bound to functions
+    (((:key :pressed #\f) .
+      ,(lambda () (print "Paying Respects")))
+     ((:key :pressed #\q) .
+      ,(lambda () (app:quit)))
+     ((:key :pressed #\Escape) .
+      ,(lambda () (app:quit)))
+     ((:key :pressed #\p) .
+      ,(lambda () (app:pop-mode)))
+     ((:key :pressed #\o) .
+      ,(lambda () (app:push-mode 'menu:tick)))
+     ((:key :pressed #\s) .
+      ,(lambda ()
+	 (app:push-mode 'sucle-per-frame)))
+     ((:key :pressed #\c) .
+      ,(lambda ()
+	 (print "Clearing...")
+	 (let ((clear (assoc :clear menu:*data*)))
+	   (setf (second clear)
+		 (with-output-to-string (str)
+		   (let ((clearstr
+			  (make-string menu:*w*
+				       :initial-element #\space)))
+		     (dotimes (y menu:*h*)
+		       (terpri str)
+		       (write-string clearstr str))))))))
+     ((:key :released #\c) .
+      ,(lambda ()
+	 (print "Clearing Done!")
+	 (let ((clear (assoc :clear menu:*data*)))
+	   (setf (second clear)
+		 "")))))
+    ;;data to render
+    ((:hello
+      "
+Press s to start the game
 
-(defparameter *big-fist-aabb*
-  (create-aabb
-   ;;0.5
-   ;;1.5
-   8.0))
+Press c to clear
+
+Press h for help
+
+Press F to pay respects [not really]
+
+Press q/escape to quit
+" 4 4 :bold t)
+     ;;(:hello "world" 8 16 :fg "green" :bg "red" :reverse t :bold t)
+     (:clear "" 0 0  :bold t))
+    ()))
+
 ;;;;</BOXES?>
 (defparameter *some-saves* nil)
 (defparameter *world-directory* nil)
@@ -75,7 +114,7 @@
 		    :test 'equal))))
   (utility:rebase-path world working-dir))
 (defun start ()
-  (enter 'sucle-app))
+  (app:enter 'sucle-app))
 
 (defun sucle-app ()
   #+nil
@@ -85,12 +124,13 @@
   (window:set-vsync t)
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
-  (push-mode 'menu-mode-per-frame)
+  (app:push-mode 'menu:tick)
+  (menu:use *start-menu*)
   (crud:use-crud-from-path (world-path))
   (sucle-mp:with-initialize-multiprocessing
-   (unwind-protect (default-loop)	  
+   (unwind-protect (app:default-loop)	  
      (when world:*persist*
-       (world:msave)))))
+       (world::save-all-chunks)))))
 
 ;;;;
 
@@ -108,112 +148,7 @@
    :title "conceptually simple block game"))
 
 ;;;;************************************************************************;;;;
-(defun enter (&optional (app 'default-per-frame))
-  (reset-per-frame-and-stack)
-  (subapp app)
-  (start-window))
-
-(defun start-window ()
-  (application:main 'default-loop
-   :width (* 80 8)
-   :height (* 25 16)
-   :title ""))
-
-(defun default-loop ()
-  (loop
-     (application:poll-app)
-     (per-frame)))
-;;Popping the last node of the stack is equivalent to quitting,
-;;because of the default-per-frame that quits app.
-
-;;A subapp is like a copy of the app,
-;;glfw3 window and all, within the app?
-
-(defun unit-circular-list (item)
-  (let ((cell (list item)))
-    (setf (cdr cell) cell)
-    cell))
-(defun circular-per-frame ()
-  (unit-circular-list 'default-per-frame))
-(defparameter *null-per-frame* (circular-per-frame))
-(defparameter *null-app-stack* (unit-circular-list *null-per-frame*))
-(defparameter *per-frame* *null-per-frame*)
-(defparameter *app-stack* *null-app-stack*)
-(defun save-modes-to-app-stack ()
-  (push *per-frame* *app-stack*)
-  (reset-per-frame))
-(defun restore-modes-to-app-stack ()
-  (setf *per-frame* (pop *app-stack*)))
-
-(defun subapp (fun)
-  ;;The application is both a mode
-  ;;and a means of quitting.
-  (labels ((this-function ()
-	     ;;(print "running")
-	     (unwind-protect
-		  (progn (save-modes-to-app-stack)
-		    (application::with-quit-token ()
-		      (funcall fun)))
-	       (restore-modes-to-app-stack)
-	       (pop-mode))))
-    (push-mode #'this-function)))
-
-(defun default-per-frame ()
-  ;;Do nothing, except quit
-  (application:quit))
-;;This is a circular list with one element.
-;;So if you keep popping the mode,
-;;nothing happens.
-(defun reset-per-frame-and-stack ()
-  (reset-per-frame)
-  (reset-app-stack))
-(defun reset-per-frame ()
-  (setf *per-frame* *null-per-frame*))
-(defun reset-app-stack ()
-  (setf *app-stack* *null-app-stack*))
-(defun per-frame ()
-  (funcall (car *per-frame*)))
-(defun push-mode (mode)
-  (etypecase mode
-    ;;mode is either a function
-    (function t)
-    ;;or a symbol with a 
-    (symbol
-     (assert (fboundp mode) nil "Symbol:~a is function unbound" mode)))
-  (push mode *per-frame*))
-(defun pop-mode ()
-  (pop *per-frame*))
-(defun switch-mode (mode)
-  (pop-mode)
-  (push-mode mode))
-
-;;test
-(defun test-for-modes ()
-  (labels ((app-entry ()
-	     (push-mode #'app)
-	     (default-loop))
-	   (app ()
-	     (when (window:button :key :repeat #\u)
-	       (print "going up!")
-	       (subapp #'app-entry))
-	     (when (window:button :key :repeat #\m)
-	       (print "another mode")
-	       (app-entry))
-	     (when (window:button :key :repeat #\n)
-	       (print "removing mode")
-	       ;;FIXME::will this pop too many modes?
-	       (pop-mode)
-	       )
-	     (when (window:button :key :repeat #\q)
-	       (print "quitting")
-	       (application:quit))
-	     (when (window:button :key :pressed #\p)
-	       (let ((*print-circle* t))
-		 (print *per-frame*)
-		 (print *app-stack*)))))
-    (enter #'app-entry)))
-
-;;;;************************************************************************;;;;
+;;;;This code basically has not changed in forever.
 
 (defparameter *raw-mouse-x* 0.0d0)
 (defparameter *raw-mouse-y* 0.0d0)
@@ -298,6 +233,16 @@
    :frustum-near (/ 1.0 8.0)))
 (defparameter *fog-ratio* 0.75)
 (defparameter *time-of-day* 1.0)
+(defparameter *sky-color*
+  (mapcar 'utility:byte/255
+	  ;;'(0 0 0)
+	  '(173 204 255)))
+(defun the-sky-color ()
+  (mapcar 
+   (lambda (x)
+     (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
+   *sky-color*))
+
 ;;Frames are for graphical frames, as in framerate.
 ;;(defparameter *frames* 0)
 
@@ -544,131 +489,13 @@
 		  (camera-matrix:camera-vec-forward camera)))
 
 ;;;;************************************************************************;;;;
-;;Ripped from sucle-test essentially.
-(defparameter *view*
-  (ncurses-clone:ncurses-newwin 5 50 0 0))
-(defun menu-app ()
-  (default-loop))
-(defun menu-mode-per-frame ()
-  (ncurses-clone-for-lem::easy-frame 1 1 10 10 *view*)
-  (simulate-menu *menu*)
-  (ncurses-clone-for-lem:render :update-data t :win *view*))
-
-(defun draw-string (str x y
-		    &key (view *view*) (fg "white") (bg "black")
-		      (underline nil) (bold nil) (reverse nil))
-  (lem.term:with-attribute
-      (:fg fg :bg bg :underline underline :bold bold :reverse reverse)
-    (ncurses-clone:ncurses-mvwaddstr view y x str)))
-
-
-(defun run-button (pair)
-  ;;((:key :pressed #\Space) . function)
-  (when (apply 'window:button (car pair))
-    (funcall (cdr pair))))
-(defun run-buttons (pairs)
-  (mapc 'run-button pairs))
-;;;;MENU
-;;-> inspired by html dom?
-(defvar *current-menu-data*)
-(defvar *menu-height*)
-(defvar *menu-width*)
-(defun simulate-menu (&optional (menu *menu*))
-  ;;do buttons
-  (let
-      ;;give buttons access to the DOM
-      ((*current-menu-data* (menu-data menu))
-       (*menu-height* (ncurses-clone:win-lines *view*))
-       (*menu-width* (ncurses-clone:win-cols *view*)))
-    (run-buttons (menu-buttons menu)))
-  ;;do items
-  (let ((menu-data (menu-data menu)))
-    (dolist (item menu-data)
-      (apply 'draw-string (cdr item)))))
-(defun menu-buttons (&optional (menu *menu*))
-  (first menu))
-(defun menu-data (&optional (menu *menu*))
-  (second menu))
-(defparameter *menu*
-  `(;;keys bound to functions
-    (((:key :pressed #\f) .
-      ,(lambda () (print "Paying Respects")))
-     ((:key :pressed #\q) .
-      ,(lambda () (application:quit)))
-     ((:key :pressed #\Escape) .
-      ,(lambda () (application:quit)))
-     ((:key :pressed #\p) .
-      ,(lambda () (pop-mode)))
-     ((:key :pressed #\o) .
-      ,(lambda () (push-mode 'menu-mode-per-frame)))
-     ((:key :pressed #\s) .
-      ,(lambda ()
-	 (push-mode 'sucle-per-frame)))
-     ((:key :pressed #\c) .
-      ,(lambda ()
-	 (print "Clearing...")
-	 (let ((clear (assoc :clear *current-menu-data*)))
-	   (setf (second clear)
-		 (with-output-to-string (str)
-		   (let ((clearstr
-			  (make-string *menu-width*
-				       :initial-element #\space)))
-		     (dotimes (y *menu-height*)
-		       (terpri str)
-		       (write-string clearstr str))))))))
-     ((:key :released #\c) .
-      ,(lambda ()
-	 (print "Clearing Done!")
-	 (let ((clear (assoc :clear *current-menu-data*)))
-	   (setf (second clear)
-		 "")))))
-    ;;data to render
-    ((:hello
-      "
-Press s to start the game
-
-Press c to clear
-
-Press h for help
-
-Press F to pay respects [not really]
-
-Press q/escape to quit
-" 4 4 :bold t)
-     ;;(:hello "world" 8 16 :fg "green" :bg "red" :reverse t :bold t)
-     (:clear "" 0 0  :bold t))
-    ()))
-;;;MENU
-;;;;************************************************************************;;;;
-(defparameter *sky-color*
-  (mapcar 'utility:byte/255
-	  ;;'(0 0 0)
-	  '(173 204 255)))
-(defun the-sky-color ()
-  (mapcar 
-   (lambda (x)
-     (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
-   *sky-color*))
-
-;;;
-
-;;;detect more entities
-;;;detect block types?
-(defun not-occupied (x y z &optional (ent *ent*))
-  (let ((aabb (pos-to-block-aabb x y z)))
-    (floatf x y z)
-    (mvc 'aabbcc:aabb-not-overlap
-	 aabb
-	 x y z
-	 (entity-aabb ent)
-	 (spread
-	  ;;position
-	  (entity-position ent)))))
 
 (defparameter *blockid* (block-data:lookup :planks))
 (defparameter *x* 0)
 (defparameter *y* 0)
 (defparameter *z* 0)
+;;;detect more entities
+;;;detect block types
 ;;;;Default punching and placing blocks
 (defparameter *left-fist-fnc* 'destroy-block-at)
 (defun destroy-block-at (&optional (x *x*) (y *y*) (z *z*))
@@ -679,7 +506,6 @@ Press q/escape to quit
   (when (not-occupied x y z)
     ;;(blocksound x y z)
     (world:plain-setblock x y z blockval (block-data:data blockval :light))))
-;;;;x
 
 (defparameter *fist-keys*
   `(((:mouse :pressed :left) . 
@@ -698,7 +524,7 @@ Press q/escape to quit
     ((:key :pressed :escape) .
      ,(lambda ()
 	(window:get-mouse-out)
-	(pop-mode)))
+	(app:pop-mode)))
     ((:key :pressed #\e) .
      ,(lambda ()
 	(window:toggle-mouse-capture)
@@ -816,3 +642,15 @@ Press q/escape to quit
 ;;FIXME -> select-block-with-scroll-wheel should use events instead?
 #+nil
 (select-block-with-scroll-wheel)
+
+#+nil
+(defparameter *slab-aabb*
+  ;;;;slab
+  (create-aabb 1.0  #+nil 0.5 1.0 1.0 0.0 0.0 0.0))
+
+#+nil
+(defparameter *big-fist-aabb*
+  (create-aabb
+   ;;0.5
+   ;;1.5
+   8.0))

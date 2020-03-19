@@ -55,6 +55,7 @@
  
 
 #+nil
+;;FIXME::have a benchmark system and test system?
 (defun test ()
   (let ((times (expt 10 6)))
     (time (dotimes (x times) (setf (getobj 0 0 0) 0)))
@@ -70,12 +71,13 @@
 ;;And have chunk loading in another file?
 
 (defun savechunk (chunk position)
+  ;;(format t "~%saved chunk ~s" position)
   (crud:crud-update
    (chunk-coordinate-to-filename position)
    (voxel-chunks:chunk-data chunk)))
 
 (defun loadchunk (chunk-coordinates)
-  (let* ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
+  (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
     (flet ((make-data (data)
 	     (let ((chunk-data (coerce data '(simple-array t (*)))))
 	       (assert (= 4096 (length chunk-data))
@@ -114,7 +116,6 @@
     (rotatef (third position)
 	     (second position))
     position))
-
 (defun chunk-coordinate-to-filename (chunk-coordinate)
   (let ((position-list (multiple-value-list (voxel-chunks:unhashfunc chunk-coordinate))))
     (rotatef (second position-list)
@@ -157,7 +158,7 @@
 	  (kmask (mod k 16)))
       (labels ((add (x y z)
 		 (let ((chunk (voxel-chunks:obtain-chunk-from-block-coordinates x y z)))
-		   (unless nil;;(voxel-chunks:empty-chunk-p chunk)
+		   (unless (voxel-chunks:empty-chunk-p chunk)
 		     (dirty-push (voxel-chunks:chunk-key chunk)))))
 	       (i-permute ()
 		 (case imask
@@ -394,40 +395,32 @@
 
 (defparameter *persist* t)
 (defun chunk-save (chunk)
-  (when (not *persist*)
-    (return-from chunk-save))
-  (cond
-    ((voxel-chunks:empty-chunk-p chunk)
-     ;;when the chunk is obviously empty
-     )
-    (t
-     ;;when the chunk is not obviously empty
-     (when (voxel-chunks:chunk-modified chunk) ;;if it wasn't modified, no point in saving
-       (let* ((worth-saving (voxel-chunks:chunk-worth-saving chunk))
-	      (key (voxel-chunks:chunk-key chunk))
-	      ;;[FIXME]have multiple unique-task hashes?
-	      (job-key (cons :save-chunk key)))
-	 ;;save the chunk first?
-	 (sucle-mp:submit-unique-task
+  (when (and
+	 *persist*
+	 ;;when the chunk is not obviously empty
+	 (not (voxel-chunks:empty-chunk-p chunk))
+	 ;;if it wasn't modified, no point in saving
+	 (voxel-chunks:chunk-modified chunk))
+    (let* ((worth-saving (voxel-chunks:chunk-worth-saving chunk))
+	   (key (voxel-chunks:chunk-key chunk))
+	   ;;[FIXME]have multiple unique-task hashes?
+	   (job-key (cons :save-chunk key)))
+      ;;save the chunk first?
+      (sucle-mp:submit-unique-task
 	  job-key
 	  ((lambda ()
 	     (cond
-	       (worth-saving
-		;;write the chunk to disk if its worth saving
-		(savechunk chunk key)
-		;;(format t "~%saved chunk ~s" key)
-		)
-	       (t
-		;;otherwise, if there is a preexisting file, destroy it
-		(crud:crud-delete (chunk-coordinate-to-filename key))
-		)))
+	       ;;write the chunk to disk if its worth saving
+	       (worth-saving (savechunk chunk key))
+	       ;;otherwise, if there is a preexisting file, destroy it
+	       (t (crud:crud-delete (chunk-coordinate-to-filename key)))))
 	   :data job-key
 	   :callback (lambda (job-task)
 		       (declare (ignorable job-task))
 		       (sucle-mp:remove-unique-task-key
 			(sucle-mp:job-task-data job-task)))
 	   ;;this task, saving and loading, must not be interrupted
-	   :unkillable t)))))))
+	   :unkillable t)))))
 
 (defun dirty-push-around (key)
   ;;[FIXME]although this is correct, it
@@ -511,7 +504,7 @@
 ;;#:msave
 ;;#:save-world
 
-(defun msave ()
+(defun save-all-chunks ()
   (loop :for chunk :being :the :hash-values :of  voxel-chunks:*chunks* :do
      (chunk-save chunk)))
 
