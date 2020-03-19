@@ -9,15 +9,8 @@
    #:clearworld)
   (:export
    #:*chunks*
-   #:total-loaded-chunks
    #:*chunk-array*
 
-   #:*chunk-array-default-size-x*
-   #:*chunk-array-default-size-y*
-   #:*chunk-array-default-size-z*  
-   
-   #:block-coord
-   #:chunk-coord
    #:chunk-data
    #:chunk-modified
    #:chunk-key
@@ -36,9 +29,6 @@
    #:obtain-chunk-from-chunk-key
 
    #:remove-chunk-from-chunk-array
-   #:remove-chunk-at
-   #:get-chunk-at
-   #:set-chunk-at
 
    #:chunk-array-x-min
    #:chunk-array-y-min
@@ -49,6 +39,8 @@
    #:chunk-worth-saving
    #:chunk-exists-p
 
+   #:block-coord
+   #:chunk-coord
    #:+size+
    #:+total-size+))
 (in-package #:voxel-chunks)
@@ -74,16 +66,6 @@
   (hash-table-count cache))
 ;;;;************************************************************************;;;;
 
-(struct-to-clos:struct->class
- (defstruct chunk
-   modified
-   ;;last-saved
-   type
-   x
-   y
-   z
-   key
-   data))
 
 ;;lets make it 16, and not care about the other parameters for now.
 (defconstant +size+ 16)
@@ -93,6 +75,11 @@
 ;;but its still a lot of space?
 (deftype chunk-coord () 'fixnum)
 (deftype block-coord () 'fixnum)
+;;bcoord = block-coord, ccoord = chunk-coord
+(defun bcoord->ccoord (&optional (x 0) (y 0) (z 0))
+  ;;[FIXME]? combine with obtain-chunk-from-block-coordinates? 
+  (declare (type block-coord x y z))
+  (values (floor x +size+) (floor y +size+) (floor z +size+)))
 (deftype chunk-data () `(simple-array t (,+total-size+)))
 ;;The inner coord
 (deftype inner-flat () `(integer 0 ,+total-size+))
@@ -112,6 +99,8 @@
 	    ry)
 	   rz))
        rx)))
+(defun inner (x y z)
+  (values (mod x +size+) (mod y +size+) (mod z +size+)))
 ;;in order to be correct, the key has to store each value unaltered
 ;;This is for creating a key for a hash table
 ;; 'cx' stands for 'chunk-x' etc...
@@ -121,6 +110,13 @@
 (defmacro with-chunk-key-coordinates ((x y z) chunk-key &body body)
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))
+;;For backwards compatibility
+(defun unhashfunc (chunk-key)
+  (with-chunk-key-coordinates (x y z) chunk-key
+    (values (* x +size+)
+	    (* y +size+)
+	    (* z +size+))))
+
 (defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
   ;;[FIXME]is this a good api?
   (with-chunk-key-coordinates (x y z) chunk-key 
@@ -141,11 +137,31 @@
   (or (null chunk)
       (eq chunk *empty-chunk*)
       (eq (chunk-type chunk) :empty)))
+(struct-to-clos:struct->class
+ (defstruct chunk
+   modified
+   ;;last-saved
+   type
+   x y z
+   key
+   data))
 (defun make-chunk-data (&rest rest &key (initial-element *empty-space*))
   (apply 'make-array
 	 +total-size+
 	 :initial-element initial-element
 	 rest))
+
+;;;;
+(defun reference-inside-chunk (chunk rx ry rz)
+  (declare (type inner-3d rx ry rz))
+  (row-major-aref (the chunk-data (chunk-data chunk))
+		  (chunk-ref rx ry rz)))
+(defun (setf reference-inside-chunk) (value chunk rx ry rz)
+  (declare (type inner-3d rx ry rz))
+  (setf (row-major-aref (the chunk-data (chunk-data chunk))
+			(chunk-ref rx ry rz))
+	value))
+;;;;
 
 (defun coerce-empty-chunk-to-regular-chunk (chunk)
   (when (eq (chunk-type chunk) :empty)
@@ -183,29 +199,16 @@
 (deftype chunk-array-data ()
   `(simple-array t (,+ca-size+ ,+ca-size+ ,+ca-size+)))
 
-(defun fill-array (array value)
-  (declare (type chunk-array-data array))
-  (dotimes (i (array-total-size array))
-    (setf (row-major-aref array i) value)))
 ;;'rx' 'ry' and 'rz' stand for remainder
-;;;;
-(defun reference-inside-chunk (chunk rx ry rz)
-  (declare (type inner-3d rx ry rz))
-  (row-major-aref (the chunk-data (chunk-data chunk))
-		  (chunk-ref rx ry rz)))
-(defun (setf reference-inside-chunk) (value chunk rx ry rz)
-  (declare (type inner-3d rx ry rz))
-  (setf (row-major-aref (the chunk-data (chunk-data chunk))
-			(chunk-ref rx ry rz))
-	value))
-;;;;
+
 ;;[FIXME]actually load chunks
-(defun load-chunk (&optional (cx 0) (cy 0) (cz 0))
+(defun load-chunk (cx cy cz)
   (error "This should not appear.")
   (create-chunk cx cy cz))
 
-(defun get-chunk (&optional (cx 0) (cy 0) (cz 0) (force-load nil)
-		    &aux (key (create-chunk-key cx cy cz)))
+(defun get-chunk (cx cy cz
+		  &optional (force-load nil)
+		  &aux (key (create-chunk-key cx cy cz)))
   (declare (type chunk-coord cx cy cz))
   (multiple-value-bind (value existsp) (get-chunk-in-cache key)
     (cond (existsp (values value t))
@@ -222,8 +225,12 @@
   (make-chunk-array))
 (defparameter *chunk-array* (create-chunk-array))
 
-(defun reposition-chunk-array (&optional 
-				 (cx 0) (cy 0) (cz 0)
+;;FIXME:optimize?
+(defun fill-array (array value)
+  (dotimes (i (array-total-size array))
+    (setf (row-major-aref array i) value)))
+(defun reposition-chunk-array (cx cy cz
+			       &optional 
 				 (chunk-array *chunk-array*))
   (declare (type chunk-coord cx cy c))
   (setf (chunk-array-x-min chunk-array) cx
@@ -232,85 +239,67 @@
   (fill-array (chunk-array-array chunk-array) *chunk-array-empty-value*)
   (values))
 
-(defun get-chunk-from-chunk-array (&optional 
-				     (chunk-x 0) (chunk-y 0) (chunk-z 0)
-				     (force-load nil)
-				     (chunk-array *chunk-array*))
-  (declare (type chunk-coord chunk-x chunk-y chunk-z))
-  ;;if the coordinates are correct, return a chunk, otherwise return nil
-  (let ((data-x (- chunk-x (the chunk-coord (chunk-array-x-min chunk-array)))))
-    (declare (type chunk-coord data-x))
-    (when (< -1 data-x +ca-size+)
-      (let ((data-y (- chunk-y (the chunk-coord (chunk-array-y-min chunk-array)))))
-	(declare (type chunk-coord data-y))
-	(when (< -1 data-y +ca-size+)
-	  (let ((data-z (- chunk-z (the chunk-coord (chunk-array-z-min chunk-array)))))
-	    (declare (type chunk-coord data-z))
-	    (when (< -1 data-z +ca-size+)
-	      (let ((data (chunk-array-array chunk-array)))
-		(declare (type chunk-array-data data))
-		;;the chunk is in the chunk-array's bounds
-		(let ((possible-chunk
-		       (aref data data-x data-y data-z)))
-		  (if (and possible-chunk
-			   ;;This check is unnecessary if we clear the chunk array every time
-			   ;;the position updates. combined with hysteresis, the relatively
-			   ;;slow filling should not happen often
-			   #+nil
-			   (chunk-coordinates-match-p possible-chunk chunk-x chunk-y chunk-z))
-		      ;;The chunk is not nil, and the coordinates line up
-		      possible-chunk
-		      (let ((next-possible-chunk (get-chunk chunk-x chunk-y chunk-z force-load)))
-			(setf (aref data data-x data-y data-z) next-possible-chunk)
-			next-possible-chunk)))))))))))
-(defun remove-chunk-from-chunk-array (&optional 
-					(chunk-x 0) (chunk-y 0) (chunk-z 0)
-					(chunk-array *chunk-array*))
-  ;;[FIXME]Some of the code is identical to get-chunk-from-chunk-array,
-  ;;namely the when and lets establishing the bounds of the chunk coordinates
-  (declare (type chunk-coord chunk-x chunk-y chunk-z))
-  ;;if the coordinates are correct, return a chunk, otherwise return nil
-  (let ((data-x (- chunk-x (the chunk-coord (chunk-array-x-min chunk-array)))))
-    (declare (type chunk-coord data-x))
-    (when (< -1 data-x +ca-size+)
-      (let ((data-y (- chunk-y (the chunk-coord (chunk-array-y-min chunk-array)))))
-	(declare (type chunk-coord data-y))
-	(when (< -1 data-y +ca-size+)
-	  (let ((data-z (- chunk-z (the chunk-coord (chunk-array-z-min chunk-array)))))
-	    (declare (type chunk-coord data-z))
-	    (when (< -1 data-z +ca-size+)
-	      (let ((data (chunk-array-array chunk-array)))
-		(declare (type chunk-array-data data))
-		;;the chunk is in the chunk-array's bounds
-		(let ((possible-chunk
-		       (aref data data-x data-y data-z)))
-		  (when possible-chunk
-		    (setf (aref data data-x data-y data-z) nil)))))))))))
+(defmacro %get-chunk-from-ca
+    ((data chunk-array-min c &optional (size '+ca-size+)) &body body)
+  `(let ((,data (- ,c (the chunk-coord (,chunk-array-min chunk-array)))))
+     (declare (type chunk-coord ,data))
+     (when (< -1 ,data ,size)
+       ,@body)))
 
-(defun obtain-chunk (&optional (cx 0) (cy 0) (cz 0) (force-load nil))
+;;if the coordinates are correct, return a chunk, otherwise return nil
+(defun get-chunk-from-chunk-array
+    (cx cy cz  &optional (force-load nil) (chunk-array *chunk-array*))
+  (declare (type chunk-coord cx cy cz))
+  (%get-chunk-from-ca (nx chunk-array-x-min cx)
+    (%get-chunk-from-ca (ny chunk-array-y-min cy)
+      (%get-chunk-from-ca (nz chunk-array-z-min cz)
+	(let* ((data (chunk-array-array chunk-array))
+	       (maybe-chunk (aref data nx ny nz)))
+	  (declare (type chunk-array-data data))
+	  (cond ((and maybe-chunk
+		       ;;This check is unnecessary if we clear the chunk array every time
+		       ;;the position updates. combined with hysteresis, the relatively
+		       ;;slow filling should not happen often
+		       #+nil
+		       (chunk-coordinates-match-p possible-chunk chunk-x chunk-y chunk-z))
+		 ;;Return the chunk found because it is not nil
+		 ;;and the coordinates are correct.
+		 maybe-chunk)
+		;;Retrieve a chunk, place it in the chunk array,
+		;;and return it.
+		(t (setf (aref data nx ny nz)
+			 (get-chunk cx cy cz force-load)))))))))
+
+(defun remove-chunk-from-chunk-array
+    (cx cy cz &optional (chunk-array *chunk-array*))
+  (declare (type chunk-coord cx cy cz))
+  (%get-chunk-from-ca (nx chunk-array-x-min cx)
+    (%get-chunk-from-ca (ny chunk-array-y-min cy)
+      (%get-chunk-from-ca (nz chunk-array-z-min cz)
+	(let* ((data (chunk-array-array chunk-array))
+	       (maybe-chunk (aref data nx ny nz)))
+	  (declare (type chunk-array-data data))
+	  ;;The chunk is found, so remove it.  
+	  (when maybe-chunk
+	    (setf (aref data nx ny nz) nil)
+	    (values t)))))))
+
+(defun obtain-chunk (cx cy cz &optional (force-load nil))
   (declare (type chunk-coord cx cy cz))
   (get-chunk-from-chunk-array cx cy cz force-load))
 
-(defun obtain-chunk-from-block-coordinates (&optional (x 0) (y 0) (z 0) (force-load nil))
+(defun obtain-chunk-from-block-coordinates (x y z &optional (force-load nil))
   (declare (type block-coord x y z))
-  (multiple-value-call
-      'obtain-chunk
-    (bcoord->ccoord x y z)
-    force-load))
-
-(defun inner (x y z)
-  (values (mod x +size+)
-	  (mod y +size+)
-	  (mod z +size+)))
+  (multiple-value-call 'obtain-chunk (bcoord->ccoord x y z) force-load))
 
 ;;;;
-(defun getobj (&optional (x 0) (y 0) (z 0))
+(defun getobj (x y z)
   (declare (type block-coord x y z))
   (multiple-value-bind (rx ry rz) (inner x y z)
     (reference-inside-chunk
      (obtain-chunk-from-block-coordinates x y z nil)
      rx ry rz)))
-(defun (setf getobj) (value &optional (x 0) (y 0) (z 0))
+(defun (setf getobj) (value x y z)
   (declare (type block-coord x y z))
   (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
     ;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
@@ -325,20 +314,6 @@
 (defun setobj (x y z new)
   (setf (getobj x y z) new))
 ;;;;
-
-;;bcoord = block-coord, ccoord = chunk-coord
-(defun bcoord->ccoord (&optional (x 0) (y 0) (z 0))
-  ;;[FIXME]? combine with obtain-chunk-from-block-coordinates? 
-  (declare (type block-coord x y z))
-  (values (floor x +size+) (floor y +size+) (floor z +size+)))
-
-
-;;For backwards compatibility
-(defun unhashfunc (chunk-key)
-  (with-chunk-key-coordinates (x y z) chunk-key
-    (values (* x +size+)
-	    (* y +size+)
-	    (* z +size+))))
 
 #+nil
 (defun chunkhashfunc (x y z)
