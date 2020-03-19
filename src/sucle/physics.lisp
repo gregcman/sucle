@@ -190,6 +190,7 @@
 	  (let* ((walkspeed 4.317)
 		 (speed walkspeed)
 		 (step-power 4.0))
+	    ;;FIXME:add great friction when on ground and sneaking
 	    (cond
 	      (fly
 	       (*= speed 4.0))		

@@ -55,8 +55,8 @@ Bottom Text
 ;;;;MENU
 ;;-> inspired by html dom?
 (defvar *data*)
-(defvar *height*)
-(defvar *width*)
+(defvar *h*)
+(defvar *w*)
 (defun simulate-menu (&optional (menu *menu*))
   ;;do buttons
   (let

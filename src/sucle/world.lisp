@@ -283,7 +283,7 @@
 (defun chunk-memory-usage (&optional (chunks *maximum-allowed-chunks*))
   ;;in megabytes
   (/ (* 8 #|8 bytes per word in 64bit sbcl|# chunks
-	(* voxel-chunks:*chunk-size-x* voxel-chunks:*chunk-size-y* voxel-chunks:*chunk-size-z*))
+	vocs:+total-size+)
      1024 1024 1.0 #|1.0 for converting to float|#))
 (defparameter *threshold* (* 8 8))
 ;;threshold so that when too many chunks exist, over compensate, so not unloading every time
@@ -312,7 +312,8 @@
 	    (abs dz))))))
 (defun get-unloadable-chunks ()
   ;;[FIXME]optimize?
-  (let ((difference (- (- (voxel-chunks:total-loaded-chunks) *maximum-allowed-chunks*)
+  (let ((difference (- (- (voxel-chunks::total-chunks-in-cache)
+			  *maximum-allowed-chunks*)
 		       *threshold*)))
     (when (plusp difference)
       (let ((distance-sorted-chunks	     
@@ -371,10 +372,10 @@
 (defun unload-extra-chunks ()
   (let (to-unload)
     ;;[FIXME]get a timer library? metering?
-    (print "getting unloadable chunks")
+    ;;(print "getting unloadable chunks")
     (setf to-unload (get-unloadable-chunks))
     ;;(print (length to-unload))
-    (print "unloading the chunks")
+    ;;(print "unloading the chunks")
     (dolist (chunk to-unload)
       (chunk-unload chunk))))
 
@@ -389,7 +390,7 @@
 	   key
 	 (voxel-chunks:remove-chunk-from-chunk-array x y z))
        ;;remove from the global table
-       (voxel-chunks:remove-chunk-at key)
+       (voxel-chunks::delete-chunk-in-cache key)
        t)
       (t nil))))
 
@@ -431,13 +432,13 @@
 	   (y0 (1- y) (+ y 2))
 	   (z0 (1- z) (+ z 2)))
 	  (let ((new-key (voxel-chunks:create-chunk-key x0 y0 z0)))
-	    (when (voxel-chunks:chunk-exists-p new-key)
+	    (when (voxel-chunks::chunk-in-cache-p new-key)
 	      (dirty-push new-key))))))
 
 (defparameter *load-jobs* 0)
 
 (defun space-for-new-chunk-p (key)
-  (voxel-chunks:empty-chunk-p (voxel-chunks:get-chunk-at key)))
+  (voxel-chunks:empty-chunk-p (voxel-chunks::get-chunk-in-cache key)))
 
 (defun chunk-load (key)
   ;;[FIXME]using chunk-coordinate-to-filename before
@@ -480,7 +481,7 @@
 			    (t 
 			     (progn
 			       (apply #'voxel-chunks:remove-chunk-from-chunk-array key)
-			       (voxel-chunks:set-chunk-at key chunk))
+			       (voxel-chunks::set-chunk-in-cache key chunk))
 			     ;;(format t "~%making chunk ~a" key)
 
 			     ;;(voxel-chunks:set-chunk-at key new-chunk)
@@ -514,3 +515,29 @@
     (load-world newpath)))
 ;;;;<CHANGE-WORLD?>
 ;;;;************************************************************************;;;;
+
+
+;; (defun make-chunk-cache ()
+;;   (make-hash-table :test 'equal))
+;; (defparameter *chunk-cache* (make-chunk-cache))
+;; (defun set-chunk-in-cache (key chunk &optional (cache *chunk-cache*))
+;;   (setf (gethash key cache) chunk))
+;; (defun get-chunk-in-cache (key &optional (cache *chunk-cache*))
+;;   ;;return (values chunk exist-p)
+;;   (gethash key cache))
+;; (defun delete-chunk-in-cache (key &optional (cache *chunk-cache*))
+;;   (remhash key cache))
+;; (defun chunk-in-cache-p (key &optional (cache *chunk-cache*))
+;;   (multiple-value-bind (value existsp) (get-chunk-in-cache key cache)
+;;     (declare (ignorable value))
+;;     existsp))
+
+;; (defun get-chunk-cache (key &optional (cache *chunk-cache*))
+;;   ;;Get the chunk from the cache if it exists, otherwise load it.
+;;   ;;If its currently being loaded, then block.
+;;   (multiple-value-bind (chunk existp) (get-chunk-in-cache cache)
+;;     (cond
+;;       ;;when it exists, return it
+;;       (existp chunk)
+;;       ;;otherwise, block until it loads
+;;       (t (set-chunk-in-cache key (loadchunk key) cache)))))

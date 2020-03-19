@@ -1,5 +1,6 @@
 (defpackage #:voxel-chunks
   (:use :cl)
+  (:nicknames :vocs)
   (:export 
    #:unhashfunc
    #:chunkhashfunc
@@ -51,13 +52,31 @@
    
    #:chunk-worth-saving
    #:chunk-exists-p
-   ))
+
+   #:+size+
+   #:+total-size+))
 (in-package #:voxel-chunks)
 
-(utility:eval-always
-  (defparameter *chunk-size-x* 16)
-  (defparameter *chunk-size-y* 16)
-  (defparameter *chunk-size-z* 16))
+;;;;************************************************************************;;;;
+;;Chunk cache
+;;equal is used because the key is a list of the chunk coordinates
+(defun make-chunk-cache ()
+  (make-hash-table :test 'equal))
+(defparameter *chunks* (make-chunk-cache))
+(defun set-chunk-in-cache (key chunk &optional (cache *chunks*))
+  (setf (gethash key cache) chunk))
+(defun get-chunk-in-cache (key &optional (cache *chunks*))
+  ;;return (values chunk exist-p)
+  (gethash key cache))
+(defun delete-chunk-in-cache (key &optional (cache *chunks*))
+  (remhash key cache))
+(defun chunk-in-cache-p (key &optional (cache *chunks*))
+  (multiple-value-bind (value existsp) (get-chunk-in-cache key cache)
+    (declare (ignorable value))
+    existsp))
+(defun total-chunks-in-cache (&optional (cache *chunks*))
+  (hash-table-count cache))
+;;;;************************************************************************;;;;
 
 (struct-to-clos:struct->class
  (defstruct chunk
@@ -70,13 +89,14 @@
    key
    data))
 
-#+nil ;;test to see what happens if chunk is just an array, and nothing else
-(progn
-  (defun make-chunk (&key data &allow-other-keys)
-    data)
-  (declaim (inline chunk-data))
-  (defun chunk-data (chunk)
-    chunk))
+;;lets make it 16, and not care about the other parameters for now.
+(defconstant +size+ 16)
+(defconstant +total-size+ (expt +size+ 3))
+
+(utility:eval-always
+  (defparameter *chunk-size-x* 16)
+  (defparameter *chunk-size-y* 16)
+  (defparameter *chunk-size-z* 16))
 
 ;;[FIXME]chunk-coord and block-coord being fixnums is not theoretically correct,
 ;;but its still a lot of space?
@@ -162,29 +182,8 @@
 		:key key
 		:data data
 		:type :normal)))
-#+nil
-(defun make-chunk-from-key-and-data-and-keep (key data)
-  (let ((new-chunk
-	 (make-chunk-from-key-and-data key data)))
-    (set-chunk-at key new-chunk)))
-;;equal is used because the key is a list of the chunk coordinates
-(defun make-chunk-table ()
-  (make-hash-table :test 'equal))
-(defparameter *chunks* (make-chunk-table))
-(defun set-chunk-at (key chunk)
-  (setf (gethash key *chunks*) chunk))
-(defun get-chunk-at (key)
-  (gethash key *chunks*))
-(defun remove-chunk-at (key)
-  (remhash key *chunks*))
 
-(defun chunk-exists-p (key)
-  (multiple-value-bind (value existsp) (get-chunk-at key)
-    (declare (ignorable value))
-    existsp))
-
-(defun total-loaded-chunks ()
-  (hash-table-count *chunks*))
+;;;;;;;;;;;;;
 
 (utility:eval-always
   (defparameter *chunk-array-default-size-x* 32)
@@ -249,7 +248,7 @@
     (defun get-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0) (force-load nil))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
       (let ((key (create-chunk-key chunk-x chunk-y chunk-z)))
-	(multiple-value-bind (value existsp) (get-chunk-at key)
+	(multiple-value-bind (value existsp) (get-chunk-in-cache key)
 	  (if existsp
 	      (values value t)
 	      (progn
@@ -258,7 +257,7 @@
 		    (progn
 		      (print "NOPeE3")
 		      (let ((new-chunk (load-chunk chunk-x chunk-y chunk-z)))
-			(set-chunk-at key new-chunk)
+			(set-chunk-in-cache key new-chunk)
 			(values new-chunk t)))
 		    (progn
 		      ;(print "NOPE2")
@@ -273,7 +272,7 @@
     
     (defun create-chunk-array ()
       (make-chunk-array))
-    (defparameter *chunk-array* (create-chunk-array))
+    ;;(defparameter *chunk-array* (create-chunk-array))
     (defun reposition-chunk-array (&optional 
 				     (chunk-x 0) (chunk-y 0) (chunk-z 0)
 				     (chunk-array *chunk-array*))
@@ -408,7 +407,7 @@
   (create-chunk-key x y z))
 ;;[FIXME]clearworld does not handle loading and stuff?
 (defun clearworld ()
-  (setf *chunks* (make-chunk-table)
+  (setf *chunks* (make-chunk-cache)
 	*chunk-array* (create-chunk-array))
   (values))
 

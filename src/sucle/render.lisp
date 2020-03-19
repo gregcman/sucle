@@ -676,14 +676,17 @@ gl_FragColor.rgb = color_out;
 		     (let ((times
 			    (draw-aabb x y z
 				       (load-time-value
-					(let ((foo *chunk-query-buffer-size*))
+					(let* ((foo *chunk-query-buffer-size*)
+					       (min (- foo))
+					       (max (+ foo vocs:+size+)))
+					  (floatf min max)
 					  (aabbcc:make-aabb
-					    :minx (- 0.0 foo)
-					    :miny (- 0.0 foo)
-					    :minz (- 0.0 foo)
-					    :maxx (+ (floatify voxel-chunks:*chunk-size-x*) foo)
-					    :maxy (+ (floatify voxel-chunks:*chunk-size-y*) foo)
-					    :maxz (+ (floatify voxel-chunks:*chunk-size-z*) foo)))))))
+					    :minx min
+					    :miny min
+					    :minz min
+					    :maxx max
+					    :maxy max
+					    :maxz max))))))
 			(scratch-buffer:flush-bind-in*
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
@@ -697,18 +700,17 @@ gl_FragColor.rgb = color_out;
 	     coords
 	     (create-chunk-gl-representation
 	      display-list occlusion-box
-	      (voxel-chunks:with-chunk-key-coordinates (x y z) coords
-		(floatf x y z)
-		(setf x (* x (floatify voxel-chunks:*chunk-size-x*)))
-		(setf y (* y (floatify voxel-chunks:*chunk-size-y*)))
-		(setf z (* z (floatify voxel-chunks:*chunk-size-z*)))
-		(aabbcc:make-aabb
-		 :minx x
-		 :miny y
-		 :minz z
-		 :maxx (+ (floatify voxel-chunks:*chunk-size-x*) x)
-		 :maxy (+ (floatify voxel-chunks:*chunk-size-y*) y)
-		 :maxz (+ (floatify voxel-chunks:*chunk-size-z*) z)))))))))))
+	      (voxel-chunks:with-chunk-key-coordinates
+	       (x y z) coords
+	       (flet ((f (n)
+			(floatify (* n vocs:+size+))))
+		 (create-aabb
+		  (f (1+ x))
+		  (f (1+ y))
+		  (f (1+ z))
+		  (f x)
+		  (f y)
+		  (f z))))))))))))
 
 
 (defun draw-aabb (x y z aabb &optional (iterator *iterator*))
@@ -860,9 +862,9 @@ Note:limits the amount of background jobs and pending lisp objects."
 	   (if thechunk
 	       (cond
 		 ;;If the chunk exists and is not empty
-		 ((and (voxel-chunks:chunk-exists-p thechunk)
+		 ((and (voxel-chunks::chunk-in-cache-p thechunk)
 		       (not (voxel-chunks:empty-chunk-p
-			     (voxel-chunks:get-chunk-at thechunk))))
+			     (voxel-chunks::get-chunk-in-cache thechunk))))
 		  ;;Then submit a job to the mesher 
 		  (incf *total-background-chunk-mesh-jobs*)
 		  (let ((lparallel:*task-category* 'mesh-chunk))
