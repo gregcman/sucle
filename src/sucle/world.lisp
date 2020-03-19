@@ -229,7 +229,7 @@
 (defparameter *chunk-coordinate-center-z* 0)
 (defun set-chunk-coordinate-center (player-x player-y player-z)
   (multiple-value-bind (chunk-x chunk-y chunk-z)
-      (voxel-chunks:chunk-coordinates-from-block-coordinates
+      (vocs::bcoord->ccoord
        (floor player-x)
        (floor player-y)
        (floor player-z))

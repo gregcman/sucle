@@ -183,11 +183,10 @@
 (deftype chunk-array-data ()
   `(simple-array t (,+ca-size+ ,+ca-size+ ,+ca-size+)))
 
-(utility:with-unsafe-speed
-  (defun fill-array (array value)
-    (declare (type chunk-array-data array))
-    (dotimes (i (array-total-size array))
-      (setf (row-major-aref array i) value))))
+(defun fill-array (array value)
+  (declare (type chunk-array-data array))
+  (dotimes (i (array-total-size array))
+    (setf (row-major-aref array i) value)))
 ;;'rx' 'ry' and 'rz' stand for remainder
 ;;;;
 (defun reference-inside-chunk (chunk rx ry rz)
@@ -294,43 +293,44 @@
 
 (defun obtain-chunk-from-block-coordinates (&optional (x 0) (y 0) (z 0) (force-load nil))
   (declare (type block-coord x y z))
-  (let ((chunk-x (floor x +size+))
-	(chunk-y (floor y +size+))
-	(chunk-z (floor z +size+)))
-    (obtain-chunk chunk-x chunk-y chunk-z force-load)))
-    
+  (multiple-value-call
+      'obtain-chunk
+    (bcoord->ccoord x y z)
+    force-load))
+
+(defun inner (x y z)
+  (values (mod x +size+)
+	  (mod y +size+)
+	  (mod z +size+)))
+
+;;;;
 (defun getobj (&optional (x 0) (y 0) (z 0))
   (declare (type block-coord x y z))
-  (let ((chunk (obtain-chunk-from-block-coordinates x y z nil))
-	(inner-x (mod x +size+))
-	(inner-y (mod y +size+))
-	(inner-z (mod z +size+)))
-    (reference-inside-chunk chunk inner-x inner-y inner-z)))
+  (multiple-value-bind (rx ry rz) (inner x y z)
+    (reference-inside-chunk
+     (obtain-chunk-from-block-coordinates x y z nil)
+     rx ry rz)))
 (defun (setf getobj) (value &optional (x 0) (y 0) (z 0))
   (declare (type block-coord x y z))
-  (let ((chunk (obtain-chunk-from-block-coordinates x y z t))
-	(inner-x (mod x +size+))
-	(inner-y (mod y +size+))
-	(inner-z (mod z +size+)))
+  (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
     ;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
     ;;chunk might be a chunk of type :EMPTY with shared data, but since it is being set,
     ;;coerce it to a regular chunk
     (coerce-empty-chunk-to-regular-chunk chunk)
     (setf (chunk-modified chunk) t)
-    (setf (reference-inside-chunk chunk inner-x inner-y inner-z) value)))
+    (multiple-value-bind (rx ry rz) (inner x y z)
+      (setf (reference-inside-chunk chunk rx ry rz) value))))
     ;;[FIXME]setobj is provided for backwards compatibility?
-
-
+;;;;
 (defun setobj (x y z new)
   (setf (getobj x y z) new))
+;;;;
 
-(defun chunk-coordinates-from-block-coordinates (&optional (x 0) (y 0) (z 0))
+;;bcoord = block-coord, ccoord = chunk-coord
+(defun bcoord->ccoord (&optional (x 0) (y 0) (z 0))
   ;;[FIXME]? combine with obtain-chunk-from-block-coordinates? 
   (declare (type block-coord x y z))
-  (let ((chunk-x (floor x +size+))
-	(chunk-y (floor y +size+))
-	(chunk-z (floor z +size+)))
-    (values chunk-x chunk-y chunk-z)))
+  (values (floor x +size+) (floor y +size+) (floor z +size+)))
 
 
 ;;For backwards compatibility
