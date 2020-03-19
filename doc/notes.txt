@@ -266,3 +266,10 @@ frustum culling
 ;;- database
 ;;- sucle-serialize
 ;;used emacs-narrow-to-region
+
+centralized place for info on each of the chunks
+- pinned by which cursors/chunk-arrays -> list of cursors
+- last accessed at -> for mru cache
+- current tasks being executed for the chunk
+-- being loaded
+-- being saved

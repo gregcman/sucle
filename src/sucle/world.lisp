@@ -222,57 +222,6 @@
     (block-dirtify i j k)))
 
 ;;;;chunk loading
-
-;;[FIXME]architecture:one center, the player, and the chunk array centers around it
-(defparameter *chunk-coordinate-center-x* 0)
-(defparameter *chunk-coordinate-center-y* 0)
-(defparameter *chunk-coordinate-center-z* 0)
-(defun set-chunk-coordinate-center (player-x player-y player-z)
-  (multiple-value-bind (chunk-x chunk-y chunk-z)
-      (vocs::bcoord->ccoord
-       (floor player-x)
-       (floor player-y)
-       (floor player-z))
-    (setf *chunk-coordinate-center-x* chunk-x)
-    (setf *chunk-coordinate-center-y* chunk-y)
-    (setf *chunk-coordinate-center-z* chunk-z)))
-
-(defparameter *reposition-chunk-array-threshold* 2)
-(defun maybe-move-chunk-array ()
-  ;;center the chunk array around the player, but don't always, only if above a certain
-  ;;threshold
-  ;;[FIXME]is this expensive to recompute every frame or does it matter?
-  ;;maybe put it in the chunk array object?
-  ;;return t if it was moved, nil otherwise
-  (let ((half-size (floor voxel-chunks::+ca-size+ 2)))
-    (let ((center-x (+ 
-		     (voxel-chunks:chunk-array-x-min voxel-chunks:*chunk-array*)
-		     half-size))
-	  (center-y (+ 
-		     (voxel-chunks:chunk-array-y-min voxel-chunks:*chunk-array*)
-		     half-size))
-	  (center-z (+ 
-		     (voxel-chunks:chunk-array-z-min voxel-chunks:*chunk-array*)
-		     half-size)))
-      ;;[FIXME]hard-coded threshold for repositioning the chunk array? 4 chunks?
-      #+nil
-      (print (list (- chunk-x center-x)
-		   (- chunk-y center-y)
-		   (- chunk-z center-z)))
-      (let ((chunk-x *chunk-coordinate-center-x*)
-	    (chunk-y *chunk-coordinate-center-y*)
-	    (chunk-z *chunk-coordinate-center-z*)
-	    (threshold *reposition-chunk-array-threshold*))
-	(when (or (<= threshold (abs (- chunk-x center-x)))
-		  (<= threshold (abs (- chunk-y center-y)))
-		  (<= threshold (abs (- chunk-z center-z))))
-	  ;;(format t "moving chunk array")
-	  (voxel-chunks:reposition-chunk-array
-	   (- chunk-x half-size)
-	   (- chunk-y half-size)
-	   (- chunk-z half-size))
-	  (values t))))))
-
 (defun safe-subseq (seq end)
   (subseq seq 0 (min (length seq) end)))
 
@@ -286,30 +235,25 @@
      1024 1024 1.0 #|1.0 for converting to float|#))
 (defparameter *threshold* (* 8 8))
 ;;threshold so that when too many chunks exist, over compensate, so not unloading every time
-(defun unsquared-chunk-distance (position-key)
-  (let ((x0 *chunk-coordinate-center-x*)
-	(y0 *chunk-coordinate-center-y*)
-	(z0 *chunk-coordinate-center-z*))
-    (voxel-chunks:with-chunk-key-coordinates
-     (x1 y1 z1) position-key
-     (let ((dx (- x1 x0))
-	   (dy (- y1 y0))
-	   (dz (- z1 z0)))
-       ;;[FIXME]we don't need the sqrt for sorting
-       (+ (* dx dx) (* dy dy) (* dz dz))))))
-(defun blocky-chunk-distance (position-key)
-  (let ((x0 *chunk-coordinate-center-x*)
-	(y0 *chunk-coordinate-center-y*)
-	(z0 *chunk-coordinate-center-z*))
-    (voxel-chunks:with-chunk-key-coordinates
-     (x1 y1 z1) position-key
-     (let ((dx (- x1 x0))
-	   (dy (- y1 y0))
-	   (dz (- z1 z0)))
-       (max (abs dx)
-	    (abs dy)
-	    (abs dz))))))
-(defun get-unloadable-chunks ()
+
+(defun unsquared-chunk-distance (position-key cx cy cz)
+  (voxel-chunks:with-chunk-key-coordinates
+   (x1 y1 z1) position-key
+   (let ((dx (- x1 cx))
+	 (dy (- y1 cy))
+	 (dz (- z1 cz)))
+     ;;[FIXME]we don't need the sqrt for sorting
+     (+ (* dx dx) (* dy dy) (* dz dz)))))
+(defun blocky-chunk-distance (position-key cx cy cz)
+  (voxel-chunks:with-chunk-key-coordinates
+   (x1 y1 z1) position-key
+   (let ((dx (- x1 cx))
+	 (dy (- y1 cy))
+	 (dz (- z1 cz)))
+     (max (abs dx)
+	  (abs dy)
+	  (abs dz)))))
+(defun get-unloadable-chunks (cx cy cz)
   ;;[FIXME]optimize?
   (let ((difference (- (- (voxel-chunks::total-chunks-in-cache)
 			  *maximum-allowed-chunks*)
@@ -317,62 +261,53 @@
     (when (plusp difference)
       (let ((distance-sorted-chunks	     
 	     (sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'> :key
-		   'unsquared-chunk-distance)))
+		   (lambda (key)
+		     (unsquared-chunk-distance key cx cy cz)))))
 	(safe-subseq distance-sorted-chunks difference)))))
 
-(defun load-chunks-around ()
+(defun load-chunks-around (cx cy cz)
   (mapc (lambda (key)
 	  (chunk-load key))
-	(get-chunks-to-load)))
-(defun get-chunks-to-load ()
-  (let ((x0 *chunk-coordinate-center-x*)
-	(y0 *chunk-coordinate-center-y*)
-	(z0 *chunk-coordinate-center-z*))
-    (declare (optimize (speed 3) (safety 0))
-	     (type voxel-chunks:chunk-coord x0 y0 z0))
-    (let ((acc nil))
-      (block out
-	(let ((chunk-count 0))
-	  (declare (type fixnum chunk-count))
-	  (flet ((add-chunk (x y z)
-		   (incf chunk-count)
-		   ;;do something
-		   (let ((key (voxel-chunks:create-chunk-key x y z)))
-		     (when (space-for-new-chunk-p key)
-		       ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		       (push key acc)
-		       ;;(print (list x y z))
-		       ))
-		   (when (>
-			  ;;[FIXME]nonportably assume chunk-count and maxium allowed chunks are fixnums
-			  (the fixnum chunk-count)
-			  (the fixnum *maximum-allowed-chunks*))
-		     ;;exceeded the allowed chunks to load
-		     (return-from out))
-		   ))
-	    (let ((size *chunk-radius*))
-	      (declare (type voxel-chunks:chunk-coord size))
-	      (utility:dobox ((chunk-x (the voxel-chunks:chunk-coord (- x0 size))
-					(the voxel-chunks:chunk-coord (+ x0 size)))
-			       (chunk-y (the voxel-chunks:chunk-coord (- y0 size))
-					(the voxel-chunks:chunk-coord (+ y0 size)))
-			       (chunk-z (the voxel-chunks:chunk-coord (- z0 size))
-					(the voxel-chunks:chunk-coord (+ z0 size))))
-			      (add-chunk chunk-x chunk-y chunk-z))))))
-      acc)))
+	(get-chunks-to-load cx cy cz)))
+(defun get-chunks-to-load (cx cy cz)
+  (declare (optimize (speed 3) (safety 0))
+	   (type voxel-chunks:chunk-coord cx cy cz))
+  (let ((acc nil))
+    (block out
+      (let ((chunk-count 0))
+	(declare (type fixnum chunk-count))
+	(flet ((add-chunk (x y z)
+		 (incf chunk-count)
+		 ;;do something
+		 (let ((key (voxel-chunks:create-chunk-key x y z)))
+		   (when (space-for-new-chunk-p key)
+		     ;;The chunk does not exist, therefore the *empty-chunk* was returned
+		     (push key acc)
+		     ;;(print (list x y z))
+		     ))
+		 (when (>
+			;;[FIXME]nonportably assume chunk-count and maxium allowed chunks are fixnums
+			(the fixnum chunk-count)
+			(the fixnum *maximum-allowed-chunks*))
+		   ;;exceeded the allowed chunks to load
+		   (return-from out))
+		 ))
+	  (let ((size *chunk-radius*))
+	    (declare (type voxel-chunks:chunk-coord size))
+	    (utility:dobox ((chunk-x (the voxel-chunks:chunk-coord (- cx size))
+				     (the voxel-chunks:chunk-coord (+ cx size)))
+			    (chunk-y (the voxel-chunks:chunk-coord (- cy size))
+				     (the voxel-chunks:chunk-coord (+ cy size)))
+			    (chunk-z (the voxel-chunks:chunk-coord (- cz size))
+				     (the voxel-chunks:chunk-coord (+ cz size))))
+			   (add-chunk chunk-x chunk-y chunk-z))))))
+    acc))
 
-(defun load-world (&optional (force nil))
-  (let ((maybe-moved (maybe-move-chunk-array)))
-    (when (or force
-	      maybe-moved)
-      (load-chunks-around)
-      (unload-extra-chunks))))
-
-(defun unload-extra-chunks ()
+(defun unload-extra-chunks (cx cy cz)
   (let (to-unload)
     ;;[FIXME]get a timer library? metering?
     ;;(print "getting unloadable chunks")
-    (setf to-unload (get-unloadable-chunks))
+    (setf to-unload (get-unloadable-chunks cx cy cz))
     ;;(print (length to-unload))
     ;;(print "unloading the chunks")
     (dolist (chunk to-unload)
@@ -385,9 +320,9 @@
        (chunk-save chunk)
        (dirty-push key)
        ;;remove from the chunk-array
-       (voxel-chunks:with-chunk-key-coordinates (x y z)
-	   key
-	 (voxel-chunks:remove-chunk-from-chunk-array x y z))
+       (multiple-value-call
+	'voxel-chunks:remove-chunk-from-chunk-array
+	 (voxel-chunks::spread-chunk-key key))
        ;;remove from the global table
        (voxel-chunks::delete-chunk-in-cache key)
        t)

@@ -237,6 +237,16 @@ Press q/escape to quit
      (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
    *sky-color*))
 
+;;[FIXME]architecture:one center, the player, and the chunk array centers around it
+(defparameter *chunk-cursor-center* nil)
+(defun set-chunk-coordinate-center (player-x player-y player-z)
+  (setf *chunk-cursor-center*
+	(multiple-value-list
+	 (vocs::bcoord->ccoord
+	  (floor player-x)
+	  (floor player-y)
+	  (floor player-z)))))
+
 ;;Frames are for graphical frames, as in framerate.
 ;;(defparameter *frames* 0)
 
@@ -250,18 +260,18 @@ Press q/escape to quit
     (voxel-chunks:clearworld)
     (setf *entities* (loop :repeat 10 :collect (create-entity)))
     (setf *ent* (elt *entities* 0))
-    (mvc 'world:set-chunk-coordinate-center (spread (entity-position *ent*)))
+    (sync_entity->chunk-array *ent*)
     ;;Controller?
     (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
     ;;Model
     ;;FIXME::this depends on the position of entity.
-    (world:load-world t)
+    (load-world *chunk-cursor-center* t)
     ;;Rendering/view?
     (reset-chunk-display-list)
     (update-world-vao))
-  (mvc 'world:set-chunk-coordinate-center (spread (entity-position *ent*)))
+  (sync_entity->chunk-array *ent*)
   ;;Polling
   ;;Physics
   ;;Rendering Chunks
@@ -343,7 +353,7 @@ Press q/escape to quit
      (run-physics-for-entity *ent*)))
 
   ;;load or unload chunks around the player who may have moved
-  (world:load-world)
+  (load-world *chunk-cursor-center*)
   ;;render chunks and such
   ;;handle chunk meshing
   (sync_entity->camera *ent* *camera*)
@@ -364,14 +374,14 @@ Press q/escape to quit
 	 (unless (eq ent *ent*)
 	   (render-entity ent)))
        *entities*)
-  (render-chunks
+  (mvc 'render-chunks
    ;;#+nil
    (let ((ent (elt *entities* 0))
 	 (camera (camera-matrix:make-camera)))
      (sync_entity->camera ent camera)
      camera)
    ;;*camera*
-   )
+   (spread *chunk-cursor-center*))
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
   ;;selected block and crosshairs
@@ -399,7 +409,14 @@ Press q/escape to quit
   (render-crosshairs)
   
   (complete-render-tasks)
-  (dispatch-mesher-to-dirty-chunks))
+  (mvc 'dispatch-mesher-to-dirty-chunks (spread *chunk-cursor-center*)))
+
+(defun load-world (chunk-cursor-center &optional (force nil))
+  (destructuring-bind (cx cy cz) chunk-cursor-center
+    (let ((maybe-moved (vocs::maybe-move-chunk-array cx cy cz)))
+      (when (or force maybe-moved)
+	(world::load-chunks-around cx cy cz)
+	(world::unload-extra-chunks cx cy cz)))))
 
 (defun render-chunk-outlines ()
   (dohash (k chunk) *g/chunk-call-list*
@@ -426,6 +443,9 @@ Press q/escape to quit
 			    arg))
 	       0.99 0.8 0.0))
 	(camera-matrix::camera-planes camera)))
+
+(defun sync_entity->chunk-array (&optional (ent *ent*))
+  (mvc 'set-chunk-coordinate-center (spread (entity-position ent))))
 (defun render-units (&optional (foo 100))
   ;;X is red
   (mvc 'render-line 0 0 0 foo 0 0 (spread #(1.0 0.0 0.0)))

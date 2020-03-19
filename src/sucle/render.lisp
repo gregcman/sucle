@@ -73,14 +73,14 @@
       (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
 	(glhelp:handle (deflazy:getfnc 'terrain)))))))
-(defun render-chunks (camera)  
+(defun render-chunks (camera cx cy cz)  
   (gl:enable :depth-test)
   (gl:enable :cull-face)
   (gl:disable :blend)
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
   (gl:front-face :ccw)
-  (get-chunks-to-draw camera)
+  (get-chunks-to-draw camera cx cy cz)
   ;#+nil
   (multiple-value-bind (shown hidden overridden) (draw-world)
     (declare (ignorable shown hidden overridden))
@@ -535,7 +535,7 @@ gl_FragColor.rgb = color_out;
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 
-(defun get-chunks-to-draw (camera)
+(defun get-chunks-to-draw (camera cx cy cz)
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
     (let* ((foo (+ 1 world:*chunk-radius*)))
@@ -546,10 +546,10 @@ gl_FragColor.rgb = color_out;
 	  (when
 	      ;;Pass the broad distance test
 	      (> (the fixnum foo)
-		 (the fixnum (world:blocky-chunk-distance key)))
+		 (the fixnum (world:blocky-chunk-distance key cx cy cz)))
 	    (symbol-macrolet
-		  ((inside-frustum-p
-		    (chunk-gl-representation-in-frustum-p value)))
+		((inside-frustum-p
+		  (chunk-gl-representation-in-frustum-p value)))
 	      (let ((frustum-state (box-in-frustum camera (chunk-gl-representation-aabb value)))
 		    (old-frustum-state inside-frustum-p))
 		(when (and (not old-frustum-state)
@@ -831,7 +831,7 @@ to be drawn by the render thread."
 		     (assert (eq :mesh-chunk type))
 		     (apply function args)))
 		  (t (print value)))))))))
-(defun dispatch-mesher-to-dirty-chunks ()
+(defun dispatch-mesher-to-dirty-chunks (cx cy cz)
   "Re-draw, draw, or delete the openGL representation of chunks based 
 observed chunk state changes. 
 Chunk state changes can be found in `world:*dirty-chunks*`
@@ -855,7 +855,8 @@ Note:limits the amount of background jobs and pending lisp objects."
 	       (delete-if (lambda (x)
 			    (>= (blocky-chunk-distance x) *chunk-render-radius*))
 			  list)
-	       '< :key 'world:unsquared-chunk-distance)))
+	       '< :key (lambda (key)
+			 (world:unsquared-chunk-distance key cx cy cz)))))
       (loop :named submit-mesh-tasks
 	 :while (not (too-much)) :do
 	 (let ((thechunk (world:dirty-pop)))

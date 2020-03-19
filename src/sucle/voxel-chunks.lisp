@@ -110,17 +110,14 @@
 (defmacro with-chunk-key-coordinates ((x y z) chunk-key &body body)
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))
+(defun spread-chunk-key (chunk-key)
+  (apply 'values chunk-key))
 ;;For backwards compatibility
 (defun unhashfunc (chunk-key)
   (with-chunk-key-coordinates (x y z) chunk-key
     (values (* x +size+)
 	    (* y +size+)
 	    (* z +size+))))
-
-(defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
-  ;;[FIXME]is this a good api?
-  (with-chunk-key-coordinates (x y z) chunk-key 
-    (obtain-chunk x y z force-load)))
 
 (defparameter *empty-space* nil)
 (defparameter *empty-chunk-data* nil)
@@ -284,14 +281,19 @@
 	    (setf (aref data nx ny nz) nil)
 	    (values t)))))))
 
+;;;;
 (defun obtain-chunk (cx cy cz &optional (force-load nil))
   (declare (type chunk-coord cx cy cz))
   (get-chunk-from-chunk-array cx cy cz force-load))
-
+(defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
+  ;;[FIXME]is this a good api?
+  (multiple-value-call 'obtain-chunk
+    (spread-chunk-key chunk-key)
+    force-load))
 (defun obtain-chunk-from-block-coordinates (x y z &optional (force-load nil))
   (declare (type block-coord x y z))
   (multiple-value-call 'obtain-chunk (bcoord->ccoord x y z) force-load))
-
+;;;
 ;;;;
 (defun getobj (x y z)
   (declare (type block-coord x y z))
@@ -332,3 +334,24 @@
   (let ((empty-space *empty-space*))
     (not (every (lambda (x) (eql x empty-space))
 		(chunk-data chunk)))))
+
+;;center the chunk array around the player, but don't always, only if above a certain
+;;threshold
+;;[FIXME]is this expensive to recompute every frame or does it matter?
+;;maybe put it in the chunk array object?
+;;return t if it was moved, nil otherwise
+(defparameter *reposition-chunk-array-threshold* 2)
+(defun maybe-move-chunk-array (cx cy cz &optional (threshold *reposition-chunk-array-threshold*))
+  (let* ((half-size (floor voxel-chunks::+ca-size+ 2))
+	 (center-x (+ half-size (chunk-array-x-min *chunk-array*)))
+	 (center-y (+ half-size (chunk-array-y-min *chunk-array*)))
+	 (center-z (+ half-size (chunk-array-z-min *chunk-array*))))
+    (when (or (<= threshold (abs (- cx center-x)))
+	      (<= threshold (abs (- cy center-y)))
+	      (<= threshold (abs (- cz center-z))))
+      ;;(format t "moving chunk array")
+      (voxel-chunks:reposition-chunk-array
+       (- cx half-size)
+       (- cy half-size)
+       (- cz half-size))
+      (values t))))
