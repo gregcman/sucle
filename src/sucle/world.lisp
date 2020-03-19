@@ -244,18 +244,16 @@
   ;;[FIXME]is this expensive to recompute every frame or does it matter?
   ;;maybe put it in the chunk array object?
   ;;return t if it was moved, nil otherwise
-  (let ((half-x-size (utility:etouq (floor voxel-chunks:*chunk-array-default-size-x* 2)))
-	(half-y-size (utility:etouq (floor voxel-chunks:*chunk-array-default-size-y* 2)))
-	(half-z-size (utility:etouq (floor voxel-chunks:*chunk-array-default-size-z* 2))))
+  (let ((half-size (floor voxel-chunks::+ca-size+ 2)))
     (let ((center-x (+ 
 		     (voxel-chunks:chunk-array-x-min voxel-chunks:*chunk-array*)
-		     half-x-size))
+		     half-size))
 	  (center-y (+ 
 		     (voxel-chunks:chunk-array-y-min voxel-chunks:*chunk-array*)
-		     half-y-size))
+		     half-size))
 	  (center-z (+ 
 		     (voxel-chunks:chunk-array-z-min voxel-chunks:*chunk-array*)
-		     half-z-size)))
+		     half-size)))
       ;;[FIXME]hard-coded threshold for repositioning the chunk array? 4 chunks?
       #+nil
       (print (list (- chunk-x center-x)
@@ -269,9 +267,10 @@
 		  (<= threshold (abs (- chunk-y center-y)))
 		  (<= threshold (abs (- chunk-z center-z))))
 	  ;;(format t "moving chunk array")
-	  (voxel-chunks:reposition-chunk-array (- chunk-x half-x-size)
-					 (- chunk-y half-y-size)
-					 (- chunk-z half-z-size))
+	  (voxel-chunks:reposition-chunk-array
+	   (- chunk-x half-size)
+	   (- chunk-y half-size)
+	   (- chunk-z half-size))
 	  (values t))))))
 
 (defun safe-subseq (seq end)
