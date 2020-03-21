@@ -326,10 +326,6 @@
       (chunk
        (chunk-save chunk)
        (dirty-push key)
-       ;;remove from the chunk-array
-       (multiple-value-call
-	'voxel-chunks:remove-chunk-from-chunk-array
-	 (voxel-chunks::spread-chunk-key key))
        ;;remove from the global table
        (voxel-chunks::delete-chunk-in-cache key)
        t)
@@ -421,9 +417,6 @@
 			     (format t "~%OMG? ~a chunk already exists" key))
 			    (t 
 			     (progn
-			       ;;FIXME:Do we need to remove the chunk from the chunk-array?
-			       ;;this is only to make sure we don't run out of memory...
-			       (apply #'voxel-chunks:remove-chunk-from-chunk-array key)
 			       (voxel-chunks::set-chunk-in-cache key chunk))
 			     ;;(format t "~%making chunk ~a" key)
 

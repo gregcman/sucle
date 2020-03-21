@@ -409,7 +409,7 @@ Press q/escape to quit
 
 ;;[FIXME]architecture:one center, the player, and the chunk array centers around it
 (defparameter *chunk-cursor-center* (vocs::make-cursor))
-(defun sync_entity->chunk-array (&optional (ent *ent*) (cursor *chunk-cursor-center*))
+(defun sync_entity->chunk-array (ent cursor)
   (mvc 'vocs::set-cursor-position
        (spread (entity-position ent))
        cursor))

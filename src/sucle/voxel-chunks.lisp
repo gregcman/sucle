@@ -48,16 +48,28 @@
 ;;;;************************************************************************;;;;
 ;;Chunk cache
 ;;equal is used because the key is a list of the chunk coordinates
+;;When updating the cache with 'set' or 'delete' invalidate the
+;;chunks that are being eviscerated.
+;;FIXME: add locks to chunks?
 (defun make-chunk-cache ()
   (make-hash-table :test 'equal))
 (defparameter *chunks* (make-chunk-cache))
 (defun set-chunk-in-cache (key chunk &optional (cache *chunks*))
+  (kill-old-chunk key)
   (setf (gethash key cache) chunk))
 (defun get-chunk-in-cache (key &optional (cache *chunks*))
   ;;return (values chunk exist-p)
   (gethash key cache))
 (defun delete-chunk-in-cache (key &optional (cache *chunks*))
-  (remhash key cache))
+  (when (kill-old-chunk key cache)
+    (remhash key cache)))
+(defun kill-old-chunk (key &optional (cache *chunks*))
+  (multiple-value-bind (old-chunk existp) (gethash key cache)
+    (when existp
+      ;;FIXME:add a logger
+      ;;(format t "~%Eviscerating old chunk at: ~a" key)
+      (kill-chunk old-chunk)
+      (values t))))
 (defun chunk-in-cache-p (key &optional (cache *chunks*))
   (multiple-value-bind (value existsp) (get-chunk-in-cache key cache)
     (declare (ignorable value))
@@ -121,18 +133,21 @@
 
 (defparameter *empty-space* nil)
 (defparameter *empty-chunk-data* nil)
-(defparameter *empty-chunk* nil)
+;;(defparameter *empty-chunk* nil)
 ;;the empty-chunk is used as a placeholder when a chunk to reference is required
+(defun create-empty-chunk ()
+  (create-chunk 0 0 0 :data
+		*empty-chunk-data*
+		:type :empty))
 (defun reset-empty-chunk-value (&optional (empty-space nil))
   (setf *empty-space* empty-space)
   (setf *empty-chunk-data* (make-chunk-data :initial-element *empty-space*))
-  (setf *empty-chunk* (create-chunk 0 0 0 :data
-				    *empty-chunk-data*
-				    :type :empty)))
+  ;;(setf *empty-chunk* (create-empty-chunk))
+  )
 
 (defun empty-chunk-p (chunk)
   (or (null chunk)
-      (eq chunk *empty-chunk*)
+      ;;(eq chunk *empty-chunk*)
       (eq (chunk-type chunk) :empty)))
 (struct-to-clos:struct->class
  (defstruct chunk
@@ -141,7 +156,12 @@
    type
    x y z
    key
-   data))
+   data
+   
+   ;;Invalidate a chunk. If used by the main cache to invalidate
+   ;;chunks in chunk-array cursors.
+   (alive? t)))
+
 (defun make-chunk-data (&rest rest &key (initial-element *empty-space*))
   (apply 'make-array
 	 +total-size+
@@ -216,7 +236,10 @@
 	   (let ((new-chunk (load-chunk cx cy cz)))
 	     (set-chunk-in-cache key new-chunk)
 	     (values new-chunk t)))
-	  (t (values *empty-chunk* nil)))))
+	  (t (values
+	      (create-empty-chunk)
+	      ;;*empty-chunk*
+	      nil)))))
     
 (defun create-chunk-array ()
   (make-chunk-array))
@@ -243,6 +266,16 @@
      (when (< -1 ,data ,size)
        ,@body)))
 
+(defun kill-chunk (chunk)
+  (setf (chunk-alive? chunk) nil
+	(chunk-data chunk) *empty-chunk-data*
+	(chunk-type chunk) :dead))
+
+;;FIXME:detect if it actually of type chunk?
+(defun valid-chunk-p (chunk)
+  (and chunk
+       (chunk-alive? chunk)))
+
 ;;if the coordinates are correct, return a chunk, otherwise return nil
 (defun get-chunk-from-chunk-array
     (cx cy cz  &optional (force-load nil) (chunk-array *chunk-array*))
@@ -253,7 +286,7 @@
 	(let* ((data (chunk-array-array chunk-array))
 	       (maybe-chunk (aref data nx ny nz)))
 	  (declare (type chunk-array-data data))
-	  (cond ((and maybe-chunk
+	  (cond ((and (valid-chunk-p maybe-chunk)
 		       ;;This check is unnecessary if we clear the chunk array every time
 		       ;;the position updates. combined with hysteresis, the relatively
 		       ;;slow filling should not happen often
@@ -267,6 +300,7 @@
 		(t (setf (aref data nx ny nz)
 			 (get-chunk cx cy cz force-load)))))))))
 
+#+nil
 (defun remove-chunk-from-chunk-array
     (cx cy cz &optional (chunk-array *chunk-array*))
   (declare (type chunk-coord cx cy cz))
