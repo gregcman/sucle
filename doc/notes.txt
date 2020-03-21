@@ -273,3 +273,10 @@ centralized place for info on each of the chunks
 - current tasks being executed for the chunk
 -- being loaded
 -- being saved
+
+;;TODO:add have CRUD use a write-oneread-many mutex. Make the mutex using locks?
+
+
+- chunk-cursor
+- draw things 
+- sucle on steam?

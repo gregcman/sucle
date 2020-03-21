@@ -253,61 +253,68 @@
      (max (abs dx)
 	  (abs dy)
 	  (abs dz)))))
-(defun get-unloadable-chunks (cx cy cz)
+(defun get-unloadable-chunks (chunk-cursor-center)
   ;;[FIXME]optimize?
-  (let ((difference (- (- (voxel-chunks::total-chunks-in-cache)
-			  *maximum-allowed-chunks*)
-		       *threshold*)))
-    (when (plusp difference)
-      (let ((distance-sorted-chunks	     
-	     (sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'> :key
-		   (lambda (key)
-		     (unsquared-chunk-distance key cx cy cz)))))
-	(safe-subseq distance-sorted-chunks difference)))))
+  ;;FIXME::use a MRU cache instead.
+  (multiple-value-bind (cx cy cz) (values (vocs::cursor-x chunk-cursor-center)
+					  (vocs::cursor-y chunk-cursor-center)
+					  (vocs::cursor-z chunk-cursor-center))
+    (let ((difference (- (- (voxel-chunks::total-chunks-in-cache)
+			    *maximum-allowed-chunks*)
+			 *threshold*)))
+      (when (plusp difference)
+	(let ((distance-sorted-chunks	     
+	       (sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'> :key
+		     (lambda (key)
+		       (unsquared-chunk-distance key cx cy cz)))))
+	  (safe-subseq distance-sorted-chunks difference))))))
 
-(defun load-chunks-around (cx cy cz)
+(defun load-chunks-around (chunk-cursor)
   (mapc (lambda (key)
 	  (chunk-load key))
-	(get-chunks-to-load cx cy cz)))
-(defun get-chunks-to-load (cx cy cz)
-  (declare (optimize (speed 3) (safety 0))
-	   (type voxel-chunks:chunk-coord cx cy cz))
-  (let ((acc nil))
-    (block out
-      (let ((chunk-count 0))
-	(declare (type fixnum chunk-count))
-	(flet ((add-chunk (x y z)
-		 (incf chunk-count)
-		 ;;do something
-		 (let ((key (voxel-chunks:create-chunk-key x y z)))
-		   (when (space-for-new-chunk-p key)
-		     ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		     (push key acc)
-		     ;;(print (list x y z))
-		     ))
-		 (when (>
-			;;[FIXME]nonportably assume chunk-count and maxium allowed chunks are fixnums
-			(the fixnum chunk-count)
-			(the fixnum *maximum-allowed-chunks*))
-		   ;;exceeded the allowed chunks to load
-		   (return-from out))
-		 ))
-	  (let ((size *chunk-radius*))
-	    (declare (type voxel-chunks:chunk-coord size))
-	    (utility:dobox ((chunk-x (the voxel-chunks:chunk-coord (- cx size))
-				     (the voxel-chunks:chunk-coord (+ cx size)))
-			    (chunk-y (the voxel-chunks:chunk-coord (- cy size))
-				     (the voxel-chunks:chunk-coord (+ cy size)))
-			    (chunk-z (the voxel-chunks:chunk-coord (- cz size))
-				     (the voxel-chunks:chunk-coord (+ cz size))))
-			   (add-chunk chunk-x chunk-y chunk-z))))))
-    acc))
+	(get-chunks-to-load chunk-cursor)))
+(defun get-chunks-to-load (chunk-cursor-center)
+  (multiple-value-bind (cx cy cz) (values (vocs::cursor-x chunk-cursor-center)
+					  (vocs::cursor-y chunk-cursor-center)
+					  (vocs::cursor-z chunk-cursor-center))
+    (declare (optimize (speed 3) (safety 0))
+	     (type voxel-chunks:chunk-coord cx cy cz))
+    (let ((acc nil))
+      (block out
+	(let ((chunk-count 0))
+	  (declare (type fixnum chunk-count))
+	  (flet ((add-chunk (x y z)
+		   (incf chunk-count)
+		   ;;do something
+		   (let ((key (voxel-chunks:create-chunk-key x y z)))
+		     (when (space-for-new-chunk-p key)
+		       ;;The chunk does not exist, therefore the *empty-chunk* was returned
+		       (push key acc)
+		       ;;(print (list x y z))
+		       ))
+		   (when (>
+			  ;;[FIXME]nonportably assume chunk-count and maxium allowed chunks are fixnums
+			  (the fixnum chunk-count)
+			  (the fixnum *maximum-allowed-chunks*))
+		     ;;exceeded the allowed chunks to load
+		     (return-from out))
+		   ))
+	    (let ((size (vocs::cursor-radius chunk-cursor-center)))
+	      (declare (type voxel-chunks:chunk-coord size))
+	      (utility:dobox ((chunk-x (the voxel-chunks:chunk-coord (- cx size))
+				       (the voxel-chunks:chunk-coord (+ cx size)))
+			      (chunk-y (the voxel-chunks:chunk-coord (- cy size))
+				       (the voxel-chunks:chunk-coord (+ cy size)))
+			      (chunk-z (the voxel-chunks:chunk-coord (- cz size))
+				       (the voxel-chunks:chunk-coord (+ cz size))))
+			     (add-chunk chunk-x chunk-y chunk-z))))))
+      acc)))
 
-(defun unload-extra-chunks (cx cy cz)
+(defun unload-extra-chunks (chunk-cursor)
   (let (to-unload)
     ;;[FIXME]get a timer library? metering?
     ;;(print "getting unloadable chunks")
-    (setf to-unload (get-unloadable-chunks cx cy cz))
+    (setf to-unload (get-unloadable-chunks chunk-cursor))
     ;;(print (length to-unload))
     ;;(print "unloading the chunks")
     (dolist (chunk to-unload)
@@ -414,6 +421,8 @@
 			     (format t "~%OMG? ~a chunk already exists" key))
 			    (t 
 			     (progn
+			       ;;FIXME:Do we need to remove the chunk from the chunk-array?
+			       ;;this is only to make sure we don't run out of memory...
 			       (apply #'voxel-chunks:remove-chunk-from-chunk-array key)
 			       (voxel-chunks::set-chunk-in-cache key chunk))
 			     ;;(format t "~%making chunk ~a" key)

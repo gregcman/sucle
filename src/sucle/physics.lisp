@@ -366,8 +366,7 @@
    clip?
 
    jump?
-   sneak?
-   ))
+   sneak?))
 (defun entity-position (entity)
   (let* ((player-pointmass (entity-particle entity))
 	 (curr (pointmass-position player-pointmass)))

@@ -355,3 +355,26 @@
        (- cy half-size)
        (- cz half-size))
       (values t))))
+
+(struct-to-clos:struct->class
+ (defstruct cursor
+   (chunk-array *chunk-array*)
+   (x 0)
+   (y 0)
+   (z 0)
+   (threshold *reposition-chunk-array-threshold*)
+   (dirty t)
+   (radius 6)))
+
+(defun set-cursor-position
+    (px py pz &optional (cursor (make-cursor)))
+  (multiple-value-bind (newx newy newz)
+      (vocs::bcoord->ccoord
+       (floor px)
+       (floor py)
+       (floor pz))
+    (setf (cursor-x cursor) newx
+	  (cursor-y cursor) newy
+	  (cursor-z cursor) newz)
+    (when (maybe-move-chunk-array newx newy newz (cursor-threshold cursor))
+      (setf (cursor-dirty cursor) t))))

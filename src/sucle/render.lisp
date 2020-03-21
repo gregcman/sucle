@@ -38,7 +38,8 @@
 (defun use-chunk-shader (&key (camera *camera*)
 			   (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
 			   (fog-ratio 0.01)
-			   (time-of-day (random 1.0)))
+			   (time-of-day (random 1.0))
+			   (chunk-radius (error "chunk-radius not supplied")))
   ;;set up shader
   (let ((shader (deflazy:getfnc 'blockshader)))
     (glhelp:use-gl-program shader)
@@ -61,7 +62,7 @@
       (%gl:uniform-1f (uniform :foglet)
 		      (/ -1.0
 			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
-			 (* 16 world:*chunk-radius*)
+			 (* vocs:+size+ chunk-radius)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
 			 fog-ratio))
@@ -73,14 +74,14 @@
       (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
 	(glhelp:handle (deflazy:getfnc 'terrain)))))))
-(defun render-chunks (camera cx cy cz)  
+
+(defun render-chunks ()  
   (gl:enable :depth-test)
   (gl:enable :cull-face)
   (gl:disable :blend)
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
   (gl:front-face :ccw)
-  (get-chunks-to-draw camera cx cy cz)
   ;#+nil
   (multiple-value-bind (shown hidden overridden) (draw-world)
     (declare (ignorable shown hidden overridden))
@@ -535,10 +536,10 @@ gl_FragColor.rgb = color_out;
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 
-(defun get-chunks-to-draw (camera cx cy cz)
+(defun get-chunks-to-draw (camera radius cx cy cz)
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
-    (let* ((foo (+ 1 world:*chunk-radius*)))
+    (let* ((foo (+ 1 radius)))
       (dohash
 	  (key value) *g/chunk-call-list*
 	  ;;(declare (ignore key))
@@ -925,3 +926,5 @@ Note:limits the amount of background jobs and pending lisp objects."
 	     (funcall fun x y z)))
     (x (aabbcc:aabb-minx aabb))
     (x (aabbcc:aabb-maxx aabb))))
+
+;;FIXME:OpenGL chunks that are too far away are never destroyed?
