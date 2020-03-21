@@ -120,7 +120,10 @@ Press q/escape to quit
   (ncurses-clone-for-lem:init)
   (app:push-mode 'menu:tick)
   (menu:use *start-menu*)
-  (crud:use-crud-from-path (world-path))
+  (crud:use-crud-from-path
+   (sucle-temp:path "data.db")
+   ;;(world-path)
+   )
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (app:default-loop)	  
      (when vocs::*persist*

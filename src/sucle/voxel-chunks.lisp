@@ -443,7 +443,8 @@
 ;;maybe put it in the chunk array object?
 ;;return t if it was moved, nil otherwise
 (defparameter *reposition-chunk-array-threshold* 2)
-(defun maybe-move-chunk-array (cx cy cz &optional (threshold *reposition-chunk-array-threshold*))
+(defun maybe-move-chunk-array (cx cy cz &optional (threshold *reposition-chunk-array-threshold*)
+					  (chunk-array *chunk-array*))
   (let* ((half-size (floor voxel-chunks::+ca-size+ 2))
 	 (center-x (+ half-size (chunk-array-x-min *chunk-array*)))
 	 (center-y (+ half-size (chunk-array-y-min *chunk-array*)))
@@ -455,7 +456,8 @@
       (voxel-chunks:reposition-chunk-array
        (- cx half-size)
        (- cy half-size)
-       (- cz half-size))
+       (- cz half-size)
+       chunk-array)
       (values t))))
 
 (struct-to-clos:struct->class
@@ -466,10 +468,11 @@
    (z 0)
    (threshold *reposition-chunk-array-threshold*)
    (dirty t)
+   ;;FIXME:difference between threshold and radius?
    (radius 6)))
 
 (defun set-cursor-position
-    (px py pz &optional (cursor (make-cursor)))
+    (px py pz &optional (cursor (make-cursor)) (chunk-array *chunk-array*))
   (multiple-value-bind (newx newy newz)
       (vocs::bcoord->ccoord
        (floor px)
@@ -478,19 +481,44 @@
     (setf (cursor-x cursor) newx
 	  (cursor-y cursor) newy
 	  (cursor-z cursor) newz)
-    (when (maybe-move-chunk-array newx newy newz (cursor-threshold cursor))
+    (when (maybe-move-chunk-array newx newy newz (cursor-threshold cursor) chunk-array)
       (setf (cursor-dirty cursor) t))))
 
+
+(struct-to-clos:struct->class
+ (defstruct pen
+   cursor
+   chunk-array))
+
+(defun create-pen ()
+  (let* ((ca (create-chunk-array))
+	 (cursor (make-cursor :chunk-array ca :x 0 :y 0 :z 0 :threshold 8 :radius 8)))
+    (make-pen :cursor cursor :chunk-array ca)))
+
+(defun move-pen (px py pz pen)
+  (let ((c (pen-cursor pen))
+	(ca (pen-chunk-array pen)))
+    (set-cursor-position px py pz c ca)))
+
+(defparameter *pen* (create-pen))
+(defun (setf pen-get) (value x y z &optional (pen *pen*))
+  (let ((*chunk-array* (pen-chunk-array pen)))
+    (move-pen x y z pen)
+    (setf (getobj x y z) value)))
+(defun pen-get (x y z &optional (pen *pen*))
+  (let ((*chunk-array* (pen-chunk-array pen)))
+    (move-pen x y z pen)
+    (getobj x y z)))
 
 ;;;;************************************************************************;;;;
 ;;;;<PERSIST-WORLD>
 ;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
 ;;And have chunk loading in another file?
 
-(defparameter *chunk-io-lock* (bt:make-lock))
+(defparameter *chunk-io-lock* (bt:make-recursive-lock))
 
 (defun savechunk (key)
-  (bt:with-lock-held (*chunk-io-lock*)
+  (bt:with-recursive-lock-held (*chunk-io-lock*)
     (let ((chunk (get-chunk-in-cache key)))
       (when (chunk-alive? chunk)   
 	;;write the chunk to disk if its worth saving
@@ -509,7 +537,7 @@
 
 ;;Read from the database and put the chunk into the cache.
 (defun loadchunk (key)
-  (bt:with-lock-held (*chunk-io-lock*)
+  (bt:with-recursive-lock-held (*chunk-io-lock*)
     (or
      ;;Check once again that it really does not exist yet.
      (get-chunk-in-cache key)
