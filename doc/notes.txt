@@ -253,3 +253,30 @@ frustum culling
 - update camera view planes
 ;;too many side effects in sucle main loop
 ;;make sure all lisp objects can be used functionally?
+[TODO] optimization -> don't frustum check each chunk, do it in columns.
+
+;;database multiple worlds
+;;chunk manager
+;;chunk cursors -> chunk array?
+
+;;menu
+;;startup
+
+;;new asdf system -> crud
+;;- database
+;;- sucle-serialize
+;;used emacs-narrow-to-region
+
+centralized place for info on each of the chunks
+- pinned by which cursors/chunk-arrays -> list of cursors
+- last accessed at -> for mru cache
+- current tasks being executed for the chunk
+-- being loaded
+-- being saved
+
+;;TODO:add have CRUD use a write-oneread-many mutex. Make the mutex using locks?
+
+
+- chunk-cursor
+- draw things 
+- sucle on steam?

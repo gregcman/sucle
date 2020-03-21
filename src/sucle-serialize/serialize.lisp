@@ -17,12 +17,11 @@
 ;;;the lisp printer in order
 (progn
   (defun store-lisp-objects-to-file-lisp-reader (path things)
-    (assert (typep things 'list))
+    ;;(assert (typep things 'list))
     ;;Store a lisp object to a file by simple printing
     (with-open-file
 	(stream path :direction :output :if-does-not-exist :create :if-exists :supersede)
-      (dolist (thing things)
-	(safer-print thing stream))))
+      (safer-print things stream)))
   (defun retrieve-lisp-objects-from-file-lisp-reader (path)
     (let ((file-existsp (probe-file path)))
       ;;if it doesn't exist, what's the point of loading it
@@ -35,21 +34,29 @@
 		 (unless (eq thing eof)
 		   (push thing things)
 		   (go rep)))))
-	  (nreverse things))))))
+	  (if (= 1 (length things))
+	      (car things)
+	      (nreverse things)))))))
+(defmacro with-safe-io (&body body)
+  `(with-standard-io-syntax
+     (let ((*package* (load-time-value (find-package :cl)))
+	   (*read-eval* nil))
+       ,@body)))
 
 (defun safer-read (&optional (stream *standard-input*)
 		     (eof-error-p nil) (eof-value nil) (recursive-p nil))
-  (with-standard-io-syntax
-    (let ((*package* (load-time-value (find-package :cl))))
-      (let ((*read-eval* nil))
-	(read stream eof-error-p eof-value recursive-p)))))
+  (with-safe-io
+    (read stream eof-error-p eof-value recursive-p)))
 (defun safer-print (object &optional (stream *standard-output*))
-  (with-standard-io-syntax
-    (let ((*package* (load-time-value (find-package :cl))))
-      (let ((*read-eval* nil)
-	    (*print-circle* t)
-	    (*print-readably* t))
-	(print object stream)))))
+  (with-safe-io
+    (let ((*print-circle* t)
+	  (*print-readably* t))
+      (print object stream))))
+(defun safer-write (object &optional (stream *standard-output*))
+  (with-safe-io
+    (let ((*print-circle* t)
+	  (*print-readably* t))
+      (write object :stream stream))))
  
 ;;File format
 ;;https://www.cs.cmu.edu/Groups/AI/html/cltl/clm/node191.html
@@ -120,7 +127,6 @@
 
 (defparameter *zlib-conspack-header* (make-header-string "zlib-conspack"))
 (defun store-lisp-objects-to-file-zlib-conspack (path things)
-  (assert (typep things 'list))
   (with-open-file (stream path :direction :output :if-exists :supersede
 			  :element-type '(unsigned-byte 8))
     (insert-reading-error-bytes stream *zlib-conspack-header*)

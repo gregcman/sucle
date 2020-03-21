@@ -38,7 +38,8 @@
 (defun use-chunk-shader (&key (camera *camera*)
 			   (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
 			   (fog-ratio 0.01)
-			   (time-of-day (random 1.0)))
+			   (time-of-day (random 1.0))
+			   (chunk-radius (error "chunk-radius not supplied")))
   ;;set up shader
   (let ((shader (deflazy:getfnc 'blockshader)))
     (glhelp:use-gl-program shader)
@@ -61,7 +62,7 @@
       (%gl:uniform-1f (uniform :foglet)
 		      (/ -1.0
 			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
-			 (* 16 world:*chunk-radius*)
+			 (* vocs:+size+ chunk-radius)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
 			 fog-ratio))
@@ -73,6 +74,7 @@
       (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
 	(glhelp:handle (deflazy:getfnc 'terrain)))))))
+
 (defun render-chunks ()  
   (gl:enable :depth-test)
   (gl:enable :cull-face)
@@ -80,16 +82,16 @@
   (gl:polygon-mode :front-and-back :fill)
   ;;render chunks
   (gl:front-face :ccw)
-  (get-chunks-to-draw)
   ;#+nil
-  (progn;;multiple-value-bind (shown hidden)
-      (draw-world)
+  (multiple-value-bind (shown hidden overridden) (draw-world)
+    (declare (ignorable shown hidden overridden))
     ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
     #+nil
-    (let ((total
-	   (hash-table-count *g/chunk-call-list*)
-	    #+nil
-	    (+ hidden shown)))
+    (when (not (zerop overridden))
+      (print overridden))
+    ;;#+nil
+    #+nil
+    (let ((total (hash-table-count *g/chunk-call-list*)))
       (unless (zerop total)
 	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
 
@@ -281,6 +283,8 @@ gl_FragColor = color;
    (glhelp:create-opengl-texture-from-data modified-terrain-png)))
 (defparameter *position-attr* 0)
 (defparameter *texcoord-attr* 2)
+;;FIXME::some standard to this? nvidia?
+(defparameter *color-attr* 3)
 
 (defparameter *shader-version* 120)
 (defun test-all-shader-versions ()
@@ -376,6 +380,7 @@ gl_FragColor.rgb = color_out;
 	 (small (- 0.0 offset))
 	 (large (+ 1.0 offset)))
     (create-aabb large large large small small small)))
+;;'render-' type functions write to OpenGL.
 
 (defun render-fist (&optional (fist *fist*))
   (gl:disable :blend)
@@ -384,26 +389,46 @@ gl_FragColor.rgb = color_out;
   (gl:line-width 2)
   ;;[FIXME]render the fist again
   (when (fist-exists fist)
-    (let ((selected-block (fist-selected-block fist)))
-      (with-vec (a b c) (selected-block)
-	(let ((iterator (scratch-buffer:my-iterator)))
-	  (let ((times (draw-aabb a b c *selected-block-aabb* iterator)))
-	    (declare (type fixnum times)
-		     (optimize (speed 3) (safety 0)))
-	    ;;mesh-fist-box
-	    (let ((box
-		   (let ((n 0.06))
-		     ;;[FIXME]why use this *iterator*?
-		     (scratch-buffer:flush-bind-in* ((iterator xyz))		    
-		       (glhelp:create-vao-or-display-list-from-specs
-			(:quads times)
-			((3 n n n)
-			 (*position-attr* (xyz) (xyz) (xyz))))
-		       ))))
-	      (glhelp:slow-draw box)
-	      (glhelp:slow-delete box)
-	      )))
-	))))
+    (mvc 'render-aabb-at *selected-block-aabb* (spread (fist-selected-block fist)))))
+(defun render-entity (entity)
+  (mvc 'render-aabb-at
+       (entity-aabb entity)
+       (spread (entity-position entity))))
+(defun render-aabb-at (aabb x y z &optional (r 0.1) (g 0.1) (b 0.1))
+  (let ((iterator (scratch-buffer:my-iterator)))
+    (let ((times (draw-aabb x y z aabb iterator)))
+      (declare (type fixnum times)
+	       (optimize (speed 3) (safety 0)))
+      ;;mesh-fist-box
+      (let ((box
+	     ;;[FIXME]why use this *iterator*?
+	     ;;inefficient: creates an iterator, and an opengl object, renders its,
+	     ;;just to delete it on the same frame
+	     (scratch-buffer:flush-bind-in* ((iterator xyz))		    
+	       (glhelp:create-vao-or-display-list-from-specs
+		(:quads times)
+		((*color-attr* r g b)
+		 (*position-attr* (xyz) (xyz) (xyz))))
+	       )))
+	(glhelp:slow-draw box)
+	(glhelp:slow-delete box)))))
+(defun render-line-dx (x0 y0 z0 dx dy dz &optional (r 0.2) (g 0.0) (b 1.0))
+  (render-line x0 y0 z0 (+ x0 dx) (+ y0 dy) (+ z0 dz) r g b))
+(defun render-line (x0 y0 z0 x1 y1 z1 &optional (r 0.2) (g 0.0) (b 1.0))
+  (floatf x0 y0 z0 x1 y1 z1)
+  (let ((thing
+	 (let ((iterator (scratch-buffer:my-iterator)))
+	   (scratch-buffer:bind-out* ((iterator fun))
+	     (fun x0 y0 z0)
+	     (fun x1 y1 z1))
+	   (scratch-buffer:flush-bind-in*
+	       ((iterator xyz))
+	     (glhelp:create-vao-or-display-list-from-specs
+	      (:lines 2)
+	      ((*color-attr* r g b 1.0)
+	       (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))
+    (glhelp:slow-draw thing)
+    (glhelp:slow-delete thing)))
 #+nil
 (defun render-chunk-outline ()
   (draw-aabb
@@ -467,14 +492,21 @@ gl_FragColor.rgb = color_out;
    occluded
    (occlusion-state :init
 		    ) ;;:hidden, visible, waiting, :init
-   occlusion-box))
+   occlusion-box
+   aabb
+   
+   in-frustum-p
+   ;;When the chunk pops into the frustum,
+   ;;override queries and draw regardless.
+   (draw-override 0)))
 (defparameter *occlusion-culling-p* t)
 (defun set-chunk-gl-representation-visible (value)
   (setf (chunk-gl-representation-occlusion-state value) :visible)
   (setf (chunk-gl-representation-occluded value) nil))
 (defun set-chunk-gl-representation-hidden (value)
   (setf (chunk-gl-representation-occlusion-state value) :hidden)
-  (setf (chunk-gl-representation-occluded value) t))
+  (setf (chunk-gl-representation-occluded value) t)
+  (setf (chunk-gl-representation-draw-override value) 0))
 (defun render-occlusion-query (value)
   (let ((query (chunk-gl-representation-occlusion-query value)))
     (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
@@ -494,26 +526,46 @@ gl_FragColor.rgb = color_out;
     (gl:color-mask t t t t)
     (gl:depth-mask t)))
 
-(defun create-chunk-gl-representation (display-list occlusion-box)
+(defun create-chunk-gl-representation (display-list occlusion-box aabb)
   (make-chunk-gl-representation
    :call-list display-list
    :occlusion-query (car (gl:gen-queries 1))
-   :occlusion-box occlusion-box))
+   :occlusion-box occlusion-box
+   :aabb aabb))
 (defun destroy-chunk-gl-representation (chunk-gl-representation)
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 
-(defun get-chunks-to-draw ()
+(defun get-chunks-to-draw (camera radius cx cy cz)
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
-    (let* ((foo (+ 1 world:*chunk-radius*)))
-      (dohash (key value) *g/chunk-call-list*
-	      ;;(declare (ignore key))
-	      (when (> (the fixnum foo) (the fixnum (world:blocky-chunk-distance key)))
-		(vector-push-extend value vec))))
+    (let* ((foo (+ 1 radius)))
+      (dohash
+	  (key value) *g/chunk-call-list*
+	  ;;(declare (ignore key))
+	  
+	  (when
+	      ;;Pass the broad distance test
+	      (> (the fixnum foo)
+		 (the fixnum (world:blocky-chunk-distance key cx cy cz)))
+	    (symbol-macrolet
+		((inside-frustum-p
+		  (chunk-gl-representation-in-frustum-p value)))
+	      (let ((frustum-state (box-in-frustum camera (chunk-gl-representation-aabb value)))
+		    (old-frustum-state inside-frustum-p))
+		(when (and (not old-frustum-state)
+			   frustum-state)
+		  ;;It just came into view, so definitely render it.
+		  (setf (chunk-gl-representation-draw-override value) 2))
+
+		;;FIXME: only necessary to write on change, but whatever.
+		(setf inside-frustum-p frustum-state)
+		(when frustum-state
+		  (vector-push-extend value vec)))))))
     vec))
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
-						  (count-actually-drawn 0))
+						  (count-actually-drawn 0)
+						  (count-overridden 0))
   #+nil
   (declare (optimize (speed 3) (safety 0))
 	   (type fixnum count-actually-drawn count-occluded-by-query))
@@ -529,37 +581,52 @@ gl_FragColor.rgb = color_out;
 		  ;;[FIXME]bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
 		  (let ((result (gl:get-query-object query :query-result)))		      
 		    (case result
-		      (0 (set-chunk-gl-representation-hidden value))
-		      (otherwise (set-chunk-gl-representation-visible value)))))))
+		      (0
+		       (set-chunk-gl-representation-hidden value)
+		       ;;The draw-override lasts a few cycles.
+		       (decf (chunk-gl-representation-draw-override value)))
+		      (otherwise
+		       (set-chunk-gl-representation-visible value)
+		       ;;Known visible, cancel the override
+		       (setf (chunk-gl-representation-draw-override value) 0)))))))
 	     (t (set-chunk-gl-representation-visible value)))
-       ;;      (gl:call-list (chunk-gl-representation-occlusion-box value))
-       
-       (cond
-	 ((not (chunk-gl-representation-occluded value)) ;;not occluded = visible
-	  (incf count-actually-drawn)
-	  (let ((query (chunk-gl-representation-occlusion-query value)))
+       ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
+       (let ((overridden-p
+	      (and *occlusion-culling-p*
+		   (plusp (chunk-gl-representation-draw-override value)))))
+	 (cond
+	   ((or
+	     ;;Regular visible
+	     (not (chunk-gl-representation-occluded value))
+	     ;;queries enabled and overridden
+	     overridden-p)
+	    ;;not occluded = visible
+	    (incf count-actually-drawn)	    
 	    (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
 	      (cond
 		((and *occlusion-culling-p*
 		      (not (eq occlusion-state :waiting)))
-		 ;;get occlusion information from regular chunk drawing
-		 (setf occlusion-state :waiting)
-		 (gl:begin-query :samples-passed query)
-		 ;;draw occlusion box here
-		 ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
-		 (glhelp:slow-draw display-list)
-		 (gl:end-query :samples-passed))
+		 (let ((query (chunk-gl-representation-occlusion-query value)))
+		   ;;get occlusion information from regular chunk drawing
+		   (setf occlusion-state :waiting)
+		   (gl:begin-query :samples-passed query)
+		   ;;draw occlusion box here
+		   ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
+		   (glhelp:slow-draw display-list)
+		   (gl:end-query :samples-passed)))
 		(t
-		 (glhelp:slow-draw display-list)))))
-	  ;;(gl:call-list display-list)
-	  )
-	 (t ;;(print "WHAT?")
-	  (incf count-occluded-by-query)
-	  ;;(gl:call-list display-list)
-	  ))))
+		 (glhelp:slow-draw display-list))))
+	    ;;(gl:call-list display-list)
+	    (when overridden-p
+	      (incf count-overridden)))
+	   (t ;;(print "WHAT?")
+	    (incf count-occluded-by-query)
+	    ;;(gl:call-list display-list)
+	    )))))
   (values
    count-actually-drawn
-   count-occluded-by-query)
+   count-occluded-by-query
+   count-overridden)
   ;;(gl:call-lists vec)
   ;;(print (- (get-internal-real-time) a))
   )
@@ -573,14 +640,14 @@ gl_FragColor.rgb = color_out;
   (sucle-mp:with-initialize-multiprocessing
     (funcall fun)))
 
-(defun update-world-vao ()
+(defun update-world-vao (distance-fun)
   (world:clean-dirty)
   (reset-meshers)
   (loop :for key :being :the :hash-keys :of *g/chunk-call-list* :do
      (remove-chunk-model key))
   (mapc #'world:dirty-push
 	(sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'< :key
-	      'world:unsquared-chunk-distance)))
+	      distance-fun)))
 
 (defparameter *chunk-query-buffer-size* 0)
 (defvar *iterator*)
@@ -610,14 +677,17 @@ gl_FragColor.rgb = color_out;
 		     (let ((times
 			    (draw-aabb x y z
 				       (load-time-value
-					(let ((foo *chunk-query-buffer-size*))
+					(let* ((foo *chunk-query-buffer-size*)
+					       (min (- foo))
+					       (max (+ foo vocs:+size+)))
+					  (floatf min max)
 					  (aabbcc:make-aabb
-					    :minx (- 0.0 foo)
-					    :miny (- 0.0 foo)
-					    :minz (- 0.0 foo)
-					    :maxx (+ (floatify voxel-chunks:*chunk-size-x*) foo)
-					    :maxy (+ (floatify voxel-chunks:*chunk-size-y*) foo)
-					    :maxz (+ (floatify voxel-chunks:*chunk-size-z*) foo)))))))
+					    :minx min
+					    :miny min
+					    :minz min
+					    :maxx max
+					    :maxy max
+					    :maxz max))))))
 			(scratch-buffer:flush-bind-in*
 			 ((*iterator* xyz))
 			 (glhelp:create-vao-or-display-list-from-specs
@@ -629,7 +699,19 @@ gl_FragColor.rgb = color_out;
 			   (*position-attr* (xyz) (xyz) (xyz) 1.0)))))))))
 	    (set-chunk-display-list
 	     coords
-	     (create-chunk-gl-representation display-list occlusion-box))))))))
+	     (create-chunk-gl-representation
+	      display-list occlusion-box
+	      (voxel-chunks:with-chunk-key-coordinates
+	       (x y z) coords
+	       (flet ((f (n)
+			(floatify (* n vocs:+size+))))
+		 (create-aabb
+		  (f (1+ x))
+		  (f (1+ y))
+		  (f (1+ z))
+		  (f x)
+		  (f y)
+		  (f z))))))))))))
 
 
 (defun draw-aabb (x y z aabb &optional (iterator *iterator*))
@@ -750,7 +832,7 @@ to be drawn by the render thread."
 		     (assert (eq :mesh-chunk type))
 		     (apply function args)))
 		  (t (print value)))))))))
-(defun dispatch-mesher-to-dirty-chunks ()
+(defun dispatch-mesher-to-dirty-chunks (cx cy cz)
   "Re-draw, draw, or delete the openGL representation of chunks based 
 observed chunk state changes. 
 Chunk state changes can be found in `world:*dirty-chunks*`
@@ -774,16 +856,17 @@ Note:limits the amount of background jobs and pending lisp objects."
 	       (delete-if (lambda (x)
 			    (>= (blocky-chunk-distance x) *chunk-render-radius*))
 			  list)
-	       '< :key 'world:unsquared-chunk-distance)))
+	       '< :key (lambda (key)
+			 (world:unsquared-chunk-distance key cx cy cz)))))
       (loop :named submit-mesh-tasks
 	 :while (not (too-much)) :do
 	 (let ((thechunk (world:dirty-pop)))
 	   (if thechunk
 	       (cond
 		 ;;If the chunk exists and is not empty
-		 ((and (voxel-chunks:chunk-exists-p thechunk)
+		 ((and (voxel-chunks::chunk-in-cache-p thechunk)
 		       (not (voxel-chunks:empty-chunk-p
-			     (voxel-chunks:get-chunk-at thechunk))))
+			     (voxel-chunks::get-chunk-in-cache thechunk))))
 		  ;;Then submit a job to the mesher 
 		  (incf *total-background-chunk-mesh-jobs*)
 		  (let ((lparallel:*task-category* 'mesh-chunk))
@@ -810,4 +893,38 @@ Note:limits the amount of background jobs and pending lisp objects."
 
 ;;;Frustum culling
 ;;;http://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm
+(defun box-in-frustum (camera aabb)
+  (let ((planes (camera-matrix::camera-planes camera))
+	(camera-position (camera-matrix::camera-vec-position camera)))
+    (dolist (plane planes)
+      (let ((out 0))
+	(call-aabb-corners
+	 (lambda (x y z)
+	   (when (< 0.0
+		    (nsb-cga:dot-product
+		     (nsb-cga:vec-
+		      camera-position
+		      (nsb-cga:vec x y z))
+		     plane))
+	     (incf out)))
+	 aabb)
+	(when (= out 8)
+	  (return-from box-in-frustum nil)))))
+  (values t))
 
+(defun call-aabb-corners
+    (&optional
+       (fun (lambda (&rest rest) (print rest)))
+		       (aabb *player-aabb*))
+  (labels ((x (x)
+	     (y x (aabbcc:aabb-miny aabb))
+	     (y x (aabbcc:aabb-maxy aabb)))
+	   (y (x y)
+	     (z x y (aabbcc:aabb-minz aabb))
+	     (z x y (aabbcc:aabb-maxz aabb)))
+	   (z (x y z)
+	     (funcall fun x y z)))
+    (x (aabbcc:aabb-minx aabb))
+    (x (aabbcc:aabb-maxx aabb))))
+
+;;FIXME:OpenGL chunks that are too far away are never destroyed?

@@ -15,7 +15,6 @@
    #:nsb-cga
    #:camera-matrix
    #:quads
-   #:sucle-serialize
    #:sucle-multiprocessing
    #:aabbcc ;;for occlusion culling 
    #:image-utility
@@ -27,8 +26,8 @@
    #:black-tie
    #:ncurses-clone-for-lem
    #:livesupport
-
-   #:sqlite)
+   
+   #:crud)
   :serial t
   :components 
   (
@@ -36,10 +35,10 @@
    (:file "voxel-chunks")
    (:file "package")
    (:file "util")
+   (:file "menu")
    ;;(:file "block-light") ;;light propogation
    (:file "mesher")
    (:file "block-data")
-   (:file "database")
    (:file "world")
    (:file "extra")
    (:file "physics")

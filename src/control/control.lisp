@@ -9,15 +9,11 @@
 
 (in-package #:control)
 
-(defun num-key-jp (&optional (control-state window:*control-state*))
-  (etouq
-   (cons
-    'cond
-    (mapcar
-     (lambda (n)
-       `((window:button :key :pressed ,n control-state)
-	 ,n))
-     '(0 1 2 3 4 5 6 7 8 9)))))
+(defun num-key-jp (&optional (type :pressed) (control-state window:*control-state*))
+  (find-if 
+   (lambda (n)
+     (window:button :key type n control-state))
+   '(0 1 2 3 4 5 6 7 8 9)))
 
 (defmacro get-control-sequence ((control-state char-var shift control alt super
 					       &optional (terminal-sequence nil))

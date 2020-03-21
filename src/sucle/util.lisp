@@ -49,3 +49,11 @@
      ,@(mapcar (lambda (arg)
 		 `(setf ,arg (floatify ,arg)))
 	       args)))
+
+;;;;
+(defun run-button (pair)
+  ;;((:key :pressed #\Space) . function)
+  (when (apply 'window:button (car pair))
+    (funcall (cdr pair))))
+(defun run-buttons (pairs)
+  (mapc 'run-button pairs))

@@ -10,8 +10,7 @@
    #:on-session-change)  
   (:export
    #:w
-   #:h
-   #:gl-context)
+   #:h)
   #+nil
   (:export
    #:al-context)
@@ -106,3 +105,124 @@
 (defun restart-sound-system ()
   (music:restart-al)
   (deflazy:refresh 'al-context t))
+
+;;;;************************************************************************;;;;
+(defpackage #:app
+  (:use :cl)
+  (:export
+   #:enter
+   #:default-loop
+
+   #:subapp
+   #:push-mode
+   #:pop-mode
+   #:switch-mode
+   #:quit)
+  (:import-from #:application
+		#:quit))
+(in-package #:app)
+;;;;Main loop
+(defun enter (&optional (app 'default-per-frame))
+  (reset-per-frame-and-stack)
+  (subapp app)
+  (start-window))
+
+(defun start-window ()
+  (application:main 'default-loop
+   :width (* 80 8)
+   :height (* 25 16)
+   :title ""))
+
+(defun default-loop ()
+  (loop
+     (application:poll-app)
+     (per-frame)))
+;;Popping the last node of the stack is equivalent to quitting,
+;;because of the default-per-frame that quits app.
+
+;;A subapp is like a copy of the app,
+;;glfw3 window and all, within the app?
+
+(defun unit-circular-list (item)
+  (let ((cell (list item)))
+    (setf (cdr cell) cell)
+    cell))
+(defun circular-per-frame ()
+  (unit-circular-list 'default-per-frame))
+(defparameter *null-per-frame* (circular-per-frame))
+(defparameter *null-app-stack* (unit-circular-list *null-per-frame*))
+(defparameter *per-frame* *null-per-frame*)
+(defparameter *app-stack* *null-app-stack*)
+(defun save-modes-to-app-stack ()
+  (push *per-frame* *app-stack*)
+  (reset-per-frame))
+(defun restore-modes-to-app-stack ()
+  (setf *per-frame* (pop *app-stack*)))
+
+(defun subapp (fun)
+  ;;The application is both a mode
+  ;;and a means of quitting.
+  (labels ((this-function ()
+	     ;;(print "running")
+	     (unwind-protect
+		  (progn (save-modes-to-app-stack)
+		    (application::with-quit-token ()
+		      (funcall fun)))
+	       (restore-modes-to-app-stack)
+	       (pop-mode))))
+    (push-mode #'this-function)))
+
+(defun default-per-frame ()
+  ;;Do nothing, except quit
+  (application:quit))
+;;This is a circular list with one element.
+;;So if you keep popping the mode,
+;;nothing happens.
+(defun reset-per-frame-and-stack ()
+  (reset-per-frame)
+  (reset-app-stack))
+(defun reset-per-frame ()
+  (setf *per-frame* *null-per-frame*))
+(defun reset-app-stack ()
+  (setf *app-stack* *null-app-stack*))
+(defun per-frame ()
+  (funcall (car *per-frame*)))
+(defun push-mode (mode)
+  (etypecase mode
+    ;;mode is either a function
+    (function t)
+    ;;or a symbol with a 
+    (symbol
+     (assert (fboundp mode) nil "Symbol:~a is function unbound" mode)))
+  (push mode *per-frame*))
+(defun pop-mode ()
+  (pop *per-frame*))
+(defun switch-mode (mode)
+  (pop-mode)
+  (push-mode mode))
+
+;;test
+(defun test-for-modes ()
+  (labels ((app-entry ()
+	     (push-mode #'app)
+	     (default-loop))
+	   (app ()
+	     (when (window:button :key :repeat #\u)
+	       (print "going up!")
+	       (subapp #'app-entry))
+	     (when (window:button :key :repeat #\m)
+	       (print "another mode")
+	       (app-entry))
+	     (when (window:button :key :repeat #\n)
+	       (print "removing mode")
+	       ;;FIXME::will this pop too many modes?
+	       (pop-mode)
+	       )
+	     (when (window:button :key :repeat #\q)
+	       (print "quitting")
+	       (application:quit))
+	     (when (window:button :key :pressed #\p)
+	       (let ((*print-circle* t))
+		 (print *per-frame*)
+		 (print *app-stack*)))))
+    (enter #'app-entry)))

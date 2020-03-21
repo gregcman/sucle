@@ -20,7 +20,8 @@
 
    (vec-up (sb-cga:vec 0.0 1.0 0.0) :type sb-cga:vec)
    (vec-forward (sb-cga:vec 1.0 0.0 0.0) :type sb-cga:vec)
-
+   (vec-backwards (sb-cga:vec -1.0 0.0 0.0) :type sb-cga:vec)
+   
    (vec-noitisop (sb-cga:vec 0.0 0.0 0.0) :type sb-cga:vec) ;;;the negative of position
    (matrix-player (sb-cga:identity-matrix)) ;;positional information of camera
    (matrix-view (sb-cga:identity-matrix))		    ;;view matrix
@@ -34,9 +35,13 @@
    (frustum-near 0.0078125 :type single-float)
    (frustum-far 128.0 :type single-float)
 
+   (cam-up (sb-cga:vec 0.0 1.0 0.0) :type sb-cga:vec)
+   (cam-right (sb-cga:vec 0.0 0.0 1.0) :type sb-cga:vec)
+   
    ;;The normals of each plane.
    ;;one is vec-forward, another -vec-forward
-   planes))
+   planes
+   edges))
 
 (defun projection-matrix (result camera)
   (let ((half-fovy (* 0.5 (camera-fov camera)))
@@ -49,21 +54,66 @@
 	    (difference (- near far)))
 	;;[FIXME]necessary?
 	(nsb-cga:%matrix result 
-			 (/ cot aspect) 0.0 0.0 0.0
+			 (* cot aspect) 0.0 0.0 0.0
 			 0.0 cot 0.0 0.0
 			 0.0 0.0 (/ sum difference) (/ (* 2.0 far near) difference)
 			 0.0 0.0 -1.0 0.0)))))
 
+(defun calculate-frustum-edge-vectors (camera)
+  (let* ((half-fovy (* 0.5 (camera-fov camera)))
+	 (forward (camera-vec-forward camera))
+	 (up (camera-cam-up camera))
+	 (right (camera-cam-right camera))
+	 ;;(near (camera-frustum-near camera))
+	 ;;(far (camera-frustum-far camera))
+	 (y+ (* 1 (tan half-fovy)))
+	 (x+ (/ y+ (camera-aspect-ratio camera)))
+
+	 (vec-y+ (nsb-cga:vec* up y+))
+	 (vec-y- (nsb-cga:vec* up (- y+)))
+	 (vec-x+ (nsb-cga:vec* right x+))
+	 (vec-x- (nsb-cga:vec* right (- x+))))
+    (setf
+     (camera-edges camera)
+     (list
+      ;;FIXME:optimize, does this create a lot of garbage?
+      ;;(nsb-cga:vec+ forward vec-x+)
+      ;;(nsb-cga:vec+ forward vec-x-)
+      ;;(nsb-cga:vec+ forward vec-y+)
+      ;;(nsb-cga:vec+ forward vec-y-)
+      (nsb-cga:vec+ (nsb-cga:vec+ forward vec-x+) vec-y+)
+      (nsb-cga:vec+ (nsb-cga:vec+ forward vec-x-) vec-y+)
+      (nsb-cga:vec+ (nsb-cga:vec+ forward vec-x-) vec-y-)
+      (nsb-cga:vec+ (nsb-cga:vec+ forward vec-x+) vec-y-)))))
+
+(defun calculate-frustum-planes (camera)
+  (destructuring-bind (tr tl bl br) (camera-edges camera)
+    (flet ((foo (a b)
+	     (let ((vec (nsb-cga:cross-product a b)))
+	       (nsb-cga:%normalize vec vec))))
+      (setf (camera-planes camera)
+	    (list
+	     (foo tl tr)
+	     (foo bl tl)
+	     (foo br bl)
+	     (foo tr br)
+	     (camera-vec-forward camera)
+	     ;;(camera-vec-backwards camera)
+	     )))))
+#+nil
+(nsb-cga:cross-product
+ (nsb-cga:vec 1.0 0.0 0.0)
+ (nsb-cga:vec 0.0 1.0 0.0))
+
 (defun relative-lookat (result relative-target up)
   (let ((camright (sb-cga:cross-product up relative-target)))
-    (declare (dynamic-extent camright))
     (sb-cga:%normalize camright camright)
     (let ((camup (sb-cga:cross-product relative-target camright)))
-      (declare (dynamic-extent camup))
-      (get-lookat result
-		  camright
-		  camup
-		  relative-target))))
+      (sb-cga:%normalize camup camup)
+      (values
+       (get-lookat result camright camup relative-target)
+       camright
+       camup))))
 
 (defun get-lookat (result right up direction)
   (let ((rx (aref right 0))
@@ -89,14 +139,23 @@
 	(projection-view-player-matrix (camera-matrix-projection-view-player camera))
 	(player-matrix (camera-matrix-player camera))
 	(forward (camera-vec-forward camera))
-	(up (camera-vec-up camera)))
+	(up (camera-vec-up camera))
+	(backwards (camera-vec-backwards camera)))
     (projection-matrix projection-matrix camera)
-    (relative-lookat view-matrix forward up)
+    (nsb-cga:%vec* backwards forward -1.0)
+    (multiple-value-bind (a right up)
+	(relative-lookat view-matrix backwards up)
+      (declare (ignorable a))
+      (setf (camera-cam-up camera) up
+	    (camera-cam-right camera) right))
     (nsb-cga:%matrix* projection-view-matrix projection-matrix view-matrix)
-    (let ((cev (camera-vec-noitisop camera)))
-      (nsb-cga:%vec* cev (camera-vec-position camera) -1.0)
+    (let ((cev (camera-vec-noitisop camera))
+	  (position (camera-vec-position camera)))
+      (nsb-cga:%vec* cev position -1.0)
       (nsb-cga:%translate player-matrix cev))
-    (nsb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix)))
+    (nsb-cga:%matrix* projection-view-player-matrix projection-view-matrix player-matrix))
+  (calculate-frustum-edge-vectors camera)
+  (calculate-frustum-planes camera))
 
 
 ;;;

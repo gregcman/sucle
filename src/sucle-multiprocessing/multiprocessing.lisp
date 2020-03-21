@@ -183,7 +183,12 @@
 	(error (c)
 	  ;;handle regular errors from function
 	  (declare (ignorable c))
-	  (debugging (print c))
+	  (debugging
+	    (terpri)
+	    (write-string "Sub-task Error:")
+	    (format t
+		    (simple-condition-format-control c)
+		    (simple-condition-format-arguments c)))
 	  (abort-job-task job-task c)))))
   job-task)
 (defmacro submit-body ((&rest rest &key &allow-other-keys) &body body)
@@ -221,8 +226,11 @@
 	   ;;[FIXME]allow errors to pass through?
 	   (error (c)
 	     (declare (ignorable c))
-	     (debugging (print c))
-	     ))))))
+	     (debugging c)))))))
+#+nil
+(handler-case (error "foo ~a" 34)
+  (error (c)
+    c))
 
 (defmacro do-queue-iterator ((next queue) &body body)
   ;;iterate through the values in the lparallel queue, with

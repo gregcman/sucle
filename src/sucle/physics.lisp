@@ -47,16 +47,34 @@
 		   (axis pz vz #b001))
 		 (when (>= 0 whats-left) (exit)))
 	       (logiorf dead-axis newclamp)))))))
+(defun noclip-motion-fun (&rest args)
+  ;;Always return no contact state.
+  ;;and the clamp value [second value]
+  ;;is 1.0 representing moving along the entire
+  ;;path unobstructed.
+  (declare (ignore args))
+  (values #b000 1.0))
 
+;;Is will the block being placed overlap with the
+;;given entity?
+(defun not-occupied (x y z &optional (ent *ent*))
+  (let ((aabb (pos-to-block-aabb x y z)))
+    (floatf x y z)
+    (mvc 'aabbcc:aabb-not-overlap
+	 aabb
+	 x y z
+	 (entity-aabb ent)
+	 (spread
+	  ;;position
+	  (entity-position ent)))))
 
 (defun pos-to-block-aabb (x y z)
   (let ((the-block (world:getblock x y z)))
     (block-to-block-aabb the-block)))
 (defun block-to-block-aabb (blockid)
+  (declare (ignore blockid))
   ;;FIXME :use defmethod on objects?
-  (case blockid
-    (3 *slab-aabb*)
-    (t *block-aabb*)))
+  *block-aabb*)
 #+nil
 (defparameter *dirtying2* nil)
 (defun entity-collision (px py pz vx vy vz aabb)
@@ -172,6 +190,7 @@
 	  (let* ((walkspeed 4.317)
 		 (speed walkspeed)
 		 (step-power 4.0))
+	    ;;FIXME:add great friction when on ground and sneaking
 	    (cond
 	      (fly
 	       (*= speed 4.0))		
@@ -208,7 +227,7 @@
 		    (if dir
 			(let ((diraux (+ dir yaw)))
 			  (nsb-cga:vec
-			   (* speed (sin diraux))
+			   (* speed (- (sin diraux)))
 			   yvalue
 			   (* speed (cos diraux))))
 			(prog1
@@ -266,7 +285,7 @@
 					  *ticks-per-second* 0.5)
 				       mass))
 	(modify nsb-cga:%vec+ vel force)
-	(contact-handle
+	(nullify-velocity-where-obstructed
 	 vel
 	 (logtest contact-state #b100000)
 	 (logtest contact-state #b010000)
@@ -294,7 +313,21 @@
 		     vy (floatify (if (logtest #b010 xyzclamp) 0 vy))
 		     vz (floatify (if (logtest #b001 xyzclamp) 0 vz))))))))))
 
-(defun contact-handle (velocity i+ i- j+ j- k+ k-)
+
+(defun vec-x (vec)
+  (aref vec 0))
+(defun vec-y (vec)
+  (aref vec 1))
+(defun vec-z (vec)
+  (aref vec 2))
+(defun (setf vec-x) (new vec)
+  (setf (aref vec 0) new))
+(defun (setf vec-y) (new vec)
+  (setf (aref vec 1) new))
+(defun (setf vec-z) (new vec)
+  (setf (aref vec 2) new))
+
+(defun nullify-velocity-where-obstructed (velocity i+ i- j+ j- k+ k-)
   ;;velocity is a 3 float array.
   ;;If we are moving along an axis, but the contact
   ;;state says that direction is obstructed, then
@@ -333,8 +366,7 @@
    clip?
 
    jump?
-   sneak?
-   ))
+   sneak?))
 (defun entity-position (entity)
   (let* ((player-pointmass (entity-particle entity))
 	 (curr (pointmass-position player-pointmass)))
