@@ -9,9 +9,10 @@
 	       #:cl-cpus
 	       #:uncommon-lisp
 	       #:utility
+	       #:alexandria
 	       )
   :serial t
   :components 
-  (
+  ((:file "package")
    (:file "multiprocessing")
-   ))
+   (:file "read-writer")))

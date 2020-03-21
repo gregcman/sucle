@@ -8,6 +8,7 @@
    #:cl-base64
    #:uiop
    #:lparallel
+   #:sucle-multiprocessing
    ;;For one macro in 'database'
    #:alexandria)
   :serial t

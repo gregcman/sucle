@@ -121,8 +121,8 @@ Press q/escape to quit
   (app:push-mode 'menu:tick)
   (menu:use *start-menu*)
   (crud:use-crud-from-path
-   (sucle-temp:path "data.db")
-   ;;(world-path)
+   ;;(sucle-temp:path "data.db")
+   (world-path)
    )
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (app:default-loop)	  

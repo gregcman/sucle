@@ -34,19 +34,23 @@
 			   ,@body)
 	 (release-handle ,handle)))))
 (defparameter *write-write-lock* (bt:make-lock))
-(defparameter *write-locks* (make-hash-table))
+(defparameter *rw-locks* (make-hash-table))
 (defun get-write-lock (db)
   (bt:with-lock-held (*write-write-lock*)
-    (let ((lock (gethash db *write-locks*)))
+    (let ((lock (gethash db *rw-locks*)))
       (unless lock
-	(let ((new-lock (bt:make-lock "db-write-lock")))
+	(let ((new-lock (sump:make-rwlock)))
 	  ;;FIXME::The *write-locks* table is not thread safe?
-	  (setf (gethash db *write-locks*) new-lock
+	  (setf (gethash db *rw-locks*) new-lock
 		lock new-lock)))
       lock)))
-(defmacro with-locked-db ((db) &body body) 
-  `(bordeaux-threads:with-lock-held ((get-write-lock ,db))
-     ,@body))
+
+(defmacro with-write-locked-db ((db) &body body) 
+  `(sump:with-write-lock (get-write-lock ,db)
+     (locally ,@body)))
+(defmacro with-read-locked-db ((db) &body body)
+  `(sump:with-read-lock (get-write-lock ,db)
+     (locally ,@body)))
 
 ;;https://www.sqlite.org/affcase1.html
 (defun create-table (&optional (name *documents*))
@@ -80,7 +84,7 @@
     (format nil "DROP TABLE IF EXISTS ~a" (error-scrub table))))
 
 (defun add (filename data &optional (table *documents*))
-  (with-locked-db (*database*)
+  (with-write-locked-db (*database*)
     ;;https://github.com/TeMPOraL/cl-sqlite
     ;;[FIXME]sqlite concurrent insert bug. see cl-sqlite by temporal.
     (print (list filename))
@@ -119,7 +123,7 @@
   ;;(format t "~%existence-test ~s" filename)
   ;;[FIXME]only loading one chunk at a time?
   ;;bottleneck? bug with cl-sqlite library?
-  (with-locked-db (*database*)
+  (with-read-locked-db (*database*)
     (when (does-file-exist filename)
       ;;(format t "~%retrieving ~s" filename)
       (execute-single *db*
