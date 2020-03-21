@@ -259,7 +259,8 @@ Press q/escape to quit
     (setf *entities* (loop :repeat 10 :collect (create-entity)))
     (setf *ent* (elt *entities* 0))
     (sync_entity->chunk-array *ent* *chunk-cursor-center*)
-    (load-world *chunk-cursor-center* t)
+    (load-world *chunk-cursor-center*;; t
+		)
     ;;Controller?
     (reset-all-modes)
     (enable-mode :normal-mode)
@@ -422,12 +423,18 @@ Press q/escape to quit
        (spread (entity-position ent))
        cursor))
 
-(defun load-world (chunk-cursor-center &optional (force nil))
+(defun load-world (chunk-cursor-center ;;&optional (force nil)
+					  )
   (let ((maybe-moved (vocs::cursor-dirty chunk-cursor-center)))
+    #+nil
     (when (or force maybe-moved)
       (world::load-chunks-around chunk-cursor-center)
       ;;(world::unload-extra-chunks chunk-cursor-center)
       )
+    (vocs::call-fresh-chunks-and-end
+     (lambda (chunk)
+       ;;FIXME:this does not load the nearest chunks to render first?
+       (world::dirty-push (vocs::chunk-key chunk))))
     (when maybe-moved
       (setf (vocs::cursor-dirty chunk-cursor-center) nil))))
 

@@ -90,30 +90,34 @@
 (/ (* 300 (expt 1024 2))
    (* +total-size+ 8))
 (defparameter *cache-limit* (* (expt 16 3)))
-(defparameter *cache-reduction-number* (* *cache-limit* 0.2))
+(defparameter *cache-reduction* 0.2)
 (defparameter *prune-lock* (bt:make-lock))
-(defun prune-cache (&optional (limit *cache-limit*) (reduction *cache-reduction-number*))
+(defun prune-cache (&optional (limit *cache-limit*) &aux (reduction
+							  (* limit *cache-reduction*)))
   (bt:with-lock-held (*prune-lock*)
-    (when (< limit (total-chunks-in-cache))
-      (let ((chunks (sort (alexandria:hash-table-alist *chunks*)
-			  '<
-			  :key (lambda (x)
-				 (chunk-last-access (cdr x))))))
-	;;(format t "~%Pruning ~a chunks" reduction)
-	(loop :repeat reduction
-	   :for pair :in chunks :do
-	   (destructuring-bind (key . chunk) pair
-	     (when (and
-		    *persist*
-		    ;;when the chunk is not obviously empty
-		    (not (voxel-chunks:empty-chunk-p chunk))
-		    ;;if it wasn't modified, no point in saving
-		    (voxel-chunks:chunk-modified chunk))
-	       (savechunk key))
-	     (delete-chunk-in-cache key))))
-      (setf *true-bit-size* (chunks-total-bits))
-      ;;(format t "~%~a" *true-bit-size*)
-      )))
+    (let ((total (total-chunks-in-cache)))
+      (when (< limit total)
+	(let ((chunks (sort (alexandria:hash-table-alist *chunks*)
+			    '<
+			    :key (lambda (x)
+				   (chunk-last-access (cdr x))))))
+	  (let ((amount-pruning (- total (- limit reduction))))
+	    ;;(print total)
+	    ;;(format t "~%Pruning ~a chunks" amount-pruning)
+	    (loop :repeat amount-pruning
+	       :for pair :in chunks :do
+	       (destructuring-bind (key . chunk) pair
+		 (when (and
+			*persist*
+			;;when the chunk is not obviously empty
+			(not (voxel-chunks:empty-chunk-p chunk))
+			;;if it wasn't modified, no point in saving
+			(voxel-chunks:chunk-modified chunk))
+		   (savechunk key))
+		 (delete-chunk-in-cache key)))))
+	(setf *true-bit-size* (chunks-total-bits))
+	;;(format t "~%~a" *true-bit-size*)
+	))))
 ;;;;************************************************************************;;;;
 
 ;;[FIXME]chunk-coord and block-coord being fixnums is not theoretically correct,
@@ -249,9 +253,18 @@
 		     :initial-element *chunk-array-empty-value*))
   (x-min 0)
   (y-min 0)
-  (z-min 0))
+  (z-min 0)
+  ;;New chunks that were recently obtained from the global cache
+  ;;go here.
+  fresh)
 (deftype chunk-array-data ()
   `(simple-array t (,+ca-size+ ,+ca-size+ ,+ca-size+)))
+
+(defun call-fresh-chunks-and-end (fun &optional 
+					(chunk-array *chunk-array*))
+  (dolist (item (chunk-array-fresh chunk-array))
+    (funcall fun item))
+  (setf (chunk-array-fresh chunk-array) nil))
 
 ;;'rx' 'ry' and 'rz' stand for remainder
 
@@ -332,6 +345,7 @@
 		  ;;and return it.
 		  (t
 		   (let ((definitely-chunk (get-chunk cx cy cz force-load)))
+		     (push definitely-chunk (chunk-array-fresh chunk-array))
 		     (setf (aref data nx ny nz) definitely-chunk)
 		     (return-from return definitely-chunk))))))))
 
@@ -353,6 +367,7 @@
 	    (values t)))))))
 
 ;;
+#+nil
 (defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
   ;;[FIXME]is this a good api?
   (multiple-value-call 'obtain-chunk
@@ -507,6 +522,7 @@
     (make-chunk :x cx :y cy :z cz :key key :data data :type :normal)))
 ;;Merely load a chunk from the database, don't put in in the cache
 (defun %loadchunk (chunk-coordinates)
+  ;;(format t "~%Loading chunk at ~a" chunk-coordinates)
   (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
     (flet ((make-data (data)
 	     (let ((chunk-data (coerce data '(simple-array t (*)))))
