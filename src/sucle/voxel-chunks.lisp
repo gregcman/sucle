@@ -225,7 +225,6 @@
 	  (force-load
 	   ;;(format t "~%Caching new chunk:(~a ~a ~a)" cx cy cz)
 	   (let ((new-chunk (loadchunk (create-chunk-key cx cy cz))))
-	     (set-chunk-in-cache key new-chunk)
 	     (values new-chunk t)))
 	  (t
 	   (error "Loading is mandatory")
@@ -415,14 +414,17 @@
 ;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
 ;;And have chunk loading in another file?
 
+(defparameter *chunk-io-lock* (bt:make-lock))
+
 (defun savechunk (key)
-  (let ((chunk (get-chunk-in-cache key)))
-    (when (chunk-alive? chunk)   
-      ;;write the chunk to disk if its worth saving
-      ;;otherwise, if there is a preexisting file, destroy it
-      (if (voxel-chunks:chunk-worth-saving chunk)
-	  (%savechunk chunk)
-	  (deletechunk key)))))
+  (bt:with-lock-held (*chunk-io-lock*)
+    (let ((chunk (get-chunk-in-cache key)))
+      (when (chunk-alive? chunk)   
+	;;write the chunk to disk if its worth saving
+	;;otherwise, if there is a preexisting file, destroy it
+	(if (voxel-chunks:chunk-worth-saving chunk)
+	    (%savechunk chunk)
+	    (deletechunk key))))))
 
 (defun %savechunk (chunk &aux (position (voxel-chunks:chunk-key chunk)))
   ;;(format t "~%saved chunk ~s" position)
@@ -434,9 +436,10 @@
 
 ;;Read from the database and put the chunk into the cache.
 (defun loadchunk (key)
-  (let ((chunk (%loadchunk key)))
-    (voxel-chunks::set-chunk-in-cache key chunk)
-    chunk))
+  (bt:with-lock-held (*chunk-io-lock*)
+    (let ((chunk (%loadchunk key)))
+      (voxel-chunks::set-chunk-in-cache key chunk)
+      chunk)))
 
 ;;Merely load a chunk from the database, don't put in in the cache
 (defun %loadchunk (chunk-coordinates)
