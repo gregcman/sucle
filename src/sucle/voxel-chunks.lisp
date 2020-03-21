@@ -722,3 +722,7 @@
 			(chunk-data c)))
 		     (alexandria:hash-table-values *chunks*)))
      divider))
+
+(defun save-all ()
+  ;;By limiting the cache to 0, everything gets flushed out.
+  (prune-cache 0))

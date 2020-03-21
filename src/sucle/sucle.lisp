@@ -123,8 +123,8 @@ Press q/escape to quit
   (crud:use-crud-from-path (world-path))
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (app:default-loop)	  
-     (when world:*persist*
-       (world::save-all-chunks)))))
+     (when vocs::*persist*
+       (vocs::save-all)))))
 
 ;;;;
 
@@ -434,6 +434,8 @@ Press q/escape to quit
     (vocs::call-fresh-chunks-and-end
      (lambda (chunk)
        ;;FIXME:this does not load the nearest chunks to render first?
+       ;;fresh-chunks are not necessarily fresh. reposition-chunk array gets rid of
+       ;;everything when moving, how to only update those that exist?
        (world::dirty-push (vocs::chunk-key chunk))))
     (when maybe-moved
       (setf (vocs::cursor-dirty chunk-cursor-center) nil))))
