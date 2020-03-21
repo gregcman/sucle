@@ -280,3 +280,7 @@ centralized place for info on each of the chunks
 - chunk-cursor
 - draw things 
 - sucle on steam?
+
+- Clean up voxel-chunks interface
+- Add logging -> log4cl
+- tests -> fiveam

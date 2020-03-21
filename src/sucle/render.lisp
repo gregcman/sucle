@@ -860,13 +860,15 @@ Note:limits the amount of background jobs and pending lisp objects."
 			 (world:unsquared-chunk-distance key cx cy cz)))))
       (loop :named submit-mesh-tasks
 	 :while (not (too-much)) :do
-	 (let ((thechunk (world:dirty-pop)))
-	   (if thechunk
+	 (let ((chunk-key (world:dirty-pop)))
+	   (if chunk-key
 	       (cond
 		 ;;If the chunk exists and is not empty
-		 ((and (voxel-chunks::chunk-in-cache-p thechunk)
-		       (not (voxel-chunks:empty-chunk-p
-			     (voxel-chunks::get-chunk-in-cache thechunk))))
+		 ((and
+		   (voxel-chunks::chunk-within-chunk-array-p chunk-key)
+		   (voxel-chunks::chunk-in-cache-p chunk-key)
+		   (not (voxel-chunks:empty-chunk-p
+			 (voxel-chunks::get-chunk-in-cache chunk-key))))
 		  ;;Then submit a job to the mesher 
 		  (incf *total-background-chunk-mesh-jobs*)
 		  (let ((lparallel:*task-category* 'mesh-chunk))
@@ -874,18 +876,19 @@ Note:limits the amount of background jobs and pending lisp objects."
 		     (lambda (iter space chunk-pos)
 		       (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		       (multiple-value-bind (io jo ko) (voxel-chunks:unhashfunc chunk-pos)
-			 (mesher:mesh-chunk iter io jo ko)
+			 (let ((vocs::*seek-database* nil))
+			   (mesher:mesh-chunk iter io jo ko))
 			 ;;The return value is used as a callback when
 			 ;;sent to the *finished-mesh-task*
 			 (%list space :mesh-chunk 'update-chunk-mesh chunk-pos iter)))
 		     :args (list
 			    (attrib-buffer-iterators)
 			    (make-list 4)
-			    thechunk)
+			    chunk-key)
 		     :callback (lambda (job-task)
 				 (lparallel.queue:push-queue job-task *finished-mesh-tasks*)
 				 (decf *total-background-chunk-mesh-jobs*)))))
-		 (t (remove-chunk-model thechunk)))
+		 (t (remove-chunk-model chunk-key)))
 	       (return-from submit-mesh-tasks)))))))
 ;;;;<CHUNK-RENDERING?>
 ;;;;************************************************************************;;;;

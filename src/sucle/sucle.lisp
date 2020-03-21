@@ -426,14 +426,10 @@ Press q/escape to quit
        (spread (entity-position ent))
        cursor))
 
-(defun load-world (chunk-cursor-center ;;&optional (force nil)
-					  )
+(defun load-world (chunk-cursor-center)
   (let ((maybe-moved (vocs::cursor-dirty chunk-cursor-center)))
-    #+nil
-    (when (or force maybe-moved)
-      (world::load-chunks-around chunk-cursor-center)
-      ;;(world::unload-extra-chunks chunk-cursor-center)
-      )
+    (when maybe-moved
+      (mapc 'world::dirty-push-around (vocs::load-chunks-around *chunk-cursor-center*)))
     (vocs::call-fresh-chunks-and-end
      (lambda (chunk)
        ;;FIXME:this does not load the nearest chunks to render first?
