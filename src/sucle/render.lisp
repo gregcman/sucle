@@ -640,14 +640,14 @@ gl_FragColor.rgb = color_out;
   (sucle-mp:with-initialize-multiprocessing
     (funcall fun)))
 
-(defun update-world-vao ()
+(defun update-world-vao (distance-fun)
   (world:clean-dirty)
   (reset-meshers)
   (loop :for key :being :the :hash-keys :of *g/chunk-call-list* :do
      (remove-chunk-model key))
   (mapc #'world:dirty-push
 	(sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'< :key
-	      'world:unsquared-chunk-distance)))
+	      distance-fun)))
 
 (defparameter *chunk-query-buffer-size* 0)
 (defvar *iterator*)

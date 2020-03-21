@@ -28,8 +28,6 @@
    #:obtain-chunk-from-block-coordinates
    #:obtain-chunk-from-chunk-key
 
-   #:remove-chunk-from-chunk-array
-
    #:chunk-array-x-min
    #:chunk-array-y-min
    #:chunk-array-z-min
@@ -218,11 +216,6 @@
 
 ;;'rx' 'ry' and 'rz' stand for remainder
 
-;;[FIXME]actually load chunks
-(defun load-chunk (cx cy cz)
-  (error "This should not appear.")
-  (create-chunk cx cy cz))
-
 (defun get-chunk (cx cy cz
 		  &optional (force-load nil)
 		  &aux (key (create-chunk-key cx cy cz)))
@@ -230,13 +223,14 @@
   (multiple-value-bind (value existsp) (get-chunk-in-cache key)
     (cond (existsp (values value t))
 	  (force-load
-	   (format t "Caching new chunk:~a" key)
-	   (error "This should not appear.")
-	   ;;[FIXME]load chunks here, unload chunks here?
-	   (let ((new-chunk (load-chunk cx cy cz)))
+	   ;;(format t "~%Caching new chunk:(~a ~a ~a)" cx cy cz)
+	   (let ((new-chunk (loadchunk (create-chunk-key cx cy cz))))
 	     (set-chunk-in-cache key new-chunk)
 	     (values new-chunk t)))
-	  (t (values
+	  (t
+	   (error "Loading is mandatory")
+	   #+nil
+	   (values
 	      (create-empty-chunk)
 	      ;;*empty-chunk*
 	      nil)))))
@@ -277,28 +271,33 @@
        (chunk-alive? chunk)))
 
 ;;if the coordinates are correct, return a chunk, otherwise return nil
-(defun get-chunk-from-chunk-array
+(defun obtain-chunk
     (cx cy cz  &optional (force-load nil) (chunk-array *chunk-array*))
   (declare (type chunk-coord cx cy cz))
-  (%get-chunk-from-ca (nx chunk-array-x-min cx)
-    (%get-chunk-from-ca (ny chunk-array-y-min cy)
-      (%get-chunk-from-ca (nz chunk-array-z-min cz)
-	(let* ((data (chunk-array-array chunk-array))
-	       (maybe-chunk (aref data nx ny nz)))
-	  (declare (type chunk-array-data data))
-	  (cond ((and (valid-chunk-p maybe-chunk)
-		       ;;This check is unnecessary if we clear the chunk array every time
-		       ;;the position updates. combined with hysteresis, the relatively
-		       ;;slow filling should not happen often
-		       #+nil
-		       (chunk-coordinates-match-p possible-chunk chunk-x chunk-y chunk-z))
-		 ;;Return the chunk found because it is not nil
-		 ;;and the coordinates are correct.
-		 maybe-chunk)
-		;;Retrieve a chunk, place it in the chunk array,
-		;;and return it.
-		(t (setf (aref data nx ny nz)
-			 (get-chunk cx cy cz force-load)))))))))
+  (block return 
+    (%get-chunk-from-ca (nx chunk-array-x-min cx)
+      (%get-chunk-from-ca (ny chunk-array-y-min cy)
+	(%get-chunk-from-ca (nz chunk-array-z-min cz)
+	  (let* ((data (chunk-array-array chunk-array))
+		 (maybe-chunk (aref data nx ny nz)))
+	    (declare (type chunk-array-data data))
+	    (cond ((and (valid-chunk-p maybe-chunk)
+			;;This check is unnecessary if we clear the chunk array every time
+			;;the position updates. combined with hysteresis, the relatively
+			;;slow filling should not happen often
+			#+nil
+			(chunk-coordinates-match-p possible-chunk chunk-x chunk-y chunk-z))
+		   ;;Return the chunk found because it is not nil
+		   ;;and the coordinates are correct.
+		   (return-from return maybe-chunk))
+		  ;;Retrieve a chunk, place it in the chunk array,
+		  ;;and return it.
+		  (t
+		   (let ((definitely-chunk (get-chunk cx cy cz force-load)))
+		     (setf (aref data nx ny nz) definitely-chunk)
+		     (return-from return definitely-chunk))))))))
+
+    (error "chunk not within chunk array!!!!!")))
 
 #+nil
 (defun remove-chunk-from-chunk-array
@@ -315,10 +314,7 @@
 	    (setf (aref data nx ny nz) nil)
 	    (values t)))))))
 
-;;;;
-(defun obtain-chunk (cx cy cz &optional (force-load nil))
-  (declare (type chunk-coord cx cy cz))
-  (get-chunk-from-chunk-array cx cy cz force-load))
+;;
 (defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
   ;;[FIXME]is this a good api?
   (multiple-value-call 'obtain-chunk
@@ -333,7 +329,7 @@
   (declare (type block-coord x y z))
   (multiple-value-bind (rx ry rz) (inner x y z)
     (reference-inside-chunk
-     (obtain-chunk-from-block-coordinates x y z nil)
+     (obtain-chunk-from-block-coordinates x y z t)
      rx ry rz)))
 (defun (setf getobj) (value x y z)
   (declare (type block-coord x y z))
@@ -412,3 +408,86 @@
 	  (cursor-z cursor) newz)
     (when (maybe-move-chunk-array newx newy newz (cursor-threshold cursor))
       (setf (cursor-dirty cursor) t))))
+
+
+;;;;************************************************************************;;;;
+;;;;<PERSIST-WORLD>
+;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
+;;And have chunk loading in another file?
+
+(defun savechunk (key)
+  (let ((chunk (get-chunk-in-cache key)))
+    (when (chunk-alive? chunk)   
+      ;;write the chunk to disk if its worth saving
+      ;;otherwise, if there is a preexisting file, destroy it
+      (if (voxel-chunks:chunk-worth-saving chunk)
+	  (%savechunk chunk)
+	  (deletechunk key)))))
+
+(defun %savechunk (chunk &aux (position (voxel-chunks:chunk-key chunk)))
+  ;;(format t "~%saved chunk ~s" position)
+  (when (not (chunk-alive? chunk))
+    (error "Attempting to save dead chunk!!!"))
+  (crud:crud-update
+   (chunk-coordinate-to-filename position)
+   (voxel-chunks:chunk-data chunk)))
+
+;;Read from the database and put the chunk into the cache.
+(defun loadchunk (key)
+  (let ((chunk (%loadchunk key)))
+    (voxel-chunks::set-chunk-in-cache key chunk)
+    chunk))
+
+;;Merely load a chunk from the database, don't put in in the cache
+(defun %loadchunk (chunk-coordinates)
+  (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
+    (flet ((make-data (data)
+	     (let ((chunk-data (coerce data '(simple-array t (*)))))
+	       (assert (= 4096 (length chunk-data))
+		       nil
+		       "offending chunk ~a"
+		       chunk-coordinates)
+	       (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates data))))
+      (typecase data
+	(list
+	 (ecase (length data)
+	   (0
+	    ;;if data is nil, just load an empty chunk
+	    (voxel-chunks:with-chunk-key-coordinates (x y z) chunk-coordinates
+						     (voxel-chunks:create-chunk x y z :type :empty)))
+
+	   (3 ;;[FIXME]does this even work?
+	    (error "world format invalid")
+	    #+nil
+	    (destructuring-bind (blocks light sky) data
+	      (let ((len (length blocks)))
+		(let ((new (make-array len)))
+		  (dotimes (i len)
+		    (setf (aref new i)
+			  (blockify (aref blocks i)  (aref light i) (aref sky i))))
+		  (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates new)))))
+	   (1 (make-data (car data)))))
+	(otherwise (make-data data))))))
+
+(defun deletechunk (key)
+  (crud:crud-delete (chunk-coordinate-to-filename key)))
+
+;;The world is saved as a directory full of files named (x y z) in block coordinates, with
+;;x and y swizzled
+#+nil
+(defun filename-to-chunk-coordinate (filename-position-list)
+  (let ((position
+	 (mapcar
+	  ;;[FIXME]assumes chunks are 16 by 16 by 16
+	  (lambda (n) (floor n 16))
+	  filename-position-list)))
+    (rotatef (third position)
+	     (second position))
+    position))
+(defun chunk-coordinate-to-filename (chunk-coordinate)
+  (let ((position-list (multiple-value-list (voxel-chunks:unhashfunc chunk-coordinate))))
+    (rotatef (second position-list)
+	     (third position-list))
+    position-list))
+
+;;;;</PERSIST-WORLD>

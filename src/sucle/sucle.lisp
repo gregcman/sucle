@@ -240,6 +240,14 @@ Press q/escape to quit
 ;;Frames are for graphical frames, as in framerate.
 ;;(defparameter *frames* 0)
 
+(defun update-world-vao2 ()
+  (update-world-vao
+   (lambda (key)
+     (world:unsquared-chunk-distance
+      key
+      (vocs::cursor-x *chunk-cursor-center*)
+      (vocs::cursor-y *chunk-cursor-center*)
+      (vocs::cursor-z *chunk-cursor-center*)))))
 (defun sucle-per-frame ()
   ;;(incf *frames*)
   ;;[FIXME]where is the best place to flush the job-tasks?
@@ -251,17 +259,19 @@ Press q/escape to quit
     (setf *entities* (loop :repeat 10 :collect (create-entity)))
     (setf *ent* (elt *entities* 0))
     (sync_entity->chunk-array *ent* *chunk-cursor-center*)
+    (load-world *chunk-cursor-center* t)
     ;;Controller?
     (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
     ;;Model
     ;;FIXME::this depends on the position of entity.
-    (load-world *chunk-cursor-center* t)
     ;;Rendering/view?
     (reset-chunk-display-list)
-    (update-world-vao))
+    ( update-world-vao2))
   (sync_entity->chunk-array *ent* *chunk-cursor-center*)
+  ;;load or unload chunks around the player who may have moved
+  (load-world *chunk-cursor-center*)
   ;;Polling
   ;;Physics
   ;;Rendering Chunks
@@ -275,6 +285,7 @@ Press q/escape to quit
   ;;physics
 
   ;;Calculate what bocks are selected etc..
+  ;;#+nil
   (setf *fist*
 	(mvc 'standard-fist
 	     (spread (entity-position *ent*))
@@ -341,9 +352,6 @@ Press q/escape to quit
      (setf *time-of-day* 1.0)
      ;;run the physics
      (run-physics-for-entity *ent*)))
-
-  ;;load or unload chunks around the player who may have moved
-  (load-world *chunk-cursor-center*)
   ;;render chunks and such
   ;;handle chunk meshing
   (sync_entity->camera *ent* *camera*)
@@ -418,7 +426,8 @@ Press q/escape to quit
   (let ((maybe-moved (vocs::cursor-dirty chunk-cursor-center)))
     (when (or force maybe-moved)
       (world::load-chunks-around chunk-cursor-center)
-      (world::unload-extra-chunks chunk-cursor-center))
+      ;;(world::unload-extra-chunks chunk-cursor-center)
+      )
     (when maybe-moved
       (setf (vocs::cursor-dirty chunk-cursor-center) nil))))
 
@@ -536,7 +545,7 @@ Press q/escape to quit
 	    (funcall *right-fist-fnc*)))))))
 (defparameter *normal-keys*
   `(((:key :pressed #\p) .
-     ,(lambda () (update-world-vao)))
+     ,(lambda () (update-world-vao2)))
     ((:key :pressed :escape) .
      ,(lambda ()
 	(window:get-mouse-out)

@@ -64,81 +64,7 @@
     (time (dotimes (x times) (getobj 0 0 0)))
     (time (dotimes (x times) (getobj 0 0 0)))))
 ;;;;************************************************************************;;;;
-;;;;<PERSIST-WORLD>
 (in-package #:world)
-
-;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
-;;And have chunk loading in another file?
-
-(defun savechunk (chunk position)
-  ;;(format t "~%saved chunk ~s" position)
-  (crud:crud-update
-   (chunk-coordinate-to-filename position)
-   (voxel-chunks:chunk-data chunk)))
-
-(defun loadchunk (chunk-coordinates)
-  (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
-    (flet ((make-data (data)
-	     (let ((chunk-data (coerce data '(simple-array t (*)))))
-	       (assert (= 4096 (length chunk-data))
-		       nil
-		       "offending chunk ~a"
-		       chunk-coordinates)
-	       (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates data))))
-      (typecase data
-	(list
-	 (ecase (length data)
-	   (0
-	    ;;if data is nil, just load an empty chunk
-	    (voxel-chunks:with-chunk-key-coordinates (x y z) chunk-coordinates
-						     (voxel-chunks:create-chunk x y z :type :empty)))
-
-	   (3 ;;[FIXME]does this even work?
-	    (destructuring-bind (blocks light sky) data
-	      (let ((len (length blocks)))
-		(let ((new (make-array len)))
-		  (dotimes (i len)
-		    (setf (aref new i)
-			  (blockify (aref blocks i)  (aref light i) (aref sky i))))
-		  (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates new)))))
-	   (1 (make-data (car data)))))
-	(otherwise (make-data data))))))
-
-;;The world is saved as a directory full of files named (x y z) in block coordinates, with
-;;x and y swizzled
-
-(defun filename-to-chunk-coordinate (filename-position-list)
-  (let ((position
-	 (mapcar
-	  ;;[FIXME]assumes chunks are 16 by 16 by 16
-	  (lambda (n) (floor n 16))
-	  filename-position-list)))
-    (rotatef (third position)
-	     (second position))
-    position))
-(defun chunk-coordinate-to-filename (chunk-coordinate)
-  (let ((position-list (multiple-value-list (voxel-chunks:unhashfunc chunk-coordinate))))
-    (rotatef (second position-list)
-	     (third position-list))
-    position-list))
-
-#+nil
-(defun load-world (path)
-  ;;[FIXME]don't load the entire world
-  (let ((files (uiop:directory-files path)))
-    (dolist (file files)
-      (loadchunk path (read-from-string (pathname-name file))))))
-
-#+nil
-(defun delete-garbage (&optional (path (world-path)))
-  (let ((files (uiop:directory-files path)))
-    (dolist (file files)
-      (let ((data
-	     (retrieve-lisp-objects-from-file file)))
-	(when (typep data '(cons array null))
-	  (delete-file file))))))
-
-;;;;</PERSIST-WORLD>
 ;;;;************************************************************************;;;;
 ;;;;<CHANGE-WORLD?>
 ;;;;keeping track of the changes to the world
@@ -321,6 +247,7 @@
       (chunk-unload chunk))))
 
 (defun chunk-unload (key)
+  ;;FIXME::Use a MRU cache instead.
   (let ((chunk (voxel-chunks:obtain-chunk-from-chunk-key key nil)))
     (cond
       (chunk
@@ -339,19 +266,16 @@
 	 (not (voxel-chunks:empty-chunk-p chunk))
 	 ;;if it wasn't modified, no point in saving
 	 (voxel-chunks:chunk-modified chunk))
-    (let* ((worth-saving (voxel-chunks:chunk-worth-saving chunk))
-	   (key (voxel-chunks:chunk-key chunk))
+    (let* ((key (voxel-chunks:chunk-key chunk))
 	   ;;[FIXME]have multiple unique-task hashes?
 	   (job-key (cons :save-chunk key)))
       ;;save the chunk first?
       (sucle-mp:submit-unique-task
 	  job-key
 	  ((lambda ()
-	     (cond
-	       ;;write the chunk to disk if its worth saving
-	       (worth-saving (savechunk chunk key))
-	       ;;otherwise, if there is a preexisting file, destroy it
-	       (t (crud:crud-delete (chunk-coordinate-to-filename key)))))
+	     ;;write the chunk to disk if its worth saving
+	     ;;otherwise, if there is a preexisting file, destroy it
+	     (vocs::savechunk key))
 	   :data job-key
 	   :callback (lambda (job-task)
 		       (declare (ignorable job-task))
@@ -372,108 +296,27 @@
 	    (when (voxel-chunks::chunk-in-cache-p new-key)
 	      (dirty-push new-key))))))
 
-(defparameter *load-jobs* 0)
-
 (defun space-for-new-chunk-p (key)
   (voxel-chunks:empty-chunk-p (voxel-chunks::get-chunk-in-cache key)))
 
 (defun chunk-load (key)
-  ;;[FIXME]using chunk-coordinate-to-filename before
-  ;;running loadchunk is a bad api?
-  #+nil
-  (let ((load-type (loadchunk path (chunk-coordinate-to-filename key))))
-    (unless (eq load-type :empty) ;;[FIXME]better api?
-      (dirty-push-around key)))
-  ;;(print 34243)
-  (let ((job-key (cons :chunk-load key)))
-    (sucle-mp:submit-unique-task
-     job-key
-     ((lambda ()
-	(setf (cdr (sucle-mp:job-task-data
-		    sucle-mp:*current-job-task*))
-	      (cond ((not (space-for-new-chunk-p key))
-		     ;;(format t "~%WTF? ~a chunk already exists" key)
-		     :skipping)
-		    (t (loadchunk key)))))
-      :data (cons job-key "")
-      :callback (lambda (job-task)
-		  (declare (ignorable job-task))
-		  (cond
-		    ((eq :complete (sucle-mp::job-task-status job-task))
-		     (let* ((job-key (car (sucle-mp:job-task-data job-task)))
-			    (key (cdr job-key))
-			    (chunk
-			     (cdr (sucle-mp:job-task-data job-task))))
-		       ;;[FIXME]? locking is not necessary if the callback runs in the
-		       ;;same thread as the code which changes the chunk-array and *chunks* ?
-		       (cond
-			 ((eq chunk :skipping)
-			  ;;(format t "~%chunk skipped loading, ")
-			  )
-			 (t
-			  (cond
-			    ((and (not (voxel-chunks:empty-chunk-p chunk))
-				  (not (space-for-new-chunk-p key)))
-			     (format t "~%OMG? ~a chunk already exists" key))
-			    (t 
-			     (progn
-			       (voxel-chunks::set-chunk-in-cache key chunk))
-			     ;;(format t "~%making chunk ~a" key)
-
-			     ;;(voxel-chunks:set-chunk-at key new-chunk)
-
-			     (cond
-			       ((voxel-chunks:empty-chunk-p chunk)
-				;;(background-generation key)
-				)
-			       (t (dirty-push-around key)))))))))
-		    (t (print "job task bad")))
-		  (sucle-mp:remove-unique-task-key job-key)
-		  (decf *load-jobs*)))
-     (incf *load-jobs*))))
+  (let ((chunk (vocs::loadchunk key)))
+    (when (not (voxel-chunks:empty-chunk-p chunk))
+      (dirty-push-around key))
+    #+nil ;;FIXME terrain generation code?
+    (cond
+      #+nil
+      ;;(format t "~%making chunk ~a" key)
+      ((voxel-chunks:empty-chunk-p chunk)
+       ;;(background-generation key)
+       )
+      )))
 
 ;;[FIXME]thread-safety for:
 ;;voxel-chunks:*chunks*
 ;;voxel-chunks:*chunk-array*
 ;;*dirty-chunks*
 ;;*achannel*
-
-;;#:msave
-;;#:save-world
-
 (defun save-all-chunks ()
   (loop :for chunk :being :the :hash-values :of  voxel-chunks:*chunks* :do
      (chunk-save chunk)))
-
-#+nil
-(defun mload (&optional (path *world-directory*))
-  (let ((newpath (world-path path)))
-    (load-world newpath)))
-;;;;<CHANGE-WORLD?>
-;;;;************************************************************************;;;;
-
-
-;; (defun make-chunk-cache ()
-;;   (make-hash-table :test 'equal))
-;; (defparameter *chunk-cache* (make-chunk-cache))
-;; (defun set-chunk-in-cache (key chunk &optional (cache *chunk-cache*))
-;;   (setf (gethash key cache) chunk))
-;; (defun get-chunk-in-cache (key &optional (cache *chunk-cache*))
-;;   ;;return (values chunk exist-p)
-;;   (gethash key cache))
-;; (defun delete-chunk-in-cache (key &optional (cache *chunk-cache*))
-;;   (remhash key cache))
-;; (defun chunk-in-cache-p (key &optional (cache *chunk-cache*))
-;;   (multiple-value-bind (value existsp) (get-chunk-in-cache key cache)
-;;     (declare (ignorable value))
-;;     existsp))
-
-;; (defun get-chunk-cache (key &optional (cache *chunk-cache*))
-;;   ;;Get the chunk from the cache if it exists, otherwise load it.
-;;   ;;If its currently being loaded, then block.
-;;   (multiple-value-bind (chunk existp) (get-chunk-in-cache cache)
-;;     (cond
-;;       ;;when it exists, return it
-;;       (existp chunk)
-;;       ;;otherwise, block until it loads
-;;       (t (set-chunk-in-cache key (loadchunk key) cache)))))
