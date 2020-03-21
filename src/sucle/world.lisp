@@ -179,26 +179,15 @@
      (max (abs dx)
 	  (abs dy)
 	  (abs dz)))))
-(defun get-unloadable-chunks (chunk-cursor-center)
-  ;;[FIXME]optimize?
-  ;;FIXME::use a MRU cache instead.
-  (multiple-value-bind (cx cy cz) (values (vocs::cursor-x chunk-cursor-center)
-					  (vocs::cursor-y chunk-cursor-center)
-					  (vocs::cursor-z chunk-cursor-center))
-    (let ((difference (- (- (voxel-chunks::total-chunks-in-cache)
-			    *maximum-allowed-chunks*)
-			 *threshold*)))
-      (when (plusp difference)
-	(let ((distance-sorted-chunks	     
-	       (sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'> :key
-		     (lambda (key)
-		       (unsquared-chunk-distance key cx cy cz)))))
-	  (safe-subseq distance-sorted-chunks difference))))))
 
 (defun load-chunks-around (chunk-cursor)
+  ;;#+nil ;;FIXME terrain generation code?
   (mapc (lambda (key)
-	  (chunk-load key))
+	  (let ((chunk (vocs::loadchunk key)))
+	    (when (not (voxel-chunks:empty-chunk-p chunk))
+	      (dirty-push-around key))))
 	(get-chunks-to-load chunk-cursor)))
+
 (defun get-chunks-to-load (chunk-cursor-center)
   (multiple-value-bind (cx cy cz) (values (vocs::cursor-x chunk-cursor-center)
 					  (vocs::cursor-y chunk-cursor-center)
@@ -236,6 +225,33 @@
 			     (add-chunk chunk-x chunk-y chunk-z))))))
       acc)))
 
+
+(defun dirty-push-around (key)
+  ;;[FIXME]although this is correct, it
+  ;;lags behind player movement?
+  (voxel-chunks:with-chunk-key-coordinates
+   (x y z) key
+   (dobox ((x0 (1- x) (+ x 2))
+	   (y0 (1- y) (+ y 2))
+	   (z0 (1- z) (+ z 2)))
+	  (let ((new-key (voxel-chunks:create-chunk-key x0 y0 z0)))
+	    (when (voxel-chunks::chunk-in-cache-p new-key)
+	      (dirty-push new-key))))))
+
+(defun space-for-new-chunk-p (key)
+  (voxel-chunks:empty-chunk-p (voxel-chunks::get-chunk-in-cache key)))
+
+;;[FIXME]thread-safety for:
+;;voxel-chunks:*chunks*
+;;voxel-chunks:*chunk-array*
+;;*dirty-chunks*
+;;*achannel*
+(defun save-all-chunks ()
+  (loop :for chunk :being :the :hash-values :of  voxel-chunks:*chunks* :do
+     (chunk-save chunk)))
+
+
+#+nil
 (defun unload-extra-chunks (chunk-cursor)
   (let (to-unload)
     ;;[FIXME]get a timer library? metering?
@@ -246,6 +262,24 @@
     (dolist (chunk to-unload)
       (chunk-unload chunk))))
 
+#+nil
+(defun get-unloadable-chunks (chunk-cursor-center)
+  ;;[FIXME]optimize?
+  ;;FIXME::use a MRU cache instead.
+  (multiple-value-bind (cx cy cz) (values (vocs::cursor-x chunk-cursor-center)
+					  (vocs::cursor-y chunk-cursor-center)
+					  (vocs::cursor-z chunk-cursor-center))
+    (let ((difference (- (- (voxel-chunks::total-chunks-in-cache)
+			    *maximum-allowed-chunks*)
+			 *threshold*)))
+      (when (plusp difference)
+	(let ((distance-sorted-chunks	     
+	       (sort (alexandria:hash-table-keys voxel-chunks:*chunks*) #'> :key
+		     (lambda (key)
+		       (unsquared-chunk-distance key cx cy cz)))))
+	  (safe-subseq distance-sorted-chunks difference))))))
+
+#+nil
 (defun chunk-unload (key)
   ;;FIXME::Use a MRU cache instead.
   (let ((chunk (voxel-chunks:obtain-chunk-from-chunk-key key nil)))
@@ -257,6 +291,9 @@
        (voxel-chunks::delete-chunk-in-cache key)
        t)
       (t nil))))
+
+
+;;FIXME:loading chunks should just be pre-warming the cache.
 
 (defparameter *persist* t)
 (defun chunk-save (chunk)
@@ -283,40 +320,3 @@
 			(sucle-mp:job-task-data job-task)))
 	   ;;this task, saving and loading, must not be interrupted
 	   :unkillable t)))))
-
-(defun dirty-push-around (key)
-  ;;[FIXME]although this is correct, it
-  ;;lags behind player movement?
-  (voxel-chunks:with-chunk-key-coordinates
-   (x y z) key
-   (dobox ((x0 (1- x) (+ x 2))
-	   (y0 (1- y) (+ y 2))
-	   (z0 (1- z) (+ z 2)))
-	  (let ((new-key (voxel-chunks:create-chunk-key x0 y0 z0)))
-	    (when (voxel-chunks::chunk-in-cache-p new-key)
-	      (dirty-push new-key))))))
-
-(defun space-for-new-chunk-p (key)
-  (voxel-chunks:empty-chunk-p (voxel-chunks::get-chunk-in-cache key)))
-
-(defun chunk-load (key)
-  (let ((chunk (vocs::loadchunk key)))
-    (when (not (voxel-chunks:empty-chunk-p chunk))
-      (dirty-push-around key))
-    #+nil ;;FIXME terrain generation code?
-    (cond
-      #+nil
-      ;;(format t "~%making chunk ~a" key)
-      ((voxel-chunks:empty-chunk-p chunk)
-       ;;(background-generation key)
-       )
-      )))
-
-;;[FIXME]thread-safety for:
-;;voxel-chunks:*chunks*
-;;voxel-chunks:*chunk-array*
-;;*dirty-chunks*
-;;*achannel*
-(defun save-all-chunks ()
-  (loop :for chunk :being :the :hash-values :of  voxel-chunks:*chunks* :do
-     (chunk-save chunk)))

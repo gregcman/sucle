@@ -43,18 +43,27 @@
    #:+total-size+))
 (in-package #:voxel-chunks)
 
+;;lets make it 16, and not care about the other parameters for now.
+;;each chunk is a 16x16x16 cube then.
+(defconstant +size+ 16)
+(defconstant +total-size+ (expt +size+ 3))
+
 ;;;;************************************************************************;;;;
 ;;Chunk cache
 ;;equal is used because the key is a list of the chunk coordinates
 ;;When updating the cache with 'set' or 'delete' invalidate the
 ;;chunks that are being eviscerated.
 ;;FIXME: add locks to chunks?
+;;FIXME::*true-bit-size* and (chunks-total-bits) don't line up.
+(defparameter *true-bit-size* 0)
 (defun make-chunk-cache ()
   (make-hash-table :test 'equal))
 (defparameter *chunks* (make-chunk-cache))
 (defun set-chunk-in-cache (key chunk &optional (cache *chunks*))
   (kill-old-chunk key)
-  (setf (gethash key cache) chunk))
+  ;;(incf *true-bit-size* (array-truesize (chunk-data chunk)))
+  (setf (gethash key cache) chunk)
+  (prune-cache))
 (defun get-chunk-in-cache (key &optional (cache *chunks*))
   ;;return (values chunk exist-p)
   (gethash key cache))
@@ -67,6 +76,7 @@
       ;;FIXME:add a logger
       ;;(format t "~%Eviscerating old chunk at: ~a" key)
       (kill-chunk old-chunk)
+      ;;(decf *true-bit-size* (array-truesize (chunk-data old-chunk)))
       (values t))))
 (defun chunk-in-cache-p (key &optional (cache *chunks*))
   (multiple-value-bind (value existsp) (get-chunk-in-cache key cache)
@@ -74,12 +84,37 @@
     existsp))
 (defun total-chunks-in-cache (&optional (cache *chunks*))
   (hash-table-count cache))
+
+(defparameter *persist* t)
+#+nil
+(/ (* 300 (expt 1024 2))
+   (* +total-size+ 8))
+(defparameter *cache-limit* (* (expt 16 3)))
+(defparameter *cache-reduction-number* (* *cache-limit* 0.2))
+(defparameter *prune-lock* (bt:make-lock))
+(defun prune-cache (&optional (limit *cache-limit*) (reduction *cache-reduction-number*))
+  (bt:with-lock-held (*prune-lock*)
+    (when (< limit (total-chunks-in-cache))
+      (let ((chunks (sort (alexandria:hash-table-alist *chunks*)
+			  '<
+			  :key (lambda (x)
+				 (chunk-last-access (cdr x))))))
+	;;(format t "~%Pruning ~a chunks" reduction)
+	(loop :repeat reduction
+	   :for pair :in chunks :do
+	   (destructuring-bind (key . chunk) pair
+	     (when (and
+		    *persist*
+		    ;;when the chunk is not obviously empty
+		    (not (voxel-chunks:empty-chunk-p chunk))
+		    ;;if it wasn't modified, no point in saving
+		    (voxel-chunks:chunk-modified chunk))
+	       (savechunk key))
+	     (delete-chunk-in-cache key))))
+      (setf *true-bit-size* (chunks-total-bits))
+      ;;(format t "~%~a" *true-bit-size*)
+      )))
 ;;;;************************************************************************;;;;
-
-
-;;lets make it 16, and not care about the other parameters for now.
-(defconstant +size+ 16)
-(defconstant +total-size+ (expt +size+ 3))
 
 ;;[FIXME]chunk-coord and block-coord being fixnums is not theoretically correct,
 ;;but its still a lot of space?
@@ -90,7 +125,7 @@
   ;;[FIXME]? combine with obtain-chunk-from-block-coordinates? 
   (declare (type block-coord x y z))
   (values (floor x +size+) (floor y +size+) (floor z +size+)))
-(deftype chunk-data () `(simple-array t (,+total-size+)))
+(deftype chunk-data () `(simple-array * (,+total-size+)))
 ;;The inner coord
 (deftype inner-flat () `(integer 0 ,+total-size+))
 ;;The remainder after flooring by the chunk size
@@ -139,7 +174,8 @@
 		:type :empty))
 (defun reset-empty-chunk-value (&optional (empty-space nil))
   (setf *empty-space* empty-space)
-  (setf *empty-chunk-data* (make-chunk-data :initial-element *empty-space*))
+  (setf *empty-chunk-data* (really-downgrade-array
+			    (make-chunk-data :initial-element *empty-space*)))
   ;;(setf *empty-chunk* (create-empty-chunk))
   )
 
@@ -158,24 +194,31 @@
    
    ;;Invalidate a chunk. If used by the main cache to invalidate
    ;;chunks in chunk-array cursors.
-   (alive? t)))
+   (alive? t)
+
+   (last-read 0)
+   (last-modified 0)
+   (last-access 0)))
 
 (defun make-chunk-data (&rest rest &key (initial-element *empty-space*))
   (apply 'make-array
 	 +total-size+
 	 :initial-element initial-element
+	 :element-type (storage-type initial-element)
 	 rest))
 
 ;;;;
 (defun reference-inside-chunk (chunk rx ry rz)
   (declare (type inner-3d rx ry rz))
-  (row-major-aref (the chunk-data (chunk-data chunk))
-		  (chunk-ref rx ry rz)))
+  (let ((data (chunk-data chunk)))
+    ;;(declare (type chunk-data data))
+    (row-major-aref data (chunk-ref rx ry rz))))
 (defun (setf reference-inside-chunk) (value chunk rx ry rz)
   (declare (type inner-3d rx ry rz))
-  (setf (row-major-aref (the chunk-data (chunk-data chunk))
-			(chunk-ref rx ry rz))
-	value))
+  (let ((data (chunk-data chunk)))
+    ;;(declare (type chunk-data data))
+    (setf (row-major-aref data (chunk-ref rx ry rz))
+	  value)))
 ;;;;
 
 (defun coerce-empty-chunk-to-regular-chunk (chunk)
@@ -194,10 +237,6 @@
 		      (:normal (or data (make-chunk-data)))
 		      (:empty *empty-chunk-data*))
 	      :type type))
-(reset-empty-chunk-value)
-(defun make-chunk-from-key-and-data (key data)
-  (with-chunk-key-coordinates (cx cy cz) key
-    (make-chunk :x cx :y cy :z cz :key key :data data :type :normal)))
 
 ;;;;;;;;;;;;;
 
@@ -324,12 +363,18 @@
   (multiple-value-call 'obtain-chunk (bcoord->ccoord x y z) force-load))
 ;;;
 ;;;;
+(defparameter *time* 0)
+;;FIXME::these functions increment '*time*' in a way that
+;;does not lock. Unsafe? Does a small error really matter?
 (defun getobj (x y z)
   (declare (type block-coord x y z))
-  (multiple-value-bind (rx ry rz) (inner x y z)
-    (reference-inside-chunk
-     (obtain-chunk-from-block-coordinates x y z t)
-     rx ry rz)))
+  (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
+    (let ((time *time*))
+      (incf *time*)
+      (setf (chunk-last-read chunk) time
+	    (chunk-last-access chunk) time))
+    (multiple-value-bind (rx ry rz) (inner x y z)
+      (reference-inside-chunk chunk rx ry rz))))
 (defun (setf getobj) (value x y z)
   (declare (type block-coord x y z))
   (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
@@ -338,9 +383,21 @@
     ;;coerce it to a regular chunk
     (coerce-empty-chunk-to-regular-chunk chunk)
     (setf (chunk-modified chunk) t)
+    (let ((time *time*))
+      (incf *time*)
+      (setf (chunk-last-modified chunk) time
+	    (chunk-last-access chunk) time))
+    (let ((array (chunk-data chunk)))
+      (when (not (typep value (array-element-type array)))
+	(let* (;;(old-size (array-truesize array))
+	       (new-array (really-downgrade-array array value))
+	       ;;(new-size (array-truesize new-array))
+	       )
+	  ;;(incf *true-bit-size* (- new-size old-size))
+	  (setf (chunk-data chunk) new-array))))
     (multiple-value-bind (rx ry rz) (inner x y z)
       (setf (reference-inside-chunk chunk rx ry rz) value))))
-    ;;[FIXME]setobj is provided for backwards compatibility?
+;;[FIXME]setobj is provided for backwards compatibility?
 ;;;;
 (defun setobj (x y z new)
   (setf (getobj x y z) new))
@@ -351,6 +408,7 @@
   (create-chunk-key x y z))
 ;;[FIXME]clearworld does not handle loading and stuff?
 (defun clearworld ()
+  (setf *true-bit-size* 0)
   (setf *chunks* (make-chunk-cache)
 	*chunk-array* (create-chunk-array))
   (values))
@@ -437,10 +495,16 @@
 ;;Read from the database and put the chunk into the cache.
 (defun loadchunk (key)
   (bt:with-lock-held (*chunk-io-lock*)
-    (let ((chunk (%loadchunk key)))
-      (voxel-chunks::set-chunk-in-cache key chunk)
-      chunk)))
+    (or
+     ;;Check once again that it really does not exist yet.
+     (get-chunk-in-cache key)
+     (let ((chunk (%loadchunk key)))
+       (voxel-chunks::set-chunk-in-cache key chunk)
+       chunk))))
 
+(defun make-chunk-from-key-and-data (key data)
+  (with-chunk-key-coordinates (cx cy cz) key
+    (make-chunk :x cx :y cy :z cz :key key :data data :type :normal)))
 ;;Merely load a chunk from the database, don't put in in the cache
 (defun %loadchunk (chunk-coordinates)
   (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
@@ -450,7 +514,9 @@
 		       nil
 		       "offending chunk ~a"
 		       chunk-coordinates)
-	       (voxel-chunks:make-chunk-from-key-and-data chunk-coordinates data))))
+	       (voxel-chunks:make-chunk-from-key-and-data
+		chunk-coordinates
+		(really-downgrade-array chunk-data)))))
       (typecase data
 	(list
 	 (ecase (length data)
@@ -461,6 +527,7 @@
 
 	   (3 ;;[FIXME]does this even work?
 	    (error "world format invalid")
+	    ;;FIXME: use defmethod to extend the interface?
 	    #+nil
 	    (destructuring-bind (blocks light sky) data
 	      (let ((len (length blocks)))
@@ -494,3 +561,148 @@
     position-list))
 
 ;;;;</PERSIST-WORLD>
+
+
+(defun downgrade-array (&rest items)
+  (block out
+    (let ((min 0)
+	  (max 0))
+      (flet ((check-thing (item)
+	       (typecase item
+		 (fixnum
+		  (when (< max item)
+		    (setf max item))
+		  (when (< item min)
+		    (setf min item)))
+		 (otherwise (return-from out t)))))
+	(dolist (item items)
+	  (typecase item
+	    (array (dotimes (i (array-total-size item))
+		     (let ((item (row-major-aref item i)))
+		       (check-thing item))))
+	    ((and (not null) sequence) (map nil #'check-thing item))
+	    (t (check-thing item)))))
+      (upgraded-array-element-type (num-type min max)))))
+(defun typetest (item test)
+  (let ((result (typep item test)))
+    (if result
+	(format t "~% ~a is ~a" item test)
+	(format t "~% ~a is not ~a" item test))))
+(defun test ()
+  (typetest 1 '(signed-byte 1))
+  (typetest -1 '(signed-byte 1))
+  (typetest 256 '(signed-byte 8))
+  (typetest -256 '(signed-byte 8))
+  (typetest 127 '(signed-byte 8))
+  (typetest -127 '(signed-byte 8))
+  (typetest 128 '(signed-byte 8))
+  (typetest -128 '(signed-byte 8)))
+
+;;From the CLHS
+;;(integer -(2^(s-1)) (2^(s-1))-1) -> signed byte
+;;(integer 0 n) for n=(2^s)-1 -> unsigned byte
+(defun num-type (min max)
+  (cond ((zerop min)
+	 ;;unsigned-byte
+	 `(unsigned-byte ,(1+ (upgrade max))))
+	(t `(signed-byte ,(max (up2 min)
+			       (+ 2 (upgrade max)))))))
+
+(defun storage-type (item)
+  (typecase item
+    (fixnum
+     (upgraded-array-element-type
+      (if (plusp item)
+	  (num-type 0 item)
+	  (num-type item 0))))
+    (otherwise t)))
+
+(defun upgrade (x)
+  (if (zerop x)
+      0
+      (floor (log x 2))))
+(defun up2 (x)
+  (+ 2 (upgrade (1- (- x)))))
+
+
+(defun test-at-random (&optional (min (- (random most-positive-fixnum)))
+			 (max (random most-positive-fixnum)))
+  (let ((type (num-type min max)))
+    (typetest min type)
+    (typetest max type)))
+
+(defun test-again (&optional (s (random 64)))
+  (let ((foo (expt 2 (1- s))))
+    (test-at-random (- foo) (1+ foo))))
+
+
+(defun test0 ()
+  (print (downgrade-array #(0 1 2 3 4 5)))
+  (print (downgrade-array #(0 1 2 3 4 5 34524352345)))
+  (print (downgrade-array #(-345345 0 1 2 3 4 5))))
+
+(defun really-downgrade-array (array &rest items)
+  (let* ((type (apply 'downgrade-array array items))
+	 (new-array
+	  (make-array (array-dimensions array)
+		      :element-type type)))
+    (dotimes (i (array-total-size array))
+      (setf (aref new-array i)
+	    (aref array i)))
+    (values new-array
+	    type)))
+
+(defun test1 ()
+  (let ((*print-readably* t))
+    (print
+     (list
+      (really-downgrade-array #(1 1 0 0 0 1 0 1 0))
+      (really-downgrade-array #(1 1 0 0 0 1 0 -1 0))
+      (really-downgrade-array #(1 1 0 0 0 1 0 -345345 0))))))
+
+;;;;;
+(reset-empty-chunk-value)
+
+(defun types-of-chunks-that-exist ()
+  (remove-duplicates
+   (mapcar (lambda (c)
+	     (type-of
+	      (chunk-data c)))
+	   (alexandria:hash-table-values *chunks*))
+   :test 'equal))
+
+;;Return the size of the type in bits
+(defun typesize (type)
+  (cond ((and (listp type)
+	      (= 2 (length type))
+	      (eq 'unsigned-byte (first type)))
+	 (roundup-2 (second type)))
+	((and (listp type)
+	      (= 2 (length type))
+	      (eq 'signed-byte (first type)))
+	 (roundup-2 (second type)))
+	((eq type 'bit)
+	 1)
+	(t
+	 #+x86-64
+	 64
+	 #+x86
+	 32)))
+
+(defun array-truesize (array)
+  (* (typesize (array-element-type array))
+     (array-total-size array)))
+
+(defun roundup-2 (n)
+  (ash 1 (ceiling (log n 2))))
+
+(defun test5 ()
+  (array-truesize (really-downgrade-array #(10 1202 012 012 0 t))))
+
+(defun chunks-total-bits (&optional (divider (* 1.0 (* 8 (expt 1024 2)))))
+  (/ (reduce '+
+	     (mapcar (lambda (c)
+		       (array-truesize
+			(chunk-data c)))
+		     (alexandria:hash-table-values *chunks*)))
+     divider))
