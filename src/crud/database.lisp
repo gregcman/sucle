@@ -26,13 +26,18 @@
    (new-connection)))
 (defun release-handle (handle)
   (lparallel.queue:push-queue handle *handles*))
+;;FIXME::detect whether *db* is already bound
 (defmacro with-open-database2 (&body body)
   (alexandria:with-gensyms (handle)
-    `(let* ((,handle (get-handle))
-	    (*db* ,handle))
-       (unwind-protect (locally
-			   ,@body)
-	 (release-handle ,handle)))))
+    `(flet ((fun ()
+	      ,@body))
+       (cond
+	 ((boundp '*db*)
+	  (fun))
+	 (t (let* ((,handle (get-handle))
+		   (*db* ,handle))
+	      (unwind-protect (fun)
+		(release-handle ,handle))))))))
 (defparameter *write-write-lock* (bt:make-lock))
 (defparameter *write-locks* (make-hash-table))
 (defun get-write-lock (db)

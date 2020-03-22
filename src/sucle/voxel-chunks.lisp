@@ -104,17 +104,19 @@
 	  (let ((amount-pruning (- total (- limit reduction))))
 	    ;;(print total)
 	    ;;(format t "~%Pruning ~a chunks" amount-pruning)
-	    (loop :repeat amount-pruning
-	       :for pair :in chunks :do
-	       (destructuring-bind (key . chunk) pair
-		 (when (and
-			*persist*
-			;;when the chunk is not obviously empty
-			(not (empty-chunk-p chunk))
-			;;if it wasn't modified, no point in saving
-			(chunk-modified chunk))
-		   (savechunk key))
-		 (delete-chunk-in-cache key)))))
+	    (flet ((thing ()
+		     (loop :repeat amount-pruning
+			:for pair :in chunks :do
+			(destructuring-bind (key . chunk) pair
+			  (when (and
+				 *persist*
+				 ;;when the chunk is not obviously empty
+				 (not (empty-chunk-p chunk))
+				 ;;if it wasn't modified, no point in saving
+				 (chunk-modified chunk))
+			    (savechunk key))
+			  (delete-chunk-in-cache key)))))
+	      (crud:call-with-transaction #'thing))))
 	(setf *true-bit-size* (chunks-total-bits))
 	;;(format t "~%~a" *true-bit-size*)
 	))))
@@ -337,6 +339,7 @@
 ;;if the coordinates are correct, return a chunk, otherwise return nil
 (defun get-chunk-from-ca
     (cx cy cz  &optional (force-load nil) (chunk-array *chunk-array*) (error-p t))
+  (declare (ignorable error-p))
   (declare (type chunk-coord cx cy cz))
   (block return 
     (%get-chunk-from-ca (nx chunk-array-x-min cx)
@@ -366,6 +369,8 @@
 			 (push maybe-chunk (chunk-array-fresh chunk-array)))
 		       (setf (aref data nx ny nz) maybe-chunk))
 		     (return-from return (values maybe-chunk valid-p)))))))))
+    ;;FIXME::an error should occur sometimes?
+    #+nil
     (when error-p
       (error "chunk not within chunk array!!!!!"))))
 
@@ -402,6 +407,9 @@
 (defun getobj (x y z)
   (declare (type block-coord x y z))
   (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
+    ;;FIXME:This just returns the 'empty' value
+    (unless chunk
+      (return-from getobj *empty-space*))
     (let ((time *time*))
       (incf *time*)
       (setf (chunk-last-read chunk) time
@@ -806,10 +814,12 @@
 
 (defun load-chunks-around (chunk-cursor)
   (let ((to-load (get-chunks-to-load chunk-cursor)))
-    (mapc (lambda (key)
-	    (with-chunk-key-coordinates (x y z) key
-	      (let ((chunk (get-chunk-from-ca x y z t)))
-		(declare (ignorable chunk))
-		key)))
-	  to-load)
+    (flet ((fun ()
+	     (mapc (lambda (key)
+		     (with-chunk-key-coordinates (x y z) key
+		       (let ((chunk (get-chunk-from-ca x y z t)))
+			 (declare (ignorable chunk))
+			 key)))
+		   to-load)))
+      (crud:call-with-transaction #'fun))
     to-load))

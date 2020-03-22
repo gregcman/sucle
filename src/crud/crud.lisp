@@ -8,7 +8,9 @@
 
    #:use-crud-from-path
    #:detect-crud-from-path
-   #:make-crud-from-path))
+   #:make-crud-from-path
+
+   #:call-with-transaction))
 (in-package #:crud)
 ;;CRUD implementation for map from lisp_obj -> lisp_obj
 ;;create, read, update, delete
@@ -159,3 +161,16 @@ LCBiLCBjLCBkLCBlLCBmLCBnLCBoLCBpLCBqLCBrLCBsLCBtLCBuLCBvLCBwLCBxLCByLCBzLg=="
   (make-instance (detect-crud-from-path path) :path path))
 (defun use-crud-from-path (path)
   (setf *implementation* (make-crud-from-path path)))
+
+(defvar *transacation-happening*)
+(defun call-with-transaction (fun)
+  (flet ((thing () (funcall fun)))
+    (cond ((typep crud::*implementation* 'crud::crud-sqlite)
+	   ;;FIXME::this references sqlite?
+	   (database::with-open-database2
+	     (if (boundp '*transacation-happening*)
+		 (thing)
+		 (let ((*transacation-happening* t))
+		   (sqlite:with-transaction database::*db*
+		     (thing))))))
+	  (t (thing)))))

@@ -80,7 +80,7 @@
   (let ((miny
 	 (aabbcc:aabb-miny
 	  (entity-aabb *ent*))))
-    (with-vec (x y z) ((player-position *ent*))
+    (with-vec (x y z) ((entity-position *ent*))
       (values (floor x)
 	      (1- (floor (+ miny y)))
 	      (floor z)))))
@@ -112,7 +112,7 @@
 	(countw))))
   count)
 
-;;
+(setf sucle::*5-fist* 'box-at)
 
 (defun player-feet-at (&rest rest)
   (declare (ignorable rest))
@@ -122,6 +122,34 @@
 	    (z (+ z -1) (+ z 2)))
 	   (setf (b@ x y z) (nick :grass)))))
 
+(defparameter *size* 4)
+(defun box-at (&optional
+		 (x *x*)
+		 (y *y*)
+		 (z *z*))
+  (dobox ((x (+ x -1) (+ x 2))
+	  (z (+ z -1) (+ z 2)))
+	 (setf (b@ x y z) (nick :grass))))
+
+(setf sucle::*5-fist* 'box-tower2345)
+(defun box-tower2345 (&optional
+			(px *x*)
+			(y *y*)
+			(pz *z*)
+			&aux (shift 2))
+  (dotimes (dy 50)
+    (box-at px (+ dy y) pz)
+    (incf px (rir shift))
+    (incf pz (rir shift))))
+
+(defun random-in-range (n)
+  (- (random (+ n n 1)) n))
+(defun rir (n)
+  (random-in-range n))
+
+(setf sucle::*5-fist* 'test456)
+(defun test456 ()
+  (mvc 'line (spread (entity-position *ent*))))
 (defun line (px py pz &optional
 			(vx *x*)
 			(vy *y*)
@@ -172,6 +200,65 @@
 	 minfactor)))
 (defun floatify2 (&rest values)
   (apply 'values (mapcar 'floatify values)))
+
+(defun rotate-random (vec &optional (n 4.0))
+  (let* ((v (rotate-normal))
+	 (c (nsb-cga:cross-product v vec)))
+    (sb-cga:transform-point
+     vec
+     (nsb-cga:rotate-around c (floatify (/ pi n))))))
+
+(setf *5-fist* 'tree3)
+(defun tree3 (&optional (x *x*) (y *y*) (z *z*) (minfactor 6.0))
+  (labels ((rec (place minfactor direction)
+	     (when (>= minfactor 0)
+	       (dotimes (x (+ 1 (random 2)))
+		 (let* ((random-direction (rotate-random direction 8.0))
+			;;Random direction scaled
+			(rds (nsb-cga:vec* random-direction
+					   (expt 1.4 minfactor))))
+		   (let ((new (sb-cga:vec+ place rds)))
+		     (multiple-value-call
+			 ;;(lambda (&rest rest) (print rest))
+			 'line
+		       (vec-values place)
+		       (vec-values new)
+		       (if (>= 4 minfactor)
+			   (nick :leaves)
+			   (nick :log))
+		       (create-aabb 0.1 ;;(* 0.1 minfactor)
+				    ))
+		     (rec new (1- minfactor) random-direction)))))))
+    (rec (multiple-value-call 'sb-cga:vec (floatify2 x y z))
+	 minfactor
+	 (nsb-cga:vec 0.0 1.0 0.0))))
+
+(setf *5-fist* 'tree35)
+(defun tree35 (&optional (x *x*) (y *y*) (z *z*) (minfactor 10.0))
+  (labels ((rec (place minfactor direction width)
+	     (when (>= minfactor 0)
+	       (let* ((random-direction direction ;;(rotate-random direction 800.0)
+			)
+		      ;;Random direction scaled
+		      (rds (nsb-cga:vec* random-direction 3.0
+					 #+nil
+					 (expt 1.4 minfactor))))
+		 (let ((new (sb-cga:vec+ place rds)))
+		   (multiple-value-call
+		       ;;(lambda (&rest rest) (print rest))
+		       'line
+		     (vec-values place)
+		     (vec-values new)
+		     (if (>= 4 minfactor)
+			 (nick :leaves)
+			 (nick :log))
+		     (create-aabb (/ width 5.0) 1.0 (/ width 5.0)))
+		   (rec new (1- minfactor) random-direction (max 0.1 (+ width (random-in-range 3)))))))))
+    (rec (multiple-value-call 'sb-cga:vec (floatify2 x y z))
+	 minfactor
+	 (nsb-cga:vec 0.0 1.0 0.0)
+	 10.0)))
+;;
 ;;
 
 (defun line-to-player-feet (&rest rest)
@@ -203,6 +290,8 @@
 		  (world:dirty-push-around key)
 		  (sucle-mp:remove-unique-task-key job-key))))))
 
+
+#+nil
 (utility:with-unsafe-speed
   (defun generate-for-new-chunk (key)
     (multiple-value-bind (x y z) (voxel-chunks:unhashfunc key)
@@ -226,6 +315,44 @@
 					 (1 0))
 				       0))))))))
 
+(defun generate-for-new-chunk (key)
+    (multiple-value-bind (x y z) (voxel-chunks:unhashfunc key)
+      (declare (type fixnum x y z))
+      ;;(print (list x y z))
+      (when (>= y -1)
+	(dobox ((x0 x (the fixnum (+ x 16)))
+		(y0 y (the fixnum (+ y 16)))
+		(z0 z (the fixnum (+ z 16))))
+	       (let ((block (let ((threshold (/ y 512.0)))
+			      (if (> threshold (black-tie:perlin-noise-single-float
+						(* x0 0.05)
+						(+ (* 1.0 (sin y0)) (* y0 0.05))
+						(* z0 0.05)))
+				  0
+				  1))))
+		 (setf (voxel-chunks::pen-get x0 y0 z0)
+		       (world:blockify block
+				       (case block
+					 (0 15)
+					 (1 0))
+				       0)))))))
+
+(defun generate-for-new-chunk (key)
+    (multiple-value-bind (x y z) (voxel-chunks:unhashfunc key)
+      (declare (type fixnum x y z))
+      ;;(print (list x y z))
+      (dobox ((x0 x (the fixnum (+ x 16)))
+	      (y0 y (the fixnum (+ y 16)))
+	      (z0 z (the fixnum (+ z 16))))
+	     (setf (voxel-chunks::pen-get x0 y0 z0)
+		   (world:blockify 4 15 0 )))))
+
+
+
+(defun test0 ()
+  (dotimes (x 100)
+    (dotimes (z 6)
+      (generate-for-new-chunk (vocs::create-chunk-key x z z)))))
 #+nil
 (defun 5fun (x y z)
   (multiple-value-bind (x y z) (get-chunk x y z)
@@ -326,3 +453,112 @@
     (camera-al-listener *camera*))
 ;;;;</AUDIO>
 ;;;;************************************************************************;;;;
+;;(defparameter *swinging* nil)
+#+nil
+(progn
+  (defparameter *big-fist-fun* (constantly nil))
+  (defparameter *middle-fist-fnc* 'place-block-at)
+  (defparameter *4-fist-fnc* 'tree)
+  (defparameter *5-fist-fnc*
+    '5fun))
+#+nil
+(progn
+  (setf *big-fist-fun* 'correct-earth)
+  (setf *middle-fist-fnc* 'player-feet-at)
+  (setf *middle-fist-fnc* 'line-to-player-feet))
+#+nil
+(progn
+  (when (window:button :key :pressed #\2) 
+    (toggle *dirtying2*))
+  (when (window:button :key :pressed #\1) 
+    (toggle *dirtying*))
+  (when (window:button :key :pressed #\3) 
+    (toggle *swinging*)))
+
+
+#+nil
+(defparameter *big-fist-reach* 32)
+#+nil
+(when (window:mouse-locked?)
+  (with-vec (px py pz) (pos)
+    (with-vec (vx vy vz) (look-vec)
+      (when *swinging*
+	(let ((u *big-fist-reach*))
+	  (aabbcc:aabb-collect-blocks
+	      (px py pz (* u vx) (* u vy) (* u vz)
+		  *big-fist-aabb*)
+	      (x y z contact)
+	    (declare (ignorable contact))
+	    (let ((*x* x)
+		  (*y* y)
+		  (*z* z))
+	      (funcall *big-fist-fun* x y z)))))))
+
+  )
+  #+nil
+  (progn
+    (when (window:button :mouse :pressed :middle)
+      (with-vec (a b c) ((fist-selected-block *fist*))
+	(let ((*x* a)
+	      (*y* b)
+	      (*z* c))
+	  (funcall *middle-fist-fnc* a b c))))
+    (when (window:button :mouse :pressed :4)
+      (with-vec (a b c) ((fist-selected-block *fist*))
+	(let ((*x* a)
+	      (*y* b)
+	      (*z* c))
+	  (funcall *4-fist-fnc* a b c))))
+    (when (window:button :mouse :pressed :5)
+      (with-vec (a b c) ((fist-selected-block *fist*))
+	(let ((*x* a)
+	      (*y* b)
+	      (*z* c))
+	  (funcall *5-fist-fnc* a b c)))))
+
+;;;; Changing the color of the sky based on which way we're looking.
+#+nil
+(defun deg-rad (deg)
+  (* deg (load-time-value (utility:floatify (/ pi 180)))))
+#+nil
+(defparameter *sun-direction* (unit-pitch-yaw (deg-rad 90) (deg-rad 0)))
+#+nil
+(defparameter *sky-color-foo* '(0.0 0.0 0.0))
+#+nil
+(defun neck-angle ()
+  (/ (+ 1.0
+	(-
+	 (sb-cga:dot-product
+	  (sb-cga:normalize (camera-matrix:camera-vec-forward *camera*))
+	  (sb-cga:normalize *sun-direction*))))
+     2.0))
+   #+nil
+   (mapcar 
+    (lambda (a0 a1)
+      (expt (alexandria:lerp (neck-angle) a0 a1) 0.5))
+    *sky-color2*
+    *sky-color*)
+;;;;
+#+nil
+(defun select-block-with-scroll-wheel ()
+  (setf *blockid*
+	(let ((seq
+	       #(3 13 12 24 1 2 18 17 20 5 89)))
+	  (elt seq (mod (round window:*scroll-y*)
+			(length seq))))))
+
+;;FIXME -> select-block-with-scroll-wheel should use events instead?
+#+nil
+(select-block-with-scroll-wheel)
+
+#+nil
+(defparameter *slab-aabb*
+  ;;;;slab
+  (create-aabb 1.0  #+nil 0.5 1.0 1.0 0.0 0.0 0.0))
+
+#+nil
+(defparameter *big-fist-aabb*
+  (create-aabb
+   ;;0.5
+   ;;1.5
+   8.0))

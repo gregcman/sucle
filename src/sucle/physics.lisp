@@ -136,182 +136,207 @@
 ;;falling friction is 0.98
 ;;0.6 * 0.91 is walking friction
 
+(defun set-doublejump (ent)
+  (when (and (not (entity-on-ground-p ent))
+	     (not (eq (entity-doublejump ent) :finished))
+	     (eq (entity-doublejump ent) :fresh))
+    (setf (entity-doublejump ent) :jump)))
+
+(defun entity-on-ground-p (entity)
+  (on-ground-p (entity-contact entity)))
+(defun on-ground-p (contact-state)
+  (logtest contact-state #b000100))
+
 (defmacro modify (fun a &rest rest)
   (once-only (a)
     `(,fun ,a ,a ,@rest)))
 (defparameter *ticks-per-second* 60.0)
 (defparameter *temp-vec* (nsb-cga:vec 0.0 0.0 0.0))
-(defun physics (entity yaw dir pointmass
-		noclip gravity fly
-		is-jumping
-		is-sneaking
-		contact-handler
-		world-collision-fun
-		aabb &optional
-		       (temp-vec *temp-vec*))
-  ;;[FIXME] This function is a total mess, a nightmare?
-  (declare (optimize (debug 3))
-	   (ignorable is-sneaking))
-  (step-pointmass pointmass)
-  (flet ((vec (x y z)
-	   (with-vec (a b c) (temp-vec symbol-macrolet)
-	     (setf a x
-		   b y
-		   c z))
-	   temp-vec))
-    (let ((vel (pointmass-velocity pointmass))
-	  (pos (pointmass-position pointmass))
-	  (mass (pointmass-mass pointmass))
-	  (force (pointmass-force pointmass)))
-      (fill force 0.0)
-      (let* ((contact-state (if noclip ;;(and noclip (not *dirtying*))
-				#b000000
-				(mvc contact-handler
-				     (spread pos)
-				     aabb)))
-	     (vel-length (nsb-cga:vec-length vel))
-	     (total-speed (* *ticks-per-second* vel-length))
-	     (old-onground (logtest (entity-contact entity) #b000100)))
+(defun run-physics-for-entity (entity &aux (temp-vec *temp-vec*))
+  (multiple-value-bind (entity yaw dir pointmass
+			       noclip gravity fly
+			       is-jumping
+			       is-sneaking
+			       contact-handler
+			       world-collision-fun
+			       aabb)
+      ;;[FIXME] This function is a total mess, a nightmare?
+      (values entity
+	      (necking-yaw (entity-neck entity))
+	      (entity-hips entity)
+	      (entity-particle entity)
+	      (not (entity-clip? entity))
+	      (entity-gravity? entity)
+	      (entity-fly? entity)
+	      (entity-jump? entity)
+	      (entity-sneak? entity)
+	      (entity-contact-fun entity)
+	      (entity-collision-fun entity)
+	      (entity-aabb entity))
+    (declare (optimize (debug 3))
+	     (ignorable is-sneaking))
+    (step-pointmass pointmass)
+    (flet ((vec (x y z)
+	     (with-vec (a b c) (temp-vec symbol-macrolet)
+	       (setf a x
+		     b y
+		     c z))
+	     temp-vec))
+      (let ((vel (pointmass-velocity pointmass))
+	    (pos (pointmass-position pointmass))
+	    (mass (pointmass-mass pointmass))
+	    (force (pointmass-force pointmass)))
+	(fill force 0.0)
+	(let* ((contact-state (if noclip ;;(and noclip (not *dirtying*))
+				  #b000000
+				  (mvc contact-handler
+				       (spread pos)
+				       aabb)))
+	       (vel-length (nsb-cga:vec-length vel))
+	       (total-speed (* *ticks-per-second* vel-length))
+	       (old-onground (entity-on-ground-p entity)))
 
-	;;wind resistance
-	;;#+nil
-	(let ((drag (* total-speed
-		       total-speed))
-	      (drag-scale (if fly
-			      0.005
-			      0.0003)))
-	  (nsb-cga:%vec* temp-vec			     
-			 vel
-			 (* *ticks-per-second* drag drag-scale))
-	  (modify nsb-cga:%vec-
-		  force
-		  temp-vec))
-	(let ((onground (logtest contact-state #b000100)))
-	  (let* ((walkspeed 4.317)
-		 (speed walkspeed)
-		 (step-power 4.0))
-	    ;;FIXME:add great friction when on ground and sneaking
-	    (cond
-	      (fly
-	       (*= speed 4.0))		
-	      (t
-	       (cond
-		 (onground
+	  ;;wind resistance
+	  ;;#+nil
+	  (let ((drag (* total-speed
+			 total-speed))
+		(drag-scale (if fly
+				0.005
+				0.0003)))
+	    (nsb-cga:%vec* temp-vec			     
+			   vel
+			   (* *ticks-per-second* drag drag-scale))
+	    (modify nsb-cga:%vec-
+		    force
+		    temp-vec))
+	  (let ((onground (on-ground-p contact-state)))
+	    (let* ((walkspeed 4.317)
+		   (speed walkspeed)
+		   (step-power 4.0))
+	      ;;FIXME:add great friction when on ground and sneaking
+	      (when is-sneaking
+		(*= speed 1.75))
+	      (block out
+		(when fly
+		  (*= speed 4.0)
+		  (return-from out))
+		(when onground
+		  (setf (entity-doublejump entity) :fresh)
 		  (when (and (not dir)
 			     old-onground)
-		    (nsb-cga:%vec* temp-vec vel *ticks-per-second*)
-		    (modify nsb-cga:%vec* temp-vec
-			    4.0
-			    )
-		    (modify nsb-cga:%vec-
-			    force
-			    temp-vec))
-		  (when is-jumping
-		    
-		    (let ((base 4.0))
-		      (modify nsb-cga:%vec+ force
-			      (vec
-			       0.0
-			       (* base *ticks-per-second*)
-			       0.0)))))
-		 (t (*= step-power 0.6
-			)))))
-	    (let* ((yvalue (if fly
-			       (if is-jumping
-				   speed
-				   (if is-sneaking
-				       (- speed )
-				       0.0))
-			       0.0))
-		   (target-vec
-		    (if dir
-			(let ((diraux (+ dir yaw)))
-			  (nsb-cga:vec
-			   (* speed (- (sin diraux)))
-			   yvalue
-			   (* speed (cos diraux))))
-			(prog1
-			    (nsb-cga:vec 0.0 yvalue 0.0)
-			  (setf step-power 1.0)))))
-	      (when (or dir fly)
-		(let ((velocity (nsb-cga:vec (* (aref vel 0) *ticks-per-second*)
-					     (if fly
-						 (* (aref vel 1) *ticks-per-second*)
-						 0.0)
-					     (* (aref vel 2) *ticks-per-second*))))
-		  (let* ((difference (nsb-cga:vec-
-				      target-vec
-				      velocity))
-			 (difference-length (nsb-cga:vec-length difference)))
-		    (unless (zerop difference-length)
-		      (let* ((dot (nsb-cga:dot-product difference target-vec)))
-			(let ((bump-direction			     
-			       (if (and (not onground)
-					(> 0.0 dot))
-				   ;;in the air?
-				   (let ((vec
-					  (nsb-cga:cross-product
-					   (nsb-cga:cross-product target-vec difference)
-					   target-vec)))
-				     (let ((value (nsb-cga:vec-length vec)))
-				       (if (zerop value)
-					   (progn
+		    (modify nsb-cga:%vec- force (nsb-cga:vec* vel (* 4.0 *ticks-per-second*)))))
+		(when (and is-jumping
+			   (or onground
+			       (when (eq (entity-doublejump entity) :jump)
+				 (setf (entity-doublejump entity) :finished)
+				 (when (minusp (aref vel 1))
+				   (setf (aref vel 1) 0.0))
+				 t)))
+		  (let ((base 4.0))
+		    (when is-sneaking
+		      (*= base 1.5))
+		    (modify nsb-cga:%vec+ force
+			    (vec 0.0 (* base *ticks-per-second*) 0.0))))
+		(return-from out)
+		;;(*= step-power 0.6)
+
+		)
+	      (let* ((yvalue (if fly
+				 (if is-jumping
+				     speed
+				     (if is-sneaking
+					 (- speed )
+					 0.0))
+				 0.0))
+		     (target-vec
+		      (if dir
+			  (let ((diraux (+ dir yaw)))
+			    (nsb-cga:vec
+			     (* speed (- (sin diraux)))
+			     yvalue
+			     (* speed (cos diraux))))
+			  (prog1
+			      (nsb-cga:vec 0.0 yvalue 0.0)
+			    (setf step-power 1.0)))))
+		(when (or dir fly)
+		  (let ((velocity (nsb-cga:vec (* (aref vel 0) *ticks-per-second*)
+					       (if fly
+						   (* (aref vel 1) *ticks-per-second*)
+						   0.0)
+					       (* (aref vel 2) *ticks-per-second*))))
+		    (let* ((difference (nsb-cga:vec-
+					target-vec
+					velocity))
+			   (difference-length (nsb-cga:vec-length difference)))
+		      (unless (zerop difference-length)
+			(let* ((dot (nsb-cga:dot-product difference target-vec)))
+			  (let ((bump-direction			     
+				 (if (and (not onground)
+					  (> 0.0 dot))
+				     ;;in the air?
+				     (let ((vec
+					    (nsb-cga:cross-product
+					     (nsb-cga:cross-product target-vec difference)
+					     target-vec)))
+				       (let ((value (nsb-cga:vec-length vec)))
+					 (if (zerop value)
+					     (progn
 					;	   (error "wtf")
-					     vec
-					     )
-					   (nsb-cga:vec/ vec value))))
-				   (nsb-cga:vec/ 
-				    difference
-				    difference-length))))
-			  (let ((step-force (* 2.0 difference-length)))
-			    (modify nsb-cga:%vec+ force
-				    (nsb-cga:vec* bump-direction
-						  (* step-power step-force)))))))))))))
-	;;to allow walking around block corners
-	;;we introduce a frame of gravity lag
-	(progn
-	  (when (and (not old-onground)
-		     gravity)
-	    (modify nsb-cga:%vec- force
-		    (load-time-value
-		     (nsb-cga:vec
-		      0.0
-		      (or 13.0
+					       vec
+					       )
+					     (nsb-cga:vec/ vec value))))
+				     (nsb-cga:vec/ 
+				      difference
+				      difference-length))))
+			    (let ((step-force (* 2.0 difference-length)))
+			      (modify nsb-cga:%vec+ force
+				      (nsb-cga:vec* bump-direction
+						    (* step-power step-force)))))))))))))
+	  ;;to allow walking around block corners
+	  ;;we introduce a frame of gravity lag
+	  (progn
+	    (when (and (not old-onground)
+		       gravity)
+	      (modify nsb-cga:%vec- force
+		      (load-time-value
+		       (nsb-cga:vec
+			0.0
+			(or 13.0
 					;		9.8
-			  )
-		      0.0))))
-	  (setf (entity-contact entity) contact-state))
-	(modify nsb-cga:%vec/ force (* (* *ticks-per-second*
-					  *ticks-per-second* 0.5)
-				       mass))
-	(modify nsb-cga:%vec+ vel force)
-	(nullify-velocity-where-obstructed
-	 vel
-	 (logtest contact-state #b100000)
-	 (logtest contact-state #b010000)
-	 (logtest contact-state #b001000)
-	 (logtest contact-state #b000100)
-	 (logtest contact-state #b000010)
-	 (logtest contact-state #b000001)))
-      (let ((aabb-gen-fnc
-	     (if noclip
-		 (lambda (&rest args)
-		       (declare (ignore args))
-		       (values #b000 1.0))
-		     (progn
-		       world-collision-fun))))
-	(with-vec (vx vy vz) (vel symbol-macrolet)
-	  (with-vec (px py pz) (pos symbol-macrolet)
-	    (multiple-value-bind (new-x new-y new-z xyzclamp)
-		(step-motion aabb-gen-fnc px py pz vx vy vz aabb)
-	      ;;Update the position and velocity, after taking into
-	      ;;account the collision data.
-	      (psetf px (floatify new-x)
-		     py (floatify new-y)
-		     pz (floatify new-z)
-		     vx (floatify (if (logtest #b100 xyzclamp) 0 vx))
-		     vy (floatify (if (logtest #b010 xyzclamp) 0 vy))
-		     vz (floatify (if (logtest #b001 xyzclamp) 0 vz))))))))))
+			    )
+			0.0))))
+	    (setf (entity-contact entity) contact-state))
+	  (modify nsb-cga:%vec/ force (* (* *ticks-per-second*
+					    *ticks-per-second* 0.5)
+					 mass))
+	  (modify nsb-cga:%vec+ vel force)
+	  (nullify-velocity-where-obstructed
+	   vel
+	   (logtest contact-state #b100000)
+	   (logtest contact-state #b010000)
+	   (logtest contact-state #b001000)
+	   (logtest contact-state #b000100)
+	   (logtest contact-state #b000010)
+	   (logtest contact-state #b000001)))
+	(let ((aabb-gen-fnc
+	       (if noclip
+		   (lambda (&rest args)
+		     (declare (ignore args))
+		     (values #b000 1.0))
+		   (progn
+		     world-collision-fun))))
+	  (with-vec (vx vy vz) (vel symbol-macrolet)
+	    (with-vec (px py pz) (pos symbol-macrolet)
+	      (multiple-value-bind (new-x new-y new-z xyzclamp)
+		  (step-motion aabb-gen-fnc px py pz vx vy vz aabb)
+		;;Update the position and velocity, after taking into
+		;;account the collision data.
+		(psetf px (floatify new-x)
+		       py (floatify new-y)
+		       pz (floatify new-z)
+		       vx (floatify (if (logtest #b100 xyzclamp) 0 vx))
+		       vy (floatify (if (logtest #b010 xyzclamp) 0 vy))
+		       vz (floatify (if (logtest #b001 xyzclamp) 0 vz)))))))))))
 
 
 (defun vec-x (vec)
@@ -366,7 +391,9 @@
    clip?
 
    jump?
-   sneak?))
+   sneak?
+
+   doublejump))
 (defun entity-position (entity)
   (let* ((player-pointmass (entity-particle entity))
 	 (curr (pointmass-position player-pointmass)))
@@ -385,21 +412,6 @@
 	       :clip? t
 	       :jump? nil
 	       :sneak? nil))
-
-(defun run-physics-for-entity (entity)
-  (physics
-   entity
-   (necking-yaw (entity-neck entity))
-   (entity-hips entity)
-   (entity-particle entity)
-   (not (entity-clip? entity))
-   (entity-gravity? entity)
-   (entity-fly? entity)
-   (entity-jump? entity)
-   (entity-sneak? entity)
-   (entity-contact-fun entity)
-   (entity-collision-fun entity)
-   (entity-aabb entity)))
 
 (struct-to-clos:struct->class
  (defstruct fist
