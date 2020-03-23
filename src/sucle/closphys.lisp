@@ -26,6 +26,9 @@
   (once-only (a)
     `(,fun ,a ,a ,@rest)))
 
+(defun vec-magnitude (vec)
+  (nsb-cga:vec-length vec))
+
 (defmacro vec-setf (place x y z)
   `(progn
      (setf (vec-x ,place) ,x)
@@ -57,6 +60,9 @@
 
 (defmacro vec+ (a f &optional (temp-vec '*temp-vec*))
   `(nsb-cga:%vec+ ,temp-vec ,a ,f))
+
+(defmacro vec- (a f &optional (temp-vec '*temp-vec*))
+  `(nsb-cga:%vec- ,temp-vec ,a ,f))
 
 (defun vec-x (vec)
   (aref vec 0))
@@ -95,33 +101,47 @@
                  :accessor acceleration))
   (:documentation "An object that moves through the world"))
 
-(defclass has-drag ()
-  ((drag-coefficient :type float
-                     :initform 0.0003
-                     :initarg :drag-coefficient
-                     :accessor drag-coefficient))
-  (:documentation "An object which experiences air friction"))
-
 (defclass has-mass ()
   ((mass :type float
          :initarg :mass
          :accessor mass))
   (:documentation "An object with a mass"))
 
-(defmethod apply-force ((object has-mass) force)
-  (vec-incf (acceleration object)
-            (vec* force (mass object))))
+(defmethod mass (object) "Default mass of 1 unit" 1)
+
+;; not useful without a more in-depth physics engine
+#+nil(defmethod apply-force ((object has-mass) force)
+       (vec-incf (acceleration object)
+                 (vec* force (mass object))))
 
 (defmethod apply-impulse ((object has-mass) impulse dt)
   (vec-incf (velocity object)
             (vec* (vec* impulse (/ 1 (mass object))) dt)))
+
+(defclass has-drag ()
+  ((drag-coefficient :type float
+                     :initform 0.0003
+                     :initarg :drag-coefficient
+                     :accessor drag-coefficient))
+  (:documentation "An object which experiences drag"))
+
+(defmethod acceleration :around ((entity has-drag))
+  "Apply acceleration due to drag before returning acceleration"
+  (let* ((velocity (velocity entity))
+         (speed (vec-magnitude velocity))
+         (k (drag-coefficient entity)))
+    (vec- (call-next-method)
+          (vec* velocity
+                (/ (* k (expt speed 2))
+                   (mass entity))))))
+
 
 (defvar *default-acceleration-due-to-gravity* (vec 0.0 -13.0 0.0))
 (defclass has-gravity ()
   ((gravity-p :type boolean
               :initform t
               :accessor gravity-p))
-  (:documentation "An object whose motion is affected by gravity."))
+  (:documentation "An object whose motion is affected by gravity"))
 
 (defmethod acceleration-due-to-gravity ((object has-gravity))
   *default-acceleration-due-to-gravity*)
@@ -129,7 +149,7 @@
 ;; method on the acceleration accessor function. Doesn't implement the
 ;; frame of gravity lag, but I'll figure that out later.
 (defmethod acceleration :around ((object has-gravity))
-  "Apply acceleration due to gravity before returning acceleration."
+  "Apply acceleration due to gravity before returning acceleration"
   (if (gravity-p object)
       (vec+ (acceleration-due-to-gravity object)
             (call-next-method object))
@@ -235,27 +255,16 @@ velocity and positon"
   (step-velocity entity (vec* (acceleration entity) dt))
   (step-position entity (vec* (velocity entity) dt)))
 
-;; Maybe this needs changing
-(defmethod step-physics :after ((entity has-drag) dt)
-  "Apply the impulse of drag"
-  (with-vec (vx vy vz) ((velocity entity))
-    (let ((k (drag-coefficient entity)))
-      (apply-impulse entity
-                     (vec (* k (expt vx 2))
-                          (* k (expt vy 2))
-                          (* k (expt vz 2)))
-                     dt))))
-
 (defgeneric step-position (entity delta)
   (:documentation "Increment ENTITY's position by DELTA, taking
-  collision in to account."))
+  collision in to account"))
 
 (defmethod step-position (entity delta)
   (vec-incf (pos entity) delta))
 
 (defmethod step-position ((entity has-world-collision) delta)
   "Increment ENTITY's position by delta, clamping position and
-velocity to prevent clipping with the world."
+velocity to prevent clipping with the world"
   (if (not (clip-p entity))
       (vec-incf (pos entity) delta)
       (with-vec (px py pz) ((pos entity))
@@ -324,13 +333,13 @@ velocity to prevent clipping with the world."
 
 (defgeneric step-velocity (entity delta)
   (:documentation "Increment ENTITY's velocity by DELTA, taking
-  collision in to account."))
+  collision in to account"))
 
 (defmethod step-velocity (entity delta)
   (vec-incf (velocity entity) delta))
 
 (defmethod step-velocity :after ((entity has-world-collision) delta)
-  "Nullify ENTITY's velocity where it is in contact with the world."
+  "Nullify ENTITY's velocity where it is in contact with the world"
   (declare (ignore delta))
   (let ((contact-state (world-contact entity)))
     (flet ((nullify-velocity-where-obstructed (velocity i+ i- j+ j- k+ k-)
