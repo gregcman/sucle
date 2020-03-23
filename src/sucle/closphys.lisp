@@ -26,6 +26,12 @@
   (once-only (a)
     `(,fun ,a ,a ,@rest)))
 
+(defmacro vec-setf (place x y z)
+  `(progn
+     (setf (vec-x ,place) ,x)
+     (setf (vec-y ,place) ,y)
+     (setf (vec-z ,place) ,z)))
+
 (defmacro vec-incf (place delta)
   `(modify nsb-cga:%vec+
            ,place
@@ -43,8 +49,29 @@
           c z))
   temp-vec)
 
+(defmacro vec (x y z)
+  `(nsb-cga:vec ,x ,y ,z))
+
 (defmacro vec* (a f &optional (temp-vec '*temp-vec*))
   `(nsb-cga:%vec* ,temp-vec ,a ,f))
+
+(defun vec-x (vec)
+  (aref vec 0))
+(defun vec-y (vec)
+  (aref vec 1))
+(defun vec-z (vec)
+  (aref vec 2))
+(defun (setf vec-x) (new vec)
+  (setf (aref vec 0) new))
+(defun (setf vec-y) (new vec)
+  (setf (aref vec 1) new))
+(defun (setf vec-z) (new vec)
+  (setf (aref vec 2) new))
+
+
+(define-modify-macro *= (&rest args) *)
+
+(define-modify-macro logiorf (&rest args) logior)
 
 ;;;; Classes
 
@@ -159,22 +186,109 @@
 (defmethod step-physics :before ((entity has-world-collision) dt)
   "Before physics is calculated, find how ENTITY is in contact
 with the world and store that information in ENTITY"
-  (setf (world-contact entity) (find-world-contact entity)))
+  (with-vec (x y z) ((pos entity))
+    (setf (world-contact entity) (find-blocks-in-contact-with
+                                  x y z (aabb entity)))))
+
+(defun find-blocks-in-contact-with (px py pz aabb)
+  (let ((acc #b000000))
+    (aabbcc:get-blocks-around (px py pz aabb) (mx my mz contact-var)
+      (declare (ignorable contact-var))
+      (let ((blockid (world:getblock mx my mz)))
+	(when (block-data:data blockid :hard)
+	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
+					    (block-to-block-aabb blockid))))))
+    acc))
 
 (defmethod step-physics :around ((entity has-physics) dt)
   "After all other physics operations, step velocity and positon"
-  (call-next-method)
+  (call-next-method entity dt)
   (step-velocity entity (vec* (acceleration entity) dt))
   (step-position entity (vec* (velocity entity) dt)))
 
-(defgeneric step-velocity (entity delta)
-  (:documentation "Increase ENTITY's velocity by DX DY and DZ, taking
-  whether ENTITY is in contact with any surfaces in to account."))
+(defgeneric step-position (entity delta)
+  (:documentation "Increment ENTITY's position by DELTA, taking
+  collision in to account."))
 
-(defmethod step-velocity ((entity has-physics) delta)
+(defmethod step-position (entity delta)
+  (vec-incf (pos entity) delta))
+
+(defmethod step-position ((entity has-world-collision) delta)
+  "Increment ENTITY's position by delta, clamping position and
+velocity to prevent clipping with the world."
+  (if (not (clip-p entity))
+      (vec-incf (pos entity) delta)
+      (with-vec (px py pz) ((pos entity))
+        (with-vec (dx dy dz) (delta)
+          (let ((dead-axis #b000)
+                (clamp #b000)
+                (aabb (aabb entity)))
+            (flet ((deadify (x bit)
+                     (when (zerop x)
+                       (logiorf dead-axis bit))))
+              (deadify dx #b100)
+              (deadify dy #b010)
+              (deadify dz #b001))
+            (step-recursive entity px py pz dx dy dz clamp dead-axis aabb))))))
+
+(defun step-recursive (entity px py pz dx dy dz clamp dead-axis aabb)
+  (if (= #b111 dead-axis)
+      (progn
+        (vec-setf (velocity entity) 0 0 0)
+        (vec-setf (pos entity) px py pz))
+      (multiple-value-bind (newclamp ratio)
+          (collect-touch px py pz dx dy dz aabb)
+        (let ((whats-left (- 1 ratio)))
+          (macrolet ((axis (pos delta bit)
+                       `(unless (logtest ,bit dead-axis)
+                          (incf ,pos (* ratio ,delta))
+                          (if (logtest ,bit newclamp)
+                              (setf ,delta 0)
+                              (*= ,delta whats-left)))))
+            (axis px dx #b100)
+            (axis py dy #b010)
+            (axis pz dz #b001))
+          (if (>= 0 whats-left)
+              (progn (vec-setf (pos entity) px py pz)
+                     (when (logtest #b100 clamp)
+                       (setf (vec-x (velocity entity)) 0))
+                     (when (logtest #b010 clamp)
+                       (setf (vec-y (velocity entity)) 0))
+                     (when (logtest #b001 clamp)
+                       (setf (vec-z (velocity entity)) 0)))
+              (step-recursive entity
+                              px py pz
+                              dx dy dz
+                              (logior clamp newclamp)
+                              (logior dead-axis newclamp)
+                              aabb))))))
+
+(defun collect-touch (px py pz dx dy dz aabb)
+  (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
+    ;;[FIXME] aabb-collect-blocks does not check
+    ;;slabs, only blocks upon entering.  also check
+    ;;"intersecting shell blocks?"
+    (aabbcc:aabb-collect-blocks (px py pz dx dy dz aabb)
+        (x y z contact)
+      (declare (ignorable contact))
+      (let ((blockid (world:getblock x y z)))
+        (when (block-data:data blockid :hard)
+          (multiple-value-bind (minimum type)
+              (aabbcc:aabb-collide aabb
+                                   px py pz
+                                   (block-to-block-aabb blockid)
+                                   x y z
+                                   dx dy dz)
+            (collect-touch minimum type)))))
+    (values (collapse-touch dx dy dz) min-ratio)))
+
+(defgeneric step-velocity (entity delta)
+  (:documentation "Increment ENTITY's velocity by DELTA, taking
+  collision in to account."))
+
+(defmethod step-velocity (entity delta)
   (vec-incf (velocity entity) delta))
 
-;; TODO remove mutation and change in to an around method?
 (defmethod step-velocity :before ((entity has-world-collision) delta)
   "Nullify ENTITY's velocity where it is in contact with the world."
   (let ((contact-state (world-contact entity)))
@@ -201,62 +315,3 @@ with the world and store that information in ENTITY"
        (logtest contact-state #b000100)
        (logtest contact-state #b000010)
        (logtest contact-state #b000001)))))
-
-(defgeneric step-position (entity delta)
-  (:documentation "Translate ENTITY's position by DX DY and DZ, taking
-  collision in to account."))
-
-(defmethod step-position ((entity has-physics) delta)
-  (vec-incf (pos entity) delta))
-
-(defmethod step-positon :around ((entity has-world-collision) delta)
-  "If the entity has noclip, continue to the next method. Otherwise,
-clamp motion to prevent the entity from clipping."
-  (if (not (clip-p entity))
-      (call-next-method)
-      ()))
-
-(defgeneric find-world-contact (entity)
-  (:documentation "Return a value which represents whether ENTITY is
-  in contact with the world on each face of its bounding box."))
-
-(defmethod find-world-contact ((entity has-world-collision))
-  (with-vec (px py pz) ((pos entity))
-    (with-vec (vx vy vz) ((velocity entity))
-      (let ((aabb (aabb entity)))
-        (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
-          ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
-          ;;also check "intersecting shell blocks?"
-          (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
-              (x y z contact)
-            (declare (ignorable contact))
-            (let ((blockid (world:getblock x y z)))
-              (when (block-data:data blockid :hard)
-                #+nil
-                (when *dirtying2*
-                  (world:plain-setblock x y z (1+ (random 5)) 0))
-                (let ((blockaabb (block-to-block-aabb blockid)))
-                  (#+nil
-                   let
-                   #+nil((args
-                          (list
-                           aabb
-                           px py pz
-                           blockaabb
-                           x y z
-                           vx vy vz)))
-                   progn
-                   (multiple-value-bind (minimum type)
-                       ;;(apply 'aabbcc:aabb-collide args)
-                       ;;#+nil
-                       (aabbcc:aabb-collide
-                        aabb
-                        px py pz
-                        blockaabb
-                        x y z
-                        vx vy vz)
-                     ;;(print (list minimum type (cons 'aabbcc:aabb-collide args)))
-                     (collect-touch minimum type)))))))
-          (values
-           (collapse-touch vx vy vz)
-           min-ratio))))))
