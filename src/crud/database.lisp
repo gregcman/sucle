@@ -6,7 +6,7 @@
 (progn (ql:quickload :sqlite)
        ;;(ql:quickload :sxql)
        )
-(defparameter *database* nil
+(defvar *database*
   ;;(sucle-temp:path "data.db")
   )
 (defun new-connection ()
@@ -19,6 +19,7 @@
     (assert (every 'alphanumericp sql-string) nil "~s is invalid, injectable SQL" string)
     string))
 ;;;Handle pooling. Each thread gets its own handle.
+;;FIXME::have different handles for different databases.
 (defparameter *handles* (lparallel.queue:make-queue))
 (defun get-handle ()
   (or

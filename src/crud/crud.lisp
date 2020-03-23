@@ -51,6 +51,9 @@
   (let ((database::*database* (path impl)))
     (crud_delete_sqlite name)))
 ;;;;SQLITE + sucle-serialize
+(defmacro with-open-sqlite-database (&body body)
+  `(let ((database::*database* (path *implementation*)))
+     (database::with-open-database2 ,@body)))
 (defun crud_create_sqlite (lisp-object data)
   ;;FIXME:update creates a row regardless, so update
   ;;is the real create.
@@ -58,17 +61,17 @@
 (defun crud_read_sqlite (lisp-object)
   (let* ((file-name (convert-object-to-filename lisp-object))
 	 (stuff
-	  (database::with-open-database2
+	  (with-open-sqlite-database
 	    (database::retreive file-name))))
     (when stuff
       (sucle-serialize::decode-zlib-conspack-payload stuff))))
 (defun crud_update_sqlite (lisp-object data)
-  (database::with-open-database2
+  (with-open-sqlite-database
     (database::add
      (convert-object-to-filename lisp-object)
      (sucle-serialize::encode-zlib-conspack-payload data))))
 (defun crud_delete_sqlite (lisp-object)
-  (database::with-open-database2
+  (with-open-sqlite-database
     (database::delete-entry (convert-object-to-filename lisp-object))))
 ;;;;sucle-serialize
 (defclass crud-file-pile (crud) ())
@@ -167,7 +170,7 @@ LCBiLCBjLCBkLCBlLCBmLCBnLCBoLCBpLCBqLCBrLCBsLCBtLCBuLCBvLCBwLCBxLCByLCBzLg=="
   (flet ((thing () (funcall fun)))
     (cond ((typep crud::*implementation* 'crud::crud-sqlite)
 	   ;;FIXME::this references sqlite?
-	   (database::with-open-database2
+	   (with-open-sqlite-database
 	     (if (boundp '*transacation-happening*)
 		 (thing)
 		 (let ((*transacation-happening* t))
