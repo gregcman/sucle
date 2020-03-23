@@ -81,15 +81,17 @@
 (defclass has-position ()
   ((position :type vec
              :initarg :pos
+             :initform (vec 0.0 0.0 0.0)
              :accessor pos))
   (:documentation "An object with a world position"))
 
 (defclass has-physics (has-position)
   ((velocity :type vec
              :initarg :velocity
+             :initform (vec 0.0 0.0 0.0)
              :accessor velocity)
    (acceleration :type vec
-                 :initarg :acceleration
+                 :initform (vec 0.0 0.0 0.0)
                  :accessor acceleration))
   (:documentation "An object that moves through the world"))
 
@@ -97,7 +99,7 @@
   ((drag-coefficient :type float
                      :initform 0.0003
                      :initarg :drag-coefficient
-                     :accessor drag))
+                     :accessor drag-coefficient))
   (:documentation "An object which experiences air friction"))
 
 (defclass has-mass ()
@@ -110,6 +112,10 @@
   (vec-incf (acceleration object)
             (vec* force (mass object))))
 
+(defmethod apply-impulse ((object has-mass) impulse dt)
+  (vec-incf (velocity object)
+            (vec* (vec* impulse (/ 1 (mass object))) dt)))
+
 (defvar *default-acceleration-due-to-gravity* (vec 0.0 -13.0 0.0))
 (defclass has-gravity ()
   ((gravity-p :type boolean
@@ -120,7 +126,8 @@
 (defmethod acceleration-due-to-gravity ((object has-gravity))
   *default-acceleration-due-to-gravity*)
 
-;; method on the acceleration accessor function
+;; method on the acceleration accessor function. Doesn't implement the
+;; frame of gravity lag, but I'll figure that out later.
 (defmethod acceleration :around ((object has-gravity))
   "Apply acceleration due to gravity before returning acceleration."
   (if (gravity-p object)
@@ -163,6 +170,10 @@
            :accessor clip-p))
   (:documentation "An object whose motion is interrupted by blocks in
   the world"))
+
+(defun on-ground (entity)
+  (when (typep entity 'has-world-collision)
+    (logtest (world-contact entity) 4)))
 
 ;; (defclass point-projectile (has-physics has-drag) ()
 ;;   (:documentation "An object "))
@@ -217,10 +228,23 @@ with the world and store that information in ENTITY"
     acc))
 
 (defmethod step-physics :around ((entity has-physics) dt)
-  "After all other physics operations, step velocity and positon"
+  "Initialize acceleration to zero, run all physics methods, then step
+velocity and positon"
+  (vec-setf (acceleration entity) 0 0 0)
   (call-next-method entity dt)
   (step-velocity entity (vec* (acceleration entity) dt))
   (step-position entity (vec* (velocity entity) dt)))
+
+;; Maybe this needs changing
+(defmethod step-physics :after ((entity has-drag) dt)
+  "Apply the impulse of drag"
+  (with-vec (vx vy vz) ((velocity entity))
+    (let ((k (drag-coefficient entity)))
+      (apply-impulse entity
+                     (vec (* k (expt vx 2))
+                          (* k (expt vy 2))
+                          (* k (expt vz 2)))
+                     dt))))
 
 (defgeneric step-position (entity delta)
   (:documentation "Increment ENTITY's position by DELTA, taking
@@ -305,8 +329,9 @@ velocity to prevent clipping with the world."
 (defmethod step-velocity (entity delta)
   (vec-incf (velocity entity) delta))
 
-(defmethod step-velocity :before ((entity has-world-collision) delta)
+(defmethod step-velocity :after ((entity has-world-collision) delta)
   "Nullify ENTITY's velocity where it is in contact with the world."
+  (declare (ignore delta))
   (let ((contact-state (world-contact entity)))
     (flet ((nullify-velocity-where-obstructed (velocity i+ i- j+ j- k+ k-)
              ;;velocity is a 3 float array.
