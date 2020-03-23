@@ -46,10 +46,6 @@
 (defmacro vec* (a f &optional (temp-vec '*temp-vec*))
   `(nsb-cga:%vec* ,temp-vec ,a ,f))
 
-(defun set-neck-values (neck yaw pitch)
-  (setf (necking-yaw neck) yaw
-	(necking-pitch neck) pitch))
-
 ;;;; Classes
 
 (defclass has-position ()
@@ -67,14 +63,14 @@
                  :accessor acceleration))
   (:documentation "An object that moves through the world"))
 
-(defclass has-drag (has-physics)
+(defclass has-drag ()
   ((drag-coefficient :type float
                      :initform 0.0003
                      :initarg :drag-coefficient
                      :accessor drag))
   (:documentation "An object which experiences air friction"))
 
-(defclass has-mass (has-physics)
+(defclass has-mass ()
   ((mass :type float
          :initarg :mass
          :accessor mass)
@@ -115,7 +111,7 @@
   *block-aabb*)
 
 
-(defclass has-world-collision (has-aabb has-physics)
+(defclass has-world-collision (has-aabb)
   ((world-contact :type (integer 0 63)
                   :initform 0
                   :accessor world-contact)
@@ -137,10 +133,10 @@
 (defclass living-entity (entity)
   ((neck-yaw :type float
              :initform 0.0
-             :acessor neck-yaw)
+             :accessor neck-yaw)
    (neck-pitch :type float
                :initform 0.0
-               :acessor neck-pitch)
+               :accessor neck-pitch)
    (hips :type (or nil float)
          :initform nil
          :accessor hips)))
@@ -160,7 +156,7 @@
 
 (defmethod step-physics (entity dt))
 
-(defmethod step-physics :before ((entity has-world-collision))
+(defmethod step-physics :before ((entity has-world-collision) dt)
   "Before physics is calculated, find how ENTITY is in contact
 with the world and store that information in ENTITY"
   (setf (world-contact entity) (find-world-contact entity)))
