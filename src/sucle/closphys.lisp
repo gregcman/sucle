@@ -106,6 +106,10 @@
          :accessor mass))
   (:documentation "An object with a mass"))
 
+(defmethod apply-force ((object has-mass) force)
+  (vec-incf (acceleration object)
+            (vec* force (mass object))))
+
 (defvar *default-acceleration-due-to-gravity* (vec 0.0 -13.0 0.0))
 (defclass has-gravity ()
   ((gravity-p :type boolean
@@ -116,18 +120,13 @@
 (defmethod acceleration-due-to-gravity ((object has-gravity))
   *default-acceleration-due-to-gravity*)
 
+;; method on the acceleration accessor function
 (defmethod acceleration :around ((object has-gravity))
   "Apply acceleration due to gravity before returning acceleration."
   (if (gravity-p object)
       (vec+ (acceleration-due-to-gravity object)
             (call-next-method object))
       (call-next-method object)))
-
-(defun apply-force (object force)
-  (assert (typep object 'has-mass))
-  (vec-incf (acceleration object)
-            (vec* force
-                  (mass object))))
 
 (defclass has-aabb ()
   ((aabb :type aabb
