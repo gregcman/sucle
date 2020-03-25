@@ -103,6 +103,16 @@
 		 (add ix jx k)))
 	(i-permute)))))
 
+(defun dirty-push-around (key)
+  ;;[FIXME]although this is correct, it
+  ;;lags behind player movement?
+  (voxel-chunks:with-chunk-key-coordinates
+   (x y z) key
+   (dobox ((x0 (1- x) (+ x 2))
+	   (y0 (1- y) (+ y 2))
+	   (z0 (1- z) (+ z 2)))
+	  (dirty-push (voxel-chunks:create-chunk-key x0 y0 z0)))))
+
 #+nil
 (defun block-dirtify-hashed (xyz)
   (multiple-value-bind (x y z) (unhashfunc xyz)
@@ -147,20 +157,6 @@
     (setf (skygetlight i j k) new-sky-light-value)
     (block-dirtify i j k)))
 
-;;;;chunk loading
-(defun safe-subseq (seq end)
-  (subseq seq 0 (min (length seq) end)))
-
-(defparameter *chunk-radius* 6)
-;;[FIXME]how to determine the maximum allowed chunks? leave some leeway for loading?
-(defparameter *maximum-allowed-chunks* (* (expt (* (+ 1 *chunk-radius*) 2) 3)))
-(defun chunk-memory-usage (&optional (chunks *maximum-allowed-chunks*))
-  ;;in megabytes
-  (/ (* 8 #|8 bytes per word in 64bit sbcl|# chunks
-	vocs:+total-size+)
-     1024 1024 1.0 #|1.0 for converting to float|#))
-(defparameter *threshold* (* 8 8))
-;;threshold so that when too many chunks exist, over compensate, so not unloading every time
 
 (defun unsquared-chunk-distance (position-key cx cy cz)
   (voxel-chunks:with-chunk-key-coordinates
@@ -179,67 +175,6 @@
      (max (abs dx)
 	  (abs dy)
 	  (abs dz)))))
-
-(defun load-chunks-around (chunk-cursor)
-  ;;#+nil ;;FIXME terrain generation code?
-  (mapc (lambda (key)
-	  (let ((chunk (vocs::loadchunk key)))
-	    (when (not (voxel-chunks:empty-chunk-p chunk))
-	      (dirty-push-around key))))
-	(get-chunks-to-load chunk-cursor)))
-
-(defun get-chunks-to-load (chunk-cursor-center)
-  (multiple-value-bind (cx cy cz) (values (vocs::cursor-x chunk-cursor-center)
-					  (vocs::cursor-y chunk-cursor-center)
-					  (vocs::cursor-z chunk-cursor-center))
-    (declare (optimize (speed 3) (safety 0))
-	     (type voxel-chunks:chunk-coord cx cy cz))
-    (let ((acc nil))
-      (block out
-	(let ((chunk-count 0))
-	  (declare (type fixnum chunk-count))
-	  (flet ((add-chunk (x y z)
-		   (incf chunk-count)
-		   ;;do something
-		   (let ((key (voxel-chunks:create-chunk-key x y z)))
-		     (when (space-for-new-chunk-p key)
-		       ;;The chunk does not exist, therefore the *empty-chunk* was returned
-		       (push key acc)
-		       ;;(print (list x y z))
-		       ))
-		   (when (>
-			  ;;[FIXME]nonportably assume chunk-count and maxium allowed chunks are fixnums
-			  (the fixnum chunk-count)
-			  (the fixnum *maximum-allowed-chunks*))
-		     ;;exceeded the allowed chunks to load
-		     (return-from out))
-		   ))
-	    (let ((size (vocs::cursor-radius chunk-cursor-center)))
-	      (declare (type voxel-chunks:chunk-coord size))
-	      (utility:dobox ((chunk-x (the voxel-chunks:chunk-coord (- cx size))
-				       (the voxel-chunks:chunk-coord (+ cx size)))
-			      (chunk-y (the voxel-chunks:chunk-coord (- cy size))
-				       (the voxel-chunks:chunk-coord (+ cy size)))
-			      (chunk-z (the voxel-chunks:chunk-coord (- cz size))
-				       (the voxel-chunks:chunk-coord (+ cz size))))
-			     (add-chunk chunk-x chunk-y chunk-z))))))
-      acc)))
-
-
-(defun dirty-push-around (key)
-  ;;[FIXME]although this is correct, it
-  ;;lags behind player movement?
-  (voxel-chunks:with-chunk-key-coordinates
-   (x y z) key
-   (dobox ((x0 (1- x) (+ x 2))
-	   (y0 (1- y) (+ y 2))
-	   (z0 (1- z) (+ z 2)))
-	  (let ((new-key (voxel-chunks:create-chunk-key x0 y0 z0)))
-	    (when (voxel-chunks::chunk-in-cache-p new-key)
-	      (dirty-push new-key))))))
-
-(defun space-for-new-chunk-p (key)
-  (voxel-chunks:empty-chunk-p (voxel-chunks::get-chunk-in-cache key)))
 
 ;;[FIXME]thread-safety for:
 ;;voxel-chunks:*chunks*

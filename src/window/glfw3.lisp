@@ -390,7 +390,7 @@ for the current implementation."
   )
 
 (defmacro define-char-mods-callback (name (window codepoint mod-keys) &body body)
-  `(claw:defcallback ,name :void ((,window (:pointer %glfw:window))
+  `(cffi:defcallback ,name :void ((,window (:pointer %glfw:window))
                                   (,codepoint :unsigned-int)
 				  (,mod-keys :int))
      ,@body))
@@ -403,7 +403,7 @@ for the current implementation."
   )
 ;;;;;;
 (defmacro define-drop-callback (name (window count paths) &body body)
-  `(claw:defcallback ,name :void ((,window (:pointer %glfw:window))
+  `(cffi:defcallback ,name :void ((,window (:pointer %glfw:window))
                                   (,count :int)
 				  (,paths (:pointer (:pointer :char))))
      ,@body))
