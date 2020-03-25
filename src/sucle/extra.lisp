@@ -314,7 +314,7 @@
 					 (0 15)
 					 (1 0))
 				       0))))))))
-
+#+nil
 (defun generate-for-new-chunk (key)
     (multiple-value-bind (x y z) (voxel-chunks:unhashfunc key)
       (declare (type fixnum x y z))

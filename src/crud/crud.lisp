@@ -91,10 +91,14 @@
 ;;[FIXME]:can possibly create filenames that are illegal.
 ;;use base64 instead? how to mix the two?
 ;;
+(defparameter *base-64-string*
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 (defun string-base64 (string)
-  (cl-base64:string-to-base64-string string :uri t))
+  (let ((base64::*base64* *base-64-string*))
+    (base64:base64-encode string)))
 (defun base64-string (string)
-  (cl-base64:base64-string-to-string string :uri t))
+  (let ((base64::*base64* *base-64-string*))
+    (base64:base64-decode string)))
 (defun commentify (&optional (string "test"))
   (concatenate 'string ";" string))
 (defun un-commentify (&optional (string ";test"))

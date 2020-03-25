@@ -5,7 +5,7 @@
   :depends-on
   (#:sucle-serialize
    #:sqlite
-   #:cl-base64
+   #:base64
    #:uiop
    #:lparallel
    ;;For one macro in 'database'

@@ -252,9 +252,6 @@ Press q/escape to quit
 (defparameter *fade-color* '(0.0 0.0 0.0))
 (defparameter *fade* 1.0)
 
-;;Frames are for graphical frames, as in framerate.
-;;(defparameter *frames* 0)
-
 (defun update-world-vao2 ()
   (update-world-vao
    (lambda (key)
@@ -263,8 +260,10 @@ Press q/escape to quit
       (vocs::cursor-x *chunk-cursor-center*)
       (vocs::cursor-y *chunk-cursor-center*)
       (vocs::cursor-z *chunk-cursor-center*)))))
+;;*frame-time* is for graphical frames, as in framerate.
+(defparameter *frame-time* 0)
 (defun sucle-per-frame ()
-  ;;(incf *frames*)
+  (incf *frame-time*)
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
   ;;set the chunk center aroun the player

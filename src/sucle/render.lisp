@@ -89,6 +89,7 @@
     #+nil
     (when (not (zerop overridden))
       (print overridden))
+    ;;(print (/ hidden (+ 0.0 hidden shown)))
     ;;#+nil
     #+nil
     (let ((total (hash-table-count *g/chunk-call-list*)))
@@ -492,6 +493,7 @@ gl_FragColor.rgb = color_out;
    occluded
    (occlusion-state :init
 		    ) ;;:hidden, visible, waiting, :init
+   (query-frame-time 0)
    occlusion-box
    aabb
    
@@ -515,6 +517,7 @@ gl_FragColor.rgb = color_out;
 	(gl:begin-query :samples-passed query)
 	;;draw occlusion box here, get occlusion information from a box
 	(glhelp:slow-draw (chunk-gl-representation-occlusion-box value))
+	(setf (chunk-gl-representation-query-frame-time value) *frame-time*)
 	(gl:end-query :samples-passed)))))
 (defparameter *call-lists* (make-array 0 :fill-pointer 0 :adjustable t))
 (defun render-occlusion-queries (&optional (vec *call-lists*))
@@ -556,13 +559,16 @@ gl_FragColor.rgb = color_out;
 		(when (and (not old-frustum-state)
 			   frustum-state)
 		  ;;It just came into view, so definitely render it.
-		  (setf (chunk-gl-representation-draw-override value) 2))
+		  ;;(setf (chunk-gl-representation-draw-override value) 2)
+		  )
 
 		;;FIXME: only necessary to write on change, but whatever.
 		(setf inside-frustum-p frustum-state)
 		(when frustum-state
 		  (vector-push-extend value vec)))))))
     vec))
+;;discard the results of queries too long ago and draw anyway.
+(defparameter *frame-time-limit* 3)
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
 						  (count-actually-drawn 0)
 						  (count-overridden 0))
@@ -579,13 +585,15 @@ gl_FragColor.rgb = color_out;
 	      (let ((available (gl:get-query-object query :query-result-available)))
 		(when available
 		  ;;[FIXME]bug in cl-opengl, gl:get-query-object not implemented for GL<3.3
-		  (let ((result (gl:get-query-object query :query-result)))		      
-		    (case result
-		      (0
+		  (let ((result (gl:get-query-object query :query-result))
+			(dt (- *frame-time* (chunk-gl-representation-query-frame-time value))))
+		    (cond
+		      ((and (= 0 result)
+			    (< dt *frame-time-limit*))
 		       (set-chunk-gl-representation-hidden value)
-		       ;;The draw-override lasts a few cycles.
+			;;The draw-override lasts a few cycles.
 		       (decf (chunk-gl-representation-draw-override value)))
-		      (otherwise
+		      (t
 		       (set-chunk-gl-representation-visible value)
 		       ;;Known visible, cancel the override
 		       (setf (chunk-gl-representation-draw-override value) 0)))))))
@@ -613,6 +621,7 @@ gl_FragColor.rgb = color_out;
 		   ;;draw occlusion box here
 		   ;;(gl:call-list (chunk-gl-representation-occlusion-box value))
 		   (glhelp:slow-draw display-list)
+		   (setf (chunk-gl-representation-query-frame-time value) *frame-time*)
 		   (gl:end-query :samples-passed)))
 		(t
 		 (glhelp:slow-draw display-list))))
