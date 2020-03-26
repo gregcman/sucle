@@ -116,7 +116,7 @@
 
 (defmethod apply-impulse ((object has-mass) impulse dt)
   (vec-incf (velocity object)
-            (vec* (vec* impulse (/ 1 (mass object))) dt)))
+            (vec* impulse (/ dt (mass object)))))
 
 (defclass has-drag ()
   ((drag-coefficient :type float
@@ -248,9 +248,8 @@ with the world and store that information in ENTITY"
     acc))
 
 (defmethod step-physics :around ((entity has-physics) dt)
-  "Initialize acceleration to zero, run all physics methods, then step
+  "Run all physics methods, then step
 velocity and positon"
-  (vec-setf (acceleration entity) 0 0 0)
   (call-next-method entity dt)
   (step-velocity entity (vec* (acceleration entity) dt))
   (step-position entity (vec* (velocity entity) dt)))
