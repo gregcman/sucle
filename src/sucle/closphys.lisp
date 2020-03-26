@@ -114,6 +114,8 @@
        (vec-incf (acceleration object)
                  (vec* force (mass object))))
 
+(defgeneric apply-impulse (object impulse dt))
+
 (defmethod apply-impulse ((object has-mass) impulse dt)
   (vec-incf (velocity object)
             (vec* impulse (/ dt (mass object)))))
@@ -213,10 +215,18 @@
                :accessor neck-pitch)
    (hips :type (or nil float)
          :initform nil
-         :accessor hips)))
+         :accessor hips)
+   (movement-speed :type float
+                   :accessor movement-speed
+                   :allocation class)
+   (step-power :type float
+               :accessor step-power
+               :allocation class)))
 
 (defclass player-entity (living-entity)
-  ((fly-p :type boolean
+  ((movement-speed :initform 4.317)
+   (step-power :initform 4.0)
+   (fly-p :type boolean
           :initform nil
           :accessor fly-p)
    (sneak-p :type boolean
@@ -229,6 +239,8 @@
   have experienced DT seconds"))
 
 (defmethod step-physics (entity dt))
+
+(defgeneric target-velocity (entity))
 
 (defmethod step-physics :before ((entity has-world-collision) dt)
   "Before physics is calculated, find how ENTITY is in contact
@@ -253,6 +265,41 @@ velocity and positon"
   (call-next-method entity dt)
   (step-velocity entity (vec* (acceleration entity) dt))
   (step-position entity (vec* (velocity entity) dt)))
+
+(defmethod step-physics ((entity player-entity) dt)
+  ())
+
+(defmethod target-velocity ((entity player-entity))
+  (let* ((flying (fly-p entity))
+         (yaw (neck-yaw entity))
+         (dir (hips entity))
+         (speed (movement-speed entity))
+         (yvalue (case flying
+                   (:up speed)
+                   (:down (- speed))
+                   (t 0.0))))
+    (if dir
+        (let ((diraux (+ dir yaw)))
+          (nsb-cga:vec
+           (* speed (- (sin diraux)))
+           yvalue
+           (* speed (cos diraux))))
+        (nsb-cga:vec 0.0 yvalue 0.0))))
+
+(defun apply-movement-impulse (current-velocity target-velocity step-power dt)
+  (let* ((delta-velocity (nsb-cga:vec-
+                          target-velocity
+                          current-velocity))
+         (dv-magnitude (nsb-cga:vec-length delta-velocity)))
+    (unless (zerop dv-magnitude)
+      (let ((bump-direction (nsb-cga:vec/
+                             delta-velocity
+                             dv-magnitude)))
+        (let ((step-force (* 2.0 dv-magnitude)))
+          (apply-impulse current-velocity
+                         (vec* bump-direction
+                               (* step-power step-force))
+                         dt))))))
 
 (defgeneric step-position (entity delta)
   (:documentation "Increment ENTITY's position by DELTA, taking
@@ -364,3 +411,4 @@ velocity to prevent clipping with the world"
        (logtest contact-state #b000100)
        (logtest contact-state #b000010)
        (logtest contact-state #b000001)))))
+
