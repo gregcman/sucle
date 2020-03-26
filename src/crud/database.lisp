@@ -21,6 +21,12 @@
 ;;;Handle pooling. Each thread gets its own handle.
 ;;FIXME::have different handles for different databases.
 (defparameter *handles* (lparallel.queue:make-queue))
+(defun clear-handles ()
+  (loop
+     (multiple-value-bind (connection existp) (lparallel.queue:try-pop-queue *handles*)
+       (if existp
+	   (disconnect connection)
+	   (return-from clear-handles)))))
 (defun get-handle ()
   (or
    (lparallel.queue:try-pop-queue *handles*)

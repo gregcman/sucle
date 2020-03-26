@@ -18,10 +18,13 @@
 ;;- pile of files
 (defclass crud () ((path :initarg :path :accessor path)))
 (defparameter *implementation* nil)
+(defgeneric crud_ensure (crud))
 (defgeneric crud_create (lisp-object data crud))
 (defgeneric crud_read (lisp-object crud))
 (defgeneric crud_update (lisp-object data crud))
 (defgeneric crud_delete (lisp-object crud))
+(defun crud-ensure ()
+  (crud_ensure *implementation*))
 (defun crud-create (lisp-object data)
   (crud_create lisp-object data *implementation*))
 (defun crud-read (lisp-object)
@@ -38,6 +41,9 @@
     (sucle-serialize::safer-write obj str)))
 
 (defclass crud-sqlite (crud) ())
+(defmethod crud_ensure ((impl crud-sqlite))
+  (let ((database::*database* (path impl)))
+    (crud_ensure_sqlite)))
 (defmethod crud_create (name data (impl crud-sqlite))
   (let ((database::*database* (path impl)))
     (crud_create_sqlite name data)))
@@ -54,6 +60,10 @@
 (defmacro with-open-sqlite-database (&body body)
   `(let ((database::*database* (path *implementation*)))
      (database::with-open-database2 ,@body)))
+(defun crud_ensure_sqlite ()
+  (database::clear-handles)
+  (with-open-sqlite-database
+    (database::create-table)))
 (defun crud_create_sqlite (lisp-object data)
   ;;FIXME:update creates a row regardless, so update
   ;;is the real create.
@@ -76,6 +86,10 @@
 ;;;;sucle-serialize
 (defclass crud-file-pile (crud) ())
 (defparameter *path* nil)
+(defmethod crud_ensure ((impl crud-file-pile))
+  (let ((*path* (path impl)))
+    (ensure-directories-exist
+     (uiop:pathname-directory-pathname *path*))))
 (defmethod crud_create (name data (impl crud-file-pile))
   (let ((*path* (path impl)))
     (crud_create_file-pile name data)))
@@ -167,7 +181,8 @@ LCBiLCBjLCBkLCBlLCBmLCBnLCBoLCBpLCBqLCBrLCBsLCBtLCBuLCBvLCBwLCBxLCByLCBzLg=="
 (defun make-crud-from-path (path)
   (make-instance (detect-crud-from-path path) :path path))
 (defun use-crud-from-path (path)
-  (setf *implementation* (make-crud-from-path path)))
+  (setf *implementation* (make-crud-from-path path))
+  (crud-ensure))
 
 (defvar *transacation-happening*)
 (defun call-with-transaction (fun)

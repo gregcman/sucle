@@ -563,6 +563,10 @@
   (with-chunk-key-coordinates (cx cy cz) key
     (make-chunk :x cx :y cy :z cz :key key :data data :type :normal)))
 ;;Merely load a chunk from the database, don't put in in the cache
+;;FIXME::this is a duplicate of world::blockify.
+(defun blockify (blockid light sky)
+  (dpb sky (byte 4 12)
+       (dpb light (byte 4 8) blockid)))
 (defun %loadchunk (chunk-coordinates)
   ;;(format t "~%Loading chunk at ~a" chunk-coordinates)
   (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
@@ -584,9 +588,9 @@
 						     (create-chunk x y z :type :empty)))
 
 	   (3 ;;[FIXME]does this even work?
-	    (error "world format invalid")
+	    ;;(error "world format invalid")
 	    ;;FIXME: use defmethod to extend the interface?
-	    #+nil
+	    ;;#+nil
 	    (destructuring-bind (blocks light sky) data
 	      (let ((len (length blocks)))
 		(let ((new (make-array len)))

@@ -89,7 +89,9 @@
     #+nil
     (when (not (zerop overridden))
       (print overridden))
-    ;;(print (/ hidden (+ 0.0 hidden shown)))
+    #+nil
+    (when (zerop (random 60))
+      (print (/ hidden (+ 0.0 hidden shown))))
     ;;#+nil
     #+nil
     (let ((total (hash-table-count *g/chunk-call-list*)))
@@ -539,7 +541,14 @@ gl_FragColor.rgb = color_out;
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 
-(defun get-chunks-to-draw (camera radius cx cy cz)
+(defun frustum-state (state total-p)
+  (if state
+      (if total-p
+	  t
+	  :some)
+      nil))
+
+(defun get-chunks-to-draw (camera radius cx cy cz &aux (frustum-in 0) (frustum-out 0))  
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
     (let* ((foo (+ 1 radius)))
@@ -552,23 +561,35 @@ gl_FragColor.rgb = color_out;
 	      (> (the fixnum foo)
 		 (the fixnum (world:blocky-chunk-distance key cx cy cz)))
 	    (symbol-macrolet
-		((inside-frustum-p
-		  (chunk-gl-representation-in-frustum-p value)))
-	      (let ((frustum-state (box-in-frustum camera (chunk-gl-representation-aabb value)))
-		    (old-frustum-state inside-frustum-p))
-		(when (and (not old-frustum-state)
-			   frustum-state)
-		  ;;It just came into view, so definitely render it.
-		  ;;(setf (chunk-gl-representation-draw-override value) 2)
-		  )
+		((inside-frustum-p (chunk-gl-representation-in-frustum-p value)))
+	      (multiple-value-bind (frustum-state total?)
+		  (box-in-frustum camera (chunk-gl-representation-aabb value))
+		(when (and frustum-state (not total?))
+		  (incf frustum-out))
+		(when total?
+		  (incf frustum-in))
+		;;(setf frustum-state (and frustum-state total?))
+		(let ((old-frustum-state inside-frustum-p))
+		  (when (and (not old-frustum-state)
+			     frustum-state)
+		    ;;It just came into view, so definitely render it.
+		    ;;(setf (chunk-gl-representation-draw-override value) 2)
+		    ))
 
 		;;FIXME: only necessary to write on change, but whatever.
-		(setf inside-frustum-p frustum-state)
+		(setf inside-frustum-p (frustum-state frustum-state total?))
 		(when frustum-state
 		  (vector-push-extend value vec)))))))
+    #+nil
+    (when (zerop (random 20))
+      (print (/ frustum-in (+ 0.0 frustum-in frustum-out))))
     vec))
 ;;discard the results of queries too long ago and draw anyway.
 (defparameter *frame-time-limit* 3)
+;;Set this to T to only query-cull chunks that are completely within the frustum
+;;2-4 times more chunks are removed at the expense of flickering when turning the
+;;camera.
+(defparameter *exclude-frustum-edge-chunks-from-query* t)
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
 						  (count-actually-drawn 0)
 						  (count-overridden 0))
@@ -607,7 +628,11 @@ gl_FragColor.rgb = color_out;
 	     ;;Regular visible
 	     (not (chunk-gl-representation-occluded value))
 	     ;;queries enabled and overridden
-	     overridden-p)
+	     overridden-p
+	     ;;Always draw chunks on the edge
+	     (and *exclude-frustum-edge-chunks-from-query*
+		  (eq :some (chunk-gl-representation-in-frustum-p value)))
+	     )
 	    ;;not occluded = visible
 	    (incf count-actually-drawn)	    
 	    (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
@@ -907,7 +932,9 @@ Note:limits the amount of background jobs and pending lisp objects."
 ;;;http://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm
 (defun box-in-frustum (camera aabb)
   (let ((planes (camera-matrix::camera-planes camera))
-	(camera-position (camera-matrix::camera-vec-position camera)))
+	(camera-position (camera-matrix::camera-vec-position camera))
+	;;Is the box completely within the frustum with no intersection at all?
+	(total t))
     (dolist (plane planes)
       (let ((out 0))
 	(call-aabb-corners
@@ -921,8 +948,10 @@ Note:limits the amount of background jobs and pending lisp objects."
 	     (incf out)))
 	 aabb)
 	(when (= out 8)
-	  (return-from box-in-frustum nil)))))
-  (values t))
+	  (return-from box-in-frustum nil))
+	(unless (zerop out)
+	  (setf total nil))))
+    (values t total)))
 
 (defun call-aabb-corners
     (&optional
