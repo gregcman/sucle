@@ -390,7 +390,8 @@ for the current implementation."
   )
 
 (defmacro define-char-mods-callback (name (window codepoint mod-keys) &body body)
-  `(cffi:defcallback ,name :void ((,window (:pointer %glfw:window))
+  `(cffi:defcallback ,name :void ((,window (:pointer ;;%glfw::window
+					    ))
                                   (,codepoint :unsigned-int)
 				  (,mod-keys :int))
      ,@body))
@@ -403,7 +404,8 @@ for the current implementation."
   )
 ;;;;;;
 (defmacro define-drop-callback (name (window count paths) &body body)
-  `(cffi:defcallback ,name :void ((,window (:pointer %glfw:window))
+  `(cffi:defcallback ,name :void ((,window (:pointer;; %glfw::window
+					    ))
                                   (,count :int)
 				  (,paths (:pointer (:pointer :char))))
      ,@body))
@@ -444,7 +446,7 @@ for the current implementation."
   #+sbcl (sb-int:set-floating-point-modes :traps nil))
 
 (defun poll-events ()
-  (%glfw:poll-events))
+  (%glfw::poll-events))
 (defparameter *shift* nil)
 (defparameter *control* nil)
 (defparameter *alt* nil)
@@ -460,9 +462,9 @@ for the current implementation."
   (when *dropped-files*
     (print *dropped-files*))
   (setf *dropped-files* nil)
-  (setq *status* (let ((value (%glfw:window-should-close *window*)))
-		   (cond ((eql value %glfw:+true+) t)
-			 ((eql value %glfw:+false+) nil)
+  (setq *status* (let ((value (%glfw::window-should-close *window*)))
+		   (cond ((eql value %glfw::+true+) t)
+			 ((eql value %glfw::+false+) nil)
 			 (t (error "what is this value? ~a" value)))))
   (poll-events)
   ;;;[FIXME]mod keys only updated indirectly through mouse or key or unicode char callback
@@ -484,7 +486,7 @@ for the current implementation."
     (alexandria:once-only (window-keys)
       `(let* ((,extra (append ,window-keys *defaults*))
 	      (,window
-	       (%glfw:create-window
+	       (%glfw::create-window
 		(getf 
 		 ,extra
 		 :width)
@@ -503,22 +505,22 @@ for the current implementation."
 	 (unwind-protect
 	      (progn
 		(let ((*window* ,window))
-		  (%glfw:make-context-current ,window)
+		  (%glfw::make-context-current ,window)
 		  ,@body))
-	   (%glfw:destroy-window ,window))))))
+	   (%glfw::destroy-window ,window))))))
 
 (defparameter *window* nil)
 ;;Graphics calls on OS X must occur in the main thread
 (defun set-callbacks (&optional (window *window*))
-  (%glfw:set-mouse-button-callback window
+  (%glfw::set-mouse-button-callback window
 				   (cffi:get-callback 'mouse-callback))
-  (%glfw:set-key-callback window (cffi:get-callback 'key-callback))
-  (%glfw:set-scroll-callback window (cffi:get-callback 'scroll-callback))
-  (%glfw:set-window-size-callback window (cffi:get-callback 'update-viewport))
-  ;;(%glfw:set-char-callback window (cffi:get-callback 'char-callback))
-  (%glfw:set-char-mods-callback window (cffi:get-callback 'char-mods-callback)) 
-  (%glfw:set-cursor-pos-callback window (cffi:get-callback 'cursor-callback))
-  (%glfw:set-drop-callback window (cffi:get-callback 'drop-callback))
+  (%glfw::set-key-callback window (cffi:get-callback 'key-callback))
+  (%glfw::set-scroll-callback window (cffi:get-callback 'scroll-callback))
+  (%glfw::set-window-size-callback window (cffi:get-callback 'update-viewport))
+  ;;(%glfw::set-char-callback window (cffi:get-callback 'char-callback))
+  (%glfw::set-char-mods-callback window (cffi:get-callback 'char-mods-callback)) 
+  (%glfw::set-cursor-pos-callback window (cffi:get-callback 'cursor-callback))
+  (%glfw::set-drop-callback window (cffi:get-callback 'drop-callback))
   )
 (defmacro wrapper (args &body body)
   (alexandria:once-only (args)
@@ -528,9 +530,9 @@ for the current implementation."
 	 (init)
 	 (glfw:with-window-hints
 	     ;;[FIXME]better interface?
-	     ((%glfw:+resizable+ (if (getf ,args :resizable)
-				     %glfw:+true+
-				     %glfw:+false+)))
+	     ((%glfw::+resizable+ (if (getf ,args :resizable)
+				     %glfw::+true+
+				     %glfw::+false+)))
 	   (with-window ,args
 	     (set-callbacks)
 	     (setf (values *width*
@@ -539,47 +541,47 @@ for the current implementation."
 	     ,@body))))))
 
 (defun get-mouse-out ()
-  (%glfw:set-input-mode *window*  %glfw:+cursor+ %glfw:+cursor-normal+))
+  (%glfw::set-input-mode *window*  %glfw::+cursor+ %glfw::+cursor-normal+))
 
 (defun toggle-mouse-capture ()
   (if (mouse-locked?)
-      (%glfw:set-input-mode *window* %glfw:+cursor+ %glfw:+cursor-normal+)
-      (%glfw:set-input-mode *window* %glfw:+cursor+ %glfw:+cursor-disabled+) ))
+      (%glfw::set-input-mode *window* %glfw::+cursor+ %glfw::+cursor-normal+)
+      (%glfw::set-input-mode *window* %glfw::+cursor+ %glfw::+cursor-disabled+) ))
 
 (defun mouse-locked? ()
-  (eq %glfw:+cursor-disabled+
-      (%glfw:get-input-mode *window* %glfw:+cursor+)))
+  (eq %glfw::+cursor-disabled+
+      (%glfw::get-input-mode *window* %glfw::+cursor+)))
 
 (defun mouse-free? ()
-  (eq  %glfw:+cursor-normal+
-      (%glfw:get-input-mode *window* %glfw:+cursor+)))
+  (eq  %glfw::+cursor-normal+
+      (%glfw::get-input-mode *window* %glfw::+cursor+)))
 
 (defun push-dimensions (width height)
   (setf *width* width
 	*height* height)
-  (%glfw:set-window-size *window* width height))
+  (%glfw::set-window-size *window* width height))
 
 (defun set-caption (caption)
-  (%glfw:set-window-title *window* caption))
+  (%glfw::set-window-title *window* caption))
 
 (defun update-display ()
-  (%glfw:swap-buffers *window*))
+  (%glfw::swap-buffers *window*))
 
 (defun set-vsync (bool)
   (if bool
-      (%glfw:swap-interval 1) ;;1 is on
-      (%glfw:swap-interval 0))) ;;0 is off
+      (%glfw::swap-interval 1) ;;1 is on
+      (%glfw::swap-interval 0))) ;;0 is off
 
 (defun get-window-size (&optional (window *window*))
   (cffi:with-foreign-objects ((w :int)
 			      (h :int))
-    (%glfw:get-window-size window w h)
+    (%glfw::get-window-size window w h)
     (values (cffi:mem-ref w :int)
 	    (cffi:mem-ref h :int))))
 
 (defun get-mouse-position (&optional (window *window*)) 
   (cffi:with-foreign-objects ((x :double) (y :double))
-    (%glfw:get-cursor-pos window x y)
+    (%glfw::get-cursor-pos window x y)
     (values 
      (cffi:mem-ref x :double)
      (cffi:mem-ref y :double))))
