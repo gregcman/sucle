@@ -1,0 +1,93 @@
+#+TITLE: Physics sytem CLOS refactor details
+
+The basic idea for this implementation is that a single generic
+function, ~step-physics~ serves as the entry point to the physics
+system, simlating a time step for a single physics enity.
+
+#+BEGIN_SRC lisp
+(defgeneric step-physics (entity dt)
+  (:documentation "Entry point to the physics system. Modify ENTITY to
+  have experienced DT seconds"))
+#+END_SRC
+
+All you have to do to give an object physics behavior is to define a
+method on that function, which will be called once per frame with dt
+set to the time that has passed since the last frame. Everything else
+follows from CLOS design patterns.
+
+* Classes
+Since CLOS has multiple inheritence, many small classes which each
+specify a single behavior can be mixed together to create more complex
+objects.
+** ~has-physics~
+#+BEGIN_SRC lisp
+  (defclass has-physics (has-position)
+    ((velocity :type vec
+               :initarg :velocity
+               :initform (vec 0.0 0.0 0.0)
+               :accessor velocity)
+     (acceleration :type vec
+                   :initform (vec 0.0 0.0 0.0)
+                   :accessor acceleration))
+    (:documentation "An object that moves through the world"))
+#+END_SRC
+This class contains the minimum necessary data to run the physics
+system and is analogous to the pointmass class from the old system.
+
+I chose to separate out the ~has-position~ aspect because having an
+object with a position in the world but no physical simulation should
+be pretty common, and should have that position acessable through the
+same API as physics objects. I chose to bundle acceleration and
+velocity together because an object with either one is a part of the
+physics system, and it's easy enough to zero out acceleration if you
+need an object with just velocity.
+
+In fact, the choice to have a field that represents acceleration
+instead of just a generic function is already questionable. In typical
+cases the acceleration of an object will be a function of its other
+fields, such as position and velocity, and those values will be
+changing frame-to-frame. For now I'll keep the acceleration field and
+accessor function because there's no real disadvantage to doing so.
+** ~has-mass~, ~has-drag~, ~has-gravity~
+These classes are used to define methods on the acceleration accssor
+function which are dependant upon the mass of the object. 
+** ~has-world-collision~
+Used to define methods for collision with the world.
+** ~entity~, ~living-entity~, ~player-entity~
+I'm not 100% sure about the organization of these classes, the main
+point is that they inherit from the classes above. The ~player-entity~
+class will have unique behavior.
+* Functions and Methods
+** ~step-physics~
+The most important method on the ~step-physics~ function is this one
+#+BEGIN_SRC lisp
+  (defmethod step-physics :around ((entity has-physics) dt)
+    "Run all physics methods, then step
+  velocity and positon"
+    (call-next-method entity dt)
+    (step-velocity entity (vec* (acceleration entity) dt))
+    (step-position entity (vec* (velocity entity) dt)))
+#+END_SRC
+
+The reason it's defined as an ~:around~ method instead of as an ~:after~
+method is that after methods are run most-specific-first, while around
+methods are run least-specific-first. This means that no matter what
+methods are defined, as long as ~has-physics~ is first on a class's
+inheritence list, this behavior will occur after all other
+behavior.
+
+** ~step-position~, ~step-velocity~
+These are generic because we want, for example, classes that inherit
+from ~has-world-collision~ to modify how an object's position is
+updated. 
+** Other functions
+The player entity is controlled by player input, but it still shares
+lots of behavior with what you might want out of an entity. The
+basic behavior of an entity which can walk and jump around could be
+separated in to another method.
+* Other Notes
+** Time step
+By passing the time passed since the last frame as a parameter to the
+physics function there's no need to rely on any particular tick
+rate. Additionally, time-based units such as velocity can just be in
+terms of seconds.
