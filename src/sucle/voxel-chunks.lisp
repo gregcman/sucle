@@ -98,12 +98,15 @@
     (dolist (item list)
       (setf (gethash item table) t))
     table))
-(defun prune-cache (&optional (limit *cache-limit*) &aux (reduction
-							  (* limit *cache-reduction*)))
+(defun prune-cache (&key (limit *cache-limit*) (ignore-cursors nil)
+		    &aux (reduction
+			  (* limit *cache-reduction*)))
   (bt:with-lock-held (*prune-lock*)
     (let ((total (total-chunks-in-cache)))
       (when (< limit total)
-	(let* ((pinned-chunks (mapcan 'cursor-all-chunks *pinned-cursors*))
+	(let* ((pinned-chunks (if ignore-cursors
+				  nil
+				  (mapcan 'cursor-all-chunks *pinned-cursors*)))
 	       (pinned-table (make-hash pinned-chunks))
 	       (all-chunks (alexandria:hash-table-alist *chunks*))	       
 	       (chunks (sort
@@ -801,7 +804,7 @@
 
 (defun save-all ()
   ;;By limiting the cache to 0, everything gets flushed out.
-  (prune-cache 0))
+  (prune-cache :limit 0 :ignore-cursors t))
 
 
 (defun chunk-within-chunk-array-p (key &optional (chunk-array *chunk-array*))
