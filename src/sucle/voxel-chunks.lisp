@@ -92,31 +92,48 @@
 (defparameter *cache-limit* (* (expt 16 3)))
 (defparameter *cache-reduction* 0.2)
 (defparameter *prune-lock* (bt:make-lock))
+(defparameter *pinned-cursors* nil)
+(defun make-hash (list)
+  (let ((table (make-hash-table)))
+    (dolist (item list)
+      (setf (gethash item table) t))
+    table))
 (defun prune-cache (&optional (limit *cache-limit*) &aux (reduction
 							  (* limit *cache-reduction*)))
   (bt:with-lock-held (*prune-lock*)
     (let ((total (total-chunks-in-cache)))
       (when (< limit total)
-	(let ((chunks (sort (alexandria:hash-table-alist *chunks*)
-			    '<
-			    :key (lambda (x)
-				   (chunk-last-access (cdr x))))))
-	  (let ((amount-pruning (- total (- limit reduction))))
-	    ;;(print total)
-	    ;;(format t "~%Pruning ~a chunks" amount-pruning)
-	    (flet ((thing ()
-		     (loop :repeat amount-pruning
-			:for pair :in chunks :do
-			(destructuring-bind (key . chunk) pair
-			  (when (and
-				 *persist*
-				 ;;when the chunk is not obviously empty
-				 (not (empty-chunk-p chunk))
-				 ;;if it wasn't modified, no point in saving
-				 (chunk-modified chunk))
-			    (savechunk key))
-			  (delete-chunk-in-cache key)))))
-	      (crud:call-with-transaction #'thing))))
+	(let* ((pinned-chunks (mapcan 'cursor-all-chunks *pinned-cursors*))
+	       (pinned-table (make-hash pinned-chunks))
+	       (all-chunks (alexandria:hash-table-alist *chunks*))	       
+	       (chunks (sort
+			;;FIXME::
+			(remove-if (lambda (pair)
+				     (gethash (cdr pair) pinned-table))
+				   all-chunks)
+			'<
+			:key (lambda (x)
+			       (chunk-last-access (cdr x)))))
+	       (amount-pruning (- total (- limit reduction))))
+	  (flet ((thing ()
+		   (loop :repeat amount-pruning
+		      :for pair :in chunks :do
+		      (destructuring-bind (key . chunk) pair
+			(when (and
+			       *persist*
+			       ;;when the chunk is not obviously empty
+			       (not (empty-chunk-p chunk))
+			       ;;if it wasn't modified, no point in saving
+			       (chunk-modified chunk))
+			  (savechunk key))
+			(delete-chunk-in-cache key)))))
+	    (crud:call-with-transaction #'thing))
+	  #+nil
+	  (progn
+	    (format t "~%Pruning ~a chunks" amount-pruning)
+	    (format t "~%pinned chunks ~a~%out of total ~a"
+		    (length pinned-chunks)
+		    (length all-chunks))))
 	(setf *true-bit-size* (chunks-total-bits))
 	;;(format t "~%~a" *true-bit-size*)
 	))))
@@ -496,6 +513,19 @@
    (dirty t)
    ;;FIXME:difference between threshold and radius?
    (radius 6)))
+
+(defun chunk-array-all-chunks (&optional (ca *chunk-array*))
+  (let* ((array (chunk-array-array ca))
+	 acc)
+    (dotimes (i (array-total-size array))
+      (let ((chunk (row-major-aref array i)))
+	(when (valid-chunk-p chunk)
+	  (push chunk acc))))
+    (remove-duplicates acc)))
+
+(defun cursor-all-chunks (cursor)
+  (let ((ca (cursor-chunk-array cursor)))
+    (chunk-array-all-chunks ca)))
 
 (defun set-cursor-position
     (px py pz &optional (cursor (make-cursor)) (chunk-array *chunk-array*))

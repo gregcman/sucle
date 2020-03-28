@@ -270,6 +270,13 @@ Press q/escape to quit
   (livesupport:update-repl-link)
   (application:on-session-change *session*
     (voxel-chunks:clearworld)
+    (pushnew
+     *chunk-cursor-center*
+     voxel-chunks::*pinned-cursors*)
+    ;;Comes after 'clearworld' because 'clearworld'
+    ;;resets the chunk-array
+    (setf (vocs::cursor-chunk-array *chunk-cursor-center*)
+	  vocs::*chunk-array*)
     (setf *entities* (loop :repeat 10 :collect (create-entity)))
     (setf *ent* (elt *entities* 0))
     (sync_entity->chunk-array *ent* *chunk-cursor-center*)
