@@ -124,7 +124,8 @@ Press q/escape to quit
   (crud:use-crud-from-path
    ;;(sucle-temp:path "data.db")
    ;;(world-path)
-   (sucle-temp:path "new.db")
+   ;;(sucle-temp:path "new.db")
+   (sucle-temp:path "test.db")
    )
   (sucle-mp:with-initialize-multiprocessing
    (unwind-protect (app:default-loop)	  
@@ -290,7 +291,7 @@ Press q/escape to quit
     ;;FIXME::this depends on the position of entity.
     ;;Rendering/view?
     (reset-chunk-display-list)
-    ( update-world-vao2))
+    (update-world-vao2))
   (sync_entity->chunk-array *ent* *chunk-cursor-center*)
   ;;load or unload chunks around the player who may have moved
   (load-world *chunk-cursor-center*)
@@ -390,7 +391,7 @@ Press q/escape to quit
      :time-of-day (* *fade* *time-of-day*)
      :fog-ratio fog
      :chunk-radius (vocs::cursor-radius *chunk-cursor-center*)))
-  #+nil
+  ;;#+nil
   (map nil
        (lambda (ent)
 	 (unless (eq ent *ent*)
@@ -412,7 +413,7 @@ Press q/escape to quit
   ;;selected block and crosshairs
   (use-solidshader *camera*)
   (render-fist *fist*)
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (map nil
@@ -426,7 +427,7 @@ Press q/escape to quit
   (progn
     (gl:line-width 10.0)
     (render-chunk-outlines))
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (render-units))
@@ -578,14 +579,14 @@ Press q/escape to quit
 
     ((:mouse :pressed :5) . 
      ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *5-fist*)))))
+	;;(when (fist-exists *fist*))
+	(multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
+	  (funcall *5-fist*))))
     ((:mouse :pressed :4) . 
      ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *4-fist*)))))
+	;;(when (fist-exists *fist*))
+	(multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
+	  (funcall *4-fist*))))
     ((:mouse :pressed :middle) . 
      ,(lambda ()
 	(when (fist-exists *fist*)

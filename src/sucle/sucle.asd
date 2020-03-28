@@ -23,7 +23,6 @@
    #:control
    #:alexandria  
    ;;for world-generation
-   #:black-tie
    #:ncurses-clone-for-lem
    #:livesupport
    
@@ -40,7 +39,6 @@
    (:file "mesher")
    (:file "block-data")
    (:file "world")
-   (:file "extra")
    (:file "physics")
    (:file "sucle")
    (:file "render")))

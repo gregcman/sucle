@@ -122,6 +122,8 @@
 	    (z (+ z -1) (+ z 2)))
 	   (setf (b@ x y z) (nick :grass)))))
 
+(setf sucle::*5-fist* 'player-feet-at)
+
 (defparameter *size* 4)
 (defun box-at (&optional
 		 (x *x*)
@@ -180,7 +182,7 @@
 (defun vec-values (&optional (vec (sb-cga:vec 1.0 2.0 3.0)))
   (with-vec (x y z) (vec)
     (values x y z)))
-;;
+(setf *5-fist* 'tree)
 (defun tree (&optional (x *x*) (y *y*) (z *z*) (minfactor 6.0))
   (labels ((rec (place minfactor)
 	     (when (>= minfactor 0)
@@ -289,6 +291,77 @@
 		  (declare (ignore job-task))
 		  (world:dirty-push-around key)
 		  (sucle-mp:remove-unique-task-key job-key))))))
+
+(defun octave (x y z xscale yscale zscale total-scale)
+  (floor (* total-scale
+	    (black-tie:perlin-noise-single-float
+	     (floatify (* x xscale))
+	     (floatify (* y yscale))
+	     (floatify (* z zscale))))))
+;;FIXME::have a separate test file for drawing things?
+(defun make-terrain ()
+  ;;(declare (optimize speed (safety 0)))
+  (let ((count 0))
+    (dobox ((x -100 100)
+	    (z -100 100))
+      (let ((difference
+	       (+ (octave x 0.0 z 0.05 1.0 0.05 10)
+		  ;;(octave x 0.0 z 0.25 1.0 0.25 2)
+		  ;;(octave x 0.0 z 0.02 1.0 0.02 20)
+		  )))
+	(dobox ((y -100 100))
+	  (incf count)
+	  (when (zerop (mod count 10000))
+	    (print count))
+	  (if (< y difference)
+	      (setf (vocs::pen-get x y z)
+		    (nick :grass))
+	      (setf (vocs::pen-get x y z)
+		    (world:blockify (nick :air) 0 15))))))))
+
+(defun deg-rad (n)
+  (* n (floatify (/ pi 180))))
+(setf *5-fist* 'spiral)
+(defun spiral (&optional (x *x*) (y *y*) (z *z*) (iterations 1000))
+  (let* ((angle (deg-rad 1))
+	 (granularity 1.0)
+	 (radius 100.0)
+	 (direction (ng:vec 0.0 1.0 0.0))
+	 (rotation-per-step (* 2 (asin (/ granularity (* 2 radius)))))
+	 (steps-per-turn (floatify (/ (* 2 pi)
+				      rotation-per-step)))
+	 (shrinkage 0.8)
+	 (s (expt shrinkage (/ 1.0 steps-per-turn)))
+	 (mat (ng:matrix*
+	       (ng:scale* s s s)
+	       (ng:rotate-around direction rotation-per-step))))
+    (labels ((rec (place iterations direction)
+	       (when (>= iterations 0)
+		 (let* ((rds (ng:transform-point direction mat)))
+		   (let ((new (ng:vec+ place rds)))
+		     (multiple-value-call
+			 'line
+		       (vec-values place)
+		       (vec-values new)
+		       (nick :stone)
+		       (create-aabb 0.1))
+		     (rec new (1- iterations) rds))))))
+      (rec (multiple-value-call 'sb-cga:vec (floatify2 x y z))
+	   iterations
+	   (ng:vec*
+	    (ng:vec (cos angle) (sin angle) 0.0)
+	    granularity)))))
+
+(setf *5-fist* 'le-box)
+(defun a-box (x y z xsize ysize zsize block)
+  (dobox ((x x (+ x xsize))
+	  (y y (+ y ysize))
+	  (z z (+ z zsize)))
+    (setf (vocs::pen-get x y z) block)))
+(defun le-box (&optional (x *x*) (y *y*) (z *z*) (iterations 100))
+  (dotimes (i iterations)
+    (a-box x y z 3 3 3 (nick :log))
+    (incf x 4)))
 
 
 #+nil

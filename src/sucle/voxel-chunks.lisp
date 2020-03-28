@@ -428,7 +428,9 @@
   (declare (type block-coord x y z))
   (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
     ;;FIXME:This just returns the 'empty' value
-    (unless chunk
+    (unless (and
+	     (not (empty-chunk-p chunk))
+	     (valid-chunk-p chunk))
       (return-from getobj *empty-space*))
     (let ((time *time*))
       (incf *time*)

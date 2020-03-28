@@ -51,7 +51,7 @@
   (blockify (logcount (sxhash obj)) 0 0))
 
 (defmethod lispobj-dispatch ((obj symbol))
-  *empty-space*)
+  vocs::*empty-space*)
  
 
 #+nil
