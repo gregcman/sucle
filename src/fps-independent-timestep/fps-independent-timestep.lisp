@@ -6,7 +6,10 @@
   (:export
    #:tick
    #:set-fps
-   #:microseconds)
+   #:microseconds
+   
+   #:dt
+   #:ticks-per-second)
   (:nicknames :fps))
 
 ;;;;1. set the fps with SET-FPS
@@ -110,3 +113,9 @@
 
 (defmacro tick (&body body)
   `(%tick *ticker* () ,@body))
+
+(defun ticks-per-second (&optional (ticker *ticker*))
+  (/ 1000000.0 (ticker-dt ticker)))
+
+(defun dt (&optional (ticker *ticker*))
+  (/ 1.0 (ticks-per-second ticker)))
