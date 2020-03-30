@@ -18,6 +18,8 @@
 
 (in-package :fps-independent-timestep)
 
+;;Implementation of https://gafferongames.com/post/fix_your_timestep/
+
 ;;;;<CLOCK>
 (deftype seconds ()
   ;;[FIXME]arbitrary amount
