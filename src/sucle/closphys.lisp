@@ -9,7 +9,17 @@
                 #:dohash
                 #:%list
                 #:toggle)
-  (:export))
+  (:export
+   :pos
+   :pos-old
+   :neck-pitch
+   :neck-yaw
+   :direction
+   :jump-p
+   :create-player-entity
+   :sneak-p
+   :fly-p
+   :step-physics))
 
 (in-package #:physics)
 
@@ -21,6 +31,7 @@
 (deftype vec () 'nsb-cga:vec) 
 
 (defparameter *temp-vec* (nsb-cga:vec 0.0 0.0 0.0))
+(defparameter *temp-vec-2* (nsb-cga:vec 0.0 0.0 0.0))
 
 (defmacro modify (fun a &rest rest)
   (once-only (a)
@@ -58,6 +69,9 @@
 (defmacro vec* (a f &optional (temp-vec '*temp-vec*))
   `(nsb-cga:%vec* ,temp-vec ,a ,f))
 
+(defmacro vec/ (a f &optional (temp-vec '*temp-vec*))
+  `(nsb-cga:%vec/ ,temp-vec ,a ,f))
+
 (defmacro vec+ (a f &optional (temp-vec '*temp-vec*))
   `(nsb-cga:%vec+ ,temp-vec ,a ,f))
 
@@ -92,7 +106,10 @@
   (:documentation "An object with a world position"))
 
 (defclass has-physics (has-position)
-  ((velocity :type vec
+  ((position-old :type vec
+                 :initarg :pos
+                 :accessor pos-old)
+   (velocity :type vec
              :initarg :velocity
              :initform (vec 0.0 0.0 0.0)
              :accessor velocity)
@@ -113,7 +130,7 @@
 
 (defmethod apply-impulse ((object has-mass) impulse)
   (vec-incf (velocity object)
-            (vec* impulse (/ 1 (mass object)))))
+            (vec* impulse (/ 1.0 (mass object)))))
 
 (defgeneric apply-force (object force dt))
 
@@ -139,7 +156,7 @@
                    (mass entity))))))
 
 
-(defvar *default-acceleration-due-to-gravity* (vec 0.0 -9.8 0.0))
+(defvar *default-acceleration-due-to-gravity* (vec 0.0 -13.0 0.0))
 (defclass has-gravity ()
   ((gravity-p :type boolean
               :initform t
@@ -154,9 +171,17 @@
 (defmethod acceleration :around ((object has-gravity))
   "Apply acceleration due to gravity before returning acceleration"
   (if (gravity-p object)
-      (vec+ (acceleration-due-to-gravity object)
-            (call-next-method object))
-      (call-next-method object)))
+      (vec+
+       (acceleration-due-to-gravity object)
+       (call-next-method object)
+       *temp-vec-2*)
+      (call-next-method object))
+
+  #+nil(if (gravity-p object)
+           (vec+ (acceleration-due-to-gravity object)
+                 (call-next-method object))
+           (call-next-method object)))
+
 
 (defclass has-aabb ()
   ((aabb :type aabb
@@ -178,6 +203,34 @@
   ;;;;1x1x1 cube
   (create-aabb 1.0 1.0 1.0 0.0 0.0 0.0))
 
+(defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
+  (* n (round (/ x n))))
+(defparameter *player-aabb*
+  (apply #'create-aabb
+	 (mapcar 'round-to-nearest	 
+		 '(0.3 0.12 0.3 -0.3 -1.5 -0.3))))
+
+(defmacro floatf (&rest args)
+  `(progn
+     ,@(mapcar (lambda (arg)
+		 `(setf ,arg (floatify ,arg)))
+	       args)))
+
+
+(defmethod not-occupied ((ent has-aabb) x y z)
+  (let ((aabb (pos-to-block-aabb x y z)))
+    (floatf x y z)
+    (sucle::mvc 'aabbcc:aabb-not-overlap
+                aabb
+                x y z
+                (aabb ent)
+                (sucle::spread
+                 ;;position
+                 (pos ent)))))
+
+(defun pos-to-block-aabb (x y z)
+  (let ((the-block (world:getblock x y z)))
+    (block-to-block-aabb the-block)))
 (defun block-to-block-aabb (blockid)
   (declare (ignore blockid))
   ;;FIXME :use defmethod on objects?
@@ -194,6 +247,11 @@
   (:documentation "An object whose motion is interrupted by blocks in
   the world"))
 
+(defmethod world-contact ((entity has-world-collision))
+  (if (clip-p entity)
+      (slot-value entity 'world-contact)
+      #b000000))
+
 (defun on-ground (entity)
   (when (typep entity 'has-world-collision)
     (logtest (world-contact entity) 4)))
@@ -204,7 +262,8 @@
 (defclass entity (has-physics
                   has-drag
                   has-mass
-                  has-world-collision)
+                  has-world-collision
+                  has-gravity)
   ())
 
 (defclass living-entity (entity)
@@ -234,23 +293,29 @@
   (let ((step-power (slot-value entity 'step-power)))
     (if (on-ground entity)
         (if (not (direction entity))
-            (+ step-power 2.0))
+            (+ step-power 2.0)
+            step-power)
         (* step-power 0.5))))
 
 (defclass player-entity (living-entity)
-  ((movement-speed :initform 4.317)
+  ((aabb :initform *player-aabb*)
+   (mass :initform 1)
+   (movement-speed :initform 4.317)
    (step-power :initform 4.0)
    (fly-p :type boolean
           :initform nil
           :accessor fly-p)
-   (sneak-p :type boolean
+   (sneak-p :type (member nil 0 1)
             :initform nil
             :accessor sneak-p)))
 
+(defun create-player-entity ()
+  (make-instance 'player-entity))
+
 (defmethod step-power :around ((entity player-entity))
-  (if (and (not (direction entity))
-           (fly-p entity))
+  (if (fly-p entity)
       2.0
+      #+nil(if (not (direction entity)) 2.0 4.0)
       (call-next-method entity)))
 
 (defmethod movement-speed :around ((entity player-entity))
@@ -287,16 +352,23 @@ with the world and store that information in ENTITY"
 (defmethod step-physics :around ((entity has-physics) dt)
   "Run all physics methods, then step
 velocity and positon"
+  (setf (pos-old entity) (pos entity))
   (call-next-method entity dt)
   (step-velocity entity (vec* (acceleration entity) dt))
   (step-position entity (vec* (velocity entity) dt)))
 
+(defgeneric apply-jump (entity))
+(defmethod apply-jump ((entity living-entity))
+  (when (and (jump-p entity)
+             (on-ground entity))
+    (apply-impulse entity (jump-impulse entity))))
+(defmethod apply-jump :around ((entity player-entity))
+  (unless (fly-p entity)
+    (call-next-method)))
+
 (defmethod step-physics :before ((entity living-entity) dt)
-  (when (jump-p entity)
-    (apply-impulse entity (jump-impulse entity))) 
-  (apply-movement-force (velocity entity)
-                        (target-velocity entity)
-                        (step-power entity)))
+  (apply-jump entity)
+  (apply-movement-force entity dt))
 
 ;; (defmethod step-physics ((entity player-entity) dt)
 ;;   (let ((speed (movement-speed entity)))
@@ -315,23 +387,26 @@ velocity and positon"
                       (vec-y (velocity entity)))))
     (if dir
         (let ((diraux (+ dir yaw)))
-          (nsb-cga:vec
+          (set-temp-vec
            (* speed (- (sin diraux)))
            yvalue
            (* speed (cos diraux))))
-        (nsb-cga:vec 0.0 yvalue 0.0))))
+        (set-temp-vec 0.0 yvalue 0.0))))
 
-(defun apply-movement-force (current-velocity target-velocity step-power dt)
-  (let* ((delta-velocity (nsb-cga:vec-
+(defun apply-movement-force (entity dt)
+  (let* ((current-velocity (velocity entity))
+         (target-velocity (target-velocity entity))
+         (step-power (step-power entity))
+         (delta-velocity (vec-
                           target-velocity
                           current-velocity))
-         (dv-magnitude (nsb-cga:vec-length delta-velocity)))
+         (dv-magnitude (vec-magnitude delta-velocity)))
     (unless (zerop dv-magnitude)
-      (let ((bump-direction (nsb-cga:vec/
+      (let ((bump-direction (vec/ 
                              delta-velocity
                              dv-magnitude)))
         (let ((step-force (* 2.0 dv-magnitude)))
-          (apply-force current-velocity
+          (apply-force entity
                        (vec* bump-direction
                              (* step-power step-force))
                        dt))))))
@@ -364,7 +439,7 @@ velocity to prevent clipping with the world"
 (defun step-recursive (entity px py pz dx dy dz clamp dead-axis aabb)
   (if (= #b111 dead-axis)
       (progn
-        (vec-setf (velocity entity) 0 0 0)
+        (vec-setf (velocity entity) 0.0 0.0 0.0)
         (vec-setf (pos entity) px py pz))
       (multiple-value-bind (newclamp ratio)
           (collect-touch px py pz dx dy dz aabb)
@@ -373,7 +448,7 @@ velocity to prevent clipping with the world"
                        `(unless (logtest ,bit dead-axis)
                           (incf ,pos (* ratio ,delta))
                           (if (logtest ,bit newclamp)
-                              (setf ,delta 0)
+                              (setf ,delta 0.0)
                               (*= ,delta whats-left)))))
             (axis px dx #b100)
             (axis py dy #b010)
@@ -381,11 +456,11 @@ velocity to prevent clipping with the world"
           (if (>= 0 whats-left)
               (progn (vec-setf (pos entity) px py pz)
                      (when (logtest #b100 clamp)
-                       (setf (vec-x (velocity entity)) 0))
+                       (setf (vec-x (velocity entity)) 0.0))
                      (when (logtest #b010 clamp)
-                       (setf (vec-y (velocity entity)) 0))
+                       (setf (vec-y (velocity entity)) 0.0))
                      (when (logtest #b001 clamp)
-                       (setf (vec-z (velocity entity)) 0)))
+                       (setf (vec-z (velocity entity)) 0.0)))
               (step-recursive entity
                               px py pz
                               dx dy dz
