@@ -4,7 +4,8 @@
   :description "Extra world drawing code"
   :depends-on
   (#:sucle
-   #:black-tie)
+   #:black-tie
+   #:cl-mathstats)
   :serial t
   :components 
   ((:file "extra")))
