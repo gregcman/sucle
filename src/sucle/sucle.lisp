@@ -330,6 +330,7 @@ Press q/escape to quit
     ;;Jump if space pressed
     (setf (physics:jump-p *ent*)
 	  (window:button :key :down #\Space))
+    #+nil
     (when (window:button :key :pressed #\Space)
       (set-doublejump *ent*))
     ;;Set the direction with WASD
