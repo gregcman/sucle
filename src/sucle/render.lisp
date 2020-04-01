@@ -972,11 +972,13 @@ Note:limits the amount of background jobs and pending lisp objects."
 ;;FIXME:OpenGL chunks that are too far away are never destroyed?
 
 ;;Particle shader
-(defun use-particle-shader (&key (camera *camera*)
-			   (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
-			   (fog-ratio 0.01)
-			   (time-of-day (random 1.0))
-			   (chunk-radius (error "chunk-radius not supplied")))
+(defun use-particle-shader
+    (&key (camera *camera*)
+       (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
+       (fog-ratio 0.01)
+       (time-of-day (random 1.0))
+       (chunk-radius (error "chunk-radius not supplied"))
+       (sampler (glhelp:handle (deflazy:getfnc 'terrain))))
   ;;set up shader
   (let ((shader (deflazy:getfnc 'particle-shader)))
     (glhelp:use-gl-program shader)
@@ -1014,8 +1016,7 @@ Note:limits the amount of background jobs and pending lisp objects."
 	   (spread (camera-matrix::camera-cam-right camera)))
 
       (glhelp:set-uniforms-to-textures
-       ((uniform :sampler)
-	(glhelp:handle (deflazy:getfnc 'terrain)))))))
+       ((uniform :sampler) sampler)))))
 (defparameter *particle-offset-attr* 9)
 (glhelp:deflazy-gl particle-shader ()
   (let ((glhelp::*glsl-version* *shader-version*))
@@ -1075,31 +1076,42 @@ gl_FragColor.rgb = temp;
        (:camera-up "camera_up")))))
 
 (defun render-particle-at (x y z)
-    (declare (optimize (speed 3) (safety 0)))
+  (declare (optimize (speed 3) (safety 0)))
   (let ((iterator (scratch-buffer:my-iterator)))
-    (draw-rectangle -0.5 -0.5 0.5 0.5 iterator)
+    (multiple-value-bind (u0 v0 u1 v1)
+	(block-data::fit-to-texture
+	 (block-data::lookup :grass))
+      ;;(print (list u0 v0 u1 v1))
+      (draw-textured-rectangle -0.5 -0.5 0.5 0.5
+			       ;;0.0 0.0 1.0 1.0
+			       u0 v0 u1 v1
+			       ;;u0 v0 u1 v1
+			       iterator))
     ;;mesh-fist-box
     (let ((box
 	   ;;[FIXME]why use this *iterator*?
 	   ;;inefficient: creates an iterator, and an opengl object, renders its,
 	   ;;just to delete it on the same frame
-	   (scratch-buffer:flush-bind-in* ((iterator offset))		    
+	   (scratch-buffer:flush-bind-in* ((iterator data))		    
 	     (glhelp:create-vao-or-display-list-from-specs
 	      (:quads 4)
-	      ((*particle-offset-attr* (offset) (offset))
-	       (*texcoord-attr* 0.0 0.0)
+	      ((*particle-offset-attr* (data) (data))
+	       (*texcoord-attr* (data) (data))
 	       (*position-attr* x y z))))))
       (glhelp:slow-draw box)
       (glhelp:slow-delete box))))
 
-(defun draw-rectangle (minx miny maxx maxy &optional (iterator *iterator*))
-  (macrolet ((vvv (offset-x offset-y)
+(defun draw-textured-rectangle (minx miny maxx maxy
+				u0 v0 u1 v1 &optional (iterator *iterator*))
+  (macrolet ((vvv (offset-x offset-y u v)
 	       `(progn
 		  ;;offset
 		  (fun ,offset-x)
-		  (fun ,offset-y))))
+		  (fun ,offset-y)
+		  (fun ,u)
+		  (fun ,v))))
     (scratch-buffer:bind-out* ((iterator fun))
-      (vvv minx miny)
-      (vvv minx maxy)
-      (vvv maxx maxy)
-      (vvv maxx miny))))
+      (vvv minx miny u0 v0)
+      (vvv minx maxy u0 v1)
+      (vvv maxx maxy u1 v1)
+      (vvv maxx miny u1 v0))))

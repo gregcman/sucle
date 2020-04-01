@@ -228,3 +228,14 @@
 
 ;;;;</BLOCK-DATA>
 ;;;;************************************************************************;;;;
+
+(defun texture-id (id)
+  (utility::with-vec (((* 4 id) u0 v0 u1 v1)) (mesher::*16x16-tilemap*)
+    (values u0 v0 u1 v1)))
+
+(defun fit-to-texture (id &optional (x (random 1.0)) (y (random 1.0)) (w 0.25) (h 0.25))
+  (multiple-value-bind (u0 v0 u1 v1) (texture-id (data id :texture))
+    (values (alexandria:lerp x u0 u1)
+	    (alexandria:lerp y v0 v1)
+	    (alexandria:lerp (min 1.0 (+ w x)) u0 u1)
+	    (alexandria:lerp (min 1.0 (+ h y)) v0 v1))))

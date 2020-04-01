@@ -419,7 +419,8 @@ Press q/escape to quit
        :sky-color color
        :time-of-day darkness
        :fog-ratio fog
-       :chunk-radius radius)
+       :chunk-radius radius
+       :sampler (glhelp:handle (deflazy:getfnc 'terrain)))
       (gl:disable :cull-face)
       (render-particle-at 0.0 0.0 0.0)))
   
