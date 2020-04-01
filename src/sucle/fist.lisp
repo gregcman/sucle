@@ -1,5 +1,5 @@
 (in-package :sucle)
-;;;;************************************************************************;;;;
+
 (defun pos-to-block-aabb (x y z)
   (let ((the-block (world:getblock x y z)))
     (block-to-block-aabb the-block)))
@@ -72,6 +72,3 @@
 	  (unless (zerop type)
 	    (return-from first-block (values type minimum x y z))))))
     #b000))
-
-;; ;;;;</PHYSICS>
-;; ;;;;************************************************************************;;;;
