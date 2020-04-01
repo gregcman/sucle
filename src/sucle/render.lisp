@@ -586,6 +586,7 @@ gl_FragColor.rgb = color_out;
     vec))
 ;;discard the results of queries too long ago and draw anyway.
 (defparameter *frame-time-limit* 3)
+;;[TODO] draw chunks from near to far to reduce rasterization.
 ;;Set this to T to only query-cull chunks that are completely within the frustum
 ;;2-4 times more chunks are removed at the expense of flickering when turning the
 ;;camera.
@@ -969,3 +970,136 @@ Note:limits the amount of background jobs and pending lisp objects."
     (x (aabbcc:aabb-maxx aabb))))
 
 ;;FIXME:OpenGL chunks that are too far away are never destroyed?
+
+;;Particle shader
+(defun use-particle-shader (&key (camera *camera*)
+			   (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
+			   (fog-ratio 0.01)
+			   (time-of-day (random 1.0))
+			   (chunk-radius (error "chunk-radius not supplied")))
+  ;;set up shader
+  (let ((shader (deflazy:getfnc 'particle-shader)))
+    (glhelp:use-gl-program shader)
+
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms uniform shader
+      (gl:uniform-matrix-4fv 
+       (uniform :pmv)
+       (camera-matrix:camera-matrix-projection-view-player camera)
+       nil))
+
+    ;;other cosmetic uniforms
+    (glhelp:with-uniforms
+	uniform shader
+      (destructuring-bind (r g b &rest rest) sky-color
+	(declare (ignorable rest))
+	(%gl:uniform-3f (uniform :fogcolor) r g b))
+      (gl:uniformfv (uniform :camera-pos)
+		    (camera-matrix:camera-vec-position camera))
+      (%gl:uniform-1f (uniform :foglet)
+		      (/ -1.0
+			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
+			 (* vocs:+size+ chunk-radius)
+			 #+nil
+			 (or 128 (camera-matrix:camera-frustum-far *camera*))
+			 fog-ratio))
+      (%gl:uniform-1f (uniform :aratio)
+		      (/ 1.0 fog-ratio))
+      (%gl:uniform-1f (uniform :time)
+		      time-of-day)
+
+      (mvc '%gl:uniform-3f (uniform :camera-up)
+	   (spread (camera-matrix::camera-cam-up camera)))
+      (mvc '%gl:uniform-3f (uniform :camera-right)
+	   (spread (camera-matrix::camera-cam-right camera)))
+
+      (glhelp:set-uniforms-to-textures
+       ((uniform :sampler)
+	(glhelp:handle (deflazy:getfnc 'terrain)))))))
+(defparameter *particle-offset-attr* 9)
+(glhelp:deflazy-gl particle-shader ()
+  (let ((glhelp::*glsl-version* *shader-version*))
+    (glhelp:create-opengl-shader
+     "
+out vec2 texcoord_out;
+out float fogratio_out;
+
+in vec4 position;
+in vec2 texcoord;
+in vec2 offset;
+uniform mat4 projection_model_view;
+
+uniform float foglet;
+uniform float aratio;
+uniform vec3 camera_pos;
+
+uniform vec3 camera_up;
+uniform vec3 camera_right;
+
+void main () {
+vec3 offset = offset.x*camera_right + offset.y*camera_up;
+vec4 new_position = position + vec4(offset,0.0);
+gl_Position = projection_model_view * new_position;
+texcoord_out = texcoord;
+
+float distance = distance(camera_pos.xyz, position.xyz);
+fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
+}"
+     "
+in vec2 texcoord_out;
+uniform sampler2D sampler;
+in float fogratio_out;
+uniform vec3 fogcolor;
+uniform float time = 0.0;
+
+void main () {
+vec4 pixdata = 
+//vec4(1.0);
+texture2D(sampler,texcoord_out.xy);
+vec3 temp = mix(fogcolor, time * pixdata.rgb, fogratio_out);
+//if (pixdata.a == 0.0){discard;}
+gl_FragColor.rgb = temp; 
+}"
+     `(("position" ,*position-attr*) 
+       ("texcoord" ,*texcoord-attr*)
+       ("offset" ,*particle-offset-attr*))
+     '((:pmv "projection_model_view")
+       (:fogcolor "fogcolor")
+       (:foglet "foglet")
+       (:aratio "aratio")
+       (:camera-pos "camera_pos")
+       (:sampler "sampler")
+       (:time "time")
+       
+       (:camera-right "camera_right")
+       (:camera-up "camera_up")))))
+
+(defun render-particle-at (x y z)
+    (declare (optimize (speed 3) (safety 0)))
+  (let ((iterator (scratch-buffer:my-iterator)))
+    (draw-rectangle -0.5 -0.5 0.5 0.5 iterator)
+    ;;mesh-fist-box
+    (let ((box
+	   ;;[FIXME]why use this *iterator*?
+	   ;;inefficient: creates an iterator, and an opengl object, renders its,
+	   ;;just to delete it on the same frame
+	   (scratch-buffer:flush-bind-in* ((iterator offset))		    
+	     (glhelp:create-vao-or-display-list-from-specs
+	      (:quads 4)
+	      ((*particle-offset-attr* (offset) (offset))
+	       (*texcoord-attr* 0.0 0.0)
+	       (*position-attr* x y z))))))
+      (glhelp:slow-draw box)
+      (glhelp:slow-delete box))))
+
+(defun draw-rectangle (minx miny maxx maxy &optional (iterator *iterator*))
+  (macrolet ((vvv (offset-x offset-y)
+	       `(progn
+		  ;;offset
+		  (fun ,offset-x)
+		  (fun ,offset-y))))
+    (scratch-buffer:bind-out* ((iterator fun))
+      (vvv minx miny)
+      (vvv minx maxy)
+      (vvv maxx maxy)
+      (vvv maxx miny))))

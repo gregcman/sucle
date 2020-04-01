@@ -384,23 +384,7 @@ Press q/escape to quit
   ;;render chunks and such
   ;;handle chunk meshing
   (sync_entity->camera *ent* *camera*)
-  
-  (draw-to-default-area)
-  ;;this also clears the depth and color buffer.
-  (multiple-value-bind (color fog) (atmosphere)
-    (apply #'render-sky color)
-    (use-chunk-shader
-     :camera *camera*
-     :sky-color color
-     :time-of-day (* *fade* *time-of-day*)
-     :fog-ratio fog
-     :chunk-radius (vocs::cursor-radius *chunk-cursor-center*)))
-  #+nil
-  (map nil
-       (lambda (ent)
-	 (unless (eq ent *ent*)
-	   (render-entity ent)))
-       *entities*)
+
   (get-chunks-to-draw
    (let ((ent (elt *entities* 0))
 	 (camera (camera-matrix:make-camera)))
@@ -410,7 +394,32 @@ Press q/escape to quit
    (vocs::cursor-x *chunk-cursor-center*)
    (vocs::cursor-y *chunk-cursor-center*)
    (vocs::cursor-z *chunk-cursor-center*))
-  (render-chunks)
+  
+  (draw-to-default-area)
+  ;;this also clears the depth and color buffer.
+  (multiple-value-bind (color fog) (atmosphere)
+    (let ((radius (vocs::cursor-radius *chunk-cursor-center*))
+	  (darkness (* *fade* *time-of-day*)))
+      (apply #'render-sky color)
+      (use-chunk-shader
+       :camera *camera*
+       :sky-color color
+       :time-of-day darkness
+       :fog-ratio fog
+       :chunk-radius radius)
+      #+nil
+      (map nil
+	   (lambda (ent)
+	     (unless (eq ent *ent*)
+	       (render-entity ent)))
+	   *entities*)
+      (render-chunks)
+      (use-particle-shader
+       :camera *camera*
+       :sky-color color
+       :time-of-day darkness
+       :fog-ratio fog
+       :chunk-radius radius)))
   
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)

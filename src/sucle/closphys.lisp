@@ -156,7 +156,7 @@
                    (mass entity))))))
 
 
-(defvar *default-acceleration-due-to-gravity* (vec 0.0 -13.0 0.0))
+(defparameter *default-acceleration-due-to-gravity* (vec 0.0 (* -9.8 2.5) 0.0))
 (defclass has-gravity ()
   ((gravity-p :type boolean
               :initform t
