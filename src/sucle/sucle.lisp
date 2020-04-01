@@ -380,7 +380,8 @@ Press q/escape to quit
      (incf *ticks*)
      (setf *time-of-day* 1.0)
      ;;run the physics
-     (physics:step-physics *ent* (fps:dt))))
+     (physics:step-physics *ent* (fps:dt))
+     (physics::run-particles (fps:dt))))
   ;;render chunks and such
   ;;handle chunk meshing
   (sync_entity->camera *ent* *camera*)
@@ -420,9 +421,8 @@ Press q/escape to quit
        :time-of-day darkness
        :fog-ratio fog
        :chunk-radius radius
-       :sampler (glhelp:handle (deflazy:getfnc 'terrain)))
-      (gl:disable :cull-face)
-      (render-particle-at 0.0 0.0 0.0)))
+       :sampler (glhelp:handle (deflazy:getfnc 'terrain))) 
+      (render-particles)))
   
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
@@ -475,6 +475,13 @@ Press q/escape to quit
        (world::dirty-push (vocs::chunk-key chunk))))
     (when maybe-moved
       (setf (vocs::cursor-dirty chunk-cursor-center) nil))))
+
+(defun render-particles ()
+  (gl:disable :cull-face)
+  (dolist (particle physics::*particles*)
+    (mvc 'render-particle-at
+	 (spread (physics::pos particle))
+	 (physics::blockid particle))))
 
 (defun render-chunk-outlines ()
   (dohash (k chunk) *g/chunk-call-list*
@@ -574,6 +581,7 @@ Press q/escape to quit
 (defparameter *left-fist* 'destroy-block-at)
 (defun destroy-block-at (&optional (x *x*) (y *y*) (z *z*))
   ;;(blocksound x y z)
+  (shoot-particles (+ 0.5 x) (+ 0.5 y) (+ 0.5 z) (world:getblock x y z))
   (world:plain-setblock x y z (block-data:lookup :air) 15))
 (defparameter *right-fist* 'place-block-at)
 (defun place-block-at (&optional (x *x*) (y *y*) (z *z*) (blockval *blockid*))
@@ -637,3 +645,24 @@ Press q/escape to quit
     ((:key :pressed #\f) .
      ,(lambda () (toggle (physics:fly-p *ent*))
          (toggle (physics::gravity-p *ent*))))))
+
+;;;
+
+(defun random-in-range (n)
+  (* (random n) (if (zerop (random 2))
+		    1
+		    -1)))
+(defun shoot-particles
+    (&optional
+       (x (random-in-range 20.0))      
+       (y (random 30.0))
+       (z (random-in-range 20.0))
+       (id 3))
+  (dotimes (i 10)
+    (let ((direction
+	   (sucle::unit-pitch-yaw (- (random (floatify pi)))
+				  (random (floatify pi)))))
+      (mvc 'physics::create-particle id x y z
+	   (spread
+	    (ng:vec* direction (random 20.0)))
+	   (+ 1 (random 1.0))))))

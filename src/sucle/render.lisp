@@ -1075,14 +1075,14 @@ gl_FragColor.rgb = temp;
        (:camera-right "camera_right")
        (:camera-up "camera_up")))))
 
-(defun render-particle-at (x y z)
+(defun render-particle-at (x y z &optional (id (block-data::lookup :grass)))
   (declare (optimize (speed 3) (safety 0)))
-  (let ((iterator (scratch-buffer:my-iterator)))
+  (let ((iterator (scratch-buffer:my-iterator))
+	(size 0.1))
     (multiple-value-bind (u0 v0 u1 v1)
-	(block-data::fit-to-texture
-	 (block-data::lookup :grass))
+	(block-data::fit-to-texture id 0.0 0.0)
       ;;(print (list u0 v0 u1 v1))
-      (draw-textured-rectangle -0.5 -0.5 0.5 0.5
+      (draw-textured-rectangle (- size) (- size) size size
 			       ;;0.0 0.0 1.0 1.0
 			       u0 v0 u1 v1
 			       ;;u0 v0 u1 v1
