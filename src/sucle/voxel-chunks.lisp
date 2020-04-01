@@ -42,7 +42,7 @@
    #:+size+
    #:+total-size+))
 (in-package #:voxel-chunks)
-(defparameter *chunk-io-lock* (bt:make-recursive-lock))
+(defparameter *cache-lock* (bt:make-recursive-lock "Chunk Cache Lock"))
 ;;lets make it 16, and not care about the other parameters for now.
 ;;each chunk is a 16x16x16 cube then.
 (defconstant +size+ 16)
@@ -60,16 +60,18 @@
   (make-hash-table :test 'equal))
 (defparameter *chunks* (make-chunk-cache))
 (defun set-chunk-in-cache (key chunk &optional (cache *chunks*))
-  (kill-old-chunk key)
-  ;;(incf *true-bit-size* (array-truesize (chunk-data chunk)))
-  (setf (gethash key cache) chunk)
-  (prune-cache))
+  (bt:with-recursive-lock-held (*cache-lock*)
+    (kill-old-chunk key)
+    ;;(incf *true-bit-size* (array-truesize (chunk-data chunk)))
+    (setf (gethash key cache) chunk)
+    (prune-cache)))
 (defun get-chunk-in-cache (key &optional (cache *chunks*))
   ;;return (values chunk exist-p)
   (gethash key cache))
 (defun delete-chunk-in-cache (key &optional (cache *chunks*))
-  (when (kill-old-chunk key cache)
-    (remhash key cache)))
+  (bt:with-recursive-lock-held (*cache-lock*)
+    (when (kill-old-chunk key cache)
+      (remhash key cache))))
 (defun kill-old-chunk (key &optional (cache *chunks*))
   (multiple-value-bind (old-chunk existp) (gethash key cache)
     (when existp
@@ -91,7 +93,6 @@
    (* +total-size+ 8))
 (defparameter *cache-limit* (* (expt 16 3)))
 (defparameter *cache-reduction* 0.2)
-(defparameter *prune-lock* (bt:make-lock))
 (defparameter *pinned-cursors* nil)
 (defun make-hash (list)
   (let ((table (make-hash-table)))
@@ -101,7 +102,7 @@
 (defun prune-cache (&key (limit *cache-limit*) (ignore-cursors nil)
 		    &aux (reduction
 			  (* limit *cache-reduction*)))
-  (bt:with-lock-held (*prune-lock*)
+  (bt:with-recursive-lock-held(*cache-lock*)
     (let ((total (total-chunks-in-cache)))
       (when (< limit total)
 	(let* ((pinned-chunks (if ignore-cursors
@@ -312,7 +313,7 @@
 	   ;;(format t "~%Caching new chunk:(~a ~a ~a)" cx cy cz)
 	   ;;Read from the database and put the chunk into the cache.
 	   (let ((new-chunk
-		  (bt:with-recursive-lock-held (*chunk-io-lock*)
+		  (bt:with-recursive-lock-held (*cache-lock*)
 		    (or
 		     ;;Check once again that it really does not exist yet.
 		     (get-chunk-in-cache key)
@@ -577,7 +578,7 @@
 ;;And have chunk loading in another file?
 
 (defun savechunk (key)
-  (bt:with-recursive-lock-held (*chunk-io-lock*)
+  (bt:with-recursive-lock-held (*cache-lock*)
     (let ((chunk (get-chunk-in-cache key)))
       (when (chunk-alive? chunk)   
 	;;write the chunk to disk if its worth saving
