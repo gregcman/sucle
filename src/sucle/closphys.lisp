@@ -4,10 +4,7 @@
                 #:dobox
                 #:with-vec
                 #:floatify
-                #:etouq
                 #:once-only
-                #:dohash
-                #:%list
                 #:toggle)
   (:export
    :pos
@@ -278,9 +275,17 @@
               :accessor direction)
    (jump-p :type boolean
            :initform nil
-           :accessor jump-p)
+           :accessor jump-p
+           :documentation "The entity will continuously attempt to
+           jump as long as this is t")
+   (jump-cooldown :type (or float nil)
+                  :initform 0.5
+                  :reader jump-cooldown)
+   (time-since-last-jump :type float
+                         :initform 0.0
+                         :reader time-since-last-jump)
    (jump-impulse :type vec
-                 :initform (vec 0.0 4.0 0.0)
+                 :initform (vec 0.0 8.0 0.0)
                  :accessor jump-impulse)
    (movement-speed :type float
                    :accessor movement-speed
@@ -357,17 +362,25 @@ velocity and positon"
   (step-velocity entity (vec* (acceleration entity) dt))
   (step-position entity (vec* (velocity entity) dt)))
 
-(defgeneric apply-jump (entity))
-(defmethod apply-jump ((entity living-entity))
-  (when (and (jump-p entity)
-             (on-ground entity))
-    (apply-impulse entity (jump-impulse entity))))
-(defmethod apply-jump :around ((entity player-entity))
+(defun jump-off-cooldown-p (entity)
+  (> (time-since-last-jump entity)
+     (jump-cooldown entity)))
+
+(defgeneric apply-jump (entity dt))
+(defmethod apply-jump ((entity living-entity) dt)
+  (if (and (jump-p entity)
+           (jump-off-cooldown-p entity)
+           (on-ground entity))
+      (progn
+        (setf (slot-value entity 'time-since-last-jump) 0.0)
+        (apply-impulse entity (jump-impulse entity)))
+      (incf (slot-value entity 'time-since-last-jump) dt)))
+(defmethod apply-jump :around ((entity player-entity) dt)
   (unless (fly-p entity)
-    (call-next-method)))
+    (call-next-method entity dt)))
 
 (defmethod step-physics :before ((entity living-entity) dt)
-  (apply-jump entity)
+  (apply-jump entity dt)
   (apply-movement-force entity dt))
 
 ;; (defmethod step-physics ((entity player-entity) dt)
