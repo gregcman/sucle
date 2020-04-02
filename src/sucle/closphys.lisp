@@ -527,27 +527,29 @@ velocity to prevent clipping with the world"
 (defparameter *particle-aabb* (create-aabb 0.1))
 (defclass particle (entity)
   ((aabb :initform *particle-aabb*)
-   (blockid :initarg :blockid
-	    :initform 1
-	    :accessor blockid)
    ;;Lifetime in seconds
    (lifetime :initarg :lifetime
 	     :initform 5.0)
    (alive-p :initform t
 	    :accessor alive-p)
-   (mass :initform 1.0)))
+   (mass :initform 1.0)
+   (uv :initform #(0.0 0.0 1.0 1.0)
+       :initarg :uv
+       :accessor particle-uv)))
 
 (defparameter *particles* ())
 (defun create-particle (blockid x y z &optional (dx 0.0) (dy 0.0) (dz 0.0) (lifetime 3.0))
   (floatf x y z dx dy dz)
-  (let ((particle
-	 (make-instance 'particle
-			:blockid blockid
-			:pos (vec x y z)
-			:velocity (vec dx dy dz)
-			:lifetime lifetime)))
-    (push particle *particles*)
-    particle))
+  (multiple-value-bind (u0 v0 u1 v1)
+      (block-data::fit-to-texture (block-data::texture-for-particle blockid)) 
+    (let ((particle
+	   (make-instance 'particle
+			  :uv (vector u0 v0 u1 v1)
+			  :pos (vec x y z)
+			  :velocity (vec dx dy dz)
+			  :lifetime lifetime)))
+      (push particle *particles*)
+      particle)))
 
 (defmethod step-physics ((particle particle) dt)
   (with-slots (lifetime alive-p) particle

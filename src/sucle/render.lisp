@@ -179,87 +179,72 @@ gl_FragColor = color;
       (values a
 	      (- pick (sum-of-first-n-integers a))))))
 
-(progn
-  (defun color-grasses (terrain)
-    (flet ((color ()
-	     (multiple-value-call #'foliage-color
-	       ;;(values 255 0)
-	       ;;#+nil
-	       (oct-24-2018)
-	       )
-	     
+;;;;
+(defun color-grasses (terrain)
+  (flet ((color ()
+	   (multiple-value-call #'foliage-color
+	     ;;(values 255 0)
+	     ;;#+nil
+	     (oct-24-2018)
+	     )
+	   
 	     ;;;does not distribute evenly. it picks a slice, then a height on the slice.
 	     ;;;points on small slices have a greater chance of being picked than
 	     ;;;points on large slices.
-	     #+nil
-	     (let ((value (random 256)))
-	       (foliage-color value (random (1+ value))))))
-      (modify-greens 5 12 :color
-		     (color)
-		    
-		     ;(foliage-color 255 0)
-		     :terrain terrain)
-      (modify-greens 0 15 :color
+	   #+nil
+	   (let ((value (random 256)))
+	     (foliage-color value (random (1+ value))))))
+    (colorize-sprite "grass" :color
 		     (color)
 		     
-		     ;(foliage-color 255 0)
-		     :terrain terrain))
-    terrain)
-  (defun getapixel (h w image)
-    (destructuring-bind (height width c) (array-dimensions image)
-      (declare (ignore height))
-      (make-array 4 :element-type (array-element-type image)
-		  :displaced-to image
-		  :displaced-index-offset (* c (+ w (* h width))))))
+					;;(foliage-color 255 0)
+		     :image terrain)
+    (colorize-sprite "leaves" :color
+		     (color)
+		     
+					;;(foliage-color 255 0)
+		     :image terrain))
+  terrain)
+(defun pixel-at (w h image)
+  (destructuring-bind (height width c) (array-dimensions image)
+    (declare (ignore height))
+    (make-array 4 :element-type (array-element-type image)
+		:displaced-to image
+		:displaced-index-offset (* c (+ w (* h width))))))
 
-  (defun modify-greens (xpos ypos
-			&key
-			  (color #(0 0 0 0))
-			  (terrain (error "no image")))
-    (let* (;;Assume texture is a square grid of squares
-	   (size (round (sqrt (/ (array-total-size terrain) 4))))
-	   (cell-size (/ size 16)))
- 
-      (setf xpos (* xpos cell-size)
-	    ypos (* ypos cell-size))
-      (dobox ((x xpos (+ cell-size xpos))
-	      (y ypos (+ cell-size ypos)))
-	     (let ((vecinto (getapixel (- (- size 1) y)
-				       x terrain)))
-	       (map-into vecinto (lambda (a b)
-				   (truncate (* a b) 256))
-			 vecinto
-			 color))))))
+(defun colorize-sprite (name &key (color #(0 0 0 0)) (image (error "no image")))
+  (multiple-value-bind (x0 y0 x1 y1)
+      (spritepacker::bounds-for-name name)
+    (dobox ((x x0 x1)
+	    (y y0 y1))
+      (let ((pixel (pixel-at x y image)))
+	(map-into pixel (lambda (a b)
+			    (truncate (* a b) 256))
+		  pixel
+		  color)))))
+;;;;
 
 (defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
-  (let ((denominator (+ (*
-			 (- vy2 vy3)
-			 (- vx1 vx3))
-			(*
-			 (- vx3 vx2)
-			 (- vy1 vy3))))
-	(py-yv3 (- py vy3))
-	(px-xv3 (- px vx3)))
-    (let* ((w1 (/
-		(+
-		 (*
-		  (- vy2 vy3)
-		  px-xv3)
-		 (*
-		  (- vx3 vx2)
-		  py-yv3))
-		  denominator))
-	   (w2 (/
-		(+
-		 (*
-		  (- vy3 vy1)
-		  px-xv3)
-		 (*
-		  (- vx1 vx3)
-		  py-yv3))
-		denominator))
-	   (w3 (- 1 w1 w2)))
-      (values w1 w2 w3))))
+  (let*
+      ((denominator (+ (* (- vy2 vy3)
+			  (- vx1 vx3))
+		       (* (- vx3 vx2)
+			  (- vy1 vy3))))
+       (py-yv3 (- py vy3))
+       (px-xv3 (- px vx3))
+       ;;
+       (w1 (/ (+ (* (- vy2 vy3)
+		    px-xv3)
+		 (* (- vx3 vx2)
+		    py-yv3))
+	      denominator))
+       (w2 (/ (+ (* (- vy3 vy1)
+		    px-xv3)
+		 (* (- vx1 vx3)
+		    py-yv3))
+	      denominator))
+       (w3 (- 1 w1 w2)))
+    (values w1 w2 w3)))
 
 
 (defun  foliage-color (a b)
@@ -1075,12 +1060,11 @@ gl_FragColor.rgb = temp;
        (:camera-right "camera_right")
        (:camera-up "camera_up")))))
 
-(defun render-particle-at (x y z &optional (id (block-data::lookup :grass)))
+(defun render-particle-at (x y z &optional (uv #(0.0 0.0 1.0 1.0)))
   (declare (optimize (speed 3) (safety 0)))
   (let ((iterator (scratch-buffer:my-iterator))
 	(size 0.1))
-    (multiple-value-bind (u0 v0 u1 v1)
-	(block-data::fit-to-texture id 0.0 0.0)
+    (multiple-value-bind (u0 v0 u1 v1) (spread uv)
       ;;(print (list u0 v0 u1 v1))
       (draw-textured-rectangle (- size) (- size) size size
 			       ;;0.0 0.0 1.0 1.0

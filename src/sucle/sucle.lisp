@@ -481,7 +481,7 @@ Press q/escape to quit
   (dolist (particle physics::*particles*)
     (mvc 'render-particle-at
 	 (spread (physics::pos particle))
-	 (physics::blockid particle))))
+	 (physics::particle-uv particle))))
 
 (defun render-chunk-outlines ()
   (dohash (k chunk) *g/chunk-call-list*

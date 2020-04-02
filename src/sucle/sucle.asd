@@ -22,11 +22,13 @@
    #:fps-independent-timestep
    #:control
    #:alexandria  
-   ;;for world-generation
    #:ncurses-clone-for-lem
    #:livesupport
    
-   #:crud)
+   #:crud
+   
+   #:sha1
+   #:patchwork)
   :serial t
   :components 
   (
@@ -37,6 +39,7 @@
    (:file "menu")
    ;;(:file "block-light") ;;light propogation
    (:file "mesher")
+   (:file "spritepacker")
    (:file "block-data")
    (:file "world")
    (:file "fist")
