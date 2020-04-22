@@ -1,25 +1,4 @@
-(defpackage #:physics
-  (:use #:cl)
-  (:import-from #:utility
-                #:dobox
-                #:with-vec
-                #:floatify
-                #:once-only
-                #:toggle)
-  (:export
-   :pos
-   :pos-old
-   :neck-pitch
-   :neck-yaw
-   :direction
-   :jump-p
-   :create-player-entity
-   :sneak-p
-   :fly-p
-   :step-physics))
-
-(in-package #:physics)
-
+(in-package #:entity)
 
 ;;;; Utilities
 
@@ -202,11 +181,6 @@
 
 (defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
   (* n (round (/ x n))))
-(defparameter *player-aabb*
-  (apply #'create-aabb
-	 (mapcar 'round-to-nearest	 
-		 '(0.3 0.12 0.3 -0.3 -1.5 -0.3))))
-
 (defmacro floatf (&rest args)
   `(progn
      ,@(mapcar (lambda (arg)
@@ -302,32 +276,6 @@
             step-power)
         (* step-power 0.5))))
 
-(defclass player-entity (living-entity)
-  ((aabb :initform *player-aabb*)
-   (mass :initform 1)
-   (movement-speed :initform 4.317)
-   (step-power :initform 4.0)
-   (fly-p :type boolean
-          :initform nil
-          :accessor fly-p)
-   (sneak-p :type (member nil 0 1)
-            :initform nil
-            :accessor sneak-p)))
-
-(defun create-player-entity ()
-  (make-instance 'player-entity))
-
-(defmethod step-power :around ((entity player-entity))
-  (if (fly-p entity)
-      2.0
-      #+nil(if (not (direction entity)) 2.0 4.0)
-      (call-next-method entity)))
-
-(defmethod movement-speed :around ((entity player-entity))
-  (if (fly-p entity)
-      (* 4.0 (call-next-method entity))
-      (call-next-method entity)))
-
 ;;;; Physics system
 (defgeneric step-physics (entity dt)
   (:documentation "Entry point to the physics system. Modify ENTITY to
@@ -336,6 +284,17 @@
 (defmethod step-physics (entity dt))
 
 (defgeneric target-velocity (entity))
+
+(defmethod target-velocity ((entity living-entity))
+  (let* ((dir (direction entity))
+         (speed (movement-speed entity))
+         (yvalue (vec-y (velocity entity))))
+    (if dir
+        (set-temp-vec
+         (* speed (- (sin dir)))
+         yvalue
+         (* speed (cos dir)))
+        (set-temp-vec 0.0 yvalue 0.0))))
 
 (defmethod step-physics :before ((entity has-world-collision) dt)
   "Before physics is calculated, find how ENTITY is in contact
@@ -375,36 +334,10 @@ velocity and positon"
         (setf (slot-value entity 'time-since-last-jump) 0.0)
         (apply-impulse entity (jump-impulse entity)))
       (incf (slot-value entity 'time-since-last-jump) dt)))
-(defmethod apply-jump :around ((entity player-entity) dt)
-  (unless (fly-p entity)
-    (call-next-method entity dt)))
 
 (defmethod step-physics :before ((entity living-entity) dt)
   (apply-jump entity dt)
   (apply-movement-force entity dt))
-
-;; (defmethod step-physics ((entity player-entity) dt)
-;;   (let ((speed (movement-speed entity)))
-;;     ))
-
-(defmethod target-velocity ((entity player-entity))
-  (let* ((flying (fly-p entity))
-         (yaw (neck-yaw entity))
-         (dir (direction entity))
-         (speed (movement-speed entity))
-         (yvalue  (if flying
-                      (cond
-                        ((jump-p entity) speed)
-                        ((sneak-p entity) (- speed))
-                        (t 0.0))
-                      (vec-y (velocity entity)))))
-    (if dir
-        (let ((diraux (+ dir yaw)))
-          (set-temp-vec
-           (* speed (- (sin diraux)))
-           yvalue
-           (* speed (cos diraux))))
-        (set-temp-vec 0.0 yvalue 0.0))))
 
 (defun apply-movement-force (entity dt)
   (let* ((current-velocity (velocity entity))
