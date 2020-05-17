@@ -12,7 +12,6 @@
 	       ;;#:opengl-immediate
 	       ;;#:character-modifier-bits
 	       #:uncommon-lisp
-	       #:livesupport
 
 	       #:sucle)
   :serial t

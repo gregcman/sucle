@@ -88,6 +88,7 @@
 (defun poll-app ()
   (when window:*status*
     (quit))
+  (livesupport:update-repl-link)
   (window:update-control-state2)
   (dependency-graph:flush-refreshes)
   (window:update-display)

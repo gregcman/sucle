@@ -8,6 +8,7 @@
 	       #:bordeaux-threads
 	       #+darwin
 	       #:trivial-main-thread
+	       #:livesupport
 	       #:cl-opengl
 	       ;;#:music
 	       #:glhelp

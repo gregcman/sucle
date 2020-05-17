@@ -218,7 +218,6 @@
   ;;[FIXME]where is the best place to flush the job-tasks?
   (sucle-mp:flush-job-tasks)
   ;;set the chunk center aroun the player
-  (livesupport:update-repl-link)
   (application:on-session-change *session*
     (voxel-chunks:clearworld)
     (setf *entities* (loop :repeat 10 :collect (create-entity)))
