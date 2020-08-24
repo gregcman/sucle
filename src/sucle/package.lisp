@@ -10,6 +10,33 @@
 		#:%list
 		#:toggle)
   (:export #:start))
+(defpackage #:entity
+  (:use #:cl)
+  (:import-from #:utility
+                #:dobox
+                #:with-vec
+                #:floatify
+                #:once-only
+                #:toggle)
+  (:export
+   ;; physics
+   :pos
+   :pos-old
+   :neck-pitch
+   :neck-yaw
+   :direction
+   :jump-p
+   :step-physics
+
+   ;; ai
+   :run-ai
+
+   ;; entity
+   :create-player-entity
+   :sneak-p
+   :fly-p
+
+   :create-dumb-entity))
 (defpackage #:world
   (:use :cl)
   (:import-from #:utility

@@ -380,8 +380,8 @@ gl_FragColor.rgb = color_out;
     (mvc 'render-aabb-at *selected-block-aabb* (spread (fist-selected-block fist)))))
 (defun render-entity (entity)
   (mvc 'render-aabb-at
-       (entity-aabb entity)
-       (spread (entity-position entity))))
+       (entity::aabb entity)
+       (spread (entity::pos entity))))
 (defun render-aabb-at (aabb x y z &optional (r 0.1) (g 0.1) (b 0.1))
   (let ((iterator (scratch-buffer:my-iterator)))
     (let ((times (draw-aabb x y z aabb iterator)))

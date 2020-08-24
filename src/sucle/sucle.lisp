@@ -278,8 +278,10 @@ Press q/escape to quit
     ;;resets the chunk-array
     (setf (vocs::cursor-chunk-array *chunk-cursor-center*)
 	  vocs::*chunk-array*)
-    (setf *entities* (loop :repeat 10 :collect (physics:create-player-entity)))
-    (setf *ent* (elt *entities* 0))
+    (let ((player (entity:create-player-entity)))
+      (setf *entities* (cons player
+                             (loop :repeat 10 :collect (entity:create-dumb-entity))))
+      (setf *ent* player))
     (sync_entity->chunk-array *ent* *chunk-cursor-center*)
     (load-world *chunk-cursor-center*;; t
 		)
@@ -311,7 +313,7 @@ Press q/escape to quit
   ;;#+nil
   (setf *fist*
 	(mvc 'standard-fist
-	     (spread (physics:pos *ent*))
+	     (spread (entity:pos *ent*))
 	     (spread (sb-cga:vec*
 		      (camera-matrix:camera-vec-forward *camera*)
 		      *reach*))))
@@ -321,21 +323,21 @@ Press q/escape to quit
     (run-buttons *god-keys*))
   (when (mode-enabled-p :movement-mode)
     ;;Set the sneaking state
-    (setf (physics:sneak-p *ent*)
+    (setf (entity:sneak-p *ent*)
 	  (cond
 	    ((window:button :key :down :left-shift)
 	     0)
 	    ((window:button :key :down :left-control)
 	     1)))
     ;;Jump if space pressed
-    (setf (physics:jump-p *ent*)
+    (setf (entity:jump-p *ent*)
 	  (window:button :key :down #\Space))
     #+nil
     (when (window:button :key :pressed #\Space)
       (set-doublejump *ent*))
     ;;Set the direction with WASD
     (setf
-     (physics:direction *ent*)
+     (entity:direction *ent*)
      (let ((x 0)
 	   (y 0))
        (when (window:button :key :down #\w)
@@ -368,8 +370,8 @@ Press q/escape to quit
   ;;mouse position
   ;; (mvc 'set-neck-values (entity-neck *ent*) (neck-values))
   (multiple-value-bind (yaw pitch) (neck-values)
-    (setf (physics:neck-yaw *ent*) yaw
-          (physics:neck-pitch *ent*) pitch))
+    (setf (entity:neck-yaw *ent*) yaw
+          (entity:neck-pitch *ent*) pitch))
 
   ;;Run the game ticks
 
@@ -380,15 +382,19 @@ Press q/escape to quit
      (incf *ticks*)
      (setf *time-of-day* 1.0)
      ;;run the physics
-     (physics:step-physics *ent* (fps:dt))
-     (physics::run-particles (fps:dt))))
+     ;; (entity:step-physics *ent* (fps:dt))
+     (mapcar (lambda (ent)
+               (entity:step-physics ent (fps:dt))
+               (entity:run-ai ent (fps:dt)))
+             *entities*)
+     (entity::run-particles (fps:dt))))
   ;;render chunks and such
   ;;handle chunk meshing
   (sync_entity->camera *ent* *camera*)
 
   (get-chunks-to-draw
    (let ((ent (elt *entities* 0))
-	 (camera (camera-matrix:make-camera)))
+         (camera (camera-matrix:make-camera)))
      (sync_entity->camera ent camera)
      camera)
    (vocs::cursor-radius *chunk-cursor-center*)
@@ -408,7 +414,7 @@ Press q/escape to quit
        :time-of-day darkness
        :fog-ratio fog
        :chunk-radius radius)
-      #+nil
+      ;; #+nil
       (map nil
 	   (lambda (ent)
 	     (unless (eq ent *ent*)
@@ -460,7 +466,7 @@ Press q/escape to quit
 (defparameter *chunk-cursor-center* (vocs::make-cursor))
 (defun sync_entity->chunk-array (ent cursor)
   (mvc 'vocs::set-cursor-position
-       (spread (physics:pos ent))
+       (spread (entity:pos ent))
        cursor))
 
 (defun load-world (chunk-cursor-center)
@@ -478,10 +484,10 @@ Press q/escape to quit
 
 (defun render-particles ()
   (gl:disable :cull-face)
-  (dolist (particle physics::*particles*)
+  (dolist (particle entity::*particles*)
     (mvc 'render-particle-at
-	 (spread (physics::pos particle))
-	 (physics::particle-uv particle))))
+	 (spread (entity::pos particle))
+	 (entity::particle-uv particle))))
 
 (defun render-chunk-outlines ()
   (dohash (k chunk) *g/chunk-call-list*
@@ -523,19 +529,19 @@ Press q/escape to quit
   
   ;;Set the direction of the camera based on the
   ;;pitch and yaw of the player
-  (sync_neck->camera (physics:neck-pitch entity)
-                     (physics:neck-yaw entity)
+  (sync_neck->camera (entity:neck-pitch entity)
+                     (entity:neck-yaw entity)
                      camera)
   ;;Calculate the camera position from
   ;;the past, current position of the player and the frame fraction
   (sync_position->camera
    ;;modify the camera for sneaking
-   (physics:pos entity)
-   (physics:pos-old entity)
+   (entity:pos entity)
+   (entity:pos-old entity)
 
    #+nil(let ((particle (entity-particle entity)))
-          (if (and (not (physics:fly-p entity))
-                   (eql 0 (physics:sneak-p entity)))
+          (if (and (not (entity:fly-p entity))
+                   (eql 0 (entity:sneak-p entity)))
               (translate-pointmass particle 0.0 -0.125 0.0)
               particle))
    camera
@@ -585,7 +591,7 @@ Press q/escape to quit
   (world:plain-setblock x y z (block-data:lookup :air) 15))
 (defparameter *right-fist* 'place-block-at)
 (defun place-block-at (&optional (x *x*) (y *y*) (z *z*) (blockval *blockid*))
-  (when (physics::not-occupied *ent* x y z)
+  (when (entity::not-occupied *ent* x y z)
     ;;(blocksound x y z)
     (world:plain-setblock x y z blockval (block-data:data blockval :light))))
 
@@ -640,11 +646,11 @@ Press q/escape to quit
 (defparameter *god-keys*
   `(;;Toggle noclip with 'v'
     ((:key :pressed #\v) .
-     ,(lambda () (toggle (physics:fly-p *ent*))))
+     ,(lambda () (toggle (entity:fly-p *ent*))))
     ;;Toggle flying with 'f'
     ((:key :pressed #\f) .
-     ,(lambda () (toggle (physics:fly-p *ent*))
-         (toggle (physics::gravity-p *ent*))))))
+     ,(lambda () (toggle (entity:fly-p *ent*))
+         (toggle (entity::gravity-p *ent*))))))
 
 ;;;
 
@@ -662,7 +668,7 @@ Press q/escape to quit
     (let ((direction
 	   (sucle::unit-pitch-yaw (- (random (floatify pi)))
 				  (random (floatify pi)))))
-      (mvc 'physics::create-particle id x y z
+      (mvc 'entity::create-particle id x y z
 	   (spread
 	    (ng:vec* direction (random 20.0)))
 	   (+ 1 (random 1.0))))))
