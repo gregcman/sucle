@@ -36,55 +36,7 @@
   (apply 'create-aabb
 	 (mapcar 'floatify
 		 (list vocs:+size+ vocs:+size+ vocs:+size+ 0.0 0.0 0.0))))
-(defparameter *start-menu*
-  `(;;keys bound to functions
-    (((:key :pressed #\f) .
-      ,(lambda () (print "Paying Respects")))
-     ((:key :pressed #\q) .
-      ,(lambda () (app:quit)))
-     ((:key :pressed #\Escape) .
-      ,(lambda () (app:quit)))
-     ((:key :pressed #\p) .
-      ,(lambda () (app:pop-mode)))
-     ((:key :pressed #\o) .
-      ,(lambda () (app:push-mode 'menu:tick)))
-     ((:key :pressed #\s) .
-      ,(lambda ()
-	 (app:push-mode 'sucle-per-frame)))
-     ((:key :pressed #\c) .
-      ,(lambda ()
-	 (print "Clearing...")
-	 (let ((clear (assoc :clear menu:*data*)))
-	   (setf (second clear)
-		 (with-output-to-string (str)
-		   (let ((clearstr
-			  (make-string menu:*w*
-				       :initial-element #\space)))
-		     (dotimes (y menu:*h*)
-		       (terpri str)
-		       (write-string clearstr str))))))))
-     ((:key :released #\c) .
-      ,(lambda ()
-	 (print "Clearing Done!")
-	 (let ((clear (assoc :clear menu:*data*)))
-	   (setf (second clear)
-		 "")))))
-    ;;data to render
-    ((:hello
-      "
-Press s to start the game
 
-Press c to clear
-
-Press h for help
-
-Press F to pay respects [not really]
-
-Press q/escape to quit
-" 4 4 :bold t)
-     ;;(:hello "world" 8 16 :fg "green" :bg "red" :reverse t :bold t)
-     (:clear "" 0 0  :bold t))
-    ()))
 
 ;;;;</BOXES?>
 (defparameter *some-saves* nil)
@@ -120,7 +72,7 @@ Press q/escape to quit
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
   (app:push-mode 'menu:tick)
-  (menu:use *start-menu*)
+  (menu:use *start-menu2*)
   (crud:use-crud-from-path
    (sucle-temp:path "data.db")
    ;;(world-path)
