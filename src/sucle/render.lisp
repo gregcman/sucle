@@ -272,8 +272,11 @@ gl_FragColor = color;
 	    '(128.0 180.0 151.0))))
 
 (deflazy:deflazy terrain-png ()
+  #+nil
   (img:load
-   (sucle-temp:path #P"res/terrain.png")))
+   (sucle-temp:path #P"res/terrain.png"))
+  (img:load
+   (sucle-temp:path #P"res/terrain1-8.png")))
 
 (deflazy:deflazy modified-terrain-png (terrain-png)
   (color-grasses

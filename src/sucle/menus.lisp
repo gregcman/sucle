@@ -140,7 +140,7 @@ Press q/escape to quit
 	   (crud:use-crud-from-path (elt saves index))
 	   (vocs:clearworld)
 	   (update-world-vao2)
-	   (app:push-mode 'sucle-per-frame)))
+	   (menu:use *menu-in-world*)))
        )
       ;;data to render
       ((:what "      saves; press enter to select" 0 4 :bg "black" :fg "cyan" :bold t)
@@ -153,3 +153,18 @@ Press q/escape to quit
 		 (alexandria:iota (length saves))))
       ()
       ,(lambda () (menu:clear)))))
+
+(defparameter *menu-in-world*
+  `(;;keys bound to functions
+    (((:key :pressed #\q) .
+      ,(lambda ()
+	 (vocs::save-all)
+	 (menu:use (make-menu-file-picker))))
+     ((:key :pressed #\e) .
+      ,(lambda ()
+	 (app:push-mode 'sucle-per-frame)))
+     )
+    ;;data to render
+    ((:what "                         e to play, q to quit" 0 10 :bg "black" :fg "white" :bold t))
+    ()
+    ,(lambda () (menu:clear))))

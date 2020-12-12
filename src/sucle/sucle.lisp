@@ -80,9 +80,7 @@
    ;;(sucle-temp:path "new.db")
    )
   (sucle-mp:with-initialize-multiprocessing
-   (unwind-protect (app:default-loop)	  
-     (when vocs::*persist*
-       (vocs::save-all)))))
+    (app:default-loop)))
 
 ;;;;
 
@@ -299,7 +297,8 @@
 	   (floatify (atan y x)))))
     ;;update the internal mouse state
     ;;taking into consideration fractions
-    (update-moused *mouse-multiplier-aux* 1.0))
+    (when (window:mouse-locked?)
+      (update-moused *mouse-multiplier-aux* 1.0)))
   (when (mode-enabled-p :normal-mode)
     ;;[FIXME] because this runs after update-moused, the camera swivels
     ;;unecessarily.
