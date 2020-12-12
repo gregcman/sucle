@@ -19,8 +19,7 @@
     (assert (every 'alphanumericp sql-string) nil "~s is invalid, injectable SQL" string)
     string))
 ;;;Handle pooling. Each thread gets its own handle.
-;;FIXME::have different handles for different databases.
-(defparameter *handles* (lparallel.queue:make-queue))
+(defvar *handles*)
 (defun get-handle ()
   (or
    (lparallel.queue:try-pop-queue *handles*)

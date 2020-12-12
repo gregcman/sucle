@@ -26,3 +26,18 @@ If you want a GUI, write a web form.
 
 It should be:
 fun, performant, scriptable, concise.
+
+It should be able to have content generated for it by an AI.
+
+PhoenixSC, AIDungeon, GPT-3
+
+Wavenet + GPT-3 + Yandex images
+
+How do I turn it into something visual?
+leverage
+
+GPT-3 has solved interaction.
+The interesting question is how do we turn text into something visual?
+people are extremely visual creatures.
+
+how can I animate the output of GPT-3?

@@ -1,0 +1,3 @@
+- greatly simplify sucle (make a copy?)
+- world selection
+ - Clean up the database -> allow multiple databases
