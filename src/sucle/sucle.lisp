@@ -73,6 +73,7 @@
   (ncurses-clone-for-lem:init)
   (app:push-mode 'menu:tick)
   (menu:use *start-menu2*)
+  #+nil
   (crud:use-crud-from-path
    (sucle-temp:path "data.db")
    ;;(world-path)
@@ -545,6 +546,7 @@
 	(app:pop-mode)))
     ((:key :pressed #\e) .
      ,(lambda ()
+	(cursor-motion-difference)
 	(window:toggle-mouse-capture)
 	(set-mode-if :movement-mode (not (window:mouse-free?)))
 	(set-mode-if :fist-mode (not (window:mouse-free?)))

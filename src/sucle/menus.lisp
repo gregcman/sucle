@@ -54,7 +54,8 @@ Press q/escape to quit
     (
      ((:key :pressed #\Space) .
       ,(lambda ()
-	 (app:push-mode 'sucle-per-frame)))
+	 (menu:use (make-menu-file-picker))
+	 ))
     )
     ;;data to render
     ((:clear "                                             
@@ -104,3 +105,51 @@ Press q/escape to quit
 	     (setf (getf data :bg) "white")
 	     (setf (getf data :bg) "black"))))))
 
+(defun saves-list ()
+  (append (uiop:directory* (sucle-temp:path "saves/*"))
+	  (uiop:directory-files (sucle-temp:path "saves/"))))
+(defparameter *menu-file-picker*
+  `(;;keys bound to functions
+    (
+     ((:key :pressed #\Space) .
+      ,(lambda ()
+	 (app:push-mode 'sucle-per-frame)))
+    )
+    ;;data to render
+    ((:press_s "
+                              press space" 0 20 :bold t :fg "black" :bg "white" :reverse t))
+    ()
+    ,(lambda ()
+       (let ((data (assoc :press_s menu:*data*)))
+	 (if (zerop (mod (floor (fps:microseconds) 1000000) 2))
+	     (setf (getf data :bg) "white")
+	     (setf (getf data :bg) "black"))))))
+
+(defun make-menu-file-picker (&optional (index 0))
+  (let ((saves (saves-list)))
+    (setf index (mod index (length saves)))
+    `(;;keys bound to functions
+      (((:key :repeat :up) .
+	,(lambda ()
+	   (menu:use (make-menu-file-picker (1- index)))))
+       ((:key :repeat :down) .
+	,(lambda ()
+	   (menu:use (make-menu-file-picker (1+ index)))))
+       ((:key :pressed :enter) .
+	,(lambda ()
+	   (crud:use-crud-from-path (elt saves index))
+	   (vocs:clearworld)
+	   (update-world-vao2)
+	   (app:push-mode 'sucle-per-frame)))
+       )
+      ;;data to render
+      ((:what "      saves; press enter to select" 0 4 :bg "black" :fg "cyan" :bold t)
+       ,@(mapcar (lambda (save list-index)
+		   `(:data ,(write-to-string save) 0 ,(+ 7 list-index) :bold t :fg "black" :bg "white" :reverse
+			   ,(if (equal index list-index)
+				nil t
+				)))
+		 saves
+		 (alexandria:iota (length saves))))
+      ()
+      ,(lambda () (menu:clear)))))

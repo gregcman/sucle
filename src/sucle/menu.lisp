@@ -6,7 +6,9 @@
    #:*h*
    #:tick
    #:use
-   #:start))
+   #:start
+   
+   #:clear))
 (in-package #:menu)
 ;;Ripped from sucle-test essentially.
 
@@ -19,6 +21,7 @@
   (app:default-loop))
 (defun start ()
   (app:enter 'menu-app))
+(defun clear () (ncurses-clone:clear-win *view*))
 (defparameter *menu*
   `((((:key :pressed #\q) .
       ,(lambda () (app:quit)))
