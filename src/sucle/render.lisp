@@ -89,7 +89,9 @@
     #+nil
     (when (not (zerop overridden))
       (print overridden))
-    ;;(print (/ hidden (+ 0.0 hidden shown)))
+    #+nil
+    (when (zerop (random 60))
+      (print (/ hidden (+ 0.0 hidden shown))))
     ;;#+nil
     #+nil
     (let ((total (hash-table-count *g/chunk-call-list*)))
@@ -177,87 +179,72 @@ gl_FragColor = color;
       (values a
 	      (- pick (sum-of-first-n-integers a))))))
 
-(progn
-  (defun color-grasses (terrain)
-    (flet ((color ()
-	     (multiple-value-call #'foliage-color
-	       ;;(values 255 0)
-	       ;;#+nil
-	       (oct-24-2018)
-	       )
-	     
+;;;;
+(defun color-grasses (terrain)
+  (flet ((color ()
+	   (multiple-value-call #'foliage-color
+	     ;;(values 255 0)
+	     ;;#+nil
+	     (oct-24-2018)
+	     )
+	   
 	     ;;;does not distribute evenly. it picks a slice, then a height on the slice.
 	     ;;;points on small slices have a greater chance of being picked than
 	     ;;;points on large slices.
-	     #+nil
-	     (let ((value (random 256)))
-	       (foliage-color value (random (1+ value))))))
-      (modify-greens 5 12 :color
-		     (color)
-		    
-		     ;(foliage-color 255 0)
-		     :terrain terrain)
-      (modify-greens 0 15 :color
+	   #+nil
+	   (let ((value (random 256)))
+	     (foliage-color value (random (1+ value))))))
+    (colorize-sprite "grass" :color
 		     (color)
 		     
-		     ;(foliage-color 255 0)
-		     :terrain terrain))
-    terrain)
-  (defun getapixel (h w image)
-    (destructuring-bind (height width c) (array-dimensions image)
-      (declare (ignore height))
-      (make-array 4 :element-type (array-element-type image)
-		  :displaced-to image
-		  :displaced-index-offset (* c (+ w (* h width))))))
+					;;(foliage-color 255 0)
+		     :image terrain)
+    (colorize-sprite "leaves" :color
+		     (color)
+		     
+					;;(foliage-color 255 0)
+		     :image terrain))
+  terrain)
+(defun pixel-at (w h image)
+  (destructuring-bind (height width c) (array-dimensions image)
+    (declare (ignore height))
+    (make-array 4 :element-type (array-element-type image)
+		:displaced-to image
+		:displaced-index-offset (* c (+ w (* h width))))))
 
-  (defun modify-greens (xpos ypos
-			&key
-			  (color #(0 0 0 0))
-			  (terrain (error "no image")))
-    (let* (;;Assume texture is a square grid of squares
-	   (size (round (sqrt (/ (array-total-size terrain) 4))))
-	   (cell-size (/ size 16)))
- 
-      (setf xpos (* xpos cell-size)
-	    ypos (* ypos cell-size))
-      (dobox ((x xpos (+ cell-size xpos))
-	      (y ypos (+ cell-size ypos)))
-	     (let ((vecinto (getapixel (- (- size 1) y)
-				       x terrain)))
-	       (map-into vecinto (lambda (a b)
-				   (truncate (* a b) 256))
-			 vecinto
-			 color))))))
+(defun colorize-sprite (name &key (color #(0 0 0 0)) (image (error "no image")))
+  (multiple-value-bind (x0 y0 x1 y1)
+      (spritepacker::bounds-for-name name)
+    (dobox ((x x0 x1)
+	    (y y0 y1))
+      (let ((pixel (pixel-at x y image)))
+	(map-into pixel (lambda (a b)
+			    (truncate (* a b) 256))
+		  pixel
+		  color)))))
+;;;;
 
 (defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
-  (let ((denominator (+ (*
-			 (- vy2 vy3)
-			 (- vx1 vx3))
-			(*
-			 (- vx3 vx2)
-			 (- vy1 vy3))))
-	(py-yv3 (- py vy3))
-	(px-xv3 (- px vx3)))
-    (let* ((w1 (/
-		(+
-		 (*
-		  (- vy2 vy3)
-		  px-xv3)
-		 (*
-		  (- vx3 vx2)
-		  py-yv3))
-		  denominator))
-	   (w2 (/
-		(+
-		 (*
-		  (- vy3 vy1)
-		  px-xv3)
-		 (*
-		  (- vx1 vx3)
-		  py-yv3))
-		denominator))
-	   (w3 (- 1 w1 w2)))
-      (values w1 w2 w3))))
+  (let*
+      ((denominator (+ (* (- vy2 vy3)
+			  (- vx1 vx3))
+		       (* (- vx3 vx2)
+			  (- vy1 vy3))))
+       (py-yv3 (- py vy3))
+       (px-xv3 (- px vx3))
+       ;;
+       (w1 (/ (+ (* (- vy2 vy3)
+		    px-xv3)
+		 (* (- vx3 vx2)
+		    py-yv3))
+	      denominator))
+       (w2 (/ (+ (* (- vy3 vy1)
+		    px-xv3)
+		 (* (- vx1 vx3)
+		    py-yv3))
+	      denominator))
+       (w3 (- 1 w1 w2)))
+    (values w1 w2 w3)))
 
 
 (defun  foliage-color (a b)
@@ -542,7 +529,14 @@ gl_FragColor.rgb = color_out;
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 
-(defun get-chunks-to-draw (camera radius cx cy cz)
+(defun frustum-state (state total-p)
+  (if state
+      (if total-p
+	  t
+	  :some)
+      nil))
+
+(defun get-chunks-to-draw (camera radius cx cy cz &aux (frustum-in 0) (frustum-out 0))  
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)
     (let* ((foo (+ 1 radius)))
@@ -555,23 +549,36 @@ gl_FragColor.rgb = color_out;
 	      (> (the fixnum foo)
 		 (the fixnum (world:blocky-chunk-distance key cx cy cz)))
 	    (symbol-macrolet
-		((inside-frustum-p
-		  (chunk-gl-representation-in-frustum-p value)))
-	      (let ((frustum-state (box-in-frustum camera (chunk-gl-representation-aabb value)))
-		    (old-frustum-state inside-frustum-p))
-		(when (and (not old-frustum-state)
-			   frustum-state)
-		  ;;It just came into view, so definitely render it.
-		  ;;(setf (chunk-gl-representation-draw-override value) 2)
-		  )
+		((inside-frustum-p (chunk-gl-representation-in-frustum-p value)))
+	      (multiple-value-bind (frustum-state total?)
+		  (box-in-frustum camera (chunk-gl-representation-aabb value))
+		(when (and frustum-state (not total?))
+		  (incf frustum-out))
+		(when total?
+		  (incf frustum-in))
+		;;(setf frustum-state (and frustum-state total?))
+		(let ((old-frustum-state inside-frustum-p))
+		  (when (and (not old-frustum-state)
+			     frustum-state)
+		    ;;It just came into view, so definitely render it.
+		    ;;(setf (chunk-gl-representation-draw-override value) 2)
+		    ))
 
 		;;FIXME: only necessary to write on change, but whatever.
-		(setf inside-frustum-p frustum-state)
+		(setf inside-frustum-p (frustum-state frustum-state total?))
 		(when frustum-state
 		  (vector-push-extend value vec)))))))
+    #+nil
+    (when (zerop (random 20))
+      (print (/ frustum-in (+ 0.0 frustum-in frustum-out))))
     vec))
 ;;discard the results of queries too long ago and draw anyway.
 (defparameter *frame-time-limit* 3)
+;;[TODO] draw chunks from near to far to reduce rasterization.
+;;Set this to T to only query-cull chunks that are completely within the frustum
+;;2-4 times more chunks are removed at the expense of flickering when turning the
+;;camera.
+(defparameter *exclude-frustum-edge-chunks-from-query* t)
 (defun draw-world (&optional (vec *call-lists*) &aux (count-occluded-by-query 0)
 						  (count-actually-drawn 0)
 						  (count-overridden 0))
@@ -610,7 +617,11 @@ gl_FragColor.rgb = color_out;
 	     ;;Regular visible
 	     (not (chunk-gl-representation-occluded value))
 	     ;;queries enabled and overridden
-	     overridden-p)
+	     overridden-p
+	     ;;Always draw chunks on the edge
+	     (and *exclude-frustum-edge-chunks-from-query*
+		  (eq :some (chunk-gl-representation-in-frustum-p value)))
+	     )
 	    ;;not occluded = visible
 	    (incf count-actually-drawn)	    
 	    (symbol-macrolet ((occlusion-state (chunk-gl-representation-occlusion-state value)))
@@ -910,7 +921,9 @@ Note:limits the amount of background jobs and pending lisp objects."
 ;;;http://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm
 (defun box-in-frustum (camera aabb)
   (let ((planes (camera-matrix::camera-planes camera))
-	(camera-position (camera-matrix::camera-vec-position camera)))
+	(camera-position (camera-matrix::camera-vec-position camera))
+	;;Is the box completely within the frustum with no intersection at all?
+	(total t))
     (dolist (plane planes)
       (let ((out 0))
 	(call-aabb-corners
@@ -924,8 +937,10 @@ Note:limits the amount of background jobs and pending lisp objects."
 	     (incf out)))
 	 aabb)
 	(when (= out 8)
-	  (return-from box-in-frustum nil)))))
-  (values t))
+	  (return-from box-in-frustum nil))
+	(unless (zerop out)
+	  (setf total nil))))
+    (values t total)))
 
 (defun call-aabb-corners
     (&optional
@@ -943,3 +958,147 @@ Note:limits the amount of background jobs and pending lisp objects."
     (x (aabbcc:aabb-maxx aabb))))
 
 ;;FIXME:OpenGL chunks that are too far away are never destroyed?
+
+;;Particle shader
+(defun use-particle-shader
+    (&key (camera *camera*)
+       (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
+       (fog-ratio 0.01)
+       (time-of-day (random 1.0))
+       (chunk-radius (error "chunk-radius not supplied"))
+       (sampler (glhelp:handle (deflazy:getfnc 'terrain))))
+  ;;set up shader
+  (let ((shader (deflazy:getfnc 'particle-shader)))
+    (glhelp:use-gl-program shader)
+
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms uniform shader
+      (gl:uniform-matrix-4fv 
+       (uniform :pmv)
+       (camera-matrix:camera-matrix-projection-view-player camera)
+       nil))
+
+    ;;other cosmetic uniforms
+    (glhelp:with-uniforms
+	uniform shader
+      (destructuring-bind (r g b &rest rest) sky-color
+	(declare (ignorable rest))
+	(%gl:uniform-3f (uniform :fogcolor) r g b))
+      (gl:uniformfv (uniform :camera-pos)
+		    (camera-matrix:camera-vec-position camera))
+      (%gl:uniform-1f (uniform :foglet)
+		      (/ -1.0
+			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
+			 (* vocs:+size+ chunk-radius)
+			 #+nil
+			 (or 128 (camera-matrix:camera-frustum-far *camera*))
+			 fog-ratio))
+      (%gl:uniform-1f (uniform :aratio)
+		      (/ 1.0 fog-ratio))
+      (%gl:uniform-1f (uniform :time)
+		      time-of-day)
+
+      (mvc '%gl:uniform-3f (uniform :camera-up)
+	   (spread (camera-matrix::camera-cam-up camera)))
+      (mvc '%gl:uniform-3f (uniform :camera-right)
+	   (spread (camera-matrix::camera-cam-right camera)))
+
+      (glhelp:set-uniforms-to-textures
+       ((uniform :sampler) sampler)))))
+(defparameter *particle-offset-attr* 9)
+(glhelp:deflazy-gl particle-shader ()
+  (let ((glhelp::*glsl-version* *shader-version*))
+    (glhelp:create-opengl-shader
+     "
+out vec2 texcoord_out;
+out float fogratio_out;
+
+in vec4 position;
+in vec2 texcoord;
+in vec2 offset;
+uniform mat4 projection_model_view;
+
+uniform float foglet;
+uniform float aratio;
+uniform vec3 camera_pos;
+
+uniform vec3 camera_up;
+uniform vec3 camera_right;
+
+void main () {
+vec3 offset = offset.x*camera_right + offset.y*camera_up;
+vec4 new_position = position + vec4(offset,0.0);
+gl_Position = projection_model_view * new_position;
+texcoord_out = texcoord;
+
+float distance = distance(camera_pos.xyz, position.xyz);
+fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
+}"
+     "
+in vec2 texcoord_out;
+uniform sampler2D sampler;
+in float fogratio_out;
+uniform vec3 fogcolor;
+uniform float time = 0.0;
+
+void main () {
+vec4 pixdata = 
+//vec4(1.0);
+texture2D(sampler,texcoord_out.xy);
+vec3 temp = mix(fogcolor, time * pixdata.rgb, fogratio_out);
+//if (pixdata.a == 0.0){discard;}
+gl_FragColor.rgb = temp; 
+}"
+     `(("position" ,*position-attr*) 
+       ("texcoord" ,*texcoord-attr*)
+       ("offset" ,*particle-offset-attr*))
+     '((:pmv "projection_model_view")
+       (:fogcolor "fogcolor")
+       (:foglet "foglet")
+       (:aratio "aratio")
+       (:camera-pos "camera_pos")
+       (:sampler "sampler")
+       (:time "time")
+       
+       (:camera-right "camera_right")
+       (:camera-up "camera_up")))))
+
+(defun render-particle-at (x y z &optional (uv #(0.0 0.0 1.0 1.0)))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((iterator (scratch-buffer:my-iterator))
+	(size 0.1))
+    (multiple-value-bind (u0 v0 u1 v1) (spread uv)
+      ;;(print (list u0 v0 u1 v1))
+      (draw-textured-rectangle (- size) (- size) size size
+			       ;;0.0 0.0 1.0 1.0
+			       u0 v0 u1 v1
+			       ;;u0 v0 u1 v1
+			       iterator))
+    ;;mesh-fist-box
+    (let ((box
+	   ;;[FIXME]why use this *iterator*?
+	   ;;inefficient: creates an iterator, and an opengl object, renders its,
+	   ;;just to delete it on the same frame
+	   (scratch-buffer:flush-bind-in* ((iterator data))		    
+	     (glhelp:create-vao-or-display-list-from-specs
+	      (:quads 4)
+	      ((*particle-offset-attr* (data) (data))
+	       (*texcoord-attr* (data) (data))
+	       (*position-attr* x y z))))))
+      (glhelp:slow-draw box)
+      (glhelp:slow-delete box))))
+
+(defun draw-textured-rectangle (minx miny maxx maxy
+				u0 v0 u1 v1 &optional (iterator *iterator*))
+  (macrolet ((vvv (offset-x offset-y u v)
+	       `(progn
+		  ;;offset
+		  (fun ,offset-x)
+		  (fun ,offset-y)
+		  (fun ,u)
+		  (fun ,v))))
+    (scratch-buffer:bind-out* ((iterator fun))
+      (vvv minx miny u0 v0)
+      (vvv minx maxy u0 v1)
+      (vvv maxx maxy u1 v1)
+      (vvv maxx miny u1 v0))))

@@ -1,6 +1,7 @@
 (defpackage #:nsb-cga
   (:use #:cl)
   (:use #:sb-cga)
+  (:nicknames :ng)
   (:import-from #:sb-cga
 		#:matrix
 		#:sfunction

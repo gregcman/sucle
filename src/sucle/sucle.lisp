@@ -221,7 +221,14 @@
   (livesupport:update-repl-link)
   (application:on-session-change *session*
     (voxel-chunks:clearworld)
-    (setf *entities* (loop :repeat 10 :collect (create-entity)))
+    (pushnew
+     *chunk-cursor-center*
+     voxel-chunks::*pinned-cursors*)
+    ;;Comes after 'clearworld' because 'clearworld'
+    ;;resets the chunk-array
+    (setf (vocs::cursor-chunk-array *chunk-cursor-center*)
+	  vocs::*chunk-array*)
+    (setf *entities* (loop :repeat 10 :collect (physics:create-player-entity)))
     (setf *ent* (elt *entities* 0))
     (sync_entity->chunk-array *ent* *chunk-cursor-center*)
     (load-world *chunk-cursor-center*;; t
@@ -234,7 +241,7 @@
     ;;FIXME::this depends on the position of entity.
     ;;Rendering/view?
     (reset-chunk-display-list)
-    ( update-world-vao2))
+    (update-world-vao2))
   (sync_entity->chunk-array *ent* *chunk-cursor-center*)
   ;;load or unload chunks around the player who may have moved
   (load-world *chunk-cursor-center*)
@@ -254,7 +261,7 @@
   ;;#+nil
   (setf *fist*
 	(mvc 'standard-fist
-	     (spread (entity-position *ent*))
+	     (spread (physics:pos *ent*))
 	     (spread (sb-cga:vec*
 		      (camera-matrix:camera-vec-forward *camera*)
 		      *reach*))))
@@ -264,20 +271,21 @@
     (run-buttons *god-keys*))
   (when (mode-enabled-p :movement-mode)
     ;;Set the sneaking state
-    (setf (entity-sneak? *ent*)
+    (setf (physics:sneak-p *ent*)
 	  (cond
 	    ((window:button :key :down :left-shift)
 	     0)
 	    ((window:button :key :down :left-control)
 	     1)))
     ;;Jump if space pressed
-    (setf (entity-jump? *ent*)
+    (setf (physics:jump-p *ent*)
 	  (window:button :key :down #\Space))
+    #+nil
     (when (window:button :key :pressed #\Space)
       (set-doublejump *ent*))
     ;;Set the direction with WASD
     (setf
-     (entity-hips *ent*)
+     (physics:direction *ent*)
      (let ((x 0)
 	   (y 0))
        (when (window:button :key :down #\w)
@@ -309,38 +317,26 @@
   
   ;;Set the pitch and yaw of the player based on the
   ;;mouse position
-  (mvc 'set-neck-values (entity-neck *ent*) (neck-values))
+  ;; (mvc 'set-neck-values (entity-neck *ent*) (neck-values))
+  (multiple-value-bind (yaw pitch) (neck-values)
+    (setf (physics:neck-yaw *ent*) yaw
+          (physics:neck-pitch *ent*) pitch))
 
   ;;Run the game ticks
 
   ;;FIXME:: run fps:tick if resuming from being paused.
   (setf
    (values *fraction-for-fps* *game-ticks-per-iteration*)
-   (fps:tick
+   (fps:tick 
      (incf *ticks*)
      (setf *time-of-day* 1.0)
      ;;run the physics
-     (run-physics-for-entity *ent*)))
+     (physics:step-physics *ent* (fps:dt))
+     (physics::run-particles (fps:dt))))
   ;;render chunks and such
   ;;handle chunk meshing
   (sync_entity->camera *ent* *camera*)
-  
-  (draw-to-default-area)
-  ;;this also clears the depth and color buffer.
-  (multiple-value-bind (color fog) (atmosphere)
-    (apply #'render-sky color)
-    (use-chunk-shader
-     :camera *camera*
-     :sky-color color
-     :time-of-day (* *fade* *time-of-day*)
-     :fog-ratio fog
-     :chunk-radius (vocs::cursor-radius *chunk-cursor-center*)))
-  #+nil
-  (map nil
-       (lambda (ent)
-	 (unless (eq ent *ent*)
-	   (render-entity ent)))
-       *entities*)
+
   (get-chunks-to-draw
    (let ((ent (elt *entities* 0))
 	 (camera (camera-matrix:make-camera)))
@@ -350,14 +346,41 @@
    (vocs::cursor-x *chunk-cursor-center*)
    (vocs::cursor-y *chunk-cursor-center*)
    (vocs::cursor-z *chunk-cursor-center*))
-  (render-chunks)
+  
+  (draw-to-default-area)
+  ;;this also clears the depth and color buffer.
+  (multiple-value-bind (color fog) (atmosphere)
+    (let ((radius (vocs::cursor-radius *chunk-cursor-center*))
+	  (darkness (* *fade* *time-of-day*)))
+      (apply #'render-sky color)
+      (use-chunk-shader
+       :camera *camera*
+       :sky-color color
+       :time-of-day darkness
+       :fog-ratio fog
+       :chunk-radius radius)
+      #+nil
+      (map nil
+	   (lambda (ent)
+	     (unless (eq ent *ent*)
+	       (render-entity ent)))
+	   *entities*)
+      (render-chunks)
+      (use-particle-shader
+       :camera *camera*
+       :sky-color color
+       :time-of-day darkness
+       :fog-ratio fog
+       :chunk-radius radius
+       :sampler (glhelp:handle (deflazy:getfnc 'terrain))) 
+      (render-particles)))
   
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
   ;;selected block and crosshairs
   (use-solidshader *camera*)
   (render-fist *fist*)
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (map nil
@@ -371,7 +394,7 @@
   (progn
     (gl:line-width 10.0)
     (render-chunk-outlines))
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (render-units))
@@ -388,7 +411,7 @@
 (defparameter *chunk-cursor-center* (vocs::make-cursor))
 (defun sync_entity->chunk-array (ent cursor)
   (mvc 'vocs::set-cursor-position
-       (spread (entity-position ent))
+       (spread (physics:pos ent))
        cursor))
 
 (defun load-world (chunk-cursor-center)
@@ -403,6 +426,13 @@
        (world::dirty-push (vocs::chunk-key chunk))))
     (when maybe-moved
       (setf (vocs::cursor-dirty chunk-cursor-center) nil))))
+
+(defun render-particles ()
+  (gl:disable :cull-face)
+  (dolist (particle physics::*particles*)
+    (mvc 'render-particle-at
+	 (spread (physics::pos particle))
+	 (physics::particle-uv particle))))
 
 (defun render-chunk-outlines ()
   (dohash (k chunk) *g/chunk-call-list*
@@ -444,16 +474,21 @@
   
   ;;Set the direction of the camera based on the
   ;;pitch and yaw of the player
-  (sync_neck->camera (entity-neck entity) camera)
+  (sync_neck->camera (physics:neck-pitch entity)
+                     (physics:neck-yaw entity)
+                     camera)
   ;;Calculate the camera position from
   ;;the past, current position of the player and the frame fraction
-  (sync_particle->camera
+  (sync_position->camera
    ;;modify the camera for sneaking
-   (let ((particle (entity-particle entity)))
-     (if (and (not (entity-fly? entity))
-	      (eql 0 (entity-sneak? entity)))
-	 (translate-pointmass particle 0.0 -0.125 0.0)
-	 particle))
+   (physics:pos entity)
+   (physics:pos-old entity)
+
+   #+nil(let ((particle (entity-particle entity)))
+          (if (and (not (physics:fly-p entity))
+                   (eql 0 (physics:sneak-p entity)))
+              (translate-pointmass particle 0.0 -0.125 0.0)
+              particle))
    camera
    *fraction-for-fps*)
   ;;update the camera
@@ -473,19 +508,17 @@
   (setf (camera-matrix:camera-aspect-ratio camera) aspect-ratio)
   (setf (camera-matrix:camera-fov camera) fov)
   (setf (camera-matrix:camera-frustum-far camera) frustum-far))
-(defun sync_particle->camera (particle camera fraction)
-  (let* ((prev (pointmass-position-old particle))
-	 (curr (pointmass-position particle)))
-    (let ((vec (camera-matrix:camera-vec-position camera)))
-      (nsb-cga:%vec-lerp vec prev curr fraction))))
-(defun sync_neck->camera (neck camera)
+(defun sync_position->camera (curr prev camera fraction)
+  (let ((vec (camera-matrix:camera-vec-position camera)))
+    (nsb-cga:%vec-lerp vec prev curr fraction)))
+(defun sync_neck->camera (pitch yaw camera)
   #+nil
   (print (list (necking-pitch neck)
 	       (necking-yaw neck)))
   ;;(print)
-  (unit-pitch-yaw (necking-pitch neck)
-		  (necking-yaw neck)
-		  (camera-matrix:camera-vec-forward camera)))
+  (unit-pitch-yaw pitch 
+                  yaw                  
+                  (camera-matrix:camera-vec-forward camera)))
 
 ;;;;************************************************************************;;;;
 
@@ -499,10 +532,11 @@
 (defparameter *left-fist* 'destroy-block-at)
 (defun destroy-block-at (&optional (x *x*) (y *y*) (z *z*))
   ;;(blocksound x y z)
+  (shoot-particles (+ 0.5 x) (+ 0.5 y) (+ 0.5 z) (world:getblock x y z))
   (world:plain-setblock x y z (block-data:lookup :air) 15))
 (defparameter *right-fist* 'place-block-at)
 (defun place-block-at (&optional (x *x*) (y *y*) (z *z*) (blockval *blockid*))
-  (when (not-occupied x y z)
+  (when (physics::not-occupied *ent* x y z)
     ;;(blocksound x y z)
     (world:plain-setblock x y z blockval (block-data:data blockval :light))))
 
@@ -523,14 +557,14 @@
 
     ((:mouse :pressed :5) . 
      ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *5-fist*)))))
+	;;(when (fist-exists *fist*))
+	(multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
+	  (funcall *5-fist*))))
     ((:mouse :pressed :4) . 
      ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *4-fist*)))))
+	;;(when (fist-exists *fist*))
+	(multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
+	  (funcall *4-fist*))))
     ((:mouse :pressed :middle) . 
      ,(lambda ()
 	(when (fist-exists *fist*)
@@ -558,8 +592,29 @@
 (defparameter *god-keys*
   `(;;Toggle noclip with 'v'
     ((:key :pressed #\v) .
-     ,(lambda () (toggle (entity-clip? *ent*))))
+     ,(lambda () (toggle (physics:fly-p *ent*))))
     ;;Toggle flying with 'f'
     ((:key :pressed #\f) .
-     ,(lambda () (toggle (entity-fly? *ent*))
-	      (toggle (entity-gravity? *ent*))))))
+     ,(lambda () (toggle (physics:fly-p *ent*))
+         (toggle (physics::gravity-p *ent*))))))
+
+;;;
+
+(defun random-in-range (n)
+  (* (random n) (if (zerop (random 2))
+		    1
+		    -1)))
+(defun shoot-particles
+    (&optional
+       (x (random-in-range 20.0))      
+       (y (random 30.0))
+       (z (random-in-range 20.0))
+       (id 3))
+  (dotimes (i 10)
+    (let ((direction
+	   (sucle::unit-pitch-yaw (- (random (floatify pi)))
+				  (random (floatify pi)))))
+      (mvc 'physics::create-particle id x y z
+	   (spread
+	    (ng:vec* direction (random 20.0)))
+	   (+ 1 (random 1.0))))))

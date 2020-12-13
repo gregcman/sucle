@@ -284,12 +284,3 @@
 		      (00 -1 1)    
 		      (00 00 1)    
 		      (-1 00 1))))))
-
-(defmacro with-texture-translator2 ((u0 u1 v0 v1) num-form &body body)
-  (let ((id (gensym)))
-    `(let ((,id (* 4 ,num-form)))
-       ,(apply #'with-vec-params `((,id ,u0 ,v0 ,u1 ,v1)) `(,*16x16-tilemap*)
-	       body))))
-
-(eval-always
-  (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))

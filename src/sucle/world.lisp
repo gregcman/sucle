@@ -38,8 +38,8 @@
 
 ;;[FIXME]move this to a better place?
 (defun blockify (blockid light sky)
-  (dpb sky (byte 4 12)
-       (dpb light (byte 4 8) blockid)))
+  ;;FIXME::this just redirects?
+  (voxel-chunks::blockify blockid light sky))
 
 (eval-when (:load-toplevel :execute)
   (voxel-chunks:reset-empty-chunk-value (blockify 0 0 15)))
@@ -51,7 +51,7 @@
   (blockify (logcount (sxhash obj)) 0 0))
 
 (defmethod lispobj-dispatch ((obj symbol))
-  *empty-space*)
+  vocs::*empty-space*)
  
 
 #+nil

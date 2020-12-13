@@ -42,7 +42,7 @@
    #:+size+
    #:+total-size+))
 (in-package #:voxel-chunks)
-(defparameter *chunk-io-lock* (bt:make-recursive-lock))
+(defparameter *cache-lock* (bt:make-recursive-lock "Chunk Cache Lock"))
 ;;lets make it 16, and not care about the other parameters for now.
 ;;each chunk is a 16x16x16 cube then.
 (defconstant +size+ 16)
@@ -60,16 +60,18 @@
   (make-hash-table :test 'equal))
 (defparameter *chunks* (make-chunk-cache))
 (defun set-chunk-in-cache (key chunk &optional (cache *chunks*))
-  (kill-old-chunk key)
-  ;;(incf *true-bit-size* (array-truesize (chunk-data chunk)))
-  (setf (gethash key cache) chunk)
-  (prune-cache))
+  (bt:with-recursive-lock-held (*cache-lock*)
+    (kill-old-chunk key)
+    ;;(incf *true-bit-size* (array-truesize (chunk-data chunk)))
+    (setf (gethash key cache) chunk)
+    (prune-cache)))
 (defun get-chunk-in-cache (key &optional (cache *chunks*))
   ;;return (values chunk exist-p)
   (gethash key cache))
 (defun delete-chunk-in-cache (key &optional (cache *chunks*))
-  (when (kill-old-chunk key cache)
-    (remhash key cache)))
+  (bt:with-recursive-lock-held (*cache-lock*)
+    (when (kill-old-chunk key cache)
+      (remhash key cache))))
 (defun kill-old-chunk (key &optional (cache *chunks*))
   (multiple-value-bind (old-chunk existp) (gethash key cache)
     (when existp
@@ -91,32 +93,51 @@
    (* +total-size+ 8))
 (defparameter *cache-limit* (* (expt 16 3)))
 (defparameter *cache-reduction* 0.2)
-(defparameter *prune-lock* (bt:make-lock))
-(defun prune-cache (&optional (limit *cache-limit*) &aux (reduction
-							  (* limit *cache-reduction*)))
-  (bt:with-lock-held (*prune-lock*)
+(defparameter *pinned-cursors* nil)
+(defun make-hash (list)
+  (let ((table (make-hash-table)))
+    (dolist (item list)
+      (setf (gethash item table) t))
+    table))
+(defun prune-cache (&key (limit *cache-limit*) (ignore-cursors nil)
+		    &aux (reduction
+			  (* limit *cache-reduction*)))
+  (bt:with-recursive-lock-held(*cache-lock*)
     (let ((total (total-chunks-in-cache)))
       (when (< limit total)
-	(let ((chunks (sort (alexandria:hash-table-alist *chunks*)
-			    '<
-			    :key (lambda (x)
-				   (chunk-last-access (cdr x))))))
-	  (let ((amount-pruning (- total (- limit reduction))))
-	    ;;(print total)
-	    ;;(format t "~%Pruning ~a chunks" amount-pruning)
-	    (flet ((thing ()
-		     (loop :repeat amount-pruning
-			:for pair :in chunks :do
-			(destructuring-bind (key . chunk) pair
-			  (when (and
-				 *persist*
-				 ;;when the chunk is not obviously empty
-				 (not (empty-chunk-p chunk))
-				 ;;if it wasn't modified, no point in saving
-				 (chunk-modified chunk))
-			    (savechunk key))
-			  (delete-chunk-in-cache key)))))
-	      (crud:call-with-transaction #'thing))))
+	(let* ((pinned-chunks (if ignore-cursors
+				  nil
+				  (mapcan 'cursor-all-chunks *pinned-cursors*)))
+	       (pinned-table (make-hash pinned-chunks))
+	       (all-chunks (alexandria:hash-table-alist *chunks*))	       
+	       (chunks (sort
+			;;FIXME::
+			(remove-if (lambda (pair)
+				     (gethash (cdr pair) pinned-table))
+				   all-chunks)
+			'<
+			:key (lambda (x)
+			       (chunk-last-access (cdr x)))))
+	       (amount-pruning (- total (- limit reduction))))
+	  (flet ((thing ()
+		   (loop :repeat amount-pruning
+		      :for pair :in chunks :do
+		      (destructuring-bind (key . chunk) pair
+			(when (and
+			       *persist*
+			       ;;when the chunk is not obviously empty
+			       (not (empty-chunk-p chunk))
+			       ;;if it wasn't modified, no point in saving
+			       (chunk-modified chunk))
+			  (savechunk key))
+			(delete-chunk-in-cache key)))))
+	    (crud:call-with-transaction #'thing))
+	  #+nil
+	  (progn
+	    (format t "~%Pruning ~a chunks" amount-pruning)
+	    (format t "~%pinned chunks ~a~%out of total ~a"
+		    (length pinned-chunks)
+		    (length all-chunks))))
 	(setf *true-bit-size* (chunks-total-bits))
 	;;(format t "~%~a" *true-bit-size*)
 	))))
@@ -292,7 +313,7 @@
 	   ;;(format t "~%Caching new chunk:(~a ~a ~a)" cx cy cz)
 	   ;;Read from the database and put the chunk into the cache.
 	   (let ((new-chunk
-		  (bt:with-recursive-lock-held (*chunk-io-lock*)
+		  (bt:with-recursive-lock-held (*cache-lock*)
 		    (or
 		     ;;Check once again that it really does not exist yet.
 		     (get-chunk-in-cache key)
@@ -408,7 +429,9 @@
   (declare (type block-coord x y z))
   (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
     ;;FIXME:This just returns the 'empty' value
-    (unless chunk
+    (unless (and
+	     (not (empty-chunk-p chunk))
+	     (valid-chunk-p chunk))
       (return-from getobj *empty-space*))
     (let ((time *time*))
       (incf *time*)
@@ -497,6 +520,19 @@
    ;;FIXME:difference between threshold and radius?
    (radius 6)))
 
+(defun chunk-array-all-chunks (&optional (ca *chunk-array*))
+  (let* ((array (chunk-array-array ca))
+	 acc)
+    (dotimes (i (array-total-size array))
+      (let ((chunk (row-major-aref array i)))
+	(when (valid-chunk-p chunk)
+	  (push chunk acc))))
+    (remove-duplicates acc)))
+
+(defun cursor-all-chunks (cursor)
+  (let ((ca (cursor-chunk-array cursor)))
+    (chunk-array-all-chunks ca)))
+
 (defun set-cursor-position
     (px py pz &optional (cursor (make-cursor)) (chunk-array *chunk-array*))
   (multiple-value-bind (newx newy newz)
@@ -542,7 +578,7 @@
 ;;And have chunk loading in another file?
 
 (defun savechunk (key)
-  (bt:with-recursive-lock-held (*chunk-io-lock*)
+  (bt:with-recursive-lock-held (*cache-lock*)
     (let ((chunk (get-chunk-in-cache key)))
       (when (chunk-alive? chunk)   
 	;;write the chunk to disk if its worth saving
@@ -563,6 +599,10 @@
   (with-chunk-key-coordinates (cx cy cz) key
     (make-chunk :x cx :y cy :z cz :key key :data data :type :normal)))
 ;;Merely load a chunk from the database, don't put in in the cache
+;;FIXME::this is a duplicate of world::blockify.
+(defun blockify (blockid light sky)
+  (dpb sky (byte 4 12)
+       (dpb light (byte 4 8) blockid)))
 (defun %loadchunk (chunk-coordinates)
   ;;(format t "~%Loading chunk at ~a" chunk-coordinates)
   (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
@@ -584,9 +624,9 @@
 						     (create-chunk x y z :type :empty)))
 
 	   (3 ;;[FIXME]does this even work?
-	    (error "world format invalid")
+	    ;;(error "world format invalid")
 	    ;;FIXME: use defmethod to extend the interface?
-	    #+nil
+	    ;;#+nil
 	    (destructuring-bind (blocks light sky) data
 	      (let ((len (length blocks)))
 		(let ((new (make-array len)))
@@ -767,7 +807,7 @@
 
 (defun save-all ()
   ;;By limiting the cache to 0, everything gets flushed out.
-  (prune-cache 0))
+  (prune-cache :limit 0 :ignore-cursors t))
 
 
 (defun chunk-within-chunk-array-p (key &optional (chunk-array *chunk-array*))

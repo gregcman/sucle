@@ -19,7 +19,15 @@
     (assert (every 'alphanumericp sql-string) nil "~s is invalid, injectable SQL" string)
     string))
 ;;;Handle pooling. Each thread gets its own handle.
+
 (defvar *handles*)
+(defun clear-handles ()
+  (loop
+     (multiple-value-bind (connection existp) (lparallel.queue:try-pop-queue *handles*)
+       (if existp
+	   (disconnect connection)
+	   (return-from clear-handles)))))
+
 (defun get-handle ()
   (or
    (lparallel.queue:try-pop-queue *handles*)
@@ -88,10 +96,12 @@
   (with-locked-db (*database*)
     ;;https://github.com/TeMPOraL/cl-sqlite
     ;;[FIXME]sqlite concurrent insert bug. see cl-sqlite by temporal.
-    (print (list filename))
+    (when (log:debug)
+      (print (list filename)))
     (cond
       ((does-file-exist filename)
-       (format t "[updating ~a]" filename)
+       (when (log:debug)
+	 (format t "[updating ~a]" filename))
        ;;If it exists, update it
        (execute-non-query *db*
 			  (format nil
@@ -99,14 +109,16 @@
 				  (error-scrub table))
 			  data filename))
       (t
-       (format t "[new row ~a]" filename)
+       (when (log:debug)
+	 (format t "[new row ~a]" filename))
        ;;If it doesn't, create a new row.
        (execute-non-query *db*
 			  (format nil
 				  "insert into ~a (filename, content) values (?, ?)"
 				  (error-scrub table))
 			  filename data)))
-    (format t "[succesfully saved ~a]" filename)))
+    (when (log:debug)
+      (format t "[succesfully saved ~a]" filename))))
 
 (defun does-file-exist (filename &optional (table *documents*))
   (/= 0

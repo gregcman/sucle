@@ -94,6 +94,9 @@
   (window:poll)
   (window:update-control-state))
 
+(defun kill ()
+  (bt::destroy-thread application:*thread*))
+
 #+nil
 (deflazy:deflazy al-context ()
   (music:really-start)
@@ -117,9 +120,11 @@
    #:push-mode
    #:pop-mode
    #:switch-mode
-   #:quit)
+   #:quit
+   #:kill)
   (:import-from #:application
-		#:quit))
+		#:quit
+		#:kill))
 (in-package #:app)
 ;;;;Main loop
 (defun enter (&optional (app 'default-per-frame))

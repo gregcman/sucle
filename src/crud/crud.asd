@@ -9,7 +9,8 @@
    #:uiop
    #:lparallel
    ;;For one macro in 'database'
-   #:alexandria)
+   #:alexandria
+   #:log4cl)
   :serial t
   :components
   ((:file "database")

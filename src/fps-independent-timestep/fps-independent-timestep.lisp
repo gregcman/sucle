@@ -6,7 +6,10 @@
   (:export
    #:tick
    #:set-fps
-   #:microseconds)
+   #:microseconds
+   
+   #:dt
+   #:ticks-per-second)
   (:nicknames :fps))
 
 ;;;;1. set the fps with SET-FPS
@@ -14,6 +17,8 @@
 ;;;;3. this will run forms are the desired FPS 
 
 (in-package :fps-independent-timestep)
+
+;;Implementation of https://gafferongames.com/post/fix_your_timestep/
 
 ;;;;<CLOCK>
 (deftype seconds ()
@@ -110,3 +115,9 @@
 
 (defmacro tick (&body body)
   `(%tick *ticker* () ,@body))
+
+(defun ticks-per-second (&optional (ticker *ticker*))
+  (/ 1000000.0 (ticker-dt ticker)))
+
+(defun dt (&optional (ticker *ticker*))
+  (/ 1.0 (ticks-per-second ticker)))

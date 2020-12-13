@@ -13,9 +13,9 @@
 
 (progn
   (defun b@ (&optional (x *x*) (y *y*) (z *z*))
-    (world:getblock x y z))
+    (vocs::pen-get x y z))
   (defun (setf b@) (value &optional (x *x*) (y *y*) (z *z*))
-    (world:plain-setblock x y z value)))
+    (setf (vocs::pen-get x y z) value)))
 
 (defun b= (b0 b1)
   (eql b0 b1))
@@ -23,27 +23,31 @@
 (defmacro nick (nickname)
   `(block-data:lookup ,nickname))
 
+(progn
+  (defun b2@ (&optional (x *x*) (y *y*) (z *z*))
+    (ldb (byte 8 0) (b@ x y z))))
+
 ;;convert dirt, stone, and grass into their 'correct' forms given air:
 ;;grass, dirt, dirt, stone
-(defun correct-earth (&rest rest)
+(defun %correct-earth (&rest rest)
   (declare (ignore rest))
-  (let ((b0 (b@)))
+  (let ((b0 (b2@)))
     (when (or (b= (nick :stone) b0)
 	      (b= (nick :grass) b0)
 	      (b= (nick :dirt) b0))
       (let ((b1 (with-xyz
 		  (incf *y* 1)
-		  (b@))))
+		  (b2@))))
 	(if (b= (nick :air) b1)
 	    (setf (b@) (nick :grass))
 	    (let ((b2 (with-xyz
 			(incf *y* 2)
-			(b@))))
+			(b2@))))
 	      (if (b= (nick :air) b2)
 		  (setf (b@) (nick :dirt))
 		  (let ((b3 (with-xyz
 			      (incf *y* 3)
-			      (b@))))
+			      (b2@))))
 		    (if (b= (nick :air) b3)
 			(setf (b@) (nick :dirt))
 			(let (#+nil
@@ -51,6 +55,12 @@
 				    (incf *y* 4)
 				    (b@))))
 			  (setf (b@) (nick :stone))))))))))))
+
+(defun correct-earth (x y z)
+  (let ((*x* x)
+	(*y* y)
+	(*z* z))
+    (%correct-earth)))
 #+nil
 (defun correct-earth (&rest rest)
   (declare (ignore rest))
@@ -66,7 +76,7 @@
 	;;#+nil
 	(<= 3 (neighbors))
 	(setf (b@) (nick :sandstone))))))
-#+nil
+;;#+nil
 (defun neighbors (&aux (count 0))
   (dobox ((x (+ -1 *x*) (+ 2 *x*))
 	  (y (+ -1 *y*) (+ 2 *y*))
@@ -75,6 +85,19 @@
 	   (b= (b@ x y z) (nick :air))
 	   (incf count)))
   count)
+(defun adjacent-neighbors (x y z)
+  (let ((tot 0))
+    (macrolet ((aux (i j k)
+		 `(unless (b= (nick :air)
+			      (world::getblock (+ x ,i) (+ y ,j) (+ z ,k)))
+		    (incf tot))))
+      (aux 1 0 0)
+      (aux -1 0 0)
+      (aux 0 1 0)
+      (aux 0 -1 0)
+      (aux 0 0 1)
+      (aux 0 0 -1))
+    tot))
 
 (defun player-feet ()
   (let ((miny
@@ -121,6 +144,8 @@
     (dobox ((x (+ x -1) (+ x 2))
 	    (z (+ z -1) (+ z 2)))
 	   (setf (b@ x y z) (nick :grass)))))
+
+(setf sucle::*5-fist* 'player-feet-at)
 
 (defparameter *size* 4)
 (defun box-at (&optional
@@ -180,7 +205,7 @@
 (defun vec-values (&optional (vec (sb-cga:vec 1.0 2.0 3.0)))
   (with-vec (x y z) (vec)
     (values x y z)))
-;;
+(setf *5-fist* 'tree)
 (defun tree (&optional (x *x*) (y *y*) (z *z*) (minfactor 6.0))
   (labels ((rec (place minfactor)
 	     (when (>= minfactor 0)
@@ -290,6 +315,164 @@
 		  (world:dirty-push-around key)
 		  (sucle-mp:remove-unique-task-key job-key))))))
 
+(defun octave (x y z xscale yscale zscale total-scale)
+  (floor (* total-scale
+	    (black-tie:perlin-noise-single-float
+	     (floatify (* x xscale))
+	     (floatify (* y yscale))
+	     (floatify (* z zscale))))))
+;;FIXME::have a separate test file for drawing things?
+(defun make-terrain ()
+  ;;(declare (optimize speed (safety 0)))
+  (let ((count 0))
+    (dobox ((x -100 100)
+	    (z -100 100))
+      (let ((difference
+	       (+ (octave x 0.0 z 0.05 1.0 0.05 10)
+		  ;;(octave x 0.0 z 0.25 1.0 0.25 2)
+		  ;;(octave x 0.0 z 0.02 1.0 0.02 20)
+		  )))
+	(dobox ((y -100 100))
+	  (incf count)
+	  (when (zerop (mod count 10000))
+	    (print count))
+	  (if (< y difference)
+	      (setf (vocs::pen-get x y z)
+		    (nick :grass))
+	      (setf (vocs::pen-get x y z)
+		    (world:blockify (nick :air) 0 15))))))))
+
+(defun deg-rad (n)
+  (* n (floatify (/ pi 180))))
+(setf *5-fist* 'spiral)
+(defun spiral (&optional (x *x*) (y *y*) (z *z*) (iterations 1000))
+  (let* ((angle (deg-rad 1))
+	 (granularity 1.0)
+	 (radius 100.0)
+	 (direction (ng:vec 0.0 1.0 0.0))
+	 (rotation-per-step (* 2 (asin (/ granularity (* 2 radius)))))
+	 (steps-per-turn (floatify (/ (* 2 pi)
+				      rotation-per-step)))
+	 (shrinkage 0.8)
+	 (s (expt shrinkage (/ 1.0 steps-per-turn)))
+	 (mat (ng:matrix*
+	       (ng:scale* s s s)
+	       (ng:rotate-around direction rotation-per-step))))
+    (labels ((rec (place iterations direction)
+	       (when (>= iterations 0)
+		 (let* ((rds (ng:transform-point direction mat)))
+		   (let ((new (ng:vec+ place rds)))
+		     (multiple-value-call
+			 'line
+		       (vec-values place)
+		       (vec-values new)
+		       (nick :stone)
+		       (create-aabb 0.1))
+		     (rec new (1- iterations) rds))))))
+      (rec (multiple-value-call 'sb-cga:vec (floatify2 x y z))
+	   iterations
+	   (ng:vec*
+	    (ng:vec (cos angle) (sin angle) 0.0)
+	    granularity)))))
+
+(setf *5-fist* 'le-box)
+(defun a-box (x y z xsize ysize zsize block)
+  (dobox ((x x (+ x xsize))
+	  (y y (+ y ysize))
+	  (z z (+ z zsize)))
+    (setf (vocs::pen-get x y z) block)))
+(defun le-box (&optional (x *x*) (y *y*) (z *z*) (iterations 100))
+  (dotimes (i iterations)
+    (a-box x y z 3 3 3 (nick :log))
+    (incf x 4)))
+
+(defun fun-box (x y z xsize ysize zsize fun &optional (center #b000))
+  (when (logtest #b100 center)
+    (decf x (floor xsize 2)))
+  (when (logtest #b010 center)
+    (decf y (floor ysize 2)))
+  (when (logtest #b001 center)
+    (decf z (floor zsize 2)))
+  (dobox ((x x (+ x xsize))
+	  (y y (+ y ysize))
+	  (z z (+ z zsize)))
+    (funcall fun x y z)))
+
+(defun distance (x y z x0 y0 z0)
+  (flet ((foo (n) (* n n)))
+    (sqrt (+ (foo (- x x0))
+	     (foo (- y y0))
+	     (foo (- z z0))))))
+
+(setf *5-fist* 'gauss)
+(defun gauss (&optional (x *x*) (y *y*) (z *z*) ;;(iterations 100)
+		)
+  (let ((radius 20)
+	(scale 6))
+    (fun-box x y z radius radius radius
+	     (lambda (x0 y0 z0)
+	       (let ((likelyhood
+		      (cl-mathstats:gaussian-significance (* (/ (distance x y z x0 y0 z0) radius)
+							     scale)
+							  :both)))
+		 (let ((foo (/ 1.0 likelyhood)))
+		   (print foo)
+		   (when (< (random foo) 1.0)
+		     (setf (vocs::pen-get x0 y0 z0) (nick :sand))))))
+	     #b111)))
+
+(defparameter *air* (world::blockify (nick :air) 0 15))
+(defun set-air (x y z)
+  (setf (vocs::pen-get x y z) *air*))
+(setf *5-fist* 'erase)
+(defun erase (&optional (x *x*) (y *y*) (z *z*))
+  (fun-box x y z 20 20 20 'set-air
+	   #b111))
+
+(setf *5-fist* 'erase)
+(defun erase (&optional (x *x*) (y *y*) (z *z*))
+  (fun-box x y z 20 20 20 'set-air
+	   #b111))
+
+(defun set-5 (fun &optional (radius 20) &aux (r radius))
+  (setf *5-fist* (lambda (&optional (x *x*) (y *y*) (z *z*))
+		   (fun-box x y z r r r fun #b111)
+		   (fun-box x y z r r r
+			    (lambda (x y z)
+			      (world::block-dirtify x y z))
+			    #b111))))
+
+(set-5 'ensmoothen)
+(defun ensmoothen (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (unless (= (nick :air) blockid)
+      (let ((naybs (adjacent-neighbors x y z)))
+	(when (> 3 naybs)
+	  (set-air x y z))))))
+
+(set-5 'fillgap)
+(defun fillgap (x y z)
+  (let ((blockid (world:getblock x y z)))
+    (when (= (nick :air) blockid)
+      (let ((naybs (adjacent-neighbors x y z)))
+	(when (< 2 naybs)
+	  (setf (vocs::pen-get x y z)
+		(majority x y z)))))))
+
+(defun majority (x y z)
+  (let (acc)
+    (fun-box x y z 3 3 3
+	     (lambda (x y z)
+	       (let ((bid (b@ x y z)))
+		 (incf (getf acc bid 0))))
+	     #b111)
+    (let ((alist (alexandria:plist-alist acc)))
+      (car (rassoc (reduce 'max
+			   alist
+			   :key 'cdr)
+		   alist)))))
+
+(set-5 'correct-earth 60)
 
 #+nil
 (utility:with-unsafe-speed
