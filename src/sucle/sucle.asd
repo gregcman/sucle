@@ -37,6 +37,7 @@
    (:file "package")
    (:file "util")
    (:file "menu")
+   (:file "menus")
    ;;(:file "block-light") ;;light propogation
    (:file "mesher")
    (:file "spritepacker")

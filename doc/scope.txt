@@ -1,0 +1,43 @@
+What I want from sucle:
+
+- fun
+- hackable
+- performant
+
+I want it to be like super mario world's YUMP, YUMP 1/2, and YUMP 2.
+
+sucle fills no niche.
+I build sucle to fit my own desire regardless of what anyone else thinks.
+sucle is my little world.
+
+Constraints:
+- 1 Person hacking on it (Me)
+- It necessarily needs to be simple.
+
+If you want an editor, use emacs.
+If you want a pretty infinite block game, use minecraft with cubic chunks with datapacks, RTX and python scripting.
+
+- 3D
+- fun
+- exceedingly simple
+- wildly scriptable: see YUMP, or dream/tapl, 
+
+If you want a GUI, write a web form.
+
+It should be:
+fun, performant, scriptable, concise.
+
+It should be able to have content generated for it by an AI.
+
+PhoenixSC, AIDungeon, GPT-3
+
+Wavenet + GPT-3 + Yandex images
+
+How do I turn it into something visual?
+leverage
+
+GPT-3 has solved interaction.
+The interesting question is how do we turn text into something visual?
+people are extremely visual creatures.
+
+how can I animate the output of GPT-3?
