@@ -15,9 +15,9 @@
   (:export
    #:al-context)
   (:export
+   #:*livesupport-p*
    #:quit))
 (in-package :application)
-
 (defparameter *quit-token* nil)
 (defmacro with-quit-token ((&optional (value '(cons "default" "quit token"))) &body body)
   `(let ((*quit-token* ,value)
@@ -85,10 +85,12 @@
      (setf window:*status* t) ;;[FIXME]t = exit
      (throw *quit-token* ,form)))
 
+(defparameter *livesupport-p* t)
 (defun poll-app ()
   (when window:*status*
     (quit))
-  (livesupport:update-repl-link)
+  (when *livesupport-p*
+    (livesupport:update-repl-link))  
   (window:update-control-state2)
   (dependency-graph:flush-refreshes)
   (window:update-display)
