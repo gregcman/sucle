@@ -16,3 +16,4 @@ Everything that is generic for creating an app.
 - graphics matrix for camera
 - geometry: rectangle
 - simple text graphics: ncurses-clone-for-lem and text-subsystem
+- multithreading: sucle-multiprocessing
