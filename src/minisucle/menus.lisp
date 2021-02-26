@@ -54,6 +54,10 @@ Press q/escape to quit
     (
      ((:key :pressed #\Space) .
       ,(lambda ()
+	 (app:push-mode 'sucle-per-frame)
+	 #+nil
+	 (menu:use *menu-in-world*)
+	 #+nil
 	 (menu:use (make-menu-file-picker))
 	 ))
     )
@@ -124,7 +128,7 @@ Press q/escape to quit
 	 (if (zerop (mod (floor (fps:microseconds) 1000000) 2))
 	     (setf (getf data :bg) "white")
 	     (setf (getf data :bg) "black"))))))
-
+#+nil
 (defun make-menu-file-picker (&optional (index 0))
   (let ((saves (saves-list)))
     (setf index (mod index (length saves)))
@@ -153,7 +157,7 @@ Press q/escape to quit
 		 (alexandria:iota (length saves))))
       ()
       ,(lambda () (menu:clear)))))
-
+#+nil
 (defparameter *menu-in-world*
   `(;;keys bound to functions
     (((:key :pressed #\q) .
