@@ -543,6 +543,7 @@ gl_FragColor.rgb = color_out;
   (glhelp:slow-delete (chunk-gl-representation-call-list chunk-gl-representation))
   (gl:delete-queries (list (chunk-gl-representation-occlusion-query chunk-gl-representation))))
 
+#+nil
 (defun get-chunks-to-draw (camera radius cx cy cz)
   (let ((vec *call-lists*))
     (setf (fill-pointer vec) 0)

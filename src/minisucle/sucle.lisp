@@ -3,64 +3,19 @@
 ;;;;************************************************************************;;;;
 ;;;;<BOXES?>
 (defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
-		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
-  (floatf maxx maxy maxz minx miny minz)
-  (aabbcc:make-aabb
-   :minx minx
-   :maxx maxx
-   :miny miny
-   :maxy maxy
-   :minz minz
-   :maxz maxz))
+			       (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
+	 (floatf maxx maxy maxz minx miny minz)
+	 (aabbcc:make-aabb
+	  :minx minx
+	  :maxx maxx
+	  :miny miny
+	  :maxy maxy
+	  :minz minz
+	  :maxz maxz))
 
-(defparameter *block-aabb*
-  ;;;;1x1x1 cube
-  (create-aabb 1.0 1.0 1.0 0.0 0.0 0.0))
-
-;;;;[FIXME]The point of this is to reduce the amount of bits to store the hitbox.
-;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
-;;;;get chopped off or something, thus leading to strange clipping.
-;;;;This effectively reduces the precision, giving leeway for math operations.
-;;;;My prediction could be wrong though.
-(defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
-  (* n (round (/ x n))))
 (defparameter *player-aabb*
-  (apply #'create-aabb
-	 (mapcar 'round-to-nearest	 
-		 '(0.3 0.12 0.3 -0.3 -1.5 -0.3))))
+  (create-aabb 0.3 0.12 0.3 -0.3 -1.5 -0.3))
 
-;;;a very small cubic fist
-(defparameter *fist-aabb* (create-aabb 0.00005))
-
-#+nil
-(defparameter *chunk-aabb*
-  (apply 'create-aabb
-	 (mapcar 'floatify
-		 (list vocs:+size+ vocs:+size+ vocs:+size+ 0.0 0.0 0.0))))
-
-
-;;;;</BOXES?>
-(defparameter *some-saves* nil)
-(defparameter *world-directory* nil)
-(defun world-path
-    (&optional
-       (world
-	;;"first/"
-	;;#+nil
-	;;"test/"
-	"other/"
-	;;"third/"
-	;;"terrarium2/"
-	;;"ridikulisp/"
-	)
-       (working-dir
-	(sucle-temp:path "save/")
-	#+nil
-	(cdr (assoc (machine-instance) 
-		    '(("gm3-iMac" . #P"/media/imac/share/space/lispysaves/saves/sandbox-saves/")
-		      ("nootboke" . #P"/home/terminal256/Documents/saves/"))
-		    :test 'equal))))
-  (utility:rebase-path world working-dir))
 (defun start ()
   (app:enter 'sucle-app))
 
@@ -68,35 +23,15 @@
   #+nil
   (setf (entity-fly? *ent*) nil
 	(entity-gravity? *ent*) t)
-  ;;(our-load)
   (window:set-vsync t)
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
-  (app:push-mode 'menu:tick)
   (menu:use *start-menu2*)
-  #+nil
-  (crud:use-crud-from-path
-   (sucle-temp:path "data.db")
-   ;;(world-path)
-   ;;(sucle-temp:path "new.db")
-   )
-  (sucle-mp:with-initialize-multiprocessing
-    (app:default-loop)))
+  (app:push-mode 'menu:tick)
 
-;;;;
+  ;;(sucle-mp:with-initialize-multiprocessing)
+  (app:default-loop))
 
-#+nil
-(defun start ()
-  (application:main
-   (lambda ()
-     (call-with-world-meshing-lparallel 
-      (lambda ()
-	(loop
-	   (application:poll-app)
-	   (per-frame)))))
-   :width 720
-   :height 480
-   :title "conceptually simple block game"))
 
 ;;;;************************************************************************;;;;
 ;;;;This code basically has not changed in forever.
@@ -173,10 +108,10 @@
 (defparameter *ticks* 0)
 (defparameter *game-ticks-per-iteration* 0)
 (defparameter *fraction-for-fps* 0.0)
-(defparameter *fist* nil)
+
 (defparameter *entities* nil)
 (defparameter *ent* nil)
-(defparameter *reach* 50.0)
+
 (defparameter *fov* (floatify (* pi (/ 85 180))))
 (defparameter *camera*
   (camera-matrix:make-camera
@@ -203,15 +138,7 @@
      (alexandria:lerp *fade* 1.0 *fog-ratio*))))
 (defparameter *fade-color* '(0.0 0.0 0.0))
 (defparameter *fade* 1.0)
-#+nil
-(defun update-world-vao2 ()
-  (update-world-vao
-   (lambda (key)
-     (world:unsquared-chunk-distance
-      key
-      (vocs::cursor-x *chunk-cursor-center*)
-      (vocs::cursor-y *chunk-cursor-center*)
-      (vocs::cursor-z *chunk-cursor-center*)))))
+
 ;;*frame-time* is for graphical frames, as in framerate.
 (defparameter *frame-time* 0)
 (defun sucle-per-frame ()
@@ -224,24 +151,15 @@
     ;;(voxel-chunks:clearworld)
     (setf *entities* (loop :repeat 10 :collect (create-entity)))
     (setf *ent* (elt *entities* 0))
-    ;;(sync_entity->chunk-array *ent* *chunk-cursor-center*)
-    #+nil
-    (load-world *chunk-cursor-center*;; t
-		)
+
     ;;Controller?
     (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
-    ;;Model
-    ;;FIXME::this depends on the position of entity.
-    ;;Rendering/view?
-    ;;(reset-chunk-display-list)
-    ;;( update-world-vao2)
+
     )
   (gl:polygon-mode :front-and-back :line)
-  ;;(sync_entity->chunk-array *ent* *chunk-cursor-center*)
-  ;;load or unload chunks around the player who may have moved
-  ;;(load-world *chunk-cursor-center*)
+
   ;;Polling
   ;;Physics
   ;;Rendering Chunks
@@ -254,17 +172,6 @@
   
   ;;physics
 
-  ;;Calculate what bocks are selected etc..
-  #+nil
-  (setf *fist*
-	(mvc 'standard-fist
-	     (spread (entity-position *ent*))
-	     (spread (sb-cga:vec*
-		      (camera-matrix:camera-vec-forward *camera*)
-		      *reach*))))
-  #+nil
-  (when (mode-enabled-p :fist-mode)
-    (run-buttons *fist-keys*))
   (when (mode-enabled-p :god-mode)
     (run-buttons *god-keys*))
   (when (mode-enabled-p :movement-mode)
@@ -347,18 +254,8 @@
 	 (unless (eq ent *ent*)
 	   (render-entity ent)))
        *entities*)
-  #+nil
-  (get-chunks-to-draw
-   (let ((ent (elt *entities* 0))
-	 (camera (camera-matrix:make-camera)))
-     (sync_entity->camera ent camera)
-     camera)
-   (vocs::cursor-radius *chunk-cursor-center*)
-   (vocs::cursor-x *chunk-cursor-center*)
-   (vocs::cursor-y *chunk-cursor-center*)
-   (vocs::cursor-z *chunk-cursor-center*))
-  #+nil
-  (render-chunks)
+
+  ;;;
   
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
@@ -375,51 +272,16 @@
 	       (sync_entity->camera ent *camera*)
 	       (render-camera *camera*))))
 	 *entities*))
-  ;;#+nil
-  (progn
-    (gl:line-width 10.0)
-    (render-chunk-outlines))
+
   ;;#+nil
   (progn
     (gl:line-width 10.0)
     (render-units))
   ;;(mvc 'render-line 0 0 0 (spread '(200 200 200)))
   (render-crosshairs)
-  
-  (complete-render-tasks)
-  #+nil
-  (dispatch-mesher-to-dirty-chunks
-   (vocs::cursor-x *chunk-cursor-center*)
-   (vocs::cursor-y *chunk-cursor-center*)
-   (vocs::cursor-z *chunk-cursor-center*)))
 
-;;[FIXME]architecture:one center, the player, and the chunk array centers around it
-;;(defparameter *chunk-cursor-center* (vocs::make-cursor))
-#+nil
-(defun sync_entity->chunk-array (ent cursor)
-  (mvc 'vocs::set-cursor-position
-       (spread (entity-position ent))
-       cursor))
-#+nil
-(defun load-world (chunk-cursor-center)
-  (let ((maybe-moved (vocs::cursor-dirty chunk-cursor-center)))
-    (when maybe-moved
-      (mapc 'world::dirty-push-around (vocs::load-chunks-around *chunk-cursor-center*)))
-    (vocs::call-fresh-chunks-and-end
-     (lambda (chunk)
-       ;;FIXME:this does not load the nearest chunks to render first?
-       ;;fresh-chunks are not necessarily fresh. reposition-chunk array gets rid of
-       ;;everything when moving, how to only update those that exist?
-       (world::dirty-push (vocs::chunk-key chunk))))
-    (when maybe-moved
-      (setf (vocs::cursor-dirty chunk-cursor-center) nil))))
+  )
 
-(defun render-chunk-outlines ()
-  (dohash (k chunk) *g/chunk-call-list*
-	  (declare (ignorable v))
-	  (render-aabb-at
-	   (chunk-gl-representation-aabb chunk)
-	   0.0 0.0 0.0)))
 
 (defun render-camera (camera)
   (mapc (lambda (arg)
@@ -489,72 +351,14 @@
     (let ((vec (camera-matrix:camera-vec-position camera)))
       (nsb-cga:%vec-lerp vec prev curr fraction))))
 (defun sync_neck->camera (neck camera)
-  #+nil
-  (print (list (necking-pitch neck)
-	       (necking-yaw neck)))
-  ;;(print)
   (unit-pitch-yaw (necking-pitch neck)
 		  (necking-yaw neck)
 		  (camera-matrix:camera-vec-forward camera)))
 
 ;;;;************************************************************************;;;;
 
-(defparameter *blockid* 0;;(block-data:lookup :planks)
-  )
-(defparameter *x* 0)
-(defparameter *y* 0)
-(defparameter *z* 0)
-;;;detect more entities
-;;;detect block types
-;;;;Default punching and placing blocks
-(defparameter *left-fist* 'destroy-block-at)
-(defun destroy-block-at (&optional (x *x*) (y *y*) (z *z*))
-  ;;(blocksound x y z)
-  (world:plain-setblock x y z (block-data:lookup :air) 15))
-(defparameter *right-fist* 'place-block-at)
-(defun place-block-at (&optional (x *x*) (y *y*) (z *z*) (blockval *blockid*))
-  (when (not-occupied x y z)
-    ;;(blocksound x y z)
-    (world:plain-setblock x y z blockval (block-data:data blockval :light))))
-
-(defparameter *5-fist* (constantly nil))
-(defparameter *4-fist* (constantly nil))
-(defparameter *middle-fist* (constantly nil))
-(defparameter *fist-keys*
-  nil
-  #+nil
-  `(((:mouse :pressed :left) . 
-     ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *left-fist*)))))
-    ((:mouse :pressed :right) .
-     ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-normal-block *fist*))
-	    (funcall *right-fist*)))))
-
-    ((:mouse :pressed :5) . 
-     ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *5-fist*)))))
-    ((:mouse :pressed :4) . 
-     ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *4-fist*)))))
-    ((:mouse :pressed :middle) . 
-     ,(lambda ()
-	(when (fist-exists *fist*)
-	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
-	    (funcall *middle-fist*)))))))
 (defparameter *normal-keys*
-  `(#+nil
-    (
-     (:key :pressed #\p) .
-     ,(lambda () (update-world-vao2)))
-    ((:key :pressed :escape) .
+  `(((:key :pressed :escape) .
      ,(lambda ()
 	(window:get-mouse-out)
 	(app:pop-mode)))
