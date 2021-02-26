@@ -26,8 +26,8 @@
   (window:set-vsync t)
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
-  ;;(menu:use *start-menu2*)
-  (app:push-mode 'sucle-per-frame)
+  (menu:use *start-menu2*)
+  (app:push-mode 'menu:tick)
 
   ;;(sucle-mp:with-initialize-multiprocessing)
   (app:default-loop))
@@ -121,8 +121,7 @@
 (defparameter *time-of-day* 1.0)
 (defparameter *sky-color*
   (mapcar 'utility:byte/255
-	  ;;'(0 0 0)
-	  '(173 204 255)))
+	  '(128 128 128)))
 (defun atmosphere ()
   (let ((sky (mapcar 
 	      (lambda (x)
@@ -239,28 +238,15 @@
   (draw-to-default-area)
   ;;this also clears the depth and color buffer.
   (multiple-value-bind (color fog) (atmosphere)
-    (apply #'render-sky color)
-    (use-chunk-shader
-     :camera *camera*
-     :sky-color color
-     :time-of-day (* *fade* *time-of-day*)
-     :fog-ratio fog
-     :chunk-radius 16 ;;(vocs::cursor-radius *chunk-cursor-center*)
-     ))
-  ;;#+nil
+    (apply #'render-sky color))
+  
+  ;;selected block and crosshairs
+  (use-solidshader *camera*)
   (map nil
        (lambda (ent)
 	 (unless (eq ent *ent*)
 	   (render-entity ent)))
        *entities*)
-
-  ;;;
-  
-  (use-occlusion-shader *camera*)
-  (render-chunk-occlusion-queries)
-  ;;selected block and crosshairs
-  (use-solidshader *camera*)
-  ;;(render-fist *fist*)
   ;;#+nil
   (progn
     (gl:line-width 10.0)
