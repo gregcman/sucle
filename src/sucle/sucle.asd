@@ -4,30 +4,14 @@
   :description "Cube Demo Game"
   :depends-on
   (
-   #:application
+   #:sucle-base
    #:alexandria  
-   #:utility 
-   #:sucle-temp ;;for the terrain picture 
-   #:text-subsystem
-   #:cl-opengl
-   #:glhelp
-   #:scratch-buffer
-   #:nsb-cga
-   #:camera-matrix
-   #:quads
-   #:sucle-multiprocessing
+   #:utility
+
+   #:sucle-base
    #:aabbcc ;;for occlusion culling 
-   #:image-utility
-   #:uncommon-lisp
-   #:fps-independent-timestep
-   #:control
-   #:alexandria  
-   ;;for world-generation
-   #:black-tie
-   #:ncurses-clone-for-lem
    #:livesupport
-   
-   #:crud)
+   #:black-tie)
   :serial t
   :components 
   (
