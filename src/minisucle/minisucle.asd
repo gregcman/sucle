@@ -13,15 +13,12 @@
   :serial t
   :components 
   (
-   (:file "queue")
-   (:file "voxel-chunks")
+   
+   
    (:file "package")
    (:file "util")
    (:file "menu")
    (:file "menus")
-   (:file "mesher")
-   (:file "block-data")
-   (:file "world")
    (:file "physics")
    (:file "sucle")
    (:file "render")))

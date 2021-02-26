@@ -138,8 +138,8 @@ Press q/escape to quit
        ((:key :pressed :enter) .
 	,(lambda ()
 	   (crud:use-crud-from-path (elt saves index))
-	   (vocs:clearworld)
-	   (update-world-vao2)
+	   ;;(vocs:clearworld)
+	   ;;(update-world-vao2)
 	   (menu:use *menu-in-world*)))
        )
       ;;data to render
@@ -158,7 +158,7 @@ Press q/escape to quit
   `(;;keys bound to functions
     (((:key :pressed #\q) .
       ,(lambda ()
-	 (vocs::save-all)
+	 ;;(vocs::save-all)
 	 (menu:use (make-menu-file-picker))))
      ((:key :pressed #\e) .
       ,(lambda ()

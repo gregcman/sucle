@@ -62,7 +62,8 @@
       (%gl:uniform-1f (uniform :foglet)
 		      (/ -1.0
 			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
-			 (* vocs:+size+ chunk-radius)
+			 (* 16;;vocs:+size+
+			    chunk-radius)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
 			 fog-ratio))
@@ -651,7 +652,7 @@ gl_FragColor.rgb = color_out;
 (defun call-with-world-meshing-lparallel (fun)
   (sucle-mp:with-initialize-multiprocessing
     (funcall fun)))
-
+#+nil
 (defun update-world-vao (distance-fun)
   (world:clean-dirty)
   (reset-meshers)
@@ -663,6 +664,7 @@ gl_FragColor.rgb = color_out;
 
 (defparameter *chunk-query-buffer-size* 0)
 (defvar *iterator*)
+#+nil
 (defun update-chunk-mesh (coords iter)
   (when coords
     (remove-chunk-model coords)
@@ -691,7 +693,8 @@ gl_FragColor.rgb = color_out;
 				       (load-time-value
 					(let* ((foo *chunk-query-buffer-size*)
 					       (min (- foo))
-					       (max (+ foo vocs:+size+)))
+					       (max (+ foo 16;;;vocs:+size+
+						       )))
 					  (floatf min max)
 					  (aabbcc:make-aabb
 					    :minx min
@@ -716,7 +719,8 @@ gl_FragColor.rgb = color_out;
 	      (voxel-chunks:with-chunk-key-coordinates
 	       (x y z) coords
 	       (flet ((f (n)
-			(floatify (* n vocs:+size+))))
+			(floatify (* n 16;;;vocs:+size+
+				     ))))
 		 (create-aabb
 		  (f (1+ x))
 		  (f (1+ y))
@@ -844,6 +848,7 @@ to be drawn by the render thread."
 		     (assert (eq :mesh-chunk type))
 		     (apply function args)))
 		  (t (print value)))))))))
+#+nil
 (defun dispatch-mesher-to-dirty-chunks (cx cy cz)
   "Re-draw, draw, or delete the openGL representation of chunks based 
 observed chunk state changes. 
@@ -888,6 +893,7 @@ Note:limits the amount of background jobs and pending lisp objects."
 		     (lambda (iter space chunk-pos)
 		       (map nil (lambda (x) (scratch-buffer:free-my-iterator-memory x)) iter)
 		       (multiple-value-bind (io jo ko) (voxel-chunks:unhashfunc chunk-pos)
+			 #+nil
 			 (let ((vocs::*seek-database* nil))
 			   (mesher:mesh-chunk iter io jo ko))
 			 ;;The return value is used as a callback when

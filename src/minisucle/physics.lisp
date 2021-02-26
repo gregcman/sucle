@@ -67,7 +67,7 @@
 	 (spread
 	  ;;position
 	  (entity-position ent)))))
-
+#+nil
 (defun pos-to-block-aabb (x y z)
   (let ((the-block (world:getblock x y z)))
     (block-to-block-aabb the-block)))
@@ -77,6 +77,7 @@
   *block-aabb*)
 #+nil
 (defparameter *dirtying2* nil)
+#+nil
 (defun entity-collision (px py pz vx vy vz aabb)
   (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
     ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
@@ -116,6 +117,7 @@
      min-ratio)))
 #+nil
 (defparameter *dirtying* nil)
+#+nil
 (defun find-blocks-in-contact-with (px py pz aabb)
   (let ((acc #b000000))
     (aabbcc:get-blocks-around (px py pz aabb) (mx my mz contact-var)
@@ -400,8 +402,8 @@
     curr))
 
 (defun create-entity ()
-  (make-entity :collision-fun 'entity-collision
-	       :contact-fun 'find-blocks-in-contact-with
+  (make-entity :collision-fun (lambda (&rest rest) (values 0 1.0)) ;;'entity-collision
+	       :contact-fun (lambda (&rest rest) 0) ;;find-blocks-in-contact-with
 	       :particle (make-pointmass)
 	       :neck (make-necking)
 	       :aabb *player-aabb*
@@ -457,7 +459,7 @@
 			   (- z dz)))))
 	   (setf (fist-exists fist) t))))
   fist)
-
+#+nil
 (defun fist-trace (px py pz vx vy vz &optional (aabb *fist-aabb*))
   (block first-block
     (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)

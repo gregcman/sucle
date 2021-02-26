@@ -32,6 +32,7 @@
 ;;;a very small cubic fist
 (defparameter *fist-aabb* (create-aabb 0.00005))
 
+#+nil
 (defparameter *chunk-aabb*
   (apply 'create-aabb
 	 (mapcar 'floatify
@@ -202,7 +203,7 @@
      (alexandria:lerp *fade* 1.0 *fog-ratio*))))
 (defparameter *fade-color* '(0.0 0.0 0.0))
 (defparameter *fade* 1.0)
-
+#+nil
 (defun update-world-vao2 ()
   (update-world-vao
    (lambda (key)
@@ -220,10 +221,11 @@
   ;;set the chunk center aroun the player
   (livesupport:update-repl-link)
   (application:on-session-change *session*
-    (voxel-chunks:clearworld)
+    ;;(voxel-chunks:clearworld)
     (setf *entities* (loop :repeat 10 :collect (create-entity)))
     (setf *ent* (elt *entities* 0))
-    (sync_entity->chunk-array *ent* *chunk-cursor-center*)
+    ;;(sync_entity->chunk-array *ent* *chunk-cursor-center*)
+    #+nil
     (load-world *chunk-cursor-center*;; t
 		)
     ;;Controller?
@@ -233,11 +235,12 @@
     ;;Model
     ;;FIXME::this depends on the position of entity.
     ;;Rendering/view?
-    (reset-chunk-display-list)
-    ( update-world-vao2))
-  (sync_entity->chunk-array *ent* *chunk-cursor-center*)
+    ;;(reset-chunk-display-list)
+    ;;( update-world-vao2)
+    )
+  ;;(sync_entity->chunk-array *ent* *chunk-cursor-center*)
   ;;load or unload chunks around the player who may have moved
-  (load-world *chunk-cursor-center*)
+  ;;(load-world *chunk-cursor-center*)
   ;;Polling
   ;;Physics
   ;;Rendering Chunks
@@ -251,13 +254,14 @@
   ;;physics
 
   ;;Calculate what bocks are selected etc..
-  ;;#+nil
+  #+nil
   (setf *fist*
 	(mvc 'standard-fist
 	     (spread (entity-position *ent*))
 	     (spread (sb-cga:vec*
 		      (camera-matrix:camera-vec-forward *camera*)
 		      *reach*))))
+  #+nil
   (when (mode-enabled-p :fist-mode)
     (run-buttons *fist-keys*))
   (when (mode-enabled-p :god-mode)
@@ -334,13 +338,15 @@
      :sky-color color
      :time-of-day (* *fade* *time-of-day*)
      :fog-ratio fog
-     :chunk-radius (vocs::cursor-radius *chunk-cursor-center*)))
-  #+nil
+     :chunk-radius 16 ;;(vocs::cursor-radius *chunk-cursor-center*)
+     ))
+  ;;#+nil
   (map nil
        (lambda (ent)
 	 (unless (eq ent *ent*)
 	   (render-entity ent)))
        *entities*)
+  #+nil
   (get-chunks-to-draw
    (let ((ent (elt *entities* 0))
 	 (camera (camera-matrix:make-camera)))
@@ -350,14 +356,15 @@
    (vocs::cursor-x *chunk-cursor-center*)
    (vocs::cursor-y *chunk-cursor-center*)
    (vocs::cursor-z *chunk-cursor-center*))
+  #+nil
   (render-chunks)
   
   (use-occlusion-shader *camera*)
   (render-chunk-occlusion-queries)
   ;;selected block and crosshairs
   (use-solidshader *camera*)
-  (render-fist *fist*)
-  #+nil
+  ;;(render-fist *fist*)
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (map nil
@@ -367,11 +374,11 @@
 	       (sync_entity->camera ent *camera*)
 	       (render-camera *camera*))))
 	 *entities*))
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (render-chunk-outlines))
-  #+nil
+  ;;#+nil
   (progn
     (gl:line-width 10.0)
     (render-units))
@@ -379,18 +386,20 @@
   (render-crosshairs)
   
   (complete-render-tasks)
+  #+nil
   (dispatch-mesher-to-dirty-chunks
    (vocs::cursor-x *chunk-cursor-center*)
    (vocs::cursor-y *chunk-cursor-center*)
    (vocs::cursor-z *chunk-cursor-center*)))
 
 ;;[FIXME]architecture:one center, the player, and the chunk array centers around it
-(defparameter *chunk-cursor-center* (vocs::make-cursor))
+;;(defparameter *chunk-cursor-center* (vocs::make-cursor))
+#+nil
 (defun sync_entity->chunk-array (ent cursor)
   (mvc 'vocs::set-cursor-position
        (spread (entity-position ent))
        cursor))
-
+#+nil
 (defun load-world (chunk-cursor-center)
   (let ((maybe-moved (vocs::cursor-dirty chunk-cursor-center)))
     (when maybe-moved
@@ -489,7 +498,8 @@
 
 ;;;;************************************************************************;;;;
 
-(defparameter *blockid* (block-data:lookup :planks))
+(defparameter *blockid* 0;;(block-data:lookup :planks)
+  )
 (defparameter *x* 0)
 (defparameter *y* 0)
 (defparameter *z* 0)
@@ -510,6 +520,8 @@
 (defparameter *4-fist* (constantly nil))
 (defparameter *middle-fist* (constantly nil))
 (defparameter *fist-keys*
+  nil
+  #+nil
   `(((:mouse :pressed :left) . 
      ,(lambda ()
 	(when (fist-exists *fist*)
@@ -537,7 +549,9 @@
 	  (multiple-value-bind (*x* *y* *z*) (spread (fist-selected-block *fist*))
 	    (funcall *middle-fist*)))))))
 (defparameter *normal-keys*
-  `(((:key :pressed #\p) .
+  `(#+nil
+    (
+     (:key :pressed #\p) .
      ,(lambda () (update-world-vao2)))
     ((:key :pressed :escape) .
      ,(lambda ()
