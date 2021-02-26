@@ -13,3 +13,6 @@ Everything that is generic for creating an app.
 - character input
 - polling loop
 - common controls
+- graphics matrix for camera
+- geometry: rectangle
+- simple text graphics: ncurses-clone-for-lem and text-subsystem
