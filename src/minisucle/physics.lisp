@@ -2,19 +2,6 @@
 ;;;;************************************************************************;;;;
 ;;;;<PHYSICS>
 
-;;;math modify macros
-(define-modify-macro *= (&rest args) *)
-(define-modify-macro += (&rest args) +)
-(define-modify-macro -= (&rest args) -)
-(define-modify-macro /f (&rest args) /)
-(define-modify-macro &= (&rest args) logand)
-(define-modify-macro ^= (&rest args) logxor)
-(define-modify-macro |\|=| (&rest args) logior)
-(define-modify-macro <<= (&rest args) ash)
-(define-modify-macro >>= (&rest args) hsa)
-(defmacro hsa (a b)
-  `(ash ,b ,a))
-
 (define-modify-macro logiorf (&rest args) logior)
 ;;;end math modify macros
 
@@ -41,7 +28,7 @@
 				 (incf ,pos (* ratio ,vel))
 				 (if (logtest ,bit newclamp)
 				     (setf ,vel 0)
-				     (*= ,vel whats-left)))))
+				     (setf ,vel (* ,vel whats-left))))))
 		   (axis px vx #b100)
 		   (axis py vy #b010)
 		   (axis pz vz #b001))
@@ -54,89 +41,6 @@
   ;;path unobstructed.
   (declare (ignore args))
   (values #b000 1.0))
-
-;;Is will the block being placed overlap with the
-;;given entity?
-(defun not-occupied (x y z &optional (ent *ent*))
-  (let ((aabb (pos-to-block-aabb x y z)))
-    (floatf x y z)
-    (mvc 'aabbcc:aabb-not-overlap
-	 aabb
-	 x y z
-	 (entity-aabb ent)
-	 (spread
-	  ;;position
-	  (entity-position ent)))))
-#+nil
-(defun pos-to-block-aabb (x y z)
-  (let ((the-block (world:getblock x y z)))
-    (block-to-block-aabb the-block)))
-(defun block-to-block-aabb (blockid)
-  (declare (ignore blockid))
-  ;;FIXME :use defmethod on objects?
-  *block-aabb*)
-#+nil
-(defparameter *dirtying2* nil)
-#+nil
-(defun entity-collision (px py pz vx vy vz aabb)
-  (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
-    ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
-    ;;also check "intersecting shell blocks?"
-    (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
-	(x y z contact)
-      (declare (ignorable contact))
-      (let ((blockid (world:getblock x y z)))
-	(when (block-data:data blockid :hard)
-	  #+nil
-	  (when *dirtying2*
-	    (world:plain-setblock x y z (1+ (random 5)) 0))
-	  (let ((blockaabb (block-to-block-aabb blockid)))
-	    (#+nil
-	     let
-	     #+nil((args
-		   (list
-		    aabb
-		    px py pz
-		    blockaabb
-		    x y z
-		    vx vy vz)))
-	     progn
-	      (multiple-value-bind (minimum type)
-		  ;;(apply 'aabbcc:aabb-collide args)
-		;;#+nil
-		(aabbcc:aabb-collide
-		 aabb
-		 px py pz
-		 blockaabb
-		 x y z
-		 vx vy vz)
-		;;(print (list minimum type (cons 'aabbcc:aabb-collide args)))
-		(collect-touch minimum type)))))))
-    (values
-     (collapse-touch vx vy vz)
-     min-ratio)))
-#+nil
-(defparameter *dirtying* nil)
-#+nil
-(defun find-blocks-in-contact-with (px py pz aabb)
-  (let ((acc #b000000))
-    (aabbcc:get-blocks-around (px py pz aabb) (mx my mz contact-var)
-      (declare (ignorable contact-var))
-      (let ((blockid (world:getblock mx my mz)))
-	(when (block-data:data blockid :hard)
-	  #+nil
-	  (when *dirtying*
-	    (world:plain-setblock mx my mz (1+ (random 5)) 0))
-	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
-					    (block-to-block-aabb blockid))))))
-    acc))
-
-  ;;;;150 ms delay for sprinting
-;;;;player eye height is 1.5, subtract 1/8 for sneaking
-
-;;gravity is (* -0.08 (expt tickscale 2)) 0 0
-;;falling friction is 0.98
-;;0.6 * 0.91 is walking friction
 
 (defun set-doublejump (ent)
   (when (and (not (entity-on-ground-p ent))
@@ -217,10 +121,10 @@
 		   (step-power 4.0))
 	      ;;FIXME:add great friction when on ground and sneaking
 	      (when is-sneaking
-		(*= speed 1.75))
+		(setf speed (* speed 1.75)))
 	      (block out
 		(when fly
-		  (*= speed 4.0)
+		  (setf speed (* speed 4.0))
 		  (return-from out))
 		(when onground
 		  (setf (entity-doublejump entity) :fresh)
@@ -236,7 +140,7 @@
 				 t)))
 		  (let ((base 4.0))
 		    (when is-sneaking
-		      (*= base 1.5))
+		      (setf base (* base 1.5)))
 		    (modify nsb-cga:%vec+ force
 			    (vec 0.0 (* base *ticks-per-second*) 0.0))))
 		(return-from out)
@@ -414,69 +318,6 @@
 	       :clip? t
 	       :jump? nil
 	       :sneak? nil))
-
-(struct-to-clos:struct->class
- (defstruct fist
-   (selected-block (vector 0 0 0))
-   (normal-block (vector 0 0 0))
-   (exists nil)
-   (position (vector 0 0 0))))
-
-(defun standard-fist (px py pz vx vy vz &optional (fist (make-fist)))
-  (multiple-value-bind (xyzclamp frac x y z)
-      (fist-trace px py pz vx vy vz)
-    (cond ((= #b000 xyzclamp)
-	   ;;The raycasted fist did not run into anything solid.
-	   (setf (fist-exists fist) nil))
-	  (t
-	   (macrolet ((setvec3d (vec x y z)
-			(let ((a (gensym)))
-			  `(let ((,a ,vec))
-			     (setf (aref ,a 0) ,x
-				   (aref ,a 1) ,y
-				   (aref ,a 2) ,z)))))
-	     (let ((a (+ px (* frac vx)))
-		   (b (+ py (* frac vy)))
-		   (c (+ pz (* frac vz))))
-	       ;;The block that it is collided with
-	       (setvec3d (fist-selected-block fist) x y z)
-	       ;;The resulting location of the fist
-	       (setvec3d (fist-position fist) a b c)
-	       (let ((dx 0)
-		     (dy 0)
-		     (dz 0))
-		 ;;Only choose one direction, don't have a fist
-		 ;;end up on the corner!!
-		 (cond ((logtest xyzclamp #b100)
-			(setf dx (if (plusp vx) 1 -1)) 0)
-		       ((logtest xyzclamp #b010)
-			(setf dy (if (plusp vy) 1 -1)) 0)
-		       ((logtest xyzclamp #b001)
-			(setf dz (if (plusp vz) 1 -1)) 0))
-		 (setvec3d (fist-normal-block fist)
-			   (- x dx)
-			   (- y dy)
-			   (- z dz)))))
-	   (setf (fist-exists fist) t))))
-  fist)
-#+nil
-(defun fist-trace (px py pz vx vy vz &optional (aabb *fist-aabb*))
-  (block first-block
-    (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
-	(x y z contact)
-      (declare (ignorable contact))
-      (when (block-data:data (world:getblock x y z) :hard)
-	(multiple-value-bind (minimum type)
-	    (aabbcc:aabb-collide
-	     aabb
-	     px py pz
-	     (pos-to-block-aabb x y z)
-	     x y z
-	     vx vy vz)
-	  (declare (ignorable minimum))
-	  (unless (zerop type)
-	    (return-from first-block (values type minimum x y z))))))
-    #b000))
 
 (struct-to-clos:struct->class
  (defstruct necking

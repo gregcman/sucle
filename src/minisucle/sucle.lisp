@@ -26,8 +26,8 @@
   (window:set-vsync t)
   (fps:set-fps 60)
   (ncurses-clone-for-lem:init)
-  (menu:use *start-menu2*)
-  (app:push-mode 'menu:tick)
+  ;;(menu:use *start-menu2*)
+  (app:push-mode 'sucle-per-frame)
 
   ;;(sucle-mp:with-initialize-multiprocessing)
   (app:default-loop))
@@ -143,8 +143,7 @@
 (defparameter *frame-time* 0)
 (defun sucle-per-frame ()
   (incf *frame-time*)
-  ;;[FIXME]where is the best place to flush the job-tasks?
-  (sucle-mp:flush-job-tasks)
+
   ;;set the chunk center aroun the player
   (livesupport:update-repl-link)
   (application:on-session-change *session*
