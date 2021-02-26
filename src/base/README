@@ -1,0 +1,15 @@
+Everything that is generic for creating an app.
+
+- Creating a window: window
+- Utilities: uncommon-lisp
+- Data serialization: sucle-serialize
+- Custom vectors: scratch-buffer
+- OpenGL: opengl
+- vectors: nsb-cga
+- image data: image-utility
+- framerate controller
+- lazy loader
+- database storage
+- character input
+- polling loop
+- common controls
