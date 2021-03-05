@@ -16,13 +16,16 @@
 
    (:file "voxel-chunks") ;;;FIXME
    (:file "queue") 
-   (:file "render-chunks") ;;FIXME
-   (:file "block-data");;FIXME
+   
    (:file "world");;FIXME
+   (:file "fix")
   
    (:file "util")
    (:file "menu")
    (:file "menus")
    (:file "physics")
-   (:file "sucle")
-   (:file "render")))
+   
+   (:file "render")
+   (:file "render-chunks")
+
+   (:file "sucle")))

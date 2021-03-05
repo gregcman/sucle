@@ -19,8 +19,10 @@
 (defparameter *mesh-epos* nil)
 
 ;;(defgeneric draw-dispatch (obj i j k))
-(defun draw-dispatch ((bits-block-data fixnum) i j k)
-  (renderstandardblock (world:getblock-extract bits-block-data) i j k))
+(defun draw-dispatch (bits-block-data i j k)
+  (let ((type (world:getblock-extract bits-block-data)))
+    (unless (= type 0)
+      (renderstandardblock type i j k))))
 
 (with-unsafe-speed
   (defun mesh-chunk (iter io jo ko)
@@ -313,24 +315,320 @@
 	   )))
 
 (defun renderstandardblock (id i j k)
-  (let ((texid (data id :texture)))
+  ;;FIXME: dummy texture
+  (let ((texid 2 ;;(data id :texture)
+	  ))
     (with-texture-translator2 (u0 u1 v0 v1) texid
       (flipuv)
       (let ((adj-id (world:getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
-	  (mesher:side-j i j k u0 v0 u1 v1)))
+	  (side-j i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock i (1+ j) k)))
 	(when (show-sidep id adj-id)
-	  (mesher:side+j i j k u0 v0 u1 v1)))
+	  (side+j i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock (1- i) j k)))
 	(when (show-sidep id adj-id)
-	  (mesher:side-i i j k u0 v0 u1 v1)))
+	  (side-i i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock (1+ i) j k)))
 	(when (show-sidep id adj-id)
-	  (mesher:side+i i j k u0 v0 u1 v1)))    
+	  (side+i i j k u0 v0 u1 v1)))    
       (let ((adj-id (world:getblock i j (1- k))))
 	(when (show-sidep id adj-id)
-	  (mesher:side-k i j k u0 v0 u1 v1)))
+	  (side-k i j k u0 v0 u1 v1)))
       (let ((adj-id (world:getblock i j (1+ k))))
 	(when (show-sidep id adj-id)
-	  (mesher:side+k i j k u0 v0 u1 v1))))))
+	  (side+k i j k u0 v0 u1 v1))))))
+
+;;;;;;
+
+(defun use-chunk-shader (&key (camera *camera*)
+			   (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
+			   (fog-ratio 0.01)
+			   (time-of-day (random 1.0))
+			   (chunk-radius (error "chunk-radius not supplied")))
+  ;;set up shader
+  (let ((shader (deflazy:getfnc 'blockshader)))
+    (glhelp:use-gl-program shader)
+
+    ;;uniform crucial for first person 3d
+    (glhelp:with-uniforms uniform shader
+      (gl:uniform-matrix-4fv 
+       (uniform :pmv)
+       (camera-matrix:camera-matrix-projection-view-player camera)
+       nil))
+
+    ;;other cosmetic uniforms
+    (glhelp:with-uniforms
+	uniform shader
+      (destructuring-bind (r g b &rest rest) sky-color
+	(declare (ignorable rest))
+	(%gl:uniform-3f (uniform :fogcolor) r g b))
+      (gl:uniformfv (uniform :camera-pos)
+		    (camera-matrix:camera-vec-position camera))
+      (%gl:uniform-1f (uniform :foglet)
+		      (/ -1.0
+			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
+			 (* vocs:+size+ chunk-radius)
+			 #+nil
+			 (or 128 (camera-matrix:camera-frustum-far *camera*))
+			 fog-ratio))
+      (%gl:uniform-1f (uniform :aratio)
+		      (/ 1.0 fog-ratio))
+      (%gl:uniform-1f (uniform :time)
+		      time-of-day)
+
+      (glhelp:set-uniforms-to-textures
+       ((uniform :sampler)
+	(glhelp:handle (deflazy:getfnc 'terrain)))))))
+
+(defun render-chunks ()  
+  (gl:enable :depth-test)
+  (gl:enable :cull-face)
+  (gl:disable :blend)
+  (gl:polygon-mode :front-and-back :fill)
+  ;;render chunks
+  (gl:front-face :ccw)
+					;#+nil
+  (let ((call-list (deflazy:getfnc 'chunk)))
+    (glhelp:slow-draw call-list))
+  #+nil
+  (multiple-value-bind (shown hidden overridden) (draw-world)
+    (declare (ignorable shown hidden overridden))
+    ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
+    #+nil
+    (when (not (zerop overridden))
+      (print overridden))
+    ;;(print (/ hidden (+ 0.0 hidden shown)))
+    ;;#+nil
+    #+nil
+    (let ((total (hash-table-count *g/chunk-call-list*)))
+      (unless (zerop total)
+	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
+(defun quadratic-formula (a b c)
+  (let ((two-a (+ a a)))
+    (let ((term2 (/ (sqrt (- (* b b)
+			     (* 4 a c)))
+		    two-a))
+	  (term1 (/ (- b)
+		    two-a)))
+      (values (+ term1 term2)
+	      (- term1 term2)))))
+
+(defun sum-of-first-n-integers (n)
+  (/ (* (+ n 1) n)
+     2))
+
+(defun reverse-sum-of-first-n-integers (n)
+  (quadratic-formula 0.5 0.5 (- n)))
+
+(defun oct-24-2018 ()
+  (let ((pick
+	 (random
+	  (sum-of-first-n-integers 256))
+	  ))
+    (let ((a (floor
+	      (reverse-sum-of-first-n-integers pick))))
+      (values a
+	      (- pick (sum-of-first-n-integers a))))))
+
+(progn
+  (defun color-grasses (terrain)
+    (flet ((color ()
+	     (multiple-value-call #'foliage-color
+	       ;;(values 255 0)
+	       ;;#+nil
+	       (oct-24-2018)
+	       )
+	     
+	     ;;;does not distribute evenly. it picks a slice, then a height on the slice.
+	     ;;;points on small slices have a greater chance of being picked than
+	     ;;;points on large slices.
+	     #+nil
+	     (let ((value (random 256)))
+	       (foliage-color value (random (1+ value))))))
+      (modify-greens 5 12 :color
+		     (color)
+		    
+		     ;(foliage-color 255 0)
+		     :terrain terrain)
+      (modify-greens 0 15 :color
+		     (color)
+		     
+		     ;(foliage-color 255 0)
+		     :terrain terrain))
+    terrain)
+  (defun getapixel (h w image)
+    (destructuring-bind (height width c) (array-dimensions image)
+      (declare (ignore height))
+      (make-array 4 :element-type (array-element-type image)
+		  :displaced-to image
+		  :displaced-index-offset (* c (+ w (* h width))))))
+
+  (defun modify-greens (xpos ypos
+			&key
+			  (color #(0 0 0 0))
+			  (terrain (error "no image")))
+    (let* (;;Assume texture is a square grid of squares
+	   (size (round (sqrt (/ (array-total-size terrain) 4))))
+	   (cell-size (/ size 16)))
+ 
+      (setf xpos (* xpos cell-size)
+	    ypos (* ypos cell-size))
+      (dobox ((x xpos (+ cell-size xpos))
+	      (y ypos (+ cell-size ypos)))
+	     (let ((vecinto (getapixel (- (- size 1) y)
+				       x terrain)))
+	       (map-into vecinto (lambda (a b)
+				   (truncate (* a b) 256))
+			 vecinto
+			 color))))))
+
+(defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
+  (let ((denominator (+ (*
+			 (- vy2 vy3)
+			 (- vx1 vx3))
+			(*
+			 (- vx3 vx2)
+			 (- vy1 vy3))))
+	(py-yv3 (- py vy3))
+	(px-xv3 (- px vx3)))
+    (let* ((w1 (/
+		(+
+		 (*
+		  (- vy2 vy3)
+		  px-xv3)
+		 (*
+		  (- vx3 vx2)
+		  py-yv3))
+		  denominator))
+	   (w2 (/
+		(+
+		 (*
+		  (- vy3 vy1)
+		  px-xv3)
+		 (*
+		  (- vx1 vx3)
+		  py-yv3))
+		denominator))
+	   (w3 (- 1 w1 w2)))
+      (values w1 w2 w3))))
+
+
+(defun foliage-color (a b)
+  (multiple-value-bind (w1 w2 w3)
+      (barycentric-interpolation a b 0.0 0.0 255.0 0.0 255.0 255.0)
+    (mapcar (lambda (x y z)
+	      (+ (* x w1)
+		 (* y w2)
+		 (* z w3)))
+	    '(71.0 205.0 51.0)
+	    '(191.0 183.0 85.0)
+	    '(128.0 180.0 151.0))))
+
+(deflazy:deflazy terrain-png ()
+  #+nil
+  (img:load
+   (sucle-temp:path #P"res/terrain.png"))
+  (img:load
+   (sucle-temp:path #P"res/terrain1-8.png")))
+
+(deflazy:deflazy modified-terrain-png (terrain-png)
+  (color-grasses
+   (alexandria:copy-array terrain-png)))
+
+(glhelp:deflazy-gl terrain (modified-terrain-png)
+  (glhelp:wrap-opengl-texture
+   (glhelp:create-opengl-texture-from-data modified-terrain-png)))
+
+(glhelp:deflazy-gl blockshader ()
+  (let ((glhelp::*glsl-version* sucle::*shader-version*))
+    (glhelp:create-opengl-shader
+     "
+out float color_out;
+out vec2 texcoord_out;
+out float fogratio_out;
+
+in vec4 position;
+in vec2 texcoord;
+in vec4 blocklight;
+in vec4 skylight;
+uniform mat4 projection_model_view;
+uniform float time = 0.0;
+
+uniform float foglet;
+uniform float aratio;
+uniform vec3 camera_pos;
+
+void main () {
+gl_Position = projection_model_view * position;
+vec4 light = max(skylight*time, blocklight);
+color_out = dot(light,vec4(0.25));
+texcoord_out = texcoord;
+
+float distance = 
+//distance(position.xyz,vec3(0.0));
+distance(camera_pos.xyz, position.xyz);
+//max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
+fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
+}"
+     "
+in vec2 texcoord_out;
+in float color_out;
+uniform sampler2D sampler;
+in float fogratio_out;
+uniform vec3 fogcolor;
+
+void main () {
+vec4 pixdata = 
+//vec4(1.0);
+texture2D(sampler,texcoord_out.xy);
+vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
+//if (pixdata.a == 0.0){discard;}
+gl_FragColor.rgb = temp; 
+}"
+     `(("position" ,sucle::*position-attr*) 
+       ("texcoord" ,sucle::*texcoord-attr*)
+       ("blocklight" 4)
+       ("skylight" 5))
+     '((:pmv "projection_model_view")
+       (:fogcolor "fogcolor")
+       (:foglet "foglet")
+       (:aratio "aratio")
+       (:camera-pos "camera_pos")
+       (:sampler "sampler")
+       (:time "time")))))
+
+
+;;;;
+
+(defun attrib-buffer-iterators ()
+  (map-into (make-array 3 :element-type t :initial-element nil)
+	    (function scratch-buffer:my-iterator)))
+
+(glhelp:deflazy-gl chunk ()
+  (render-chunk))
+
+(defun render-chunk ()
+  (let ((iterators (attrib-buffer-iterators)))
+    (render-chunks:mesh-chunk iterators 0 0 0)
+    (update-chunk-mesh iterators)))
+
+(defun update-chunk-mesh (iter)
+  (utility:with-vec (a b c) (iter)
+    (let ((len (floor (scratch-buffer:iterator-fill-pointer a) 3)))
+      (unless (zerop len)
+	(let ((display-list
+	       (utility:with-unsafe-speed
+		 (scratch-buffer:flush-bind-in*
+		     ((a xyz)
+		      (b uv)
+		      (c dark))
+		   (glhelp:create-vao-or-display-list-from-specs
+		    (:quads len)
+		    ((sucle::*texcoord-attr* (uv) (uv))
+		     (4 (dark) (dark) (dark) (dark))
+		     (5 (dark) (dark) (dark) (dark))
+		     ;;[FIXME]zero always comes last for display lists?
+		     ;;have to figure this out manually?
+		     (sucle::*position-attr* (xyz) (xyz) (xyz) 1.0)))))))
+	  (return-from update-chunk-mesh (values display-list)))))))

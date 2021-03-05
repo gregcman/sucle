@@ -29,6 +29,9 @@
   (menu:use *start-menu2*)
   (app:push-mode 'menu:tick)
 
+  (fix::fix)
+  (fix::seed)
+
   ;;(sucle-mp:with-initialize-multiprocessing)
   (app:default-loop))
 
@@ -238,7 +241,16 @@
   (draw-to-default-area)
   ;;this also clears the depth and color buffer.
   (multiple-value-bind (color fog) (atmosphere)
-    (apply #'render-sky color))
+    (apply #'render-sky color)
+    (render-chunks::use-chunk-shader
+     :camera *camera*
+     :sky-color color
+     :time-of-day (* *fade* *time-of-day*)
+     :fog-ratio fog
+     :chunk-radius 16 ;;(vocs::cursor-radius *chunk-cursor-center*)
+     ))
+
+  (render-chunks::render-chunks)
   
   ;;selected block and crosshairs
   (use-solidshader *camera*)
