@@ -16,7 +16,7 @@
 
    (:file "voxel-chunks") ;;;FIXME
    (:file "queue") 
-   (:file "mesher") ;;FIXME
+   (:file "render-chunks") ;;FIXME
    (:file "block-data");;FIXME
    (:file "world");;FIXME
   

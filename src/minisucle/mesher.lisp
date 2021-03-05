@@ -1,4 +1,4 @@
-(defpackage #:mesher
+(defpackage #:render-chunks
   (:use :cl :utility)
   (:export
    :mesh-chunk
@@ -12,13 +12,16 @@
    :side+j
    :side-k
    :side+k))
-(in-package :mesher)
+(in-package :render-chunks)
 
 (defparameter *mesh-etex* nil)
 (defparameter *mesh-dark* nil)
 (defparameter *mesh-epos* nil)
 
-(defgeneric draw-dispatch (obj i j k))
+;;(defgeneric draw-dispatch (obj i j k))
+(defun draw-dispatch ((bits-block-data fixnum) i j k)
+  (renderstandardblock (world:getblock-extract bits-block-data) i j k))
+
 (with-unsafe-speed
   (defun mesh-chunk (iter io jo ko)
     (declare (type voxel-chunks:block-coord io jo ko))
@@ -293,3 +296,41 @@
 
 (eval-always
   (defparameter *16x16-tilemap* (rectangular-tilemap:regular-enumeration 16 16)))
+
+(defmacro flipuv (&optional (i 'i) (j 'j) (k 'k) (u1 'u1) (u0 'u0) (v1 'v1) (v0 'v0))
+  (utility:with-gensyms (u v)
+    `(locally ;;(declare (inline block-hash))
+       (multiple-value-bind (,u ,v) (values t nil) ;;(block-hash ,i ,j ,k)
+	 (when ,u
+	   (rotatef ,u1 ,u0))
+	 (when ,v
+	   (rotatef ,v1 ,v0))))))
+
+(defun show-sidep (blockid other-blockid)
+  (or (zerop other-blockid)
+      (and (/= blockid other-blockid)
+	   ;;(not (data other-blockid :opaque))
+	   )))
+
+(defun renderstandardblock (id i j k)
+  (let ((texid (data id :texture)))
+    (with-texture-translator2 (u0 u1 v0 v1) texid
+      (flipuv)
+      (let ((adj-id (world:getblock i (1- j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-j i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i (1+ j) k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+j i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1- i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side-i i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock (1+ i) j k)))
+	(when (show-sidep id adj-id)
+	  (mesher:side+i i j k u0 v0 u1 v1)))    
+      (let ((adj-id (world:getblock i j (1- k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side-k i j k u0 v0 u1 v1)))
+      (let ((adj-id (world:getblock i j (1+ k))))
+	(when (show-sidep id adj-id)
+	  (mesher:side+k i j k u0 v0 u1 v1))))))
