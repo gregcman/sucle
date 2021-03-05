@@ -1,0 +1,6 @@
+- Get world loading to work and moving around
+- Get rendering to work
+
+- physics is not so important
+
+- rewrite world and rendering to have multiple layers

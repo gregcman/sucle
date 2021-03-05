@@ -504,7 +504,7 @@ gl_FragColor.rgb = color_out;
    ;;When the chunk pops into the frustum,
    ;;override queries and draw regardless.
    (draw-override 0)))
-(defparameter *occlusion-culling-p* t)
+(defparameter *occlusion-culling-p* nil)
 (defun set-chunk-gl-representation-visible (value)
   (setf (chunk-gl-representation-occlusion-state value) :visible)
   (setf (chunk-gl-representation-occluded value) nil))

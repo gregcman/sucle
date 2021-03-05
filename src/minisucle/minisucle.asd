@@ -21,4 +21,5 @@
    (:file "menus")
    (:file "physics")
    (:file "sucle")
-   (:file "render")))
+   (:file "render")
+   (:file "render-chunks")))

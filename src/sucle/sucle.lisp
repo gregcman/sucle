@@ -235,6 +235,7 @@
     ;;Rendering/view?
     (reset-chunk-display-list)
     ( update-world-vao2))
+  
   (sync_entity->chunk-array *ent* *chunk-cursor-center*)
   ;;load or unload chunks around the player who may have moved
   (load-world *chunk-cursor-center*)
