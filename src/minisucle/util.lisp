@@ -1,5 +1,8 @@
 (in-package :sucle)
 ;;multiple-value-call synonym
+(defun empty-air-p (thing)
+  (or (eql 0 thing)
+      (null thing)))
 (defmacro mvc (fun arg &rest args)
   `(multiple-value-call ,fun ,arg ,@args))
 (declaim (inline spread))

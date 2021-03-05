@@ -305,9 +305,81 @@
 	 (curr (pointmass-position player-pointmass)))
     curr))
 
+
+;;;;
+(defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
+		      (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
+  (floatf maxx maxy maxz minx miny minz)
+  (aabbcc:make-aabb
+   :minx minx
+   :maxx maxx
+   :miny miny
+   :maxy maxy
+   :minz minz
+   :maxz maxz))
+
+(defparameter *block-aabb*
+  ;;;;1x1x1 cube
+  (create-aabb 1.0 1.0 1.0 0.0 0.0 0.0))
+
+;;;;[FIXME]The point of this is to reduce the amount of bits to store the hitbox.
+;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
+;;;;get chopped off or something, thus leading to strange clipping.
+;;;;This effectively reduces the precision, giving leeway for math operations.
+;;;;My prediction could be wrong though.
+(defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
+  (* n (round (/ x n))))
+(defparameter *player-aabb*
+  (apply #'create-aabb
+	 (mapcar 'round-to-nearest	 
+		 '(0.3 0.12 0.3 -0.3 -1.5 -0.3))))
+
+;;;;
+
+(defun block-to-block-aabb (blockid)
+  (declare (ignore blockid))
+  ;;FIXME :use defmethod on objects?
+  *block-aabb*)
+
+(defun entity-collision (px py pz vx vy vz aabb)
+  (aabbcc:with-touch-collector (collect-touch collapse-touch min-ratio)
+    ;;[FIXME] aabb-collect-blocks does not check slabs, only blocks upon entering.
+    ;;also check "intersecting shell blocks?"
+    (aabbcc:aabb-collect-blocks (px py pz vx vy vz aabb)
+	(x y z contact)
+      (declare (ignorable contact))
+      (let ((blockid (voxel-chunks:getobj x y z)))
+	(when (not (empty-air-p blockid))
+	  (let ((blockaabb (block-to-block-aabb blockid)))
+	    (multiple-value-bind (minimum type)
+		(aabbcc:aabb-collide
+		 aabb
+		 px py pz
+		 blockaabb
+		 x y z
+		 vx vy vz)
+	      (collect-touch minimum type))))))
+    (values
+     (collapse-touch vx vy vz)
+     min-ratio)))
+
+(defun find-blocks-in-contact-with (px py pz aabb)
+  (let ((acc #b000000))
+    (aabbcc:get-blocks-around (px py pz aabb) (mx my mz contact-var)
+      (declare (ignorable contact-var))
+      (let ((blockid (voxel-chunks:getobj mx my mz)))
+	(when (not (empty-air-p blockid))
+	  (logiorf acc (aabbcc:aabb-contact px py pz aabb mx my mz
+					    (block-to-block-aabb blockid))))))
+    acc))
+
 (defun create-entity ()
-  (make-entity :collision-fun (lambda (&rest rest) (values 0 1.0)) ;;'entity-collision
-	       :contact-fun (lambda (&rest rest) 0) ;;find-blocks-in-contact-with
+  ;;Reapply comments to make it noclip
+  (make-entity :collision-fun ;;(lambda (&rest rest) (values 0 1.0))
+	       #'entity-collision
+	       :contact-fun ;;(lambda (&rest rest) 0)
+
+	       #'find-blocks-in-contact-with
 	       :particle (make-pointmass)
 	       :neck (make-necking)
 	       :aabb *player-aabb*

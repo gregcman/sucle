@@ -34,16 +34,12 @@
 (defun getblock (x y z)
   (funcall *getblockfun* x y z))
 
-(defun empty-air-p (thing)
-  (or (eql 0 thing)
-      (null thing)))
-
 (with-unsafe-speed
   (defun mesh-chunk (iter &optional (io 0) (jo 0) (ko 0) (isize 16) (jsize 16) (ksize 16))
     (declare (type voxel-chunks:block-coord io jo ko))
     (let* ((lightfun (lambda (x y z)
 		       (let ((thing (voxel-chunks:getobj x y z)))
-			 (if (empty-air-p thing)
+			 (if (sucle::empty-air-p thing)
 			     15
 			     0))))
 	   (*getlightfun* lightfun)
@@ -331,7 +327,7 @@
 	   (rotatef ,v1 ,v0))))))
 
 (defun show-sidep (blockid other-blockid)
-  (or (empty-air-p other-blockid)
+  (or (sucle::empty-air-p other-blockid)
       (and (not (eql blockid other-blockid))
 	   ;;(not (data other-blockid :opaque))
 	   )))
