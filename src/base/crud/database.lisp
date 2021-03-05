@@ -19,12 +19,14 @@
     (assert (every 'alphanumericp sql-string) nil "~s is invalid, injectable SQL" string)
     string))
 ;;;Handle pooling. Each thread gets its own handle.
-(defvar *handles*)
+;;(defvar *handles*)
 (defun get-handle ()
   (or
-   (lparallel.queue:try-pop-queue *handles*)
+   ;;(lparallel.queue:try-pop-queue *handles*)
    (new-connection)))
 (defun release-handle (handle)
+  (sqlite:disconnect handle)
+  #+nil
   (lparallel.queue:push-queue handle *handles*))
 ;;FIXME::detect whether *db* is already bound
 (defmacro with-open-database2 (&body body)

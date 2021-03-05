@@ -15,10 +15,6 @@
   ((:file "package")
 
    (:file "voxel-chunks") ;;;FIXME
-   (:file "queue") 
-   
-   (:file "world");;FIXME
-   (:file "fix")
   
    (:file "util")
    (:file "menu")
@@ -28,4 +24,6 @@
    (:file "render")
    (:file "render-chunks")
 
+   (:file "fix")
+   
    (:file "sucle")))

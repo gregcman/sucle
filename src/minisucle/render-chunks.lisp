@@ -19,21 +19,43 @@
 (defparameter *mesh-epos* nil)
 
 ;;(defgeneric draw-dispatch (obj i j k))
-(defun draw-dispatch (bits-block-data i j k)
-  (let ((type (world:getblock-extract bits-block-data)))
-    (unless (= type 0)
-      (renderstandardblock type i j k))))
+(defun draw-dispatch (type i j k)
+  (unless (= type 0)
+    (renderstandardblock type i j k)))
+
+(defparameter *getlightfun* (constantly 0))
+(defparameter *skygetlightfun* (constantly 0))
+(defparameter *getblockfun* (constantly 0))
+
+(defun getlight (x y z)
+  (funcall *getlightfun* x y z))
+(defun skygetlight (x y z)
+  (funcall *skygetlightfun* x y z))
+(defun getblock (x y z)
+  (funcall *getblockfun* x y z))
+
+(defun empty-air-p (thing)
+  (or (eql 0 thing)
+      (null thing)))
 
 (with-unsafe-speed
-  (defun mesh-chunk (iter io jo ko)
+  (defun mesh-chunk (iter &optional (io 0) (jo 0) (ko 0) (isize 16) (jsize 16) (ksize 16))
     (declare (type voxel-chunks:block-coord io jo ko))
-    (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
-      ;;(draw-dispatch (voxel-chunks:getobj io jo ko) io jo ko)
-      ;;#+nil
-      (dobox ((i io (the voxel-chunks:block-coord (+ 16 io)))
-	      (j jo (the voxel-chunks:block-coord (+ 16 jo)))
-	      (k ko (the voxel-chunks:block-coord (+ 16 ko))))
-	     (draw-dispatch (voxel-chunks:getobj i j k) i j k)))))
+    (let* ((lightfun (lambda (x y z)
+		       (let ((thing (voxel-chunks:getobj x y z)))
+			 (if (empty-air-p thing)
+			     15
+			     0))))
+	   (*getlightfun* lightfun)
+	   (*skygetlightfun* lightfun)
+	   (*getblockfun* 'voxel-chunks:getobj))
+      (with-vec (*mesh-epos* *mesh-etex* *mesh-dark*) (iter)
+	;;(draw-dispatch (voxel-chunks:getobj io jo ko) io jo ko)
+	;;#+nil
+	(dobox ((i io (the voxel-chunks:block-coord (+ isize io)))
+		(j jo (the voxel-chunks:block-coord (+ jsize jo)))
+		(k ko (the voxel-chunks:block-coord (+ ksize ko))))
+	       (draw-dispatch (getblock i j k) i j k))))))
 
 (eval-always
   ;;;;total faces touched by a light of distance n
@@ -143,9 +165,9 @@
 		   `(let ((,actual-color ,color))
 		      (declare (type single-float ,actual-color))
 		      ,(%edge-aux
-			'world:getlight 'q0 'q1 'q2 'q3 
+			'getlight 'q0 'q1 'q2 'q3 
 			(%edge-aux
-			 'world:skygetlight 'q4 'q5 'q6 'q7
+			 'skygetlight 'q4 'q5 'q6 'q7
 			 ;;Write block light and sky light values
 			 `(dark q0 q1 q2 q3 q4 q5 q6 q7)
 			 #+nil
@@ -309,8 +331,8 @@
 	   (rotatef ,v1 ,v0))))))
 
 (defun show-sidep (blockid other-blockid)
-  (or (zerop other-blockid)
-      (and (/= blockid other-blockid)
+  (or (empty-air-p other-blockid)
+      (and (not (eql blockid other-blockid))
 	   ;;(not (data other-blockid :opaque))
 	   )))
 
@@ -320,22 +342,22 @@
 	  ))
     (with-texture-translator2 (u0 u1 v0 v1) texid
       (flipuv)
-      (let ((adj-id (world:getblock i (1- j) k)))
+      (let ((adj-id (getblock i (1- j) k)))
 	(when (show-sidep id adj-id)
 	  (side-j i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i (1+ j) k)))
+      (let ((adj-id (getblock i (1+ j) k)))
 	(when (show-sidep id adj-id)
 	  (side+j i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1- i) j k)))
+      (let ((adj-id (getblock (1- i) j k)))
 	(when (show-sidep id adj-id)
 	  (side-i i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock (1+ i) j k)))
+      (let ((adj-id (getblock (1+ i) j k)))
 	(when (show-sidep id adj-id)
 	  (side+i i j k u0 v0 u1 v1)))    
-      (let ((adj-id (world:getblock i j (1- k))))
+      (let ((adj-id (getblock i j (1- k))))
 	(when (show-sidep id adj-id)
 	  (side-k i j k u0 v0 u1 v1)))
-      (let ((adj-id (world:getblock i j (1+ k))))
+      (let ((adj-id (getblock i j (1+ k))))
 	(when (show-sidep id adj-id)
 	  (side+k i j k u0 v0 u1 v1))))))
 
@@ -610,7 +632,7 @@ gl_FragColor.rgb = temp;
 
 (defun render-chunk ()
   (let ((iterators (attrib-buffer-iterators)))
-    (render-chunks:mesh-chunk iterators 0 0 0)
+    (render-chunks:mesh-chunk iterators 0 0 0 32 32 32)
     (update-chunk-mesh iterators)))
 
 (defun update-chunk-mesh (iter)
