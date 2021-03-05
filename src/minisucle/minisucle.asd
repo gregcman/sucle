@@ -12,14 +12,17 @@
    #:livesupport)
   :serial t
   :components 
-  (
-   
-   
-   (:file "package")
+  ((:file "package")
+
+   (:file "voxel-chunks") ;;;FIXME
+   (:file "queue") 
+   (:file "mesher") ;;FIXME
+   (:file "block-data");;FIXME
+   (:file "world");;FIXME
+  
    (:file "util")
    (:file "menu")
    (:file "menus")
    (:file "physics")
    (:file "sucle")
-   (:file "render")
-   (:file "render-chunks")))
+   (:file "render")))
