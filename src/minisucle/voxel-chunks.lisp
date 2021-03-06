@@ -119,12 +119,18 @@
 ;;FIXME:detect if it actually of type chunk?
 
 (with-unsafe-speed
-  (declaim (inline valid-chunk-p))
+  (declaim (inline valid-chunk-p)
+	   (inline chunk-matches-coords-p))
   (defun valid-chunk-p (chunk)
     (and chunk
 	 ;;FIXME:: hack? 0 is empty.
 	 (not (eq 0 chunk))
-	 (chunk-alive? chunk))))
+	 (chunk-alive? chunk)))
+  (defun chunk-matches-coords-p (chunk cx cy cz)
+    ;;FIXME: eq assumes fixnums.
+    (and (eq cx (chunk-x chunk))
+	 (eq cy (chunk-y chunk))
+	 (eq cz (chunk-z chunk)))))
 
 ;;;;
 
@@ -219,28 +225,31 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 (with-unsafe-speed
   (declaim (inline getchunk)))
 (defun getchunk (cx cy cz &optional (allocate-p nil))
-  (declare (optimize (debug 3)))
-  ;;Search cache 1
-  (multiple-value-bind (cx2 cy2 cz2) (cache2_inner cx cy cz)
-    (let ((maybe-chunk (cache2_reference-inside *cache2* cx2 cy2 cz2)))
-      (if (valid-chunk-p maybe-chunk)
-	  (values maybe-chunk t)
-	  (multiple-value-bind (main-mem-chunk valid-p)
-	      ;;Search main memory
-	      (let ((key (create-chunk-key cx cy cz)))
-		(let ((maybe-chunk (get-chunk-in-cache key)))
-		  (if (valid-chunk-p maybe-chunk)
-		      (values maybe-chunk t)
-		      (if allocate-p
-			  ;;Create a new chunk if it does not already exist.
-			  (let ((new (create-chunk cx cy cz)))
-			    (set-chunk-in-cache key new)
-			    (values new t))
-			  (values nil nil)))))
-	    (when valid-p
-	      ;;(print "foo")
-	      (setf (cache2_reference-inside *cache2* cx2 cy2 cz2) main-mem-chunk))
-	    (values main-mem-chunk valid-p))))))
+  ;;(declare (optimize (debug 3)))
+  (flet ((valid-here (maybe-chunk)
+	   (and (valid-chunk-p maybe-chunk)
+		(chunk-matches-coords-p maybe-chunk cx cy cz))))
+    ;;Search cache 1
+    (multiple-value-bind (cx2 cy2 cz2) (cache2_inner cx cy cz)
+      (let ((maybe-chunk (cache2_reference-inside *cache2* cx2 cy2 cz2)))
+	(if (valid-here maybe-chunk)
+	    (values maybe-chunk t)
+	    (multiple-value-bind (main-mem-chunk valid-p)
+		;;Search main memory
+		(let ((key (create-chunk-key cx cy cz)))
+		  (let ((maybe-chunk (get-chunk-in-cache key)))
+		    (if (valid-here maybe-chunk)
+			(values maybe-chunk t)
+			(if allocate-p
+			    ;;Create a new chunk if it does not already exist.
+			    (let ((new (create-chunk cx cy cz)))
+			      (set-chunk-in-cache key new)
+			      (values new t))
+			    (values nil nil)))))
+	      (when valid-p
+		;;(print "foo")
+		(setf (cache2_reference-inside *cache2* cx2 cy2 cz2) main-mem-chunk))
+	      (values main-mem-chunk valid-p)))))))
 
 ;;;;;
 ;;(reset-empty-chunk-value)
