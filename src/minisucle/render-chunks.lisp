@@ -636,8 +636,9 @@ gl_FragColor.rgb = temp;
   (render-chunk))
 
 (defun render-chunk ()
-  (let ((iterators (attrib-buffer-iterators)))
-    (render-chunks:mesh-chunk iterators 0 0 0 32 32 32)
+  (let ((iterators (attrib-buffer-iterators))
+	(n 33))
+    (render-chunks:mesh-chunk iterators 0 0 0 n n n)
     (update-chunk-mesh iterators)))
 
 (defun update-chunk-mesh (iter)

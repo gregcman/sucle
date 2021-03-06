@@ -19,11 +19,11 @@
 			 (type (inner-3d ,lenz) rz)))
 	  (bar `(declare (type (chunk-data ,lenx ,leny ,lenz) data))))
       `(progn
-	 (defun ,name3 (&rest rest &key (initial-element *empty-space*))
+	 (defun ,name3 (&rest rest &key (initial-element *empty-space*) &allow-other-keys)
 	   (apply 'make-array
 		  ,(* lenx leny lenz)
 		  :initial-element initial-element
-		  :element-type (downgrade-array:storage-type initial-element)
+		  ;;:element-type (downgrade-array:storage-type initial-element)
 		  rest))
 	 (utility:with-unsafe-speed
 	   (declaim (ftype (function ((inner-3d ,lenx) (inner-3d ,leny) (inner-3d ,lenz))
@@ -73,21 +73,23 @@
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))
 
-(defparameter *empty-space* nil)
-(defparameter *empty-chunk-data* nil)
+(defparameter *empty-space* 0)
+(defparameter *empty-chunk-data* (make-chunk-data :initial-element *empty-space*))
 ;;(defparameter *empty-chunk* nil)
 ;;the empty-chunk is used as a placeholder when a chunk to reference is required
+#+nil
 (defun create-empty-chunk ()
   (create-chunk 0 0 0 :data
 		*empty-chunk-data*
 		:type :empty))
+#+nil
 (defun reset-empty-chunk-value (&optional (empty-space nil))
   (setf *empty-space* empty-space)
   (setf *empty-chunk-data* (downgrade-array:really-downgrade-array
 			    (make-chunk-data :initial-element *empty-space*)))
   ;;(setf *empty-chunk* (create-empty-chunk))
   )
-
+#+nil
 (defun empty-chunk-p (chunk)
   (or (null chunk)
       ;;(eq chunk *empty-chunk*)
@@ -115,9 +117,14 @@
 	(chunk-type chunk) :dead))
 
 ;;FIXME:detect if it actually of type chunk?
-(defun valid-chunk-p (chunk)
-  (and chunk
-       (chunk-alive? chunk)))
+
+(with-unsafe-speed
+  (declaim (inline valid-chunk-p))
+  (defun valid-chunk-p (chunk)
+    (and chunk
+	 ;;FIXME:: hack? 0 is empty.
+	 (not (eq 0 chunk))
+	 (chunk-alive? chunk))))
 
 ;;;;
 
@@ -176,7 +183,7 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
   (gen-optimized-3d-array 32 32 32 'cache2_ref 'cache2_inner 'make_cache2 'cache2_reference-inside
 			  'cache2_chop ;;Unused
 			  ))
-(defparameter *cache2* (make_cache2))
+(defparameter *cache2* (make_cache2 :initial-element 0 :element-type T))
 
 
 
@@ -185,56 +192,58 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 #+nil
 (with-unsafe-speed
   (declaim (inline (setf getobj))
-	   (inline getobj)
-	   (inline setobj)
-	   (inline getchunk)))
-(defun (setf getobj) (value x y z)
-  (setobj value x y z))
-(defun setobj (value x y z ;;space
-	       )
-  (let ((chunk (multiple-value-call #'getchunk (bcoord->ccoord x y z) t)))
+	   (inline getobj)))
+(defun (setf getobj) (value x y z ;;space
+		      )
+  (multiple-value-bind (chunk valid-p) (multiple-value-call #'getchunk (bcoord->ccoord x y z) t)
     ;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
     ;;chunk might be a chunk of type :EMPTY with shared data, but since it is being set,
     ;;coerce it to a regular chunk
     ;;FIXME::What does this comment mean here?
-    (coerce-empty-chunk-to-regular-chunk chunk)
-    (setf (chunk-modified chunk) t)
-    
-    (multiple-value-bind (rx ry rz) (inner x y z)
-      (setf (reference-inside-chunk (chunk-data chunk) rx ry rz) value))))
+    (cond (valid-p
+	   (coerce-empty-chunk-to-regular-chunk chunk)
+	   (setf (chunk-modified chunk) t)
+	   (multiple-value-bind (rx ry rz) (inner x y z)
+	     (setf (reference-inside-chunk (chunk-data chunk) rx ry rz) value)))
+	  (t (error "invalid chunk returned!")))))
 
 (defun getobj (x y z ;;space
 	       )
-  (let ((chunk (multiple-value-call #'getchunk (bcoord->ccoord x y z) nil)))
-    (if chunk
+  (multiple-value-bind (chunk valid-p) (multiple-value-call #'getchunk (bcoord->ccoord x y z) nil)
+    (if valid-p
 	(multiple-value-bind (rx ry rz) (inner x y z)
 	  (reference-inside-chunk (chunk-data chunk) rx ry rz))
 	*empty-space*)))
 
+#+nil
+(with-unsafe-speed
+  (declaim (inline getchunk)))
 (defun getchunk (cx cy cz &optional (allocate-p nil))
+  (declare (optimize (debug 3)))
   ;;Search cache 1
   (multiple-value-bind (cx2 cy2 cz2) (cache2_inner cx cy cz)
     (let ((maybe-chunk (cache2_reference-inside *cache2* cx2 cy2 cz2)))
-      (if maybe-chunk
-	  maybe-chunk
-	  (let ((main-mem-chunk
-		 ;;Search main memory
-		 (let ((key (create-chunk-key cx cy cz)))
-		   (multiple-value-bind (chunk existp) (get-chunk-in-cache key)
-		     (if existp
-			 chunk
-			 (if allocate-p
-			     ;;Create a new chunk if it does not already exist.
-			     (let ((new (create-chunk cx cy cz)))
-			       (set-chunk-in-cache key new)
-			       new)
-			     nil))))))
-	    (when main-mem-chunk
+      (if (valid-chunk-p maybe-chunk)
+	  (values maybe-chunk t)
+	  (multiple-value-bind (main-mem-chunk valid-p)
+	      ;;Search main memory
+	      (let ((key (create-chunk-key cx cy cz)))
+		(let ((maybe-chunk (get-chunk-in-cache key)))
+		  (if (valid-chunk-p maybe-chunk)
+		      (values maybe-chunk t)
+		      (if allocate-p
+			  ;;Create a new chunk if it does not already exist.
+			  (let ((new (create-chunk cx cy cz)))
+			    (set-chunk-in-cache key new)
+			    (values new t))
+			  (values nil nil)))))
+	    (when valid-p
+	      ;;(print "foo")
 	      (setf (cache2_reference-inside *cache2* cx2 cy2 cz2) main-mem-chunk))
-	    main-mem-chunk)))))
+	    (values main-mem-chunk valid-p))))))
 
 ;;;;;
-(reset-empty-chunk-value)
+;;(reset-empty-chunk-value)
 
 (defun test-chunks ()
   
@@ -260,11 +269,11 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
     (time
      (let ((n 2001))
        (dotimes (i (expt 10 6))
-	 (setobj n n n n)))))
+	 (setf (getobj n n n) n)))))
   (defun test2 ()
     (time
      (dotimes (i (expt 10 6))
-       (setobj (random 64) (random 64) (random 64) (random 64)))))
+       (setf (getobj (random 64) (random 64) (random 64)) (random 64)))))
 
   (defun test3 ()
     (time
@@ -272,4 +281,4 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
        (let ((x (mod (* i 7) 512))
 	     (y (mod (* i 13) 512))
 	     (z (mod (* i 19) 512)))
-	 (setobj x y z i))))))
+	 (setf (getobj x y z) i))))))
