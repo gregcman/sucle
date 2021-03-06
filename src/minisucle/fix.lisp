@@ -3,8 +3,7 @@
 (in-package :fix)
 
 (defun fix ()
-  (crud:use-crud-from-path (merge-pathnames (sucle-temp:path "saves/") "fix.db"))
-  (voxel-chunks::clearworld))
+  (crud:use-crud-from-path (merge-pathnames (sucle-temp:path "saves/") "fix.db")))
 
 (defun seed ()
   (dotimes (x 100)

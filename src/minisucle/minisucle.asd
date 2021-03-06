@@ -13,9 +13,10 @@
   :serial t
   :components 
   ((:file "package")
-
-   (:file "voxel-chunks") ;;;FIXME
-  
+   
+   (:file "downgrade-array")
+   (:file "voxel-chunks")
+   
    (:file "util")
    (:file "menu")
    (:file "menus")
@@ -26,4 +27,10 @@
 
    (:file "fix")
    (:file "mouse")
+   (:file "modes")
+   (:module "extra"
+	    :serial t
+	    :components
+	    ((:file "render-extra")))
+   
    (:file "sucle")))

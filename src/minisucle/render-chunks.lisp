@@ -386,7 +386,8 @@
       (%gl:uniform-1f (uniform :foglet)
 		      (/ -1.0
 			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
-			 (* vocs:+size+ chunk-radius)
+			 (* 16 ;;vocs:+size+
+			    chunk-radius)
 			 #+nil
 			 (or 128 (camera-matrix:camera-frustum-far *camera*))
 			 fog-ratio))

@@ -1,129 +1,15 @@
-(defpackage #:voxel-chunks
-  (:use :cl)
-  (:nicknames :vocs)
-  (:export 
-   #:unhashfunc
-   #:chunkhashfunc
-   #:getobj
-   #:setobj
-   #:clearworld)
+(defpackage :voxel-chunks
+  (:use :cl :utility)
   (:export
-   #:*chunks*
-   #:*chunk-array*
+   #:getobj
+   #:block-coord))
+(in-package :voxel-chunks)
 
-   #:chunk-data
-   #:chunk-modified
-   #:chunk-key
-   
-   #:chunk-coordinates-from-block-coordinates
-   #:create-chunk-key
-
-   #:empty-chunk-p
-   #:reset-empty-chunk-value  
-   
-   #:create-chunk
-   #:make-chunk-from-key-and-data
-   #:with-chunk-key-coordinates
-   
-   #:obtain-chunk-from-block-coordinates
-   #:obtain-chunk-from-chunk-key
-
-   #:chunk-array-x-min
-   #:chunk-array-y-min
-   #:chunk-array-z-min
-   
-   #:reposition-chunk-array
-   
-   #:chunk-worth-saving
-   #:chunk-exists-p
-
-   #:block-coord
-   #:chunk-coord
-   #:+size+
-   #:+total-size+))
-(in-package #:voxel-chunks)
-(defparameter *chunk-io-lock* (bt:make-recursive-lock))
-;;lets make it 16, and not care about the other parameters for now.
-;;each chunk is a 16x16x16 cube then.
+;;The length of the side of the cube.
 (defconstant +size+ 16)
+;;Each chunk is a 16x16x16 cube.
 (defconstant +total-size+ (expt +size+ 3))
 
-;;;;************************************************************************;;;;
-;;Chunk cache
-;;equal is used because the key is a list of the chunk coordinates
-;;When updating the cache with 'set' or 'delete' invalidate the
-;;chunks that are being eviscerated.
-;;FIXME: add locks to chunks?
-;;FIXME::*true-bit-size* and (chunks-total-bits) don't line up.
-(defparameter *true-bit-size* 0)
-(defun make-chunk-cache ()
-  (make-hash-table :test 'equal))
-(defparameter *chunks* (make-chunk-cache))
-(defun set-chunk-in-cache (key chunk &optional (cache *chunks*))
-  (kill-old-chunk key)
-  ;;(incf *true-bit-size* (array-truesize (chunk-data chunk)))
-  (setf (gethash key cache) chunk)
-  (prune-cache))
-(defun get-chunk-in-cache (key &optional (cache *chunks*))
-  ;;return (values chunk exist-p)
-  (gethash key cache))
-(defun delete-chunk-in-cache (key &optional (cache *chunks*))
-  (when (kill-old-chunk key cache)
-    (remhash key cache)))
-(defun kill-old-chunk (key &optional (cache *chunks*))
-  (multiple-value-bind (old-chunk existp) (gethash key cache)
-    (when existp
-      ;;FIXME:add a logger
-      ;;(format t "~%Eviscerating old chunk at: ~a" key)
-      (kill-chunk old-chunk)
-      ;;(decf *true-bit-size* (array-truesize (chunk-data old-chunk)))
-      (values t))))
-(defun chunk-in-cache-p (key &optional (cache *chunks*))
-  (multiple-value-bind (value existsp) (get-chunk-in-cache key cache)
-    (declare (ignorable value))
-    existsp))
-(defun total-chunks-in-cache (&optional (cache *chunks*))
-  (hash-table-count cache))
-
-(defparameter *persist* t)
-#+nil
-(/ (* 300 (expt 1024 2))
-   (* +total-size+ 8))
-(defparameter *cache-limit* (* (expt 16 3)))
-(defparameter *cache-reduction* 0.2)
-(defparameter *prune-lock* (bt:make-lock))
-(defun prune-cache (&optional (limit *cache-limit*) &aux (reduction
-							  (* limit *cache-reduction*)))
-  (bt:with-lock-held (*prune-lock*)
-    (let ((total (total-chunks-in-cache)))
-      (when (< limit total)
-	(let ((chunks (sort (alexandria:hash-table-alist *chunks*)
-			    '<
-			    :key (lambda (x)
-				   (chunk-last-access (cdr x))))))
-	  (let ((amount-pruning (- total (- limit reduction))))
-	    ;;(print total)
-	    ;;(format t "~%Pruning ~a chunks" amount-pruning)
-	    (flet ((thing ()
-		     (loop :repeat amount-pruning
-			:for pair :in chunks :do
-			(destructuring-bind (key . chunk) pair
-			  (when (and
-				 *persist*
-				 ;;when the chunk is not obviously empty
-				 (not (empty-chunk-p chunk))
-				 ;;if it wasn't modified, no point in saving
-				 (chunk-modified chunk))
-			    (savechunk key))
-			  (delete-chunk-in-cache key)))))
-	      (crud:call-with-transaction #'thing))))
-	(setf *true-bit-size* (chunks-total-bits))
-	;;(format t "~%~a" *true-bit-size*)
-	))))
-;;;;************************************************************************;;;;
-
-;;[FIXME]chunk-coord and block-coord being fixnums is not theoretically correct,
-;;but its still a lot of space?
 (deftype chunk-coord () 'fixnum)
 (deftype block-coord () 'fixnum)
 ;;bcoord = block-coord, ccoord = chunk-coord
@@ -152,6 +38,7 @@
        rx)))
 (defun inner (x y z)
   (values (mod x +size+) (mod y +size+) (mod z +size+)))
+;;;;************************************************************************;;;;
 ;;in order to be correct, the key has to store each value unaltered
 ;;This is for creating a key for a hash table
 ;; 'cx' stands for 'chunk-x' etc...
@@ -161,9 +48,11 @@
 (defmacro with-chunk-key-coordinates ((x y z) chunk-key &body body)
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))
+#+nil
 (defun spread-chunk-key (chunk-key)
   (apply 'values chunk-key))
 ;;For backwards compatibility
+#+nil
 (defun unhashfunc (chunk-key)
   (with-chunk-key-coordinates (x y z) chunk-key
     (values (* x +size+)
@@ -180,7 +69,7 @@
 		:type :empty))
 (defun reset-empty-chunk-value (&optional (empty-space nil))
   (setf *empty-space* empty-space)
-  (setf *empty-chunk-data* (really-downgrade-array
+  (setf *empty-chunk-data* (downgrade-array:really-downgrade-array
 			    (make-chunk-data :initial-element *empty-space*)))
   ;;(setf *empty-chunk* (create-empty-chunk))
   )
@@ -220,7 +109,7 @@
   (apply 'make-array
 	 +total-size+
 	 :initial-element initial-element
-	 :element-type (storage-type initial-element)
+	 :element-type (downgrade-array:storage-type initial-element)
 	 rest))
 
 ;;;;
@@ -245,7 +134,7 @@
 ;;type can be either :NORMAL or :EMPTY. empty is used to signify that
 ;;all the chunk data is eql to *empty-space*
 ;;this is an optimization to save memory
-(defun create-chunk (cx cy cz &key (type :normal) (data (make-chunk-data)))
+(defun create-chunk (cx cy cz &key (type :normal) data)
   (declare (type chunk-coord cx cy cz))
   (make-chunk :x cx :y cy :z cz
 	      :key (create-chunk-key cx cy cz)
@@ -253,573 +142,67 @@
 		      (:normal (or data (make-chunk-data)))
 		      (:empty *empty-chunk-data*))
 	      :type type))
-;;;;;;;;;;;;;
-
-;;size of one side of the chunk array.
-(defconstant +ca-size+ 32)
-(defparameter *chunk-array-empty-value* nil)
-;;(struct-to-clos:struct->class)
-(defstruct chunk-array
-  (array (make-array (list +ca-size+ +ca-size+ +ca-size+)
-		     :initial-element *chunk-array-empty-value*))
-  (x-min 0)
-  (y-min 0)
-  (z-min 0)
-  ;;New chunks that were recently obtained from the global cache
-  ;;go here.
-  (tracking-fresh t)
-  fresh)
-(deftype chunk-array-data ()
-  `(simple-array t (,+ca-size+ ,+ca-size+ ,+ca-size+)))
-
-(defun call-fresh-chunks-and-end (fun &optional 
-					(chunk-array *chunk-array*))
-  (dolist (item (chunk-array-fresh chunk-array))
-    (funcall fun item))
-  (setf (chunk-array-fresh chunk-array) nil))
-
-;;'rx' 'ry' and 'rz' stand for remainder
-;;cache levels?
-;;cache invalidation?
-
-;;Should the request read from the database, aka the disk?
-;;database->cache ?
-(defparameter *seek-database* t)
-(defun get-chunk-from-cache (key)
-  (multiple-value-bind (value existsp) (get-chunk-in-cache key)
-    (cond (existsp (values value t))
-	  (*seek-database*
-	   ;;(format t "~%Caching new chunk:(~a ~a ~a)" cx cy cz)
-	   ;;Read from the database and put the chunk into the cache.
-	   (let ((new-chunk
-		  (bt:with-recursive-lock-held (*chunk-io-lock*)
-		    (or
-		     ;;Check once again that it really does not exist yet.
-		     (get-chunk-in-cache key)
-		     (let ((chunk (%loadchunk key)))
-		       (set-chunk-in-cache key chunk)
-		       chunk)))))
-	     (values new-chunk t)))
-	  (t (values nil nil)))))
-
-(defun create-chunk-array ()
-  (make-chunk-array))
-(defparameter *chunk-array* (create-chunk-array))
-
-;;FIXME:optimize?
-(defun fill-array (array value)
-  (dotimes (i (array-total-size array))
-    (setf (row-major-aref array i) value)))
-(defun reposition-chunk-array (cx cy cz &optional (chunk-array *chunk-array*))
-  (declare (type chunk-coord cx cy cz))
-  (setf (chunk-array-x-min chunk-array) cx
-	(chunk-array-y-min chunk-array) cy
-	(chunk-array-z-min chunk-array) cz)
-  (fill-array (chunk-array-array chunk-array) *chunk-array-empty-value*)
-  (values))
-
-;;What are the names of the valid chunks within the chunk-array?
-(defun chunks-in-chunk-array (&optional (chunk-array *chunk-array*))
-  (let ((array (chunk-array-array chunk-array))
-	acc)
-    (dotimes (i (array-total-size array))
-      (let ((chunk (row-major-aref array i)))
-	(when (and (typep chunk 'chunk)
-		   (valid-chunk-p chunk))
-	  (push (chunk-key chunk) acc))))
-    acc))
-
-(defmacro %get-chunk-from-ca
-    ((data chunk-array-min c &optional (size '+ca-size+)) &body body)
-  `(let ((,data (- ,c (the chunk-coord (,chunk-array-min chunk-array)))))
-     (declare (type chunk-coord ,data))
-     (when (< -1 ,data ,size)
-       ,@body)))
-
-;;if the coordinates are correct, return a chunk, otherwise return nil
-(defun get-chunk-from-ca
-    (cx cy cz  &optional (force-load nil) (chunk-array *chunk-array*) (error-p t))
-  (declare (ignorable error-p))
-  (declare (type chunk-coord cx cy cz))
-  (block return 
-    (%get-chunk-from-ca (nx chunk-array-x-min cx)
-      (%get-chunk-from-ca (ny chunk-array-y-min cy)
-	(%get-chunk-from-ca (nz chunk-array-z-min cz)
-	  (let* ((data (chunk-array-array chunk-array))
-		 (maybe-chunk (aref data nx ny nz)))
-	    (declare (type chunk-array-data data))
-	    (cond ((and (valid-chunk-p maybe-chunk)
-			;;This check is unnecessary if we clear the chunk array every time
-			;;the position updates. combined with hysteresis, the relatively
-			;;slow filling should not happen often
-			#+nil
-			(chunk-coordinates-match-p possible-chunk chunk-x chunk-y chunk-z))
-		   ;;Return the chunk found because it is not nil
-		   ;;and the coordinates are correct.
-		   (return-from return maybe-chunk))
-		  ;;Retrieve a chunk, place it in the chunk array,
-		  ;;and return it.
-		  (t
-		   (let* ((maybe-chunk
-			   (let ((*seek-database* force-load))
-			     (get-chunk-from-cache (create-chunk-key cx cy cz))))
-			  (valid-p (valid-chunk-p maybe-chunk)))
-		     (when valid-p
-		       (when (chunk-array-tracking-fresh chunk-array)
-			 (push maybe-chunk (chunk-array-fresh chunk-array)))
-		       (setf (aref data nx ny nz) maybe-chunk))
-		     (return-from return (values maybe-chunk valid-p)))))))))
-    ;;FIXME::an error should occur sometimes?
-    #+nil
-    (when error-p
-      (error "chunk not within chunk array!!!!!"))))
-
-#+nil
-(defun remove-chunk-from-chunk-array
-    (cx cy cz &optional (chunk-array *chunk-array*))
-  (declare (type chunk-coord cx cy cz))
-  (%get-chunk-from-ca (nx chunk-array-x-min cx)
-    (%get-chunk-from-ca (ny chunk-array-y-min cy)
-      (%get-chunk-from-ca (nz chunk-array-z-min cz)
-	(let* ((data (chunk-array-array chunk-array))
-	       (maybe-chunk (aref data nx ny nz)))
-	  (declare (type chunk-array-data data))
-	  ;;The chunk is found, so remove it.  
-	  (when maybe-chunk
-	    (setf (aref data nx ny nz) nil)
-	    (values t)))))))
-
-;;
-#+nil
-(defun obtain-chunk-from-chunk-key (chunk-key &optional force-load)
-  ;;[FIXME]is this a good api?
-  (multiple-value-call 'obtain-chunk
-    (spread-chunk-key chunk-key)
-    force-load))
-(defun obtain-chunk-from-block-coordinates (x y z &optional (force-load nil))
-  (declare (type block-coord x y z))
-  (multiple-value-call 'get-chunk-from-ca (bcoord->ccoord x y z) force-load))
-;;;
-;;;;
-(defparameter *time* 0)
-;;FIXME::these functions increment '*time*' in a way that
-;;does not lock. Unsafe? Does a small error really matter?
-(defun getobj (x y z)
-  (declare (type block-coord x y z))
-  (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
-    ;;FIXME:This just returns the 'empty' value
-    (unless chunk
-      (return-from getobj *empty-space*))
-    (let ((time *time*))
-      (incf *time*)
-      (setf (chunk-last-read chunk) time
-	    (chunk-last-access chunk) time))
-    (multiple-value-bind (rx ry rz) (inner x y z)
-      (reference-inside-chunk chunk rx ry rz))))
-(defun (setf getobj) (value x y z)
-  (declare (type block-coord x y z))
-  (let ((chunk (obtain-chunk-from-block-coordinates x y z t)))
-    ;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
-    ;;chunk might be a chunk of type :EMPTY with shared data, but since it is being set,
-    ;;coerce it to a regular chunk
-    (coerce-empty-chunk-to-regular-chunk chunk)
-    (setf (chunk-modified chunk) t)
-    (let ((time *time*))
-      (incf *time*)
-      (setf (chunk-last-modified chunk) time
-	    (chunk-last-access chunk) time))
-    (let ((array (chunk-data chunk)))
-      (when (not (typep value (array-element-type array)))
-	(let* (;;(old-size (array-truesize array))
-	       (new-array (really-downgrade-array array value))
-	       ;;(new-size (array-truesize new-array))
-	       )
-	  ;;(incf *true-bit-size* (- new-size old-size))
-	  (setf (chunk-data chunk) new-array))))
-    (multiple-value-bind (rx ry rz) (inner x y z)
-      (setf (reference-inside-chunk chunk rx ry rz) value))))
-;;[FIXME]setobj is provided for backwards compatibility?
-;;;;
-(defun setobj (x y z new)
-  (setf (getobj x y z) new))
-;;;;
-
-#+nil
-(defun chunkhashfunc (x y z)
-  (create-chunk-key x y z))
-;;[FIXME]clearworld does not handle loading and stuff?
-(defun clearworld ()
-  (setf *true-bit-size* 0)
-  (setf *chunks* (make-chunk-cache)
-	*chunk-array* (create-chunk-array))
-  (values))
-
-;;a chunk is not worth saving if all the values are the empty value
-;;[FIXME]optimize?
-;;[FIXME]what about terrain generation? if a chunk is generated with terrain,
-;;then erased with the *empty-space* value, it will be reloaded.
-(defun chunk-worth-saving (chunk)
-  (let ((empty-space *empty-space*))
-    (not (every (lambda (x) (eql x empty-space))
-		(chunk-data chunk)))))
-
-;;center the chunk array around the player, but don't always, only if above a certain
-;;threshold
-;;[FIXME]is this expensive to recompute every frame or does it matter?
-;;maybe put it in the chunk array object?
-;;return t if it was moved, nil otherwise
-(defparameter *reposition-chunk-array-threshold* 2)
-(defun maybe-move-chunk-array (cx cy cz &optional (threshold *reposition-chunk-array-threshold*)
-					  (chunk-array *chunk-array*))
-  (let* ((half-size (floor +ca-size+ 2))
-	 (center-x (+ half-size (chunk-array-x-min *chunk-array*)))
-	 (center-y (+ half-size (chunk-array-y-min *chunk-array*)))
-	 (center-z (+ half-size (chunk-array-z-min *chunk-array*))))
-    (when (or (<= threshold (abs (- cx center-x)))
-	      (<= threshold (abs (- cy center-y)))
-	      (<= threshold (abs (- cz center-z))))
-      ;;(format t "moving chunk array")
-      (reposition-chunk-array
-       (- cx half-size)
-       (- cy half-size)
-       (- cz half-size)
-       chunk-array)
-      (values t))))
-
-(struct-to-clos:struct->class
- (defstruct cursor
-   (chunk-array *chunk-array*)
-   (x 0)
-   (y 0)
-   (z 0)
-   (threshold *reposition-chunk-array-threshold*)
-   (dirty t)
-   ;;FIXME:difference between threshold and radius?
-   (radius 6)))
-
-(defun set-cursor-position
-    (px py pz &optional (cursor (make-cursor)) (chunk-array *chunk-array*))
-  (multiple-value-bind (newx newy newz)
-      (bcoord->ccoord
-       (floor px)
-       (floor py)
-       (floor pz))
-    (setf (cursor-x cursor) newx
-	  (cursor-y cursor) newy
-	  (cursor-z cursor) newz)
-    (when (maybe-move-chunk-array newx newy newz (cursor-threshold cursor) chunk-array)
-      (setf (cursor-dirty cursor) t))))
-
-
-(struct-to-clos:struct->class
- (defstruct pen
-   cursor
-   chunk-array))
-
-(defun create-pen ()
-  (let* ((ca (create-chunk-array))
-	 (cursor (make-cursor :chunk-array ca :x 0 :y 0 :z 0 :threshold 8 :radius 8)))
-    (make-pen :cursor cursor :chunk-array ca)))
-
-(defun move-pen (px py pz pen)
-  (let ((c (pen-cursor pen))
-	(ca (pen-chunk-array pen)))
-    (set-cursor-position px py pz c ca)))
-
-(defparameter *pen* (create-pen))
-(defun (setf pen-get) (value x y z &optional (pen *pen*))
-  (let ((*chunk-array* (pen-chunk-array pen)))
-    (move-pen x y z pen)
-    (setf (getobj x y z) value)))
-(defun pen-get (x y z &optional (pen *pen*))
-  (let ((*chunk-array* (pen-chunk-array pen)))
-    (move-pen x y z pen)
-    (getobj x y z)))
 
 ;;;;************************************************************************;;;;
-;;;;<PERSIST-WORLD>
-;;[FIXME]move generic loading and saving with printer and conspack to a separate file?
-;;And have chunk loading in another file?
+"
+Chunk cache is a hash table. 
+(x y z) -> chunk object
 
-(defun savechunk (key)
-  (bt:with-recursive-lock-held (*chunk-io-lock*)
-    (let ((chunk (get-chunk-in-cache key)))
-      (when (chunk-alive? chunk)   
-	;;write the chunk to disk if its worth saving
-	;;otherwise, if there is a preexisting file, destroy it
-	(if (chunk-worth-saving chunk)
-	    (%savechunk chunk)
-	    (deletechunk key))))))
-
-(defun %savechunk (chunk &aux (position (chunk-key chunk)))
-  ;;(format t "~%saved chunk ~s" position)
-  (when (not (chunk-alive? chunk))
-    (error "Attempting to save dead chunk!!!"))
-  (crud:crud-update
-   (chunk-coordinate-to-filename position)
-   (chunk-data chunk)))
-
-(defun make-chunk-from-key-and-data (key data)
-  (with-chunk-key-coordinates (cx cy cz) key
-    (make-chunk :x cx :y cy :z cz :key key :data data :type :normal)))
-;;Merely load a chunk from the database, don't put in in the cache
-(defun %loadchunk (chunk-coordinates)
-  ;;(format t "~%Loading chunk at ~a" chunk-coordinates)
-  (let ((data (crud:crud-read (chunk-coordinate-to-filename chunk-coordinates))))
-    (flet ((make-data (data)
-	     (let ((chunk-data (coerce data '(simple-array t (*)))))
-	       (assert (= 4096 (length chunk-data))
-		       nil
-		       "offending chunk ~a"
-		       chunk-coordinates)
-	       (make-chunk-from-key-and-data
-		chunk-coordinates
-		(really-downgrade-array chunk-data)))))
-      (typecase data
-	(list
-	 (ecase (length data)
-	   (0
-	    ;;if data is nil, just load an empty chunk
-	    (with-chunk-key-coordinates (x y z) chunk-coordinates
-						     (create-chunk x y z :type :empty)))
-
-	   (3 ;;[FIXME]does this even work?
-	    (error "world format invalid")
-	    ;;FIXME: use defmethod to extend the interface?
-	    #+nil
-	    (destructuring-bind (blocks light sky) data
-	      (let ((len (length blocks)))
-		(let ((new (make-array len)))
-		  (dotimes (i len)
-		    (setf (aref new i)
-			  (blockify (aref blocks i)  (aref light i) (aref sky i))))
-		  (make-chunk-from-key-and-data chunk-coordinates new)))))
-	   (1 (make-data (car data)))))
-	(otherwise (make-data data))))))
-
-(defun deletechunk (key)
-  (crud:crud-delete (chunk-coordinate-to-filename key)))
-
-;;The world is saved as a directory full of files named (x y z) in block coordinates, with
-;;x and y swizzled
-#+nil
-(defun filename-to-chunk-coordinate (filename-position-list)
-  (let ((position
-	 (mapcar
-	  ;;[FIXME]assumes chunks are 16 by 16 by 16
-	  (lambda (n) (floor n 16))
-	  filename-position-list)))
-    (rotatef (third position)
-	     (second position))
-    position))
-(defun chunk-coordinate-to-filename (chunk-coordinate)
-  (let ((position-list (multiple-value-list (unhashfunc chunk-coordinate))))
-    (rotatef (second position-list)
-	     (third position-list))
-    position-list))
-
-;;;;</PERSIST-WORLD>
+When removing or setting chunks, kill the chunk which is no longer to be used."
 
 
-(defun downgrade-array (&rest items)
-  (block out
-    (let ((min 0)
-	  (max 0))
-      (flet ((check-thing (item)
-	       (typecase item
-		 (fixnum
-		  (when (< max item)
-		    (setf max item))
-		  (when (< item min)
-		    (setf min item)))
-		 (otherwise (return-from out t)))))
-	(dolist (item items)
-	  (typecase item
-	    (array (dotimes (i (array-total-size item))
-		     (let ((item (row-major-aref item i)))
-		       (check-thing item))))
-	    ((and (not null) sequence) (map nil #'check-thing item))
-	    (t (check-thing item)))))
-      (upgraded-array-element-type (num-type min max)))))
-(defun typetest (item test)
-  (let ((result (typep item test)))
-    (if result
-	(format t "~% ~a is ~a" item test)
-	(format t "~% ~a is not ~a" item test))))
-(defun test ()
-  (typetest 1 '(signed-byte 1))
-  (typetest -1 '(signed-byte 1))
-  (typetest 256 '(signed-byte 8))
-  (typetest -256 '(signed-byte 8))
-  (typetest 127 '(signed-byte 8))
-  (typetest -127 '(signed-byte 8))
-  (typetest 128 '(signed-byte 8))
-  (typetest -128 '(signed-byte 8)))
+(defun make-chunk-cache ()
+  (make-hash-table :test 'equal))
+(defparameter *chunks* (make-chunk-cache))
+(defun get-chunk-in-cache (key &optional (cache *chunks*))
+  (gethash key cache))
+(defun chunk-in-cache-p (key &optional (cache *chunks*))
+  (multiple-value-bind (value existsp) (get-chunk-in-cache key cache)
+    (declare (ignorable value))
+    existsp))
 
-;;From the CLHS
-;;(integer -(2^(s-1)) (2^(s-1))-1) -> signed byte
-;;(integer 0 n) for n=(2^s)-1 -> unsigned byte
-(defun num-type (min max)
-  (cond ((zerop min)
-	 ;;unsigned-byte
-	 `(unsigned-byte ,(1+ (upgrade max))))
-	(t `(signed-byte ,(max (up2 min)
-			       (+ 2 (upgrade max)))))))
-
-(defun storage-type (item)
-  (typecase item
-    (fixnum
-     (upgraded-array-element-type
-      (if (plusp item)
-	  (num-type 0 item)
-	  (num-type item 0))))
-    (otherwise t)))
-
-(defun upgrade (x)
-  (if (zerop x)
-      0
-      (floor (log x 2))))
-(defun up2 (x)
-  (+ 2 (upgrade (1- (- x)))))
+(defun set-chunk-in-cache (key chunk &optional (cache *chunks*))
+  (kill-old-chunk key)
+  (setf (gethash key cache) chunk))
+(defun delete-chunk-in-cache (key &optional (cache *chunks*))
+  (when (kill-old-chunk key cache)
+    (remhash key cache)))
+(defun kill-old-chunk (key &optional (cache *chunks*))
+  (multiple-value-bind (old-chunk existp) (gethash key cache)
+    (when existp
+      (kill-chunk old-chunk)
+      (values t))))
+(defun total-chunks-in-cache (&optional (cache *chunks*))
+  (hash-table-count cache))
 
 
-(defun test-at-random (&optional (min (- (random most-positive-fixnum)))
-			 (max (random most-positive-fixnum)))
-  (let ((type (num-type min max)))
-    (typetest min type)
-    (typetest max type)))
-
-(defun test-again (&optional (s (random 64)))
-  (let ((foo (expt 2 (1- s))))
-    (test-at-random (- foo) (1+ foo))))
-
-
-(defun test0 ()
-  (print (downgrade-array #(0 1 2 3 4 5)))
-  (print (downgrade-array #(0 1 2 3 4 5 34524352345)))
-  (print (downgrade-array #(-345345 0 1 2 3 4 5))))
-
-(defun really-downgrade-array (array &rest items)
-  (let* ((type (apply 'downgrade-array array items))
-	 (new-array
-	  (make-array (array-dimensions array)
-		      :element-type type)))
-    (dotimes (i (array-total-size array))
-      (setf (aref new-array i)
-	    (aref array i)))
-    (values new-array
-	    type)))
-
-(defun test1 ()
-  (let ((*print-readably* t))
-    (print
-     (list
-      (really-downgrade-array #(1 1 0 0 0 1 0 1 0))
-      (really-downgrade-array #(1 1 0 0 0 1 0 -1 0))
-      (really-downgrade-array #(1 1 0 0 0 1 0 -345345 0))))))
+;;;;************************************************************************;;;;
+(defun (setf getobj) (value x y z)
+  (setobj value x y z))
+(defun setobj (value x y z ;;space
+	       )
+  (multiple-value-bind (cx cy cz) (bcoord->ccoord x y z)
+    (let ((key (create-chunk-key cx cy cz)))
+      (multiple-value-bind (chunk existp)
+	  (get-chunk-in-cache key)
+	;;Create a new chunk if it does not already exist.
+	(unless existp
+	  (let ((new (create-chunk cx cy cz)))
+	    (set-chunk-in-cache key new)
+	    (setf chunk new)))	
+	(multiple-value-bind (rx ry rz) (inner x y z)
+	  (setf (reference-inside-chunk chunk rx ry rz) value))))))
+(defun getobj (x y z ;;space
+	       )
+  (multiple-value-bind (cx cy cz) (bcoord->ccoord x y z)
+    (multiple-value-bind (chunk existp)
+	(get-chunk-in-cache (create-chunk-key cx cy cz))
+      (if existp
+	  (multiple-value-bind (rx ry rz) (inner x y z)
+	    (reference-inside-chunk chunk rx ry rz))
+	  *empty-space*))))
 
 ;;;;;
 (reset-empty-chunk-value)
 
-(defun types-of-chunks-that-exist ()
-  (remove-duplicates
-   (mapcar (lambda (c)
-	     (type-of
-	      (chunk-data c)))
-	   (alexandria:hash-table-values *chunks*))
-   :test 'equal))
 
-;;Return the size of the type in bits
-(defun typesize (type)
-  (cond ((and (listp type)
-	      (= 2 (length type))
-	      (eq 'unsigned-byte (first type)))
-	 (roundup-2 (second type)))
-	((and (listp type)
-	      (= 2 (length type))
-	      (eq 'signed-byte (first type)))
-	 (roundup-2 (second type)))
-	((eq type 'bit)
-	 1)
-	(t
-	 #+x86-64
-	 64
-	 #+x86
-	 32)))
-
-(defun array-truesize (array)
-  (* (typesize (array-element-type array))
-     (array-total-size array)))
-
-(defun roundup-2 (n)
-  (ash 1 (ceiling (log n 2))))
-
-(defun test5 ()
-  (array-truesize (really-downgrade-array #(10 1202 012 012 0 t))))
-
-(defun chunks-total-bits (&optional (divider (* 1.0 (* 8 (expt 1024 2)))))
-  (/ (reduce '+
-	     (mapcar (lambda (c)
-		       (array-truesize
-			(chunk-data c)))
-		     (alexandria:hash-table-values *chunks*)))
-     divider))
-
-(defun save-all ()
-  ;;By limiting the cache to 0, everything gets flushed out.
-  (prune-cache 0))
-
-
-(defun chunk-within-chunk-array-p (key &optional (chunk-array *chunk-array*))
-  (with-chunk-key-coordinates (cx cy cz) key
-    (get-chunk-from-ca cx cy cz nil chunk-array nil)))
-
-;;Is there a chunk missing from any cache?
-(defun ca-uncached-p (key)
-  (or (and (get-chunk-in-cache key)
-	   (chunk-within-chunk-array-p key))
-      (not (chunk-in-cache-p key))))
-
-(defun get-chunks-to-load (chunk-cursor-center)
-  (multiple-value-bind (cx cy cz) (values (cursor-x chunk-cursor-center)
-					  (cursor-y chunk-cursor-center)
-					  (cursor-z chunk-cursor-center))
-    ;;#+nil
-    (declare (optimize (speed 3) (safety 0))
-	     (type chunk-coord cx cy cz))
-    (block out
-      (let* ((acc nil)
-	     (chunk-count 0)
-	     (size (cursor-radius chunk-cursor-center))
-	     (minx (- cx size))
-	     (maxx (+ cx size))
-	     (miny (- cy size))
-	     (maxy (+ cy size))
-	     (minz (- cz size))
-	     (maxz (+ cz size)))
-	(declare (type fixnum chunk-count)
-		 (type chunk-coord size)
-		 (type chunk-coord minx maxx miny maxy minz maxz))
-	(flet ((add-chunk (x y z)
-		 (incf chunk-count)
-		 ;;do something
-		 (let ((key (create-chunk-key x y z)))
-		   (when (ca-uncached-p key)
-		     (push key acc)))))    
-	  (utility:dobox ((chunk-x minx maxx)
-			  (chunk-y miny maxy)
-			  (chunk-z minz maxz))
-			 (add-chunk chunk-x chunk-y chunk-z)))
-	acc))))
-
-(defun load-chunks-around (chunk-cursor)
-  (let ((to-load (get-chunks-to-load chunk-cursor)))
-    (flet ((fun ()
-	     (mapc (lambda (key)
-		     (with-chunk-key-coordinates (x y z) key
-		       (let ((chunk (get-chunk-from-ca x y z t)))
-			 (declare (ignorable chunk))
-			 key)))
-		   to-load)))
-      (crud:call-with-transaction #'fun))
-    to-load))

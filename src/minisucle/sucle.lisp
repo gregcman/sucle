@@ -20,42 +20,22 @@
   (app:default-loop))
 
 ;;;;************************************************************************;;;;
-;;emacs-like modes
-(defparameter *active-modes* ())
-(defun reset-all-modes ()
-  (setf *active-modes* nil))
-(defun enable-mode (mode)
-  (pushnew mode *active-modes* :test 'equal))
-(defun disable-mode (mode)
-  (setf *active-modes* (delete mode *active-modes*)))
-(defun mode-enabled-p (mode)
-  (member mode *active-modes* :test 'equal))
-(defun set-mode-if (mode p)
-  (if p
-      (enable-mode mode)
-      (disable-mode mode)))
-;;;;************************************************************************;;;;
-
-(defparameter *session* nil)
-(defparameter *ticks* 0)
 
 (defparameter *entities* nil)
 (defparameter *ent* nil)
 
+
+(defparameter *sky-color* '(0.5 0.5 0.5))
+
+;;;;;
+
+(defparameter *session* nil)
+(defparameter *ticks* 0)
 (defparameter *fov* (floatify (* pi (/ 85 180))))
 (defparameter *camera*
   (camera-matrix:make-camera
    :frustum-far (* 256.0)
    :frustum-near (/ 1.0 8.0)))
-(defparameter *time-of-day* 1.0)
-(defparameter *sky-color*
-  (mapcar 'utility:byte/255
-	  '(128 128 128)))
-(defun atmosphere ()
-  (mapcar 
-   (lambda (x)
-     (alexandria:clamp (* x *time-of-day*) 0.0 1.0))
-   *sky-color*))
 
 ;;*frame-time* is for graphical frames, as in framerate.
 (defparameter *frame-time* 0)
@@ -65,7 +45,6 @@
   ;;set the chunk center aroun the player
   (livesupport:update-repl-link)
   (application:on-session-change *session*
-    ;;(voxel-chunks:clearworld)
     (setf *entities* (loop :repeat 10 :collect (create-entity
 						 (create-aabb 0.3 0.12 0.3 -0.3 -1.5 -0.3))))
     (setf *ent* (elt *entities* 0))
@@ -157,15 +136,14 @@
     
     (draw-to-default-area)
     ;;this also clears the depth and color buffer.
-    (multiple-value-bind (color) (atmosphere)
-      (apply #'render-sky color)
-      (render-chunks::use-chunk-shader
-       :camera *camera*
-       :sky-color color
-       :time-of-day *time-of-day*
-       :fog-ratio 1.0
-       :chunk-radius 16 ;;(vocs::cursor-radius *chunk-cursor-center*)
-       ))
+    (apply #'render-sky *sky-color*)
+    (render-chunks::use-chunk-shader
+     :camera *camera*
+     :sky-color *sky-color*
+     :time-of-day 1.0
+     :fog-ratio 1.0
+     :chunk-radius 16 ;;(vocs::cursor-radius *chunk-cursor-center*)
+     )
 
     (render-chunks::render-chunks)
 
@@ -173,16 +151,14 @@
     
     ;;selected block and crosshairs
     (use-solidshader *camera*)
-    (render-debug fraction-for-fps)
-    (render-crosshairs))
+    ;;(render-debug fraction-for-fps)
+    ;;(render-crosshairs)
+    )
 
   )
 
-
-
-
-
 ;;;;************************************************************************;;;;
+;;;;controls
 
 (defparameter *normal-keys*
   `(((:key :pressed :escape) .
