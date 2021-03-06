@@ -60,3 +60,16 @@
     (funcall (cdr pair))))
 (defun run-buttons (pairs)
   (mapc 'run-button pairs))
+
+;;;;************************************************************************;;;;
+;;;;<BOXES?>
+(defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
+			       (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
+	 (floatf maxx maxy maxz minx miny minz)
+	 (aabbcc:make-aabb
+	  :minx minx
+	  :maxx maxx
+	  :miny miny
+	  :maxy maxy
+	  :minz minz
+	  :maxz maxz))

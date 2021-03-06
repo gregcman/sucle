@@ -565,9 +565,12 @@
 out float color_out;
 out vec2 texcoord_out;
 out float fogratio_out;
+out vec3 color_three; 
 
 in vec4 position;
 in vec2 texcoord;
+in vec3 color;
+
 in vec4 blocklight;
 in vec4 skylight;
 uniform mat4 projection_model_view;
@@ -587,7 +590,8 @@ float distance =
 //distance(position.xyz,vec3(0.0));
 distance(camera_pos.xyz, position.xyz);
 //max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
-fogratio_out = clamp(aratio+foglet*distance, 0.0, 1.0);
+fogratio_out = 1.0 ;clamp(aratio+foglet*distance, 0.0, 1.0);
+color_three = position.xyz;
 }"
      "
 in vec2 texcoord_out;
@@ -596,8 +600,11 @@ uniform sampler2D sampler;
 in float fogratio_out;
 uniform vec3 fogcolor;
 
+in vec3 color_three;
+
 void main () {
 vec4 pixdata = 
+vec4(mod((color_three.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
 //vec4(1.0);
 texture2D(sampler,texcoord_out.xy);
 vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
@@ -606,6 +613,7 @@ gl_FragColor.rgb = temp;
 }"
      `(("position" ,sucle::*position-attr*) 
        ("texcoord" ,sucle::*texcoord-attr*)
+       ("color" ,sucle::*color-attr*)
        ("blocklight" 4)
        ("skylight" 5))
      '((:pmv "projection_model_view")

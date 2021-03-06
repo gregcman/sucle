@@ -1,6 +1,6 @@
-- infinite in xyz directions
 - as concise as humanly possible, simple
 - as scriptable and modifiable as possible
+- Stock images ripped from the web
 
 
 - NOT GOALS:
@@ -13,3 +13,4 @@
   - Phong shading
   - Photorealism
   - Physical realism
+ - infinite in xyz directions

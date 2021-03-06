@@ -52,6 +52,62 @@ gl_FragColor.rgb = color_out;
   (mvc 'render-aabb-at
        (entity-aabb entity)
        (spread (entity-position entity))))
+
+(defun render-total-bounding-area ()
+  (render-aabb-at
+   (load-time-value
+    (let ((max 1024))
+      (create-aabb max max max 0 0 0)))
+   0 0 0))
+
+(defun render-debug ()
+  (map nil
+       (lambda (ent)
+	 (unless (eq ent *ent*)
+	   (render-entity ent)))
+       *entities*)
+  (progn
+    (gl:line-width 10.0)
+    (map nil
+	 (lambda (ent)
+	   (when (eq ent (elt *entities* 0))
+	     (let ((*camera* (camera-matrix:make-camera)))
+	       (sync_entity->camera ent *camera*)
+	       (render-camera *camera*))))
+	 *entities*))
+  (progn
+    (gl:line-width 10.0)
+    (render-units))
+  (mvc 'render-line 0 0 0 (spread '(200 200 200))))
+
+
+(defun render-camera (camera)
+  (mapc (lambda (arg)
+	  (mvc 'render-line-dx
+	       (spread (camera-matrix:camera-vec-position camera))
+	       (spread (map 'list
+			    (lambda (x)
+			      (* x 100))
+			    arg))))
+	(camera-matrix::camera-edges camera))
+  (mapc (lambda (arg)
+	  (mvc 'render-line-dx
+	       (spread (camera-matrix:camera-vec-position camera))
+	       (spread (map 'list
+			    (lambda (x)
+			      (* x 100))
+			    arg))
+	       0.99 0.8 0.0))
+	(camera-matrix::camera-planes camera)))
+
+(defun render-units (&optional (foo 100))
+  ;;X is red
+  (mvc 'render-line 0 0 0 foo 0 0 (spread #(1.0 0.0 0.0)))
+  ;;Y is green
+  (mvc 'render-line 0 0 0 0 foo 0 (spread #(0.0 1.0 0.0)))
+  ;;Z is blue
+  (mvc 'render-line 0 0 0 0 0 foo (spread #(0.0 0.0 1.0))))
+
 (defun render-aabb-at (aabb x y z &optional (r 0.1) (g 0.1) (b 0.1))
   (let ((iterator (scratch-buffer:my-iterator)))
     (let ((times (draw-aabb x y z aabb iterator)))
@@ -214,3 +270,41 @@ gl_FragColor.rgb = color_out;
       (x (aabbcc:aabb-minx aabb))
       (x (aabbcc:aabb-maxx aabb)))))
 
+
+;;;; Sync camera to player
+(defun sync_entity->camera (entity camera fraction)
+  ;;FIXME:this lumps in generating the other cached camera values,
+  ;;and the generic used configuration, such as aspect ratio and fov.
+  
+  ;;Set the direction of the camera based on the
+  ;;pitch and yaw of the player
+  (sync_neck->camera (entity-neck entity) camera)
+  ;;Calculate the camera position from
+  ;;the past, current position of the player and the frame fraction
+  (sync_particle->camera (entity-particle entity) camera fraction)
+  ;;update the camera
+  ;;FIXME::these values are
+  (set-camera-values
+   camera
+   (/ (floatify window:*height*)
+      (floatify window:*width*)
+      )
+   *fov*
+   (* 1024.0 256.0)
+   )
+  (camera-matrix:update-matrices camera)
+  ;;return the camera, in case it was created.
+  (values camera))
+(defun set-camera-values (camera aspect-ratio fov frustum-far)
+  (setf (camera-matrix:camera-aspect-ratio camera) aspect-ratio)
+  (setf (camera-matrix:camera-fov camera) fov)
+  (setf (camera-matrix:camera-frustum-far camera) frustum-far))
+(defun sync_particle->camera (particle camera fraction)
+  (let* ((prev (pointmass-position-old particle))
+	 (curr (pointmass-position particle)))
+    (let ((vec (camera-matrix:camera-vec-position camera)))
+      (nsb-cga:%vec-lerp vec prev curr fraction))))
+(defun sync_neck->camera (neck camera)
+  (unit-pitch-yaw (necking-pitch neck)
+		  (necking-yaw neck)
+		  (camera-matrix:camera-vec-forward camera)))

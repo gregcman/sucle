@@ -373,7 +373,8 @@
 					    (block-to-block-aabb blockid))))))
     acc))
 
-(defun create-entity ()
+(defun create-entity (&optional (aabb
+				 (create-aabb 0.3 0.12 0.3 -0.3 -1.5 -0.3)))
   ;;Reapply comments to make it noclip
   (make-entity :collision-fun ;;(lambda (&rest rest) (values 0 1.0))
 	       #'entity-collision
@@ -382,7 +383,7 @@
 	       #'find-blocks-in-contact-with
 	       :particle (make-pointmass)
 	       :neck (make-necking)
-	       :aabb *player-aabb*
+	       :aabb aabb 
 	       :hips nil
 	       :contact #b000000
 	       :fly? t

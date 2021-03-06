@@ -35,3 +35,5 @@
   (sucle-mp:with-initialize-multiprocessing
     (let ((database::*database* (sucle-temp:path "saves/fix.db")))
       (database::with-open-database2 (database::create-table)))))
+
+
