@@ -5,40 +5,63 @@
    #:block-coord))
 (in-package :voxel-chunks)
 
-;;The length of the side of the cube.
-(defconstant +size+ 16)
-;;Each chunk is a 16x16x16 cube.
-(defconstant +total-size+ (expt +size+ 3))
-
-(deftype chunk-coord () 'fixnum)
+;;inner-flat -> array index into array using row-major-aref
+;;inner-3d -> some dimension inside 3d array
 (deftype block-coord () 'fixnum)
-;;bcoord = block-coord, ccoord = chunk-coord
-(defun bcoord->ccoord (&optional (x 0) (y 0) (z 0))
-  ;;[FIXME]? combine with obtain-chunk-from-block-coordinates? 
-  (declare (type block-coord x y z))
-  (values (floor x +size+) (floor y +size+) (floor z +size+)))
-(deftype chunk-data () `(simple-array * (,+total-size+)))
-;;The inner coord
-(deftype inner-flat () `(integer 0 ,+total-size+))
-;;The remainder after flooring by the chunk size
-(deftype inner-3d () `(integer 0 ,+size+))
-(utility:with-unsafe-speed
-  (declaim (inline chunk-ref)
-	   (ftype (function (inner-3d inner-3d inner-3d)
-			    inner-flat)
-		  chunk-ref))
-  (defun chunk-ref (rx ry rz)
-    (declare (type inner-3d rx ry rz))
-    (+ (* ;;size-z
-	+size+
-	(+ (*;;size-y
-	    +size+
-	    ry)
-	   rz))
-       rx)))
-(defun inner (x y z)
-  (values (mod x +size+) (mod y +size+) (mod z +size+)))
+(deftype chunk-data (x y z) `(simple-array * (,(* x y z))))
+(deftype inner-flat (x y z) `(integer 0 ,(* x y z)))
+(deftype inner-3d (size) `(integer 0 ,size))
+
+(utility:eval-always
+  (defun gen-optimized-3d-array (lenx leny lenz name1 name2 name3 name4 name5)
+    (let ((foo `(declare (type (inner-3d ,lenx) rx)
+			 (type (inner-3d ,leny) ry)
+			 (type (inner-3d ,lenz) rz)))
+	  (bar `(declare (type (chunk-data ,lenx ,leny ,lenz) data))))
+      `(progn
+	 (utility:with-unsafe-speed
+	   (declaim (inline ,name1)
+		    (ftype (function ((inner-3d ,lenx) (inner-3d ,leny) (inner-3d ,lenz))
+				     (inner-flat ,lenx ,leny ,lenz))
+			   ,name1)
+		    (inline ,name2))
+	   (defun ,name1 (rx ry rz)
+	     ,foo
+	     ;;FIXME::correct ordering?
+	     (+ (* ;;size-z
+		 ,lenz
+		 (+ (*;;size-y
+		     ,leny
+		     ry)
+		    rz))
+		rx))
+	   (defun ,name2 (x y z)
+	     (declare (type block-coord x y z))
+	     (values (mod x ,lenx) (mod y ,leny) (mod z ,lenz))))
+	 (defun ,name3 (&rest rest &key (initial-element *empty-space*))
+	   (apply 'make-array
+		  ,(* lenx leny lenz)
+		  :initial-element initial-element
+		  :element-type (downgrade-array:storage-type initial-element)
+		  rest))
+       ;;;;
+	 (defun ,name4 (data rx ry rz)
+	   ,foo
+	   ,bar
+	   (row-major-aref data (chunk-ref rx ry rz)))
+	 (defun (setf ,name4) (value data rx ry rz)
+	   ,foo
+	   ,bar
+	   (setf (row-major-aref data (chunk-ref rx ry rz))
+		 value))
+	 (defun ,name5 (&optional (x 0) (y 0) (z 0))
+	   (declare (type block-coord x y z))
+	   (values (floor x ,lenx) (floor y ,leny) (floor z ,lenz)))))))
+
 ;;;;************************************************************************;;;;
+
+(utility:etouq
+  (gen-optimized-3d-array 16 16 16 'chunk-ref 'inner 'make-chunk-data 'reference-inside-chunk 'bcoord->ccoord))
 ;;in order to be correct, the key has to store each value unaltered
 ;;This is for creating a key for a hash table
 ;; 'cx' stands for 'chunk-x' etc...
@@ -48,16 +71,6 @@
 (defmacro with-chunk-key-coordinates ((x y z) chunk-key &body body)
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))
-#+nil
-(defun spread-chunk-key (chunk-key)
-  (apply 'values chunk-key))
-;;For backwards compatibility
-#+nil
-(defun unhashfunc (chunk-key)
-  (with-chunk-key-coordinates (x y z) chunk-key
-    (values (* x +size+)
-	    (* y +size+)
-	    (* z +size+))))
 
 (defparameter *empty-space* nil)
 (defparameter *empty-chunk-data* nil)
@@ -105,25 +118,6 @@
   (and chunk
        (chunk-alive? chunk)))
 
-(defun make-chunk-data (&rest rest &key (initial-element *empty-space*))
-  (apply 'make-array
-	 +total-size+
-	 :initial-element initial-element
-	 :element-type (downgrade-array:storage-type initial-element)
-	 rest))
-
-;;;;
-(defun reference-inside-chunk (chunk rx ry rz)
-  (declare (type inner-3d rx ry rz))
-  (let ((data (chunk-data chunk)))
-    ;;(declare (type chunk-data data))
-    (row-major-aref data (chunk-ref rx ry rz))))
-(defun (setf reference-inside-chunk) (value chunk rx ry rz)
-  (declare (type inner-3d rx ry rz))
-  (let ((data (chunk-data chunk)))
-    ;;(declare (type chunk-data data))
-    (setf (row-major-aref data (chunk-ref rx ry rz))
-	  value)))
 ;;;;
 
 (defun coerce-empty-chunk-to-regular-chunk (chunk)
@@ -135,7 +129,6 @@
 ;;all the chunk data is eql to *empty-space*
 ;;this is an optimization to save memory
 (defun create-chunk (cx cy cz &key (type :normal) data)
-  (declare (type chunk-coord cx cy cz))
   (make-chunk :x cx :y cy :z cz
 	      :key (create-chunk-key cx cy cz)
 	      :data (ecase type
@@ -177,32 +170,66 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 
 
 ;;;;************************************************************************;;;;
+;;FIXME::The cache itself is a 16x16x16 chunk array.
+;;(defparameter *cache2* )
+
+
+;;;;************************************************************************;;;;
 (defun (setf getobj) (value x y z)
   (setobj value x y z))
 (defun setobj (value x y z ;;space
 	       )
   (multiple-value-bind (cx cy cz) (bcoord->ccoord x y z)
     (let ((key (create-chunk-key cx cy cz)))
-      (multiple-value-bind (chunk existp)
-	  (get-chunk-in-cache key)
+      (multiple-value-bind (chunk existp) (get-chunk-in-cache key)
 	;;Create a new chunk if it does not already exist.
 	(unless existp
 	  (let ((new (create-chunk cx cy cz)))
 	    (set-chunk-in-cache key new)
-	    (setf chunk new)))	
+	    (setf chunk new)))
+
+	;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
+	;;chunk might be a chunk of type :EMPTY with shared data, but since it is being set,
+	;;coerce it to a regular chunk
+	;;FIXME::What does this comment mean here?
+	(coerce-empty-chunk-to-regular-chunk chunk)
+	(setf (chunk-modified chunk) t)
+	
 	(multiple-value-bind (rx ry rz) (inner x y z)
-	  (setf (reference-inside-chunk chunk rx ry rz) value))))))
+	  (setf (reference-inside-chunk (chunk-data chunk) rx ry rz) value))))))
 (defun getobj (x y z ;;space
 	       )
   (multiple-value-bind (cx cy cz) (bcoord->ccoord x y z)
-    (multiple-value-bind (chunk existp)
-	(get-chunk-in-cache (create-chunk-key cx cy cz))
-      (if existp
-	  (multiple-value-bind (rx ry rz) (inner x y z)
-	    (reference-inside-chunk chunk rx ry rz))
-	  *empty-space*))))
+    (let ((key (create-chunk-key cx cy cz)))
+      (multiple-value-bind (chunk existp) (get-chunk-in-cache key)
+	(if existp
+	    (multiple-value-bind (rx ry rz) (inner x y z)
+	      (reference-inside-chunk (chunk-data chunk) rx ry rz))
+	    *empty-space*)))))
 
 ;;;;;
 (reset-empty-chunk-value)
 
+(defun test-chunks ()
+  
+  (let ((acc ()))
+    (flet ((add (x y z w)
+	     (push (list x y z w) acc)
+	     (setf (getobj x y z) w)))
 
+      ;;Not a real test, because blocks can overlap!!!
+      #+nil
+      (dotimes (i 1000)
+	(add (random 10000) (random 10000) (random 10000) (random 10000)))
+      (time
+       (dotimes (i 10000)
+	 (add i i i i)))
+
+      (dolist (item acc)
+	(destructuring-bind (x y z w) item
+	  (assert (eq w (getobj x y z))))))))
+
+(defun test2 ()
+  (time
+   (dotimes (i (expt 10 6))
+     (setobj (random 64) (random 64) (random 64) (random 64)))))

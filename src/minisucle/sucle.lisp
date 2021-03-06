@@ -126,7 +126,6 @@
   (multiple-value-bind (fraction-for-fps game-ticks-per-iteration)
    (fps:tick
      (incf *ticks*)
-     (setf *time-of-day* 1.0)
      ;;run the physics
      (run-physics-for-entity *ent*))
     (declare (ignorable game-ticks-per-iteration))
