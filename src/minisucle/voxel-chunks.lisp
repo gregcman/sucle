@@ -19,12 +19,20 @@
 			 (type (inner-3d ,lenz) rz)))
 	  (bar `(declare (type (chunk-data ,lenx ,leny ,lenz) data))))
       `(progn
+	 (defun ,name3 (&rest rest &key (initial-element *empty-space*))
+	   (apply 'make-array
+		  ,(* lenx leny lenz)
+		  :initial-element initial-element
+		  :element-type (downgrade-array:storage-type initial-element)
+		  rest))
 	 (utility:with-unsafe-speed
-	   (declaim (inline ,name1)
-		    (ftype (function ((inner-3d ,lenx) (inner-3d ,leny) (inner-3d ,lenz))
+	   (declaim (ftype (function ((inner-3d ,lenx) (inner-3d ,leny) (inner-3d ,lenz))
 				     (inner-flat ,lenx ,leny ,lenz))
 			   ,name1)
-		    (inline ,name2))
+		    (inline ,name1)
+		    (inline ,name2)
+		    (inline ,name4)
+		    (inline ,name5))
 	   (defun ,name1 (rx ry rz)
 	     ,foo
 	     ;;FIXME::correct ordering?
@@ -36,27 +44,20 @@
 		    rz))
 		rx))
 	   (defun ,name2 (x y z)
-	     (declare (type block-coord x y z))
-	     (values (mod x ,lenx) (mod y ,leny) (mod z ,lenz))))
-	 (defun ,name3 (&rest rest &key (initial-element *empty-space*))
-	   (apply 'make-array
-		  ,(* lenx leny lenz)
-		  :initial-element initial-element
-		  :element-type (downgrade-array:storage-type initial-element)
-		  rest))
-       ;;;;
-	 (defun ,name4 (data rx ry rz)
-	   ,foo
-	   ,bar
-	   (row-major-aref data (chunk-ref rx ry rz)))
-	 (defun (setf ,name4) (value data rx ry rz)
-	   ,foo
-	   ,bar
-	   (setf (row-major-aref data (chunk-ref rx ry rz))
-		 value))
-	 (defun ,name5 (&optional (x 0) (y 0) (z 0))
-	   (declare (type block-coord x y z))
-	   (values (floor x ,lenx) (floor y ,leny) (floor z ,lenz)))))))
+	     (declare (type fixnum x y z))
+	     (values (mod x ,lenx) (mod y ,leny) (mod z ,lenz)))
+	   (defun ,name4 (data rx ry rz)
+	     ,foo
+	     ,bar
+	     (row-major-aref data (,name1 rx ry rz)))
+	   (defun (setf ,name4) (value data rx ry rz)
+	     ,foo
+	     ,bar
+	     (setf (row-major-aref data (,name1 rx ry rz))
+		   value))
+	   (defun ,name5 (&optional (x 0) (y 0) (z 0))
+	     (declare (type fixnum x y z))
+	     (values (floor x ,lenx) (floor y ,leny) (floor z ,lenz))))))))
 
 ;;;;************************************************************************;;;;
 
@@ -170,42 +171,67 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 
 
 ;;;;************************************************************************;;;;
-;;FIXME::The cache itself is a 16x16x16 chunk array.
-;;(defparameter *cache2* )
+;;The cache 
+(utility:etouq
+  (gen-optimized-3d-array 32 32 32 'cache2_ref 'cache2_inner 'make_cache2 'cache2_reference-inside
+			  'cache2_chop ;;Unused
+			  ))
+(defparameter *cache2* (make_cache2))
+
 
 
 ;;;;************************************************************************;;;;
+;;TODO::optimize 
+#+nil
+(with-unsafe-speed
+  (declaim (inline (setf getobj))
+	   (inline getobj)
+	   (inline setobj)
+	   (inline getchunk)))
 (defun (setf getobj) (value x y z)
   (setobj value x y z))
 (defun setobj (value x y z ;;space
 	       )
-  (multiple-value-bind (cx cy cz) (bcoord->ccoord x y z)
-    (let ((key (create-chunk-key cx cy cz)))
-      (multiple-value-bind (chunk existp) (get-chunk-in-cache key)
-	;;Create a new chunk if it does not already exist.
-	(unless existp
-	  (let ((new (create-chunk cx cy cz)))
-	    (set-chunk-in-cache key new)
-	    (setf chunk new)))
+  (let ((chunk (multiple-value-call #'getchunk (bcoord->ccoord x y z) t)))
+    ;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
+    ;;chunk might be a chunk of type :EMPTY with shared data, but since it is being set,
+    ;;coerce it to a regular chunk
+    ;;FIXME::What does this comment mean here?
+    (coerce-empty-chunk-to-regular-chunk chunk)
+    (setf (chunk-modified chunk) t)
+    
+    (multiple-value-bind (rx ry rz) (inner x y z)
+      (setf (reference-inside-chunk (chunk-data chunk) rx ry rz) value))))
 
-	;;chunk is not *empty-chunk* because of force-load being passed to obtain-chunk.
-	;;chunk might be a chunk of type :EMPTY with shared data, but since it is being set,
-	;;coerce it to a regular chunk
-	;;FIXME::What does this comment mean here?
-	(coerce-empty-chunk-to-regular-chunk chunk)
-	(setf (chunk-modified chunk) t)
-	
-	(multiple-value-bind (rx ry rz) (inner x y z)
-	  (setf (reference-inside-chunk (chunk-data chunk) rx ry rz) value))))))
 (defun getobj (x y z ;;space
 	       )
-  (multiple-value-bind (cx cy cz) (bcoord->ccoord x y z)
-    (let ((key (create-chunk-key cx cy cz)))
-      (multiple-value-bind (chunk existp) (get-chunk-in-cache key)
-	(if existp
-	    (multiple-value-bind (rx ry rz) (inner x y z)
-	      (reference-inside-chunk (chunk-data chunk) rx ry rz))
-	    *empty-space*)))))
+  (let ((chunk (multiple-value-call #'getchunk (bcoord->ccoord x y z) nil)))
+    (if chunk
+	(multiple-value-bind (rx ry rz) (inner x y z)
+	  (reference-inside-chunk (chunk-data chunk) rx ry rz))
+	*empty-space*)))
+
+(defun getchunk (cx cy cz &optional (allocate-p nil))
+  ;;Search cache 1
+  (multiple-value-bind (cx2 cy2 cz2) (cache2_inner cx cy cz)
+    (let ((maybe-chunk (cache2_reference-inside *cache2* cx2 cy2 cz2)))
+      (if maybe-chunk
+	  maybe-chunk
+	  (let ((main-mem-chunk
+		 ;;Search main memory
+		 (let ((key (create-chunk-key cx cy cz)))
+		   (multiple-value-bind (chunk existp) (get-chunk-in-cache key)
+		     (if existp
+			 chunk
+			 (if allocate-p
+			     ;;Create a new chunk if it does not already exist.
+			     (let ((new (create-chunk cx cy cz)))
+			       (set-chunk-in-cache key new)
+			       new)
+			     nil))))))
+	    (when main-mem-chunk
+	      (setf (cache2_reference-inside *cache2* cx2 cy2 cz2) main-mem-chunk))
+	    main-mem-chunk)))))
 
 ;;;;;
 (reset-empty-chunk-value)
@@ -229,7 +255,21 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 	(destructuring-bind (x y z w) item
 	  (assert (eq w (getobj x y z))))))))
 
-(defun test2 ()
-  (time
-   (dotimes (i (expt 10 6))
-     (setobj (random 64) (random 64) (random 64) (random 64)))))
+(utility:with-unsafe-speed
+  (defun test1 ()
+    (time
+     (let ((n 2001))
+       (dotimes (i (expt 10 6))
+	 (setobj n n n n)))))
+  (defun test2 ()
+    (time
+     (dotimes (i (expt 10 6))
+       (setobj (random 64) (random 64) (random 64) (random 64)))))
+
+  (defun test3 ()
+    (time
+     (dotimes (i (expt 10 6))
+       (let ((x (mod (* i 7) 512))
+	     (y (mod (* i 13) 512))
+	     (z (mod (* i 19) 512)))
+	 (setobj x y z i))))))
