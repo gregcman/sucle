@@ -13,9 +13,6 @@
   (menu:use *start-menu2*)
   (app:push-mode 'menu:tick)
 
-  (fix::fix)
-  (fix::seed)
-
   ;;(sucle-mp:with-initialize-multiprocessing)
   (app:default-loop))
 
@@ -54,6 +51,7 @@
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
 
+    (fix::seed)
     )
   (gl:polygon-mode :front-and-back :line)
 
@@ -124,10 +122,10 @@
 
   ;;FIXME:: run fps:tick if resuming from being paused.
   (multiple-value-bind (fraction-for-fps game-ticks-per-iteration)
-   (fps:tick
-     (incf *ticks*)
-     ;;run the physics
-     (run-physics-for-entity *ent*))
+      (fps:tick
+	(incf *ticks*)
+	;;run the physics
+	(run-physics-for-entity *ent*))
     (declare (ignorable game-ticks-per-iteration))
     ;;render chunks and such
     ;;handle chunk meshing
@@ -145,7 +143,7 @@
     ;;selected block and crosshairs
     (use-solidshader *camera*)
     ;;(render-debug fraction-for-fps)
-    ;;(render-crosshairs)
+    (render-crosshairs)
     )
 
   )

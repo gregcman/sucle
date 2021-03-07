@@ -1,7 +1,7 @@
 (defpackage :fix
   (:use :cl))
 (in-package :fix)
-
+#+nil
 (defun fix ()
   (crud:use-crud-from-path (merge-pathnames (sucle-temp:path "saves/") "fix.db")))
 

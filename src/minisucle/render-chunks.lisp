@@ -444,10 +444,10 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
 (defun attrib-buffer-iterators ()
   (map-into (make-array 3 :element-type t :initial-element nil)
 	    (function scratch-buffer:my-iterator)))
-
+#+nil
 (glhelp:deflazy-gl chunk ()
   (render-chunk2))
-
+#+nil
 (defun render-chunk2 ()
   (let ((iterators (attrib-buffer-iterators))
 	(n 33))
@@ -481,35 +481,53 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
     (render-chunks:mesh-chunk iterators x y z n n n)
     (chunk_iter->vao iterators)))
 
-(defparameter *chunk-view* (make-hash-table))
-(defun mesh-chunks ()
-  (voxel-chunks::do-chunks-in-cache (chunk)
-    (let ((key (voxel-chunks::chunk-key chunk))
-	  (hash (voxel-chunks::chunk-hash chunk))
-	  (chunk-last-modified (voxel-chunks::chunk-last-modified chunk)))
-      (multiple-value-bind (view existp) (gethash hash *chunk-view*)
-	(when (or (not existp)
-		  (not (eql chunk-last-modified
-			    (chunk_mesh-last-modified view)))
-		  (not (eql key
-			    (chunk_mesh-key view)))
-		  ;;(not (glhelp:alive-p (chunk_mesh-mesh view)))
-		  )
-	  ;;Free up the opengl object from previously
-	  (when existp
-	    (glhelp::gl-delete* (chunk_mesh-mesh view)))
-	  (let ((len 16)
-		(x (voxel-chunks::chunk-x chunk))
-		(y (voxel-chunks::chunk-y chunk))
-		(z (voxel-chunks::chunk-z chunk)))
-	    (setf (gethash hash *chunk-view*)
-		  (make-chunk_mesh
-		   :mesh (render-chunk (* x len) (* y len) (* z len))
-		   :key key
-		   :last-modified chunk-last-modified))))))))
+(struct-to-clos:struct->class
+ (defstruct chunk_view
+   (table (make-hash-table))
+   (voxels voxel-chunks::*voxels*)))
 
-(defun render-chunks ()
-  (mesh-chunks)
+(defun create-chunk_view (&optional (voxels voxel-chunks::*voxels*))
+  (make-chunk_view :voxels voxels))
+
+(glhelp:deflazy-gl chunk-view ()
+		   (make-chunk_view))
+(defun mesh-chunks (&optional (view (deflazy:getfnc 'chunk-view)) &aux (table (chunk_view-table view))
+								    (microsecond-timeout 8000)
+								    (start-time (fps:microseconds))
+								    (timeout-end (+ start-time microsecond-timeout)))
+  (block out
+    (voxel-chunks::do-chunks-in-cache (chunk (voxel-chunks::voxels-main-cache
+					      (chunk_view-voxels view)))
+      (let ((key (voxel-chunks::chunk-key chunk))
+	    (hash (voxel-chunks::chunk-hash chunk))
+	    (chunk-last-modified (voxel-chunks::chunk-last-modified chunk)))
+	(multiple-value-bind (view existp) (gethash hash table)
+	  (when (or (not existp)
+		    (not (eql chunk-last-modified
+			      (chunk_mesh-last-modified view)))
+		    (not (eql key
+			      (chunk_mesh-key view)))
+		    ;;(not (glhelp:alive-p (chunk_mesh-mesh view)))
+		    )
+	    ;;Free up the opengl object from previously
+	    (when existp
+	      (glhelp::gl-delete* (chunk_mesh-mesh view)))
+	    (let ((len 16)
+		  (x (voxel-chunks::chunk-x chunk))
+		  (y (voxel-chunks::chunk-y chunk))
+		  (z (voxel-chunks::chunk-z chunk)))
+	      (setf (gethash hash table)
+		    (make-chunk_mesh
+		     :mesh (render-chunk (* x len) (* y len) (* z len))
+		     :key key
+		     :last-modified chunk-last-modified))
+
+	      ;;Timeout so it doesn't mesh too many chunks
+	      (when (< timeout-end (fps:microseconds))
+		(return-from out)))))))))
+
+(defun render-chunks (&optional (view (deflazy:getfnc 'chunk-view)))
+  (mesh-chunks view)
   (gl:enable :depth-test)
   (gl:enable :cull-face)
   (gl:disable :blend)
@@ -519,12 +537,9 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
   #+nil
   (let ((call-list (deflazy:getfnc 'chunk)))
     (glhelp:slow-draw call-list))
-  (utility:dohash (k v) *chunk-view*
+  (utility:dohash (k v) (chunk_view-table view)
 		  (declare (ignorable k))
 		  (glhelp:slow-draw (chunk_mesh-mesh v))))
-#+nil
-(struct-to-clos:struct->class
- (defstruct chunk_view))
 
 (struct-to-clos:struct->class
  (defstruct chunk_mesh
