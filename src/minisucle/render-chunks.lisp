@@ -334,7 +334,7 @@
 
 (defun renderstandardblock (id i j k)
   ;;FIXME: dummy texture
-  (let ((texid 2 ;;(data id :texture)
+  (let ((texid id ;;2 ;;(data id :texture)
 	  ))
     (with-texture-translator2 (u0 u1 v0 v1) texid
       (flipuv)
@@ -359,11 +359,7 @@
 
 ;;;;;;
 
-(defun use-chunk-shader (&key (camera *camera*)
-			   (sky-color (list (random 1.0) (random 1.0) (random 1.0)))
-			   (fog-ratio 0.01)
-			   (time-of-day (random 1.0))
-			   (chunk-radius (error "chunk-radius not supplied")))
+(defun use-chunk-shader (&key (camera *camera*))
   ;;set up shader
   (let ((shader (deflazy:getfnc 'blockshader)))
     (glhelp:use-gl-program shader)
@@ -372,29 +368,15 @@
     (glhelp:with-uniforms uniform shader
       (gl:uniform-matrix-4fv 
        (uniform :pmv)
-       (camera-matrix:camera-matrix-projection-view-player camera)
+       (nsb-cga:matrix*
+	(camera-matrix:camera-matrix-projection-view-player camera)
+	(nsb-cga:translate* 0.0 0.0 0.0)
+	)
        nil))
 
     ;;other cosmetic uniforms
     (glhelp:with-uniforms
 	uniform shader
-      (destructuring-bind (r g b &rest rest) sky-color
-	(declare (ignorable rest))
-	(%gl:uniform-3f (uniform :fogcolor) r g b))
-      (gl:uniformfv (uniform :camera-pos)
-		    (camera-matrix:camera-vec-position camera))
-      (%gl:uniform-1f (uniform :foglet)
-		      (/ -1.0
-			 ;;[FIXME]16 assumes chunk is a 16x16x16 cube
-			 (* 16 ;;vocs:+size+
-			    chunk-radius)
-			 #+nil
-			 (or 128 (camera-matrix:camera-frustum-far *camera*))
-			 fog-ratio))
-      (%gl:uniform-1f (uniform :aratio)
-		      (/ 1.0 fog-ratio))
-      (%gl:uniform-1f (uniform :time)
-		      time-of-day)
 
       (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
@@ -563,10 +545,9 @@
   (let ((glhelp::*glsl-version* sucle::*shader-version*))
     (glhelp:create-opengl-shader
      "
-out float color_out;
 out vec2 texcoord_out;
-out float fogratio_out;
 out vec3 color_three; 
+out float ao; 
 
 in vec4 position;
 in vec2 texcoord;
@@ -575,31 +556,20 @@ in vec3 color;
 in vec4 blocklight;
 in vec4 skylight;
 uniform mat4 projection_model_view;
-uniform float time = 0.0;
-
-uniform float foglet;
-uniform float aratio;
-uniform vec3 camera_pos;
+uniform float time = 1.0;
 
 void main () {
 gl_Position = projection_model_view * position;
-vec4 light = max(skylight*time, blocklight);
-color_out = dot(light,vec4(0.25));
+vec4 light = max(skylight, blocklight);
+ao = dot(light,vec4(0.25));
 texcoord_out = texcoord;
 
-float distance = 
-//distance(position.xyz,vec3(0.0));
-distance(camera_pos.xyz, position.xyz);
-//max(distance(camera_pos.x, position.x), max(distance(camera_pos.z, position.z),distance(camera_pos.y, position.y)));
-fogratio_out = 1.0 ;clamp(aratio+foglet*distance, 0.0, 1.0);
 color_three = position.xyz;
 }"
      "
 in vec2 texcoord_out;
-in float color_out;
+in float ao;
 uniform sampler2D sampler;
-in float fogratio_out;
-uniform vec3 fogcolor;
 
 in vec3 color_three;
 
@@ -608,9 +578,7 @@ vec4 pixdata =
 vec4(mod((color_three.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
 //vec4(1.0);
 texture2D(sampler,texcoord_out.xy);
-vec3 temp = mix(fogcolor, color_out * pixdata.rgb, fogratio_out);
-//if (pixdata.a == 0.0){discard;}
-gl_FragColor.rgb = temp; 
+gl_FragColor.rgb = ao*pixdata.rgb; 
 }"
      `(("position" ,sucle::*position-attr*) 
        ("texcoord" ,sucle::*texcoord-attr*)
@@ -618,12 +586,7 @@ gl_FragColor.rgb = temp;
        ("blocklight" 4)
        ("skylight" 5))
      '((:pmv "projection_model_view")
-       (:fogcolor "fogcolor")
-       (:foglet "foglet")
-       (:aratio "aratio")
-       (:camera-pos "camera_pos")
-       (:sampler "sampler")
-       (:time "time")))))
+       (:sampler "sampler")))))
 
 
 ;;;;
