@@ -386,10 +386,10 @@
 
 
 (deflazy:deflazy terrain-png ()
-  
+  #+nil
   (img:load
    (sucle-temp:path #P"res/terrain.png"))
-  #+nil
+  ;;#+nil
   (img:load
    (sucle-temp:path #P"res/terrain1-8.png")))
 
@@ -426,7 +426,7 @@ uniform sampler2D sampler;
 
 void main () {
 vec4 pixdata = 
-vec4(mod((position_out.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
+//vec4(mod((position_out.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
 //vec4(1.0);
 texture2D(sampler,texcoord_out.xy);
 
@@ -518,6 +518,7 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
 		  (z (voxel-chunks::chunk-z chunk)))
 	      (setf (gethash hash table)
 		    (make-chunk_mesh
+		     ;;FIXME:: mesh can be nil
 		     :mesh (render-chunk (* x len) (* y len) (* z len))
 		     :key key
 		     :last-modified chunk-last-modified))
@@ -537,11 +538,13 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
   #+nil
   (let ((call-list (deflazy:getfnc 'chunk)))
     (glhelp:slow-draw call-list))
-  (with-unsafe-speed
-    (glhelp:slow-dispatch draw
-      (utility:dohash (k v) (chunk_view-table view)
-		      (declare (ignorable k))
-		      (draw (chunk_mesh-mesh v))))))
+  ;;(with-unsafe-speed)
+  (glhelp:slow-dispatch draw
+    (utility:dohash (k v) (chunk_view-table view)
+		    (declare (ignorable k))
+		    (let ((mesh (chunk_mesh-mesh v)))
+		      (when mesh
+			(draw mesh))))))
 
 (struct-to-clos:struct->class
  (defstruct chunk_mesh

@@ -1049,3 +1049,5 @@ gl_FragColor = pixcolor;
   (etypecase thing
     (gl-framebuffer (glhelp:texture thing))
     (gl-texture (glhelp:handle thing))))
+
+(defmethod gl-delete* ((obj (eql nil))))

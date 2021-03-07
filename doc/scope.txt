@@ -14,3 +14,4 @@
   - Photorealism
   - Physical realism
  - infinite in xyz directions
+ - Octree: may make rendering loads of blocks faster, but complicated.

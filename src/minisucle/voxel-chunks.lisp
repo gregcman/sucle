@@ -115,7 +115,7 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 ;;smaller names are easier to read and see.
 (defun create-chunk-key (&optional (cx 0) (cy 0) (cz 0))
   (list cx cy cz))
-#+nil
+
 (defmacro with-chunk-key-coordinates ((x y z) chunk-key &body body)
   `(destructuring-bind (,x ,y ,z) ,chunk-key
      ,@body))

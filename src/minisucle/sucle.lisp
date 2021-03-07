@@ -138,7 +138,7 @@
     (progn ;time
      (render-chunks::render-chunks))
 
-    (render-total-bounding-area)
+    ;;(render-total-bounding-area)
     
     ;;selected block and crosshairs
     (use-solidshader *camera*)

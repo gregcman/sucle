@@ -49,4 +49,46 @@
     (let ((database::*database* (sucle-temp:path "saves/fix.db")))
       (database::with-open-database2 (database::create-table)))))
 
+(deftype key () '(cons fixnum (cons fixnum (cons fixnum t))))
+(defun chunks (&optional (name "fix"))
+  (let ((database::*database* (sucle-temp:path (merge-pathnames "saves/" (concatenate 'string name ".db")))))
+    (remove-if-not (lambda (x) (typep x 'key))
+		   (mapcar 'read-from-string
+			   (mapcar 'first (database::with-open-database2 (database::all-data)))
+			   ))))
 
+(defun chunkat (key &optional (name "fix"))
+  (crud:use-crud-from-path (sucle-temp:path (merge-pathnames "saves/" (concatenate 'string name ".db"))))
+  (crud:crud-read key))
+
+(defun what2 (&optional (name "new"))
+  
+  (let ((chunks (chunks name)))
+    (dolist (key chunks)
+      (let ((data (chunkat key name)))
+	(let ((chunk-data (coerce data '(simple-array t (*)))))
+	  #+nil
+	  (assert (= 4096 (length chunk-data))
+		  nil
+		  "offending chunk ~a"
+		  key)
+	  (when (= 4096 (length chunk-data))
+	    ;;(print "what")
+	    (voxel-chunks::with-chunk-key-coordinates (xo zo yo) key
+	      (utility:dobox ((xi 0 16)
+			      (yi 0 16)
+			      (zi 0 16))			     
+			     (setf (voxel-chunks::getobj
+				    (+ xo xi)
+				    (+ yo yi)
+				    (+ zo zi))
+				   (mod (voxel-chunks::reference-inside-chunk chunk-data xi yi zi)
+					8))))))))))
+
+(defun worldtest ()
+  (time
+   (progn (what2 "new")
+	  (what2 "fix")
+	  ;;(what2 "test")
+	  (what2 "meh")
+	  )))
