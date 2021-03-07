@@ -137,7 +137,7 @@
     ;;this also clears the depth and color buffer.
     (apply #'render-sky *sky-color*)
     (render-chunks::use-chunk-shader :camera *camera*)
-
+    
     (render-chunks::render-chunks)
 
     (render-total-bounding-area)

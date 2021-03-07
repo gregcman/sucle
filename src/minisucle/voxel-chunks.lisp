@@ -102,14 +102,16 @@
    x y z
    key
    data
+   hash
    
    ;;Invalidate a chunk. If used by the main cache to invalidate
    ;;chunks in chunk-array cursors.
    (alive? t)
 
-   (last-read 0)
+   ;;(last-read 0)
    (last-modified 0)
-   (last-access 0)))
+   ;;(last-access 0)
+   ))
 
 (defun kill-chunk (chunk)
   (setf (chunk-alive? chunk) nil
@@ -144,11 +146,25 @@
 ;;this is an optimization to save memory
 (defun create-chunk (cx cy cz &key (type :normal) data)
   (make-chunk :x cx :y cy :z cz
+	      :hash (hash-key cx cy cz)
 	      :key (create-chunk-key cx cy cz)
 	      :data (ecase type
 		      (:normal (or data (make-chunk-data)))
 		      (:empty *empty-chunk-data*))
 	      :type type))
+
+(with-unsafe-speed
+  (declaim (inline hash-key))
+  (defun hash-key (cx cy cz)
+    ;;take the 10 bits from each for a 30 bit hash
+    (let ((10bits (- (ash 1 10) 1)))
+      (dpb (logand cx 10bits)
+	   (byte 10 20)
+	   (dpb (logand cy 10bits)
+		(byte 10 10)
+		(dpb (logand cz 10bits)
+		     (byte 10 0)
+		     0))))))
 
 ;;;;************************************************************************;;;;
 "
@@ -181,6 +197,14 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
       (values t))))
 (defun total-chunks-in-cache (&optional (cache *chunks*))
   (hash-table-count cache))
+#+nil
+(defun chunks-in-cache (&optional (cache *chunks*))
+  (alexandria:hash-table-values cache))
+(defmacro do-chunks-in-cache ((name &optional (cache '*chunks*)) &body body)
+  (with-gensyms (k)
+    `(utility:dohash (,k ,name) ,cache
+		     (declare (ignorable ,k))
+		     ,@body)))
 
 
 ;;;;************************************************************************;;;;
@@ -209,6 +233,7 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
     (cond (valid-p
 	   (coerce-empty-chunk-to-regular-chunk chunk)
 	   (setf (chunk-modified chunk) t)
+	   (incf (chunk-last-modified chunk))
 	   (multiple-value-bind (rx ry rz) (inner x y z)
 	     (setf (reference-inside-chunk (chunk-data chunk) rx ry rz) value)))
 	  (t (error "invalid chunk returned!")))))

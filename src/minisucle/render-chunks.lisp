@@ -331,8 +331,9 @@
 
 (defun show-sidep (blockid other-blockid)
   (or (sucle::empty-air-p other-blockid)
+      #+nil
       (and (not (eql blockid other-blockid))
-	   ;;(not (data other-blockid :opaque))
+	   (not (data other-blockid :opaque))
 	   )))
 
 (defun renderstandardblock (id i j k)
@@ -383,34 +384,12 @@
        ((uniform :sampler)
 	(glhelp:handle (deflazy:getfnc 'terrain)))))))
 
-(defun render-chunks ()  
-  (gl:enable :depth-test)
-  (gl:enable :cull-face)
-  (gl:disable :blend)
-  (gl:polygon-mode :front-and-back :fill)
-  ;;render chunks
-  (gl:front-face :ccw)
-					;#+nil
-  (let ((call-list (deflazy:getfnc 'chunk)))
-    (glhelp:slow-draw call-list))
-  #+nil
-  (multiple-value-bind (shown hidden overridden) (draw-world)
-    (declare (ignorable shown hidden overridden))
-    ;;Wow, so occlusion queries reduce the amount of chunks shown by 10 to 25 times? who knew?
-    #+nil
-    (when (not (zerop overridden))
-      (print overridden))
-    ;;(print (/ hidden (+ 0.0 hidden shown)))
-    ;;#+nil
-    #+nil
-    (let ((total (hash-table-count *g/chunk-call-list*)))
-      (unless (zerop total)
-	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
 
 (deflazy:deflazy terrain-png ()
-  #+nil
+  
   (img:load
    (sucle-temp:path #P"res/terrain.png"))
+  #+nil
   (img:load
    (sucle-temp:path #P"res/terrain1-8.png")))
 
@@ -467,15 +446,15 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
 	    (function scratch-buffer:my-iterator)))
 
 (glhelp:deflazy-gl chunk ()
-  (render-chunk))
+  (render-chunk2))
 
-(defun render-chunk ()
+(defun render-chunk2 ()
   (let ((iterators (attrib-buffer-iterators))
 	(n 33))
     (render-chunks:mesh-chunk iterators 0 0 0 n n n)
-    (update-chunk-mesh iterators)))
+    (chunk_iter->vao iterators)))
 
-(defun update-chunk-mesh (iter)
+(defun chunk_iter->vao (iter)
   (utility:with-vec (a b c) (iter)
     (let ((len (floor (scratch-buffer:iterator-fill-pointer a) 3)))
       (unless (zerop len)
@@ -492,4 +471,64 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
 		     ;;[FIXME]zero always comes last for display lists?
 		     ;;have to figure this out manually?
 		     (sucle::*position-attr* (xyz) (xyz) (xyz) 1.0)))))))
-	  (return-from update-chunk-mesh (values display-list)))))))
+	  (return-from chunk_iter->vao (values display-list)))))))
+
+;;;;************************************************************************;;;;
+
+(defun render-chunk (x y z)
+  (let ((iterators (attrib-buffer-iterators))
+	(n 16))
+    (render-chunks:mesh-chunk iterators x y z n n n)
+    (chunk_iter->vao iterators)))
+
+(defparameter *chunk-view* (make-hash-table))
+(defun mesh-chunks ()
+  (voxel-chunks::do-chunks-in-cache (chunk)
+    (let ((key (voxel-chunks::chunk-key chunk))
+	  (hash (voxel-chunks::chunk-hash chunk))
+	  (chunk-last-modified (voxel-chunks::chunk-last-modified chunk)))
+      (multiple-value-bind (view existp) (gethash hash *chunk-view*)
+	(when (or (not existp)
+		  (not (eql chunk-last-modified
+			    (chunk_mesh-last-modified view)))
+		  (not (eql key
+			    (chunk_mesh-key view)))
+		  ;;(not (glhelp:alive-p (chunk_mesh-mesh view)))
+		  )
+	  ;;Free up the opengl object from previously
+	  (when existp
+	    (glhelp::gl-delete* (chunk_mesh-mesh view)))
+	  (let ((len 16)
+		(x (voxel-chunks::chunk-x chunk))
+		(y (voxel-chunks::chunk-y chunk))
+		(z (voxel-chunks::chunk-z chunk)))
+	    (setf (gethash hash *chunk-view*)
+		  (make-chunk_mesh
+		   :mesh (render-chunk (* x len) (* y len) (* z len))
+		   :key key
+		   :last-modified chunk-last-modified))))))))
+
+(defun render-chunks ()
+  (mesh-chunks)
+  (gl:enable :depth-test)
+  (gl:enable :cull-face)
+  (gl:disable :blend)
+  (gl:polygon-mode :front-and-back :fill)
+  ;;render chunks
+  (gl:front-face :ccw)
+  #+nil
+  (let ((call-list (deflazy:getfnc 'chunk)))
+    (glhelp:slow-draw call-list))
+  (utility:dohash (k v) *chunk-view*
+		  (declare (ignorable k))
+		  (glhelp:slow-draw (chunk_mesh-mesh v))))
+#+nil
+(struct-to-clos:struct->class
+ (defstruct chunk_view))
+
+(struct-to-clos:struct->class
+ (defstruct chunk_mesh
+   mesh
+   key ;;should be EQ to the key in the chunk object
+   last-modified
+   ))
