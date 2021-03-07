@@ -386,10 +386,10 @@
 
 
 (deflazy:deflazy terrain-png ()
-  #+nil
+  ;;#+nil
   (img:load
    (sucle-temp:path #P"res/terrain.png"))
-  ;;#+nil
+  #+nil
   (img:load
    (sucle-temp:path #P"res/terrain1-8.png")))
 

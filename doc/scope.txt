@@ -15,3 +15,7 @@
   - Physical realism
  - infinite in xyz directions
  - Octree: may make rendering loads of blocks faster, but complicated.
+ - Multiplayer: supposedly makes the game much more complicated.
+
+sucle was built for my imac 2009, so contains optimizations for reading from disk, occlusion queries
+minisucle is devloped on my 16 GB 1060 gtx 6gb so is much simpler yet more performant.

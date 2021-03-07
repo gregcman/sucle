@@ -66,24 +66,33 @@
   (let ((chunks (chunks name)))
     (dolist (key chunks)
       (let ((data (chunkat key name)))
-	(let ((chunk-data (coerce data '(simple-array t (*)))))
-	  #+nil
-	  (assert (= 4096 (length chunk-data))
-		  nil
-		  "offending chunk ~a"
-		  key)
-	  (when (= 4096 (length chunk-data))
-	    ;;(print "what")
-	    (voxel-chunks::with-chunk-key-coordinates (xo zo yo) key
-	      (utility:dobox ((xi 0 16)
-			      (yi 0 16)
-			      (zi 0 16))			     
-			     (setf (voxel-chunks::getobj
-				    (+ xo xi)
-				    (+ yo yi)
-				    (+ zo zi))
-				   (mod (voxel-chunks::reference-inside-chunk chunk-data xi yi zi)
-					8))))))))))
+	(flet ((make-data (data)
+		 (let ((chunk-data (coerce data '(simple-array t (*)))))
+		   #+nil
+		   (assert (= 4096 (length chunk-data))
+			   nil
+			   "offending chunk ~a"
+			   key)
+		   (when (= 4096 (length chunk-data))
+		     ;;(print "what")
+		     (voxel-chunks::with-chunk-key-coordinates (xo zo yo) key
+		       (utility:dobox ((xi 0 16)
+				       (yi 0 16)
+				       (zi 0 16))			     
+				      (setf (voxel-chunks::getobj
+					     (+ xo xi)
+					     (+ yo yi)
+					     (+ zo zi))
+					    (mod (voxel-chunks::reference-inside-chunk chunk-data xi yi zi)
+						 8))))))))
+	  (typecase data
+	    (list
+	     (ecase (length data)
+	       (0)
+	       (3 ;;[FIXME]does this even work?
+		(error "world format invalid"))
+	       (1 (make-data (car data)))))
+	    (otherwise (make-data data))))))))
 
 (defun worldtest ()
   (time
