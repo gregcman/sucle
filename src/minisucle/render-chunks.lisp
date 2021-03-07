@@ -492,7 +492,7 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
 (glhelp:deflazy-gl chunk-view ()
 		   (make-chunk_view))
 (defun mesh-chunks (&optional (view (deflazy:getfnc 'chunk-view)) &aux (table (chunk_view-table view))
-								    (microsecond-timeout 8000)
+								    (microsecond-timeout 16000)
 								    (start-time (fps:microseconds))
 								    (timeout-end (+ start-time microsecond-timeout)))
   (block out
@@ -537,9 +537,11 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
   #+nil
   (let ((call-list (deflazy:getfnc 'chunk)))
     (glhelp:slow-draw call-list))
-  (utility:dohash (k v) (chunk_view-table view)
-		  (declare (ignorable k))
-		  (glhelp:slow-draw (chunk_mesh-mesh v))))
+  (with-unsafe-speed
+    (glhelp:slow-dispatch draw
+      (utility:dohash (k v) (chunk_view-table view)
+		      (declare (ignorable k))
+		      (draw (chunk_mesh-mesh v))))))
 
 (struct-to-clos:struct->class
  (defstruct chunk_mesh

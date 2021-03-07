@@ -34,13 +34,15 @@
     (setf (voxel-chunks:getobj 0 0 x) (random 256))))
 
 (defun stress2 ()
-  (dotimes (x 1000)
-    (dotimes (y 1000)
-      (setf (voxel-chunks:getobj y 0 x) (random 256)))))
+  (time
+   (dotimes (x 1000)
+     (dotimes (y 1000)
+       (setf (voxel-chunks:getobj y 0 x) (random 256))))))
 (defun stress2-2 ()
-  (dotimes (x 1000)
-    (dotimes (y 1000)
-      (setf (voxel-chunks:getobj y (+ x y) x) (random 256)))))
+  (time
+   (dotimes (x 1000)
+     (dotimes (y 1000)
+       (setf (voxel-chunks:getobj y (+ x y) x) (random 256))))))
 
 (defun fix-database ()
   (sucle-mp:with-initialize-multiprocessing

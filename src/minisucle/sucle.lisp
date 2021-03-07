@@ -50,7 +50,7 @@
     (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
-
+    (setf voxel-chunks::*voxels* (voxel-chunks::make-voxels))
     (fix::seed)
     )
   (gl:polygon-mode :front-and-back :line)
@@ -135,8 +135,8 @@
     ;;this also clears the depth and color buffer.
     (apply #'render-sky *sky-color*)
     (render-chunks::use-chunk-shader :camera *camera*)
-    
-    (render-chunks::render-chunks)
+    (progn ;time
+     (render-chunks::render-chunks))
 
     (render-total-bounding-area)
     

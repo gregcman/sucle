@@ -49,6 +49,7 @@
    
    #:slow-draw
    #:slow-delete
+   #:slow-dispatch
 
    #:gl-framebuffer
    #:gl-texture
@@ -1013,6 +1014,26 @@ gl_FragColor = pixcolor;
     (+gluint+ (gl:delete-lists gl-thing 1))
     (vao (delete-vao gl-thing))
     (gl-list (gl:delete-lists (handle gl-thing) 1))))
+
+(defmacro slow-dispatch (draw &body body)
+  (utility:with-gensyms (type)
+    `(let ((,type nil))
+       (labels ((,draw (gl-thing)
+		  (cond ((eq ,type 'gl-list)
+			 (draw-display-list (handle gl-thing)))
+			((eq ,type 'vao)
+			 (draw-vertex-array gl-thing))		     
+			((eq ,type '+gluint+)
+			 (draw-display-list gl-thing))
+			((eq ,type nil)
+			 (typecase gl-thing
+			   (+gluint+ (setf ,type '+gluint+))
+			   (vao (setf ,type 'vao))
+			   (gl-list (setf ,type 'gl-list))
+			   (otherwise (return-from ,draw)))
+			 ;;try again, but this time with updated type
+			 (,draw gl-thing)))))
+	 ,@body))))
 
 ;;;;</SWITCH BETWEEN DISPLAY LISTS AND VAOS>
 ;;;;************************************************************************;;;;

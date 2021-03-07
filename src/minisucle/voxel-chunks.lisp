@@ -200,9 +200,14 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 
 ;;;;
 
+(defun make-empty-data (space)
+  (let ((type (downgrade-array:storage-type space)))
+    (make-chunk-data :initial-element space
+		     :element-type type)))
+
 (defun coerce-empty-chunk-to-regular-chunk (chunk)
   (when (eq (chunk-type chunk) :empty)
-    (setf (chunk-data chunk) (make-chunk-data :initial-element (chunk-empty-space chunk))
+    (setf (chunk-data chunk) (make-empty-data (chunk-empty-space chunk))
 	  (chunk-type chunk) :normal)))
 
 ;;type can be either :NORMAL or :EMPTY. empty is used to signify that
@@ -214,7 +219,8 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 		:hash (hash-key cx cy cz)
 		:key (create-chunk-key cx cy cz)
 		:data (ecase type
-			(:normal (or data (make-chunk-data :initial-element empty-space)))
+			(:normal (or data
+				     (make-empty-data empty-space)))
 			(:empty empty-data))
 		:type type
 		:empty-space empty-space
@@ -250,6 +256,13 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 	   (coerce-empty-chunk-to-regular-chunk chunk)
 	   (setf (chunk-modified chunk) t)
 	   (incf (chunk-last-modified chunk))
+
+	   ;;To save space
+	   (let ((array (chunk-data chunk)))
+	     (when (not (typep value (array-element-type array)))
+	       (let ((new-array (downgrade-array:really-downgrade-array array value)))
+		 (setf (chunk-data chunk) new-array))))
+	   
 	   (multiple-value-bind (rx ry rz) (inner x y z)
 	     (setf (reference-inside-chunk (chunk-data chunk) rx ry rz) value)))
 	  (t (error "invalid chunk returned!")))))
@@ -296,3 +309,16 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
 ;;;;;
 ;;(reset-empty-chunk-value)
 
+;;List all the types of chunks that exist
+(defun chunk-types (&optional (voxels *voxels*))
+  (let ((acc ()))
+    (do-chunks-in-cache (chunk (voxels-main-cache voxels))
+      (pushnew (array-element-type (chunk-data chunk))
+	       acc :test 'equalp))
+    acc))
+
+(defun voxel-megabytes (&optional (voxels *voxels*))
+  (let ((acc 0))
+    (do-chunks-in-cache (chunk (voxels-main-cache voxels))
+      (incf acc (downgrade-array:array-truesize (chunk-data chunk))))
+    (/ acc (* 1024 1024 8.0))))

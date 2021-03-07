@@ -2,7 +2,8 @@
   (:use :cl)
   (:export
    #:storage-type
-   #:really-downgrade-array))
+   #:really-downgrade-array
+   #:array-truesize))
 (in-package :downgrade-array)
 
 (defun downgrade-array (&rest items)
@@ -63,3 +64,28 @@
 	    (aref array i)))
     (values new-array
 	    type)))
+
+;;;; type sizes
+(defun typesize (type)
+  (cond ((and (listp type)
+	      (= 2 (length type))
+	      (eq 'unsigned-byte (first type)))
+	 (roundup-2 (second type)))
+	((and (listp type)
+	      (= 2 (length type))
+	      (eq 'signed-byte (first type)))
+	 (roundup-2 (second type)))
+	((eq type 'bit)
+	 1)
+	(t
+	 #+x86-64
+	 64
+	 #+x86
+	 32)))
+
+(defun array-truesize (array)
+  (* (typesize (array-element-type array))
+     (array-total-size array)))
+
+(defun roundup-2 (n)
+  (ash 1 (ceiling (log n 2))))

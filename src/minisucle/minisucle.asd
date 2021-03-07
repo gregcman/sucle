@@ -14,7 +14,7 @@
   :components 
   ((:file "package")
    
-   
+   (:file "downgrade-array")
    (:file "voxel-chunks")
    
    (:file "util")
@@ -32,7 +32,6 @@
 	    :serial t
 	    :components
 	    ((:file "render-extra")
-	     ;;(:file "downgrade-array")
 	     ;;(:file "test")
 	     ))
    

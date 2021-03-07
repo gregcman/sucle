@@ -42,6 +42,9 @@
       (really-downgrade-array #(1 1 0 0 0 1 0 -1 0))
       (really-downgrade-array #(1 1 0 0 0 1 0 -345345 0))))))
 
+(defun test5 ()
+  (array-truesize (really-downgrade-array #(10 1202 012 012 0 t))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (in-package :voxel-chunks)
 (defun test-chunks ()
@@ -68,7 +71,7 @@
     (time
      (let ((n 2001))
        (dotimes (i (expt 10 6))
-	 (setf (getobj n n n) n)))))
+	 (setf (getobj n n n) (mod i 256))))))
   (defun test2 ()
     (time
      (dotimes (i (expt 10 6))
@@ -79,5 +82,6 @@
      (dotimes (i (expt 10 6))
        (let ((x (mod (* i 7) 512))
 	     (y (mod (* i 13) 512))
-	     (z (mod (* i 19) 512)))
-	 (setf (getobj x y z) i))))))
+	     (z (mod (* i 19) 512))
+	     (w (mod (* i 23) 256)))
+	 (setf (getobj x y z) w))))))
