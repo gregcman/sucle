@@ -121,9 +121,9 @@
      clockwise-winding
      (list u0 u1 v0 v1)))))
 
-#+nil
+
 (defun dark-fun (darkness b0 b1 b2 b3 s0 s1 s2 s3)
-  (let ((time *daytime*))
+  (let ((time 1.0))
     (* darkness
        0.25
        (+ (max b0 (* time s0))
@@ -164,8 +164,11 @@
 			'getlight 'q0 'q1 'q2 'q3 
 			(%edge-aux
 			 'skygetlight 'q4 'q5 'q6 'q7
+			 #+nil
 			 ;;Write block light and sky light values
 			 `(dark q0 q1 q2 q3 q4 q5 q6 q7)
+			 `(let ((rgb (dark-fun ,actual-color q0 q1 q2 q3 q4 q5 q6 q7)))
+			    (dark rgb rgb rgb))
 			 #+nil
 			 ;;Write block light and sky light values precomputed into one float,
 			 ;;as opposed to calculating light in the vertex shader
@@ -375,9 +378,7 @@
        nil))
 
     ;;other cosmetic uniforms
-    (glhelp:with-uniforms
-	uniform shader
-
+    (glhelp:with-uniforms uniform shader
       (glhelp:set-uniforms-to-textures
        ((uniform :sampler)
 	(glhelp:handle (deflazy:getfnc 'terrain)))))))
@@ -405,126 +406,6 @@
     (let ((total (hash-table-count *g/chunk-call-list*)))
       (unless (zerop total)
 	(format t "~%~s" (* 100.0 (/ shown total 1.0)))))))
-(defun quadratic-formula (a b c)
-  (let ((two-a (+ a a)))
-    (let ((term2 (/ (sqrt (- (* b b)
-			     (* 4 a c)))
-		    two-a))
-	  (term1 (/ (- b)
-		    two-a)))
-      (values (+ term1 term2)
-	      (- term1 term2)))))
-
-(defun sum-of-first-n-integers (n)
-  (/ (* (+ n 1) n)
-     2))
-
-(defun reverse-sum-of-first-n-integers (n)
-  (quadratic-formula 0.5 0.5 (- n)))
-
-(defun oct-24-2018 ()
-  (let ((pick
-	 (random
-	  (sum-of-first-n-integers 256))
-	  ))
-    (let ((a (floor
-	      (reverse-sum-of-first-n-integers pick))))
-      (values a
-	      (- pick (sum-of-first-n-integers a))))))
-
-(progn
-  (defun color-grasses (terrain)
-    (flet ((color ()
-	     (multiple-value-call #'foliage-color
-	       ;;(values 255 0)
-	       ;;#+nil
-	       (oct-24-2018)
-	       )
-	     
-	     ;;;does not distribute evenly. it picks a slice, then a height on the slice.
-	     ;;;points on small slices have a greater chance of being picked than
-	     ;;;points on large slices.
-	     #+nil
-	     (let ((value (random 256)))
-	       (foliage-color value (random (1+ value))))))
-      (modify-greens 5 12 :color
-		     (color)
-		    
-		     ;(foliage-color 255 0)
-		     :terrain terrain)
-      (modify-greens 0 15 :color
-		     (color)
-		     
-		     ;(foliage-color 255 0)
-		     :terrain terrain))
-    terrain)
-  (defun getapixel (h w image)
-    (destructuring-bind (height width c) (array-dimensions image)
-      (declare (ignore height))
-      (make-array 4 :element-type (array-element-type image)
-		  :displaced-to image
-		  :displaced-index-offset (* c (+ w (* h width))))))
-
-  (defun modify-greens (xpos ypos
-			&key
-			  (color #(0 0 0 0))
-			  (terrain (error "no image")))
-    (let* (;;Assume texture is a square grid of squares
-	   (size (round (sqrt (/ (array-total-size terrain) 4))))
-	   (cell-size (/ size 16)))
- 
-      (setf xpos (* xpos cell-size)
-	    ypos (* ypos cell-size))
-      (dobox ((x xpos (+ cell-size xpos))
-	      (y ypos (+ cell-size ypos)))
-	     (let ((vecinto (getapixel (- (- size 1) y)
-				       x terrain)))
-	       (map-into vecinto (lambda (a b)
-				   (truncate (* a b) 256))
-			 vecinto
-			 color))))))
-
-(defun barycentric-interpolation (px py vx1 vy1 vx2 vy2 vx3 vy3)
-  (let ((denominator (+ (*
-			 (- vy2 vy3)
-			 (- vx1 vx3))
-			(*
-			 (- vx3 vx2)
-			 (- vy1 vy3))))
-	(py-yv3 (- py vy3))
-	(px-xv3 (- px vx3)))
-    (let* ((w1 (/
-		(+
-		 (*
-		  (- vy2 vy3)
-		  px-xv3)
-		 (*
-		  (- vx3 vx2)
-		  py-yv3))
-		  denominator))
-	   (w2 (/
-		(+
-		 (*
-		  (- vy3 vy1)
-		  px-xv3)
-		 (*
-		  (- vx1 vx3)
-		  py-yv3))
-		denominator))
-	   (w3 (- 1 w1 w2)))
-      (values w1 w2 w3))))
-
-
-(defun foliage-color (a b)
-  (multiple-value-bind (w1 w2 w3)
-      (barycentric-interpolation a b 0.0 0.0 255.0 0.0 255.0 255.0)
-    (mapcar (lambda (x y z)
-	      (+ (* x w1)
-		 (* y w2)
-		 (* z w3)))
-	    '(71.0 205.0 51.0)
-	    '(191.0 183.0 85.0)
-	    '(128.0 180.0 151.0))))
 
 (deflazy:deflazy terrain-png ()
   #+nil
@@ -533,58 +414,48 @@
   (img:load
    (sucle-temp:path #P"res/terrain1-8.png")))
 
-(deflazy:deflazy modified-terrain-png (terrain-png)
-  (color-grasses
-   (alexandria:copy-array terrain-png)))
-
-(glhelp:deflazy-gl terrain (modified-terrain-png)
+(glhelp:deflazy-gl terrain (terrain-png)
   (glhelp:wrap-opengl-texture
-   (glhelp:create-opengl-texture-from-data modified-terrain-png)))
+   (glhelp:create-opengl-texture-from-data terrain-png)))
 
 (glhelp:deflazy-gl blockshader ()
   (let ((glhelp::*glsl-version* sucle::*shader-version*))
     (glhelp:create-opengl-shader
      "
-out vec2 texcoord_out;
-out vec3 color_three; 
-out float ao; 
-
 in vec4 position;
-in vec2 texcoord;
 in vec3 color;
+in vec2 texcoord;
 
-in vec4 blocklight;
-in vec4 skylight;
+out vec3 position_out;
+out vec3 color_out;  
+out vec2 texcoord_out;
+
 uniform mat4 projection_model_view;
-uniform float time = 1.0;
 
 void main () {
 gl_Position = projection_model_view * position;
-vec4 light = max(skylight, blocklight);
-ao = dot(light,vec4(0.25));
+color_out = color;
 texcoord_out = texcoord;
 
-color_three = position.xyz;
+position_out = position.xyz;
 }"
      "
+in vec3 position_out;
+in vec3 color_out;
 in vec2 texcoord_out;
-in float ao;
 uniform sampler2D sampler;
-
-in vec3 color_three;
 
 void main () {
 vec4 pixdata = 
-vec4(mod((color_three.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
+vec4(mod((position_out.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
 //vec4(1.0);
 texture2D(sampler,texcoord_out.xy);
-gl_FragColor.rgb = ao*pixdata.rgb; 
+
+gl_FragColor.rgb = color_out*pixdata.rgb; 
 }"
      `(("position" ,sucle::*position-attr*) 
        ("texcoord" ,sucle::*texcoord-attr*)
-       ("color" ,sucle::*color-attr*)
-       ("blocklight" 4)
-       ("skylight" 5))
+       ("color" ,sucle::*color-attr*))
      '((:pmv "projection_model_view")
        (:sampler "sampler")))))
 
@@ -617,8 +488,7 @@ gl_FragColor.rgb = ao*pixdata.rgb;
 		   (glhelp:create-vao-or-display-list-from-specs
 		    (:quads len)
 		    ((sucle::*texcoord-attr* (uv) (uv))
-		     (4 (dark) (dark) (dark) (dark))
-		     (5 (dark) (dark) (dark) (dark))
+		     (sucle::*color-attr* (dark) (dark) (dark))
 		     ;;[FIXME]zero always comes last for display lists?
 		     ;;have to figure this out manually?
 		     (sucle::*position-attr* (xyz) (xyz) (xyz) 1.0)))))))

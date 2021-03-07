@@ -136,13 +136,7 @@
     (draw-to-default-area)
     ;;this also clears the depth and color buffer.
     (apply #'render-sky *sky-color*)
-    (render-chunks::use-chunk-shader
-     :camera *camera*
-     :sky-color *sky-color*
-     :time-of-day 1.0
-     :fog-ratio 1.0
-     :chunk-radius 16 ;;(vocs::cursor-radius *chunk-cursor-center*)
-     )
+    (render-chunks::use-chunk-shader :camera *camera*)
 
     (render-chunks::render-chunks)
 
