@@ -61,15 +61,23 @@
 (defun run-buttons (pairs)
   (mapc 'run-button pairs))
 
+;;;;[FIXME]The point of this is to reduce the amount of bits to store the hitbox.
+;;;;Why? because when there is an inexact number, like 0.3, there are bits at the end which
+;;;;get chopped off or something, thus leading to strange clipping.
+;;;;This effectively reduces the precision, giving leeway for math operations.
+;;;;My prediction could be wrong though.
+(defun round-to-nearest (x &optional (n (load-time-value (/ 1.0 128.0))))
+  (* n (round (/ x n))))
+
 ;;;;************************************************************************;;;;
 ;;;;<BOXES?>
 (defun create-aabb (&optional (maxx 1.0) (maxy maxx) (maxz maxx)
 			       (minx (- maxx)) (miny (- maxy)) (minz (- maxz)))
 	 (floatf maxx maxy maxz minx miny minz)
 	 (aabbcc:make-aabb
-	  :minx minx
-	  :maxx maxx
-	  :miny miny
-	  :maxy maxy
-	  :minz minz
-	  :maxz maxz))
+	  :minx (round-to-nearest minx)
+	  :maxx (round-to-nearest maxx)
+	  :miny (round-to-nearest miny)
+	  :maxy (round-to-nearest maxy)
+	  :minz (round-to-nearest minz)
+	  :maxz (round-to-nearest maxz)))
