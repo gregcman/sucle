@@ -47,3 +47,19 @@
   (mvc 'render-line 0 0 0 0 foo 0 (spread #(0.0 1.0 0.0)))
   ;;Z is blue
   (mvc 'render-line 0 0 0 0 0 foo (spread #(0.0 0.0 1.0))))
+
+(defparameter *selected-block-aabb*
+  (let* ((offset 0.1)
+	 (small (- 0.0 offset))
+	 (large (+ 1.0 offset)))
+    (create-aabb large large large small small small)))
+;;'render-' type functions write to OpenGL.
+
+(defun render-fist (&optional (fist *fist*))
+  (gl:disable :blend)
+  (gl:disable :cull-face)
+  (gl:polygon-mode :front-and-back :line)
+  (gl:line-width 2)
+  ;;[FIXME]render the fist again
+  (when (fist-exists fist)
+    (mvc 'render-aabb-at *selected-block-aabb* (spread (fist-selected-block fist)))))

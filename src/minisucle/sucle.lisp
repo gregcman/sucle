@@ -20,9 +20,10 @@
 
 (defparameter *entities* nil)
 (defparameter *ent* nil)
-
-
-(defparameter *sky-color* '(0.5 0.5 0.5))
+(defparameter *fist* (make-fist))
+(defparameter *reach* 50.0)
+(defparameter *sky-color* '(0.5 0.5 0.5)
+  )
 
 ;;;;;
 
@@ -67,6 +68,15 @@
   
   ;;physics
 
+  (mvc 'standard-fist
+       (spread (entity-position *ent*))
+       ;;FIXME::conses a new vec
+       (spread (sb-cga:vec*
+		(camera-matrix:camera-vec-forward *camera*)
+		*reach*))
+       *fist*)
+  (when (mode-enabled-p :fist-mode)
+    (run-buttons *fist-keys*))
   (when (mode-enabled-p :god-mode)
     (run-buttons *god-keys*))
   (when (mode-enabled-p :movement-mode)
@@ -142,6 +152,7 @@
     
     ;;selected block and crosshairs
     (use-solidshader *camera*)
+    (render-fist *fist*)
     ;;(render-debug fraction-for-fps)
     (render-crosshairs)
     )
@@ -176,3 +187,15 @@
     ((:key :pressed #\f) .
      ,(lambda () (toggle (entity-fly? *ent*))
 	      (toggle (entity-gravity? *ent*))))))
+
+(defparameter *fist-keys*
+  `(((:mouse :pressed :left) . 
+     ,(lambda ()
+	(when (fist-exists *fist*)	  
+	  (multiple-value-bind (x y z) (spread (fist-selected-block *fist*))
+	    (setf (voxel-chunks::getobj x y z) 0)))))
+    ((:mouse :pressed :right) .
+     ,(lambda ()
+	(when (fist-exists *fist*)
+	  (multiple-value-bind (x y z) (spread (fist-normal-block *fist*))
+	    (setf (voxel-chunks::getobj x y z) 1)))))))

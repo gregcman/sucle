@@ -6,6 +6,11 @@
   (crud:use-crud-from-path (merge-pathnames (sucle-temp:path "saves/") "fix.db")))
 
 (defun seed ()
+  (dotimes (x 16)
+    (dotimes (y 16)
+      (dotimes (z 16)
+	(setf (voxel-chunks:getobj (random 64) (random 64) (random 64))
+	      (random 256)))))
   (dotimes (x 32)
     (dotimes (y 32)
       (dotimes (z 32)
