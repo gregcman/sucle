@@ -106,56 +106,49 @@
 		     t)))
       (modify nsb-cga:%vec+ force
 	      (nsb-cga:vec 0.0 (* 4.0 *ticks-per-second*) 0.0)))
-    		
+    
     (let* ((speed (if fly (* 4.317 4) 4.317))
 	   (step-power 4.0)
-	   (yvalue (if fly
-		       (cond (is-jumping speed)
-			     (is-sneaking (- speed))
-			     (t 0.0))
-		       0.0))
-	   (target-vec
-	    (if dir
-		(let ((diraux (+ dir yaw)))
-		  (nsb-cga:vec
-		   (* speed (- (sin diraux)))
-		   yvalue
-		   (* speed (cos diraux))))
-		(prog1
-		    (nsb-cga:vec 0.0 yvalue 0.0)
-		  (setf step-power 1.0)))))
+	   (yvalue (cond ((not fly) 0.0)
+			 (is-jumping speed)
+			 (is-sneaking (- speed))
+			 (t 0.0)))
+	   (target-vec (nsb-cga:vec 0.0 yvalue 0.0)))
+      
+      (when dir
+	(let ((diraux (+ dir yaw)))
+	  (setf (vec-x target-vec) (* speed (- (sin diraux))))
+	  (setf (vec-z target-vec) (* speed (cos diraux)))))
       (when (or dir fly)
 	(let ((velocity (nsb-cga:vec* vel *ticks-per-second*)))
 	  (unless fly
 	    (setf (vec-y velocity) 0.0))
-	  (let* ((difference (nsb-cga:vec-
-			      target-vec
-			      velocity))
+	  (let* (;;Difference between target velocity and current velocity.
+		 (difference (nsb-cga:vec- target-vec velocity))
 		 (difference-length (nsb-cga:vec-length difference)))
 	    (unless (zerop difference-length)
-	      (let* ((dot (nsb-cga:dot-product difference target-vec)))
-		(let ((bump-direction			     
-		       (if (and (not onground)
-				(> 0.0 dot))
-			   ;;in the air?
-			   (let ((vec
-				  (nsb-cga:cross-product
-				   (nsb-cga:cross-product target-vec difference)
-				   target-vec)))
-			     (let ((value (nsb-cga:vec-length vec)))
-			       (if (zerop value)
-				   (progn
+	      (let ((bump-direction
+		     (cond
+		       ;;in the air and
+		       ;;FIMXE:: numerical instability.
+		       #+nil
+		       ((and (not onground)
+			     (> 0.0 (nsb-cga:dot-product difference target-vec)))
+			(let ((vec
+			       (nsb-cga:cross-product
+				(nsb-cga:cross-product target-vec difference)
+				target-vec)))
+			  (let ((value (nsb-cga:vec-length vec)))
+			    (if (zerop value)
+				(progn
 					;	   (error "wtf")
-				     vec
-				     )
-				   (nsb-cga:vec/ vec value))))
-			   (nsb-cga:vec/ 
-			    difference
-			    difference-length))))
-		  (let ((step-force (* 2.0 difference-length)))
-		    (modify nsb-cga:%vec+ force
-			    (nsb-cga:vec* bump-direction
-					  (* step-power step-force)))))))))))
+				  vec
+				  )
+				(nsb-cga:vec/ vec value)))))
+		       (t (nsb-cga:vec/  difference difference-length)))))
+		(modify nsb-cga:%vec+ force
+			(nsb-cga:vec* bump-direction
+				      (* step-power difference-length 2.0)))))))))
     
     ;;Apply gravity, but introduce a frame of gravity lag to allow walking around block corners
     (progn
