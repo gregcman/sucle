@@ -345,6 +345,22 @@
 (defun set-neck-values (neck yaw pitch)
   (setf (necking-yaw neck) yaw
 	(necking-pitch neck) pitch))
+(defun increment-neck-values (neck yawdx pitchdx)
+  (let* ((old-yaw (necking-yaw neck))
+	 (old-pitch (necking-pitch neck))
+	 (clamp (load-time-value (- (* 0.5 (floatify pi)) 0.00000009)))
+	 (yaw (+ yawdx old-yaw))
+	 (pitch (+ pitchdx old-pitch)))    
+    ;;So looking straight up stops.
+    (when (> pitch clamp)
+      (setf pitch clamp))
+    ;;So looking straight down stops
+    (let ((negative (- clamp)))
+      (when (< pitch negative)
+	(setf pitch negative)))
+    
+    (setf (necking-yaw neck) yaw)
+    (setf (necking-pitch neck) pitch)))
 
 (struct-to-clos:struct->class
  (defstruct pointmass

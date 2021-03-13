@@ -2,8 +2,12 @@
 
 (defun b@ (x y z)
   (voxel-chunks:getobj x y z))
+#+nil
 (defun (setf b@) (value x y z)
   (setf (voxel-chunks:getobj x y z) value))
+;;constrained
+(defun (setf b@) (value x y z)
+  (setf (voxel-chunks:getobj (mod x 512) (mod y 512) (mod z 512)) value))
 
 (defun wools (xn yn zn)
   (dotimes (x 16)
@@ -243,3 +247,40 @@
 								 (local-time:now))))
 			voxel-chunks::*voxels*)
   (values))
+
+(setf *fun*
+      (lambda (x y z &optional (val 103) (o 3) (g 6) (q 2))
+	(dobox ((xi 0 g)
+		(yi 0 g)
+		(zi 0 g))
+	       (when (and (> q (mod xi o))
+			  (> q (mod yi o))
+			  (> q (mod zi o)))
+		 (let ((xb (+ x (* xi o)))
+		       (yb (+ y (* yi o)))
+		       (zb (+ z (* zi o))))
+		   (dobox ((x xb (+ xb o))
+			   (y yb (+ yb o))
+			   (z zb (+ zb o)))
+			  (setf (b@ x y z) val)))))))
+
+(setf *fun*
+      (lambda (x y z)
+	(print (b@ x y z))))
+
+(defun random-block ()
+  (random 256))
+
+(setf *fun*
+      (lambda (x y z &optional (v (random-block)) (r 4) (% 0.7))
+	(dobox ((x0 (- x r) (+ 1 x r))
+		(z0 (- z r) (+ 1 z r)))
+	       (let* ((what
+		       (max 0 (+ (- (* % r))
+				 (floor
+				  (sqrt
+				   (+ (expt (- x0 x) 2)
+				      (expt (- z0 z) 2)))))))
+		      (what (floor (expt what 2))))
+		 (dotimes (i what)
+		   (setf (b@ x0 (+ i y) z0) v))))))

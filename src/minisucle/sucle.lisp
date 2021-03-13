@@ -52,7 +52,7 @@
     (reset-all-modes)
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
-    (setf voxel-chunks::*voxels* (voxel-chunks::make-voxels))
+    ;;(setf voxel-chunks::*voxels* (voxel-chunks::make-voxels))
     ;;(fix::seed)
     )
   (gl:polygon-mode :front-and-back :line)
@@ -116,7 +116,7 @@
     ;;update the internal mouse state
     ;;taking into consideration fractions
     (when (window:mouse-locked?)
-      (update-moused *mouse-multiplier-aux* 1.0)))
+      (update-moused 1.0)))
   (when (mode-enabled-p :normal-mode)
     ;;[FIXME] because this runs after update-moused, the camera swivels
     ;;unecessarily.
@@ -127,7 +127,7 @@
   
   ;;Set the pitch and yaw of the player based on the
   ;;mouse position
-  (mvc 'set-neck-values (entity-neck *ent*) (neck-values))
+  (mvc 'increment-neck-values (entity-neck *ent*) (neck-values))
 
   ;;Run the game ticks
 
