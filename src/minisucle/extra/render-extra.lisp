@@ -49,7 +49,7 @@
   (mvc 'render-line 0 0 0 0 0 foo (spread #(0.0 0.0 1.0))))
 
 (defparameter *selected-block-aabb*
-  (let* ((offset 0.1)
+  (let* ((offset 0.01)
 	 (small (- 0.0 offset))
 	 (large (+ 1.0 offset)))
     (create-aabb large large large small small small)))

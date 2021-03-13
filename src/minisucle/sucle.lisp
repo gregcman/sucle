@@ -201,9 +201,21 @@
 	(when (fist-exists *fist*)
 	  (multiple-value-bind (x y z) (spread (fist-normal-block *fist*))
 	    (setf (voxel-chunks::getobj x y z) 1)))))
-    #+nil
-    ((:mouse :pressed :right) .
+    ((:mouse :pressed :middle) .
      ,(lambda ()
 	(when (fist-exists *fist*)
 	  (multiple-value-bind (x y z) (spread (fist-selected-block *fist*))
-	    (print (voxel-chunks::getobj x y z))))))))
+	    (multiple-value-bind (xn yn zn) (spread (fist-normal-block *fist*))
+	      (middlemouse x y z xn yn zn))))))))
+
+(defparameter *fun* (constantly nil))
+(defvar *normals* ())
+(defun middlemouse (x y z xn yn zn)
+  (declare (ignorable x y z))
+  (block out
+    (handler-bind ((error
+		    (lambda (c)
+		      (declare (ignorable c))
+		      (return-from out))))
+      (let ((*normals* (list (- xn x) (- yn y) (- zn z))))
+	(funcall *fun* x y z)))))

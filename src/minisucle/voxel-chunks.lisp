@@ -2,7 +2,9 @@
   (:use :cl :utility)
   (:export
    #:getobj
-   #:block-coord))
+   #:block-coord
+
+   #:clearworld))
 (in-package :voxel-chunks)
 
 ;;inner-flat -> array index into array using row-major-aref
@@ -127,6 +129,9 @@ When removing or setting chunks, kill the chunk which is no longer to be used."
    (main-cache (make-chunk-cache))
    (cache (make_cache2 :initial-element 0 :element-type T))))
 (defparameter *voxels* (make-voxels))
+
+(defun clearworld ()
+  (setf *voxels* (make-voxels)))
 
 (set-pprint-dispatch
  'voxels
