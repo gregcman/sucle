@@ -22,7 +22,8 @@
 (defparameter *ent* nil)
 (defparameter *fist* (make-fist))
 (defparameter *reach* 50.0)
-(defparameter *sky-color* '(0.5 0.5 0.5)
+(defparameter *sky-color* (let ((n 0.1))
+			    `(,n ,n ,n))
   )
 
 ;;;;;
@@ -52,7 +53,7 @@
     (enable-mode :normal-mode)
     (enable-mode :god-mode)
     (setf voxel-chunks::*voxels* (voxel-chunks::make-voxels))
-    (fix::seed)
+    ;;(fix::seed)
     )
   (gl:polygon-mode :front-and-back :line)
 
@@ -194,8 +195,15 @@
 	(when (fist-exists *fist*)	  
 	  (multiple-value-bind (x y z) (spread (fist-selected-block *fist*))
 	    (setf (voxel-chunks::getobj x y z) 0)))))
+    ;;#+nil
     ((:mouse :pressed :right) .
      ,(lambda ()
 	(when (fist-exists *fist*)
 	  (multiple-value-bind (x y z) (spread (fist-normal-block *fist*))
-	    (setf (voxel-chunks::getobj x y z) 1)))))))
+	    (setf (voxel-chunks::getobj x y z) 1)))))
+    #+nil
+    ((:mouse :pressed :right) .
+     ,(lambda ()
+	(when (fist-exists *fist*)
+	  (multiple-value-bind (x y z) (spread (fist-selected-block *fist*))
+	    (print (voxel-chunks::getobj x y z))))))))

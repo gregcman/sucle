@@ -57,7 +57,7 @@ gl_FragColor.rgb = color_out;
   (render-aabb-at
    (load-time-value
     (let ((max 1024))
-      (create-aabb max max max 0 0 0)))
+      (create-aabb max max max (- max) (- max) (- max))))
    0 0 0))
 
 (defun render-aabb-at (aabb x y z &optional (r 0.1) (g 0.1) (b 0.1))
