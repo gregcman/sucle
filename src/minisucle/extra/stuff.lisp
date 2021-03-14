@@ -248,6 +248,10 @@
 			voxel-chunks::*voxels*)
   (values))
 
+(defun loadworld ()
+  (setf voxel-chunks::*voxels* (sucle-serialize:load "/home/master/Documents/saves/1615730702.cpack"))
+  (values))
+
 (setf *fun*
       (lambda (x y z &optional (val 103) (o 3) (g 6) (q 2))
 	(dobox ((xi 0 g)
