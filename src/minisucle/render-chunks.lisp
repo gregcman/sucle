@@ -406,17 +406,25 @@
 	    (array-total-size array)
 	    :displaced-to array
 	    :element-type (array-element-type array))))
-    (let ((array (array-flatten terrain-png))
-	  (x 512)
-	  (y 512)
-	  (z 4))
-      (let ((arr (make-array (* x y z 4) :element-type 'unsigned-byte))
-	    (foo (length array)))
-	(dotimes (x (length arr))
-	  (setf (aref arr x)
-		(aref array (mod x foo))))
-	(glhelp:wrap-opengl-texture
-	 (glhelp::create-texture3d arr x y z))))))
+    (let* ((array (array-flatten terrain-png))
+	   (x 512)
+	   (y 512)
+	   ;;lisp runs out of memory at 32
+	   (z 1) 
+	   (len (* x y z 4)))
+      (cffi:with-foreign-object (arr :uint8 len)
+	(let ((foo (length array)))
+	  (dotimes (x len)
+	    (setf (cffi:mem-aref arr :uint8 x)
+		  (aref array (mod x foo))))
+	  (glhelp:wrap-opengl-texture
+	   (glhelp::create-texture3d arr x y z)))))))
+
+;;how many images can we pack into a texture3d?
+(defun detect-blocks (&optional (n 128) (x 512) (y 512) (z 128))
+  (* (/ x n)
+     (/ y n)
+     z))
 
 (glhelp:deflazy-gl blockshader ()
   (let ((glhelp::*glsl-version* sucle::*shader-version*))
