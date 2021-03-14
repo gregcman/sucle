@@ -377,12 +377,15 @@
 	(nsb-cga:translate* 0.0 0.0 0.0)
 	)
        nil))
-
     ;;other cosmetic uniforms
     (glhelp:with-uniforms uniform shader
-      (glhelp:set-uniforms-to-textures
+      (glhelp::set-uniforms-to-textures
+       ((uniform :sampler3d)
+	(glhelp:handle (deflazy:getfnc 'terrain3d))
+	:texture-3d)
        ((uniform :sampler)
-	(glhelp:handle (deflazy:getfnc 'terrain)))))))
+	(glhelp:handle (deflazy:getfnc 'terrain))
+	)))))
 
 
 (deflazy:deflazy terrain-png ()
@@ -397,6 +400,24 @@
   (glhelp:wrap-opengl-texture
    (glhelp:create-opengl-texture-from-data terrain-png)))
 
+(glhelp:deflazy-gl terrain3d (terrain-png)
+  (flet ((array-flatten (array)
+	   (make-array
+	    (array-total-size array)
+	    :displaced-to array
+	    :element-type (array-element-type array))))
+    (let ((array (array-flatten terrain-png))
+	  (x 512)
+	  (y 512)
+	  (z 4))
+      (let ((arr (make-array (* x y z 4) :element-type 'unsigned-byte))
+	    (foo (length array)))
+	(dotimes (x (length arr))
+	  (setf (aref arr x)
+		(aref array (mod x foo))))
+	(glhelp:wrap-opengl-texture
+	 (glhelp::create-texture3d arr x y z))))))
+
 (glhelp:deflazy-gl blockshader ()
   (let ((glhelp::*glsl-version* sucle::*shader-version*))
     (glhelp:create-opengl-shader
@@ -407,28 +428,31 @@ in vec2 texcoord;
 
 out vec3 position_out;
 out vec3 color_out;  
-out vec2 texcoord_out;
+out vec3 texcoord_out;
 
 uniform mat4 projection_model_view;
 
 void main () {
 gl_Position = projection_model_view * position;
 color_out = color;
-texcoord_out = texcoord;
+texcoord_out = vec3(texcoord, 0.49);
 
 position_out = position.xyz;
 }"
      "
 in vec3 position_out;
 in vec3 color_out;
-in vec2 texcoord_out;
+in vec3 texcoord_out;
 uniform sampler2D sampler;
+uniform sampler3D sampler3d;
 
 void main () {
 vec4 pixdata = 
 //vec4(mod((position_out.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
 //vec4(1.0);
-texture2D(sampler,texcoord_out.xy);
+//texture2D(sampler,texcoord_out.xy)
+texture3D(sampler3d,texcoord_out.xyz)
+;
 
 gl_FragColor.rgb = color_out*pixdata.rgb; 
 }"
@@ -436,7 +460,8 @@ gl_FragColor.rgb = color_out*pixdata.rgb;
        ("texcoord" ,sucle::*texcoord-attr*)
        ("color" ,sucle::*color-attr*))
      '((:pmv "projection_model_view")
-       (:sampler "sampler")))))
+       (:sampler "sampler")
+       (:sampler3d "sampler3d")))))
 
 
 ;;;;

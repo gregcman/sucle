@@ -455,6 +455,14 @@ just put together a new vao"
     (apply-tex-params *default-tex-params*)
     (gl:bind-texture :texture-2d 0)
     tex))
+
+(defun create-texture3d (tex-data width height depth &key (format :rgba) (type :unsigned-byte))
+  (let ((tex (gl:gen-texture)))
+    (gl:bind-texture :texture-3d tex)
+    (gl:tex-image-3d :texture-3d 0 :rgba width height depth 0 format type tex-data)
+    (apply-tex-params3d *default-tex-params*)
+    (gl:bind-texture :texture-3d 0)
+    tex))
 ;;;
 (defparameter *default-tex-params* (quote ((:texture-min-filter . :nearest)
 					   (:texture-mag-filter . :nearest)
@@ -506,6 +514,10 @@ just put together a new vao"
 (defun apply-tex-params (tex-parameters)
   (dolist (param tex-parameters)
     (gl:tex-parameter :texture-2d (car param) (cdr param))))
+
+(defun apply-tex-params3d (tex-parameters)
+  (dolist (param tex-parameters)
+    (gl:tex-parameter :texture-3d (car param) (cdr param))))
 ;;;
 (progn
   (defconstant +gltexture0+ (cffi:foreign-enum-value (quote %gl:enum) :texture0))
@@ -627,10 +639,19 @@ just put together a new vao"
 (defmacro set-uniforms-to-textures (&rest specs)
   (cons 'progn
 	(mapcar (lambda (spec number)
-		  (destructuring-bind (location texture) spec
-		    `(set-uniform-to-texture ,location ,texture ,number)))
+		  (destructuring-bind (location texture &optional (type :texture-2d)) spec
+		    `(,(ecase type
+			 (:texture-2d 'set-uniform-to-texture)
+			 (:texture-3d 'set-uniform-to-texture3d))
+		       ,location ,texture ,number)))
 		specs
 		(alexandria:iota (length specs)))))
+
+(defun set-uniform-to-texture3d (uniform-location texture num)
+  (gl:uniformi uniform-location num)
+  (set-active-texture num)
+  (gl:bind-texture :texture-3d texture))
+
 ;;;;</PROGRAM>
 ;;;;************************************************************************;;;;
 ;;;;<SHADER>
