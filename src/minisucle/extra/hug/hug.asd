@@ -8,6 +8,6 @@
   :serial t
   :depends-on
   (
-   #:py4cl)
+   #:py4cl2)
   :components ((:file "package")
                (:file "hug")))
