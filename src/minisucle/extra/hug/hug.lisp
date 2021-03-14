@@ -77,6 +77,10 @@ for k in range(top):
 (defun safe-subseq (str start end)
   (subseq str (max 0 start)
 	  (min end (length str))))
+(defun partialp (str)
+  (string=
+   (safe-subseq str 0 2)
+   "##"))
 (defun foo (&optional (str *teststr*))
   (let ((res (results str))
 	(first t))
@@ -84,9 +88,7 @@ for k in range(top):
        (with-output-to-string (stream)
 	 (loop :for str :across seq :do
 	    (progn	   
-	      (cond ((string=
-		      (safe-subseq str 0 2)
-		      "##")
+	      (cond ((partialp str)
 		     (setf str (safe-subseq str 2 (length str)))
 		     (write-char #\| stream))
 		    ((not first)
@@ -119,13 +121,20 @@ for k in range(top):
     (write-string thing)
     (car (foo thing))))
 
+(defun test12 (&optional (a +mask+) (b +mask+) (c +mask+))
+  (format nil
+	  ;;"When you combine ~a and ~a you get ~a."
+	  "Combining ~a and ~a produces ~a."
+	  a b c))
+
 (defun mask (n)
   (with-output-to-string (str)
     (loop :repeat n :do
        (write-string +mask+ str))))
 
-(defun onlymasks ()
-  (let ((thing (results)))
+(defun onlymasks (&optional (str *teststr*))
+  (write-string str)
+  (let ((thing (results str)))
     (setf thing (coerce thing 'list))
     (let ((input (first thing))
 	  (rest (cdr thing))
@@ -142,3 +151,27 @@ for k in range(top):
 			     (aref item 0)
 			     (aref item 1))))
 	      rest))))
+
+;;(onlymasks "[[X O X][[MASK] [MASK] [MASK]] [[MASK] [MASK] [MASK]]]")
+
+;;python3.6 run_generation.py  --model_type=gpt2 --model_name_or_path=gpt2
+;;python3.6 run_generation.py  --model_type=ctrl --model_name_or_path=ctrl
+;;python3.6 run_generation.py  --model_type=xlnet --model_name_or_path=xlnet ;doesnt work
+;;python3.6 run_generation.py  --model_type=xlm --model_name_or_path=xlm ;doesnt work
+;;python3.6 run_generation.py  --model_type=transfo-xl --model_name_or_path=trasnfo-xl
+
+(defun alltokens ()
+  (py4cl2:pyexec
+   "
+what = []
+for i in tokenizer.get_vocab():
+   what.append(i)")
+  (sort 
+   (remove-if 'partialp
+	      (coerce (py4cl2:pyeval "what")
+		      'list
+		      ))
+   'string<))
+
+(/ (* 24000 (* 128 128 4)) 1024 1024 1024 1.0)
+
