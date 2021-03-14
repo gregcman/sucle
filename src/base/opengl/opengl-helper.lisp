@@ -468,6 +468,7 @@ just put together a new vao"
 					   (:texture-mag-filter . :nearest)
 					   (:texture-wrap-s . :repeat)
 					   (:texture-wrap-t . :repeat)
+					   (:texture-wrap-r . :repeat)
 					   )))
 
 ;;;;in opengl horizontal lines must be multiples of 4 bytes

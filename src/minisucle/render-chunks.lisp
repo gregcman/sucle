@@ -436,7 +436,7 @@
       (glhelp:wrap-opengl-texture texture))))
 
 ;;how many images can we pack into a texture3d?
-(defun detect-blocks (&optional (n 128) (x 512) (y 512) (z 128))
+(defun detect-blocks (&optional (n 128) (x 512) (y 512) (z 512))
   (* (/ x n)
      (/ y n)
      z))
@@ -473,8 +473,8 @@ void main () {
 vec4 pixdata = 
 //vec4(mod((position_out.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0),1.0) *
 //vec4(1.0);
-//texture2D(sampler,texcoord_out.xy)
-texture3D(sampler3d,texcoord_out.xyz)
+texture2D(sampler,texcoord_out.xy)
+//texture3D(sampler3d,texcoord_out.xyz)
 ;
 
 gl_FragColor.rgb = color_out*pixdata.rgb; 

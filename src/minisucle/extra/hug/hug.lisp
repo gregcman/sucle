@@ -151,6 +151,10 @@ for k in range(top):
 			     (aref item 0)
 			     (aref item 1))))
 	      rest))))
+(defun onlymasks2 (&optional (str *teststr*))
+  (apply 'mapcar 'list (mapcar (lambda (x)
+				 (mapcar 'first x))
+			       (onlymasks str))))
 
 ;;(onlymasks "[[X O X][[MASK] [MASK] [MASK]] [[MASK] [MASK] [MASK]]]")
 
@@ -175,3 +179,4 @@ for i in tokenizer.get_vocab():
 
 (/ (* 24000 (* 128 128 4)) 1024 1024 1024 1.0)
 
+(/ (* 512 512 512 4) (* 1024 1024 1024 1.0))
