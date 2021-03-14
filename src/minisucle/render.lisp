@@ -31,6 +31,7 @@
   (glhelp:create-opengl-shader
    "
 out vec3 color_out;
+out vec3 position_out;
 in vec4 position;
 in vec3 color;
 uniform mat4 projection_model_view;
@@ -38,12 +39,16 @@ uniform mat4 projection_model_view;
 void main () {
 gl_Position = projection_model_view * position;
 color_out = color;
+position_out = position.xyz;
 }"
    "
 in vec3 color_out;
+in vec3 position_out;
 void main () {
 gl_FragColor.a = 1.0;
-gl_FragColor.rgb = color_out;
+gl_FragColor.rgb = 
+mod((position_out.xyz + 0.7) * vec3(0.05,0.07,0.09), 1.0) *
+color_out;
 }"
    `(("position" ,*position-attr*) 
      ("color" 3))

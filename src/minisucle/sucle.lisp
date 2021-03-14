@@ -22,7 +22,7 @@
 (defparameter *ent* nil)
 (defparameter *fist* (make-fist))
 (defparameter *reach* 50.0)
-(defparameter *sky-color* (let ((n 0.1))
+(defparameter *sky-color* (let ((n 0.5))
 			    `(,n ,n ,n))
   )
 
@@ -149,10 +149,10 @@
     (progn ;time
      (render-chunks::render-chunks))
 
-    ;;(render-total-bounding-area)
     
     ;;selected block and crosshairs
     (use-solidshader *camera*)
+    (render-total-bounding-area)
     (render-fist *fist*)
     ;;(render-debug fraction-for-fps)
     (render-crosshairs)
@@ -188,7 +188,7 @@
     ((:key :pressed #\f) .
      ,(lambda () (toggle (entity-fly? *ent*))
 	      (toggle (entity-gravity? *ent*))))))
-
+(defparameter *block* 1)
 (defparameter *fist-keys*
   `(((:mouse :pressed :left) . 
      ,(lambda ()
@@ -200,7 +200,7 @@
      ,(lambda ()
 	(when (fist-exists *fist*)
 	  (multiple-value-bind (x y z) (spread (fist-normal-block *fist*))
-	    (setf (voxel-chunks::getobj x y z) 1)))))
+	    (setf (voxel-chunks::getobj x y z) *block*)))))
     ((:mouse :pressed :middle) .
      ,(lambda ()
 	(when (fist-exists *fist*)

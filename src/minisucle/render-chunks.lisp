@@ -210,8 +210,8 @@
   (defparameter *blockface-color*  
     (simple-float-array 0.6 0.6 0.5 1.0 0.8 0.8)
     ;;(simple-float-array 0.55 0.95 0.2 1.0 0.45 0.85)
-    ;;#+nil
-    ;;(simple-float-array 1.0 1.0 1.0 1.0 1.0 1.0)
+    #+nil
+    (simple-float-array 1.0 1.0 1.0 1.0 1.0 1.0)
     #+nil
     (let ((side (expt 0.5 2.33)))
       (simple-float-array side side 0.0 1.0 side side))

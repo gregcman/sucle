@@ -284,3 +284,62 @@
 		      (what (floor (expt what 2))))
 		 (dotimes (i what)
 		   (setf (b@ x0 (+ i y) z0) v))))))
+
+(setf *fun*
+      (lambda (x y z)
+	(setf *block*
+	      (b@ x y z))))
+
+(setf *fun*
+      (lambda (xn yn zn)
+	(dotimes (x 16)
+	  (dotimes (y 16)
+	    (setf (b@ (+ xn x) (+ 0 yn) (+ zn y))
+		  (wrap (+ (wrap y 0 16)
+			   (* (wrap x 0 16) 16))
+			0 256))))))
+
+(setf *fun*
+      (lambda (x y z)
+	(sphere x y z 0 5)))
+
+(setf *fun*
+      (lambda (x y z &aux (v (b@ x y z)))
+	(unless (= v 0)
+	  (labels ((next (x y z)
+		     (when (= (b@ x y z) v)
+		       (setf (b@ x y z) 0)
+		       (next (+ 1 x) (+ 0 y) (+ 0 z))
+		       (next (+ -1 x) (+ 0 y) (+ 0 z))
+		       (next (+ 0 x) (+ 1 y) (+ 0 z))
+		       (next (+ 0 x) (+ -1 y) (+ 0 z))
+		       (next (+ 0 x) (+ 0 y) (+ -1 z))
+		       (next (+ 0 x) (+ 0 y) (+ 1 z)))))
+	    (next x y z)))))
+
+(load (merge-pathnames "extra/queue.lisp"
+		       (asdf:system-source-directory :minisucle)))
+
+;;get all blocks of a type and delete them
+(setf *fun*
+      (lambda (x y z &aux (v (b@ x y z)) (q (queue:make-uniq-q)))
+	(unless (= v 0)
+	  (labels ((add (x y z)
+		     (when (= v (b@ x y z))
+		       (queue:uniq-push (list x y z) q)))
+		   (next (x y z)		     
+		     (add (+ 1 x) (+ 0 y) (+ 0 z))
+		     (add (+ -1 x) (+ 0 y) (+ 0 z))
+		     (add (+ 0 x) (+ 1 y) (+ 0 z))
+		     (add (+ 0 x) (+ -1 y) (+ 0 z))
+		     (add (+ 0 x) (+ 0 y) (+ -1 z))
+		     (add (+ 0 x) (+ 0 y) (+ 1 z)))
+		   (del (x y z)
+		     (setf (b@ x y z) 0)))
+	    (next x y z)
+	    (loop :named out :do
+	       (multiple-value-bind (value p) (queue:uniq-pop q)
+		 (when (not p)
+		   (return-from out))
+		 (apply #'del value)
+		 (apply #'next value)))))))
