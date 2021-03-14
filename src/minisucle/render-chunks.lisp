@@ -401,24 +401,39 @@
    (glhelp:create-opengl-texture-from-data terrain-png)))
 
 (glhelp:deflazy-gl terrain3d (terrain-png)
-  (flet ((array-flatten (array)
-	   (make-array
-	    (array-total-size array)
-	    :displaced-to array
-	    :element-type (array-element-type array))))
-    (let* ((array (array-flatten terrain-png))
-	   (x 512)
-	   (y 512)
-	   ;;lisp runs out of memory at 32
-	   (z 1) 
-	   (len (* x y z 4)))
-      (cffi:with-foreign-object (arr :uint8 len)
-	(let ((foo (length array)))
-	  (dotimes (x len)
-	    (setf (cffi:mem-aref arr :uint8 x)
-		  (aref array (mod x foo))))
-	  (glhelp:wrap-opengl-texture
-	   (glhelp::create-texture3d arr x y z)))))))
+  (let ((texture nil))
+    (flet ((array-flatten (array)
+	     (make-array
+	      (array-total-size array)
+	      :displaced-to array
+	      :element-type (array-element-type array))))
+      ;;FIXME: 512 512 512 may be too big for some implementations.
+      (setf texture (glhelp::create-texture3d nil 512 512 512))
+      (let* ((array (array-flatten terrain-png))
+	     (x 512)
+	     (y 512)
+	     (len (* x y 4)))
+	#+nil
+	;;Stress test: 512 textures, but the deeper layers get more random.
+	(loop :for depth :from 0 :below 512 :do	
+	   (cffi:with-foreign-object (arr :uint8 len)
+				     (let ((foo (length array)))
+				       (dotimes (x len)
+					 (setf (cffi:mem-aref arr :uint8 x)
+					       (mod (+ (random (+ 1 depth))
+						       (aref array (mod x foo)))
+						    256))))
+				     (gl:bind-texture :texture-3d texture)
+				     (gl:tex-sub-image-3d :texture-3d 0 0 0 depth x y 1 :rgba :unsigned-byte arr)))
+	(cffi:with-foreign-object (arr :uint8 len)
+				  (let ((foo (length array)))
+				    (dotimes (x len)
+				      (setf (cffi:mem-aref arr :uint8 x)
+					    (aref array (mod x foo)))))
+				  (gl:bind-texture :texture-3d texture)
+				  (loop :for depth :from 0 :below 512 :do
+				     (gl:tex-sub-image-3d :texture-3d 0 0 0 depth x y 1 :rgba :unsigned-byte arr))))
+      (glhelp:wrap-opengl-texture texture))))
 
 ;;how many images can we pack into a texture3d?
 (defun detect-blocks (&optional (n 128) (x 512) (y 512) (z 128))
@@ -443,7 +458,7 @@ uniform mat4 projection_model_view;
 void main () {
 gl_Position = projection_model_view * position;
 color_out = color;
-texcoord_out = vec3(texcoord, 0.49);
+texcoord_out = vec3(texcoord, position.x + 0.01);
 
 position_out = position.xyz;
 }"
