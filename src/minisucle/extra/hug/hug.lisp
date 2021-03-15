@@ -32,7 +32,12 @@ model = BertForMaskedLM.from_pretrained('bert-large-uncased')
    )
   ;;get tokens
   (alltokens)
-  (setf *longest-token* (longest-token)))
+  (setf *longest-token* (longest-token))
+  (setup-special-tokens))
+
+(defparameter *id_cls* nil)
+(defparameter *id_sep* nil)
+(defparameter *id_mask* nil)
 
 (defun mask-id ()
   (py4cl2:pyexec
@@ -47,6 +52,12 @@ len = inputs.input_ids
 	  :sep (aref array 1)
 	  :mask (aref array 2)))
   )
+
+(defun setup-special-tokens ()
+  (let ((data (mask-id)))
+    (setf *id_cls* (getf data :cls)
+	  *id_sep* (getf data :sep)
+	  *id_mask* (getf data :mask))))
 
 (defparameter *teststr* "[MASK] [MASK] [MASK] of the United States mismanagement of the Coronavirus is its distrust of science.")
 (defun results
@@ -74,7 +85,7 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 "
    )
 
-  (py4cl2:pyeval "[inputids,predicted]"))
+  (py4cl2:pyeval "[inputids, predicted]"))
 
 ;;https://stackoverflow.com/questions/46826218/pytorch-how-to-get-the-shape-of-a-tensor-as-a-list-of-int
 (defun safe-subseq (str start end)
@@ -140,8 +151,9 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
     (/ (round (* f n))
        n)))
 
-(defun onlymasks3 (&optional (str *teststr*))
-  (write-string str)
+;;FIXME::misnomer, not only masks.
+(defun predict (&optional (str *teststr*))
+  (format t "~%~a" str)
   (let* ((thing (results str))
 	 (input (elt thing 0))
 	 (output (elt thing 1)))
@@ -156,16 +168,7 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 						  (aref tok 1)))
 				    index))
 		       output))))
-      fixed-outputs
-      ;;#+nil
-      #+nil
-      (let ((mask (getf (mask-id) :mask)))
-	(mapcar 'rest
-		(remove-if-not
-		 (lambda (x)
-		   (= mask (second (first x))))
-		 (mapcar 'cons paired-input
-			 fixed-outputs)))))))
+      fixed-outputs)))
 #+nil
 (defun onlymasks (&optional (str *teststr*))
   (write-string str)
@@ -279,10 +282,12 @@ for i in tokenizer.get_vocab():
 (/ (* 512 512 512 4) (* 1024 1024 1024 1.0))
 
 (defun whatmadeof (&optional (string "man"))
-  (onlymasks3 (format nil "A ~a is made of [MASK] [MASK], [MASK] [MASK], [MASK] [MASK], and [MASK] [MASK]."
+  (predict (format nil "A ~a is made of [MASK] [MASK], [MASK] [MASK], [MASK] [MASK], and [MASK] [MASK]."
 		      string)))
 (defun join (&optional (list '( 1 2 3 4 )))
   (format nil "~{~A~^, ~}" list))
+(defun joinspace (&optional (list '( 1 2 3 4 )))
+  (format nil "~{~A~^ ~}" list))
 (defun maskn (items &optional (andp t))
   (let ((items (mapcar 'mask items)))
     (symbol-macrolet ((laststr (car (last items))))
@@ -294,13 +299,12 @@ for i in tokenizer.get_vocab():
     (join items)))
 
 (defun whatmadeof2 (&optional (string "man") (mask '(2 2 2 2)))
-  (onlymasks3 (format nil "~a is made of ~a" string (maskn mask))))
+  (predict (format nil "~a is made of ~a" string (maskn mask))))
 
 (defun cmd (&optional (obj "man") (question "is made of") (mask '(2 2 2 2)))
-  (onlymasks3 (format nil "~a ~a ~a" obj question (maskn mask))))
+  (predict (format nil "~a ~a ~a" obj question (maskn mask))))
 (defun cm (&optional (thing "man is made of") (mask '(2 2 2 2)))
-  (onlymasks3 (format nil "~a ~a" thing (maskn mask))))
-(setf (symbol-function 'c) (function onlymasks3))
+  (predict (format nil "~a ~a" thing (maskn mask))))
 
 (struct-to-clos:struct->class
     (defstruct half-sentence
@@ -308,16 +312,68 @@ for i in tokenizer.get_vocab():
       predictions))
 ;;words looks like '("word" nil "thing" nil)
 ;;nil represents the mask
-
+(defmethod fulfilledp ((hs half-sentence))
+  (not (position nil (half-sentence-words hs))))
 (defun create-half-sentence (&optional words)
   (make-half-sentence :words words))
 (defparameter *hs* (create-half-sentence '("The man is " nil " which means that " nil ".")))
-(setf (symbol-function 'chs) (function create-half-sentence))
+
 (defun serialize-hs (&optional (hs *hs*))
-  (with-output-to-string (str)
-    (dolist (item (half-sentence-words hs))
-      (write-string (or item +mask+) str))))
+  (joinspace (mapcar (lambda (item)
+		       (or item +mask+))
+		     (half-sentence-words hs))))
 
 (defun foo (&rest words)
-  (let ((hs (create-half-sentence words)))
-    (c (serialize-hs))))
+  (let ((hs (create-half-sentence words))
+	(timeout 10))
+    (tagbody
+     :loop
+       (let ((pred (predict (serialize-hs hs))))
+	 (setf (half-sentence-predictions hs) pred)
+	 (when (not (fulfilledp hs))
+	   (multiple-value-bind (i tok) (find-best-index hs)
+	     (print (list i tok))
+	     (fulfill i tok hs))
+	   (and (< 0 (decf timeout))
+		(go :loop)))))))
+
+(defun fulfill (index token hs)
+  (setf (elt (half-sentence-words hs) index) (token-string token)))
+;;FIXME::may be quadratic?
+(defun find-best-index (hs)
+  (let ((max 0)
+	(index nil)
+	(token nil))
+    (with-slots (words predictions) hs
+      (dotimes (i (length words))
+	(let ((p (elt predictions i))
+	      (item (elt words i)))
+	  (when (and (not item)
+		     (not (maskp p)))
+	    (destructuring-bind (tok prob) (elt (prediction-tokens p) 0)
+	      (declare (ignorable tok))
+	      (when (> prob max)
+		(setf max prob
+		      index i
+		      token tok)))))))
+    (values index token)))
+
+
+(defmethod maskp ((obj token))
+  (maskp (token-id obj)))
+(defmethod maskp ((obj prediction))
+  (maskp (prediction-original-token obj)))
+(defmethod maskp ((obj fixnum))
+  (= obj *id_mask*))
+
+;;(foo "The man goes to " () " to buy the " () () " for " () ".")
+;;(foo "The man goes to " () " " () " to buy the " () " " () " for " () ".")
+
+(defun foo2 (&rest words)
+  (setf words
+	(mapcan (lambda (x)
+		  (typecase x
+		    (number (make-list x :initial-element nil))
+		    (otherwise (list x))))
+		words))
+  (apply 'foo words))
