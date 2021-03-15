@@ -29,7 +29,10 @@ from transformers import BertTokenizer, BertModel,BertForMaskedLM
 tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
 model = BertForMaskedLM.from_pretrained('bert-large-uncased')
 "
-   ))
+   )
+  ;;get tokens
+  (alltokens)
+  (setf *longest-token* (longest-token)))
 
 (defun mask-id ()
   (py4cl2:pyexec
@@ -65,16 +68,13 @@ sorted_preds, sorted_idx = predictions[0].sort(dim=-1, descending=True)
 # print(sorted_preds)
 # print(sorted_idx.size())
 
-acc = []
 inputids = inputs.input_ids[0].tolist()
-for k in range(top):
-   predicted_index = [sorted_idx[i, k].item() for i in range(0,len)]
-   predicted_pred = [sorted_preds[i, k].item() for i in range(0,len)]
-   predicted_token = tokenizer.convert_ids_to_tokens(predicted_index)
-   acc.append([predicted_token,predicted_index,predicted_pred])"
+
+predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range(top)] for i in range(0,len)]
+"
    )
 
-  (py4cl2:pyeval "[[tokenizer.convert_ids_to_tokens(inputids), inputids],acc]"))
+  (py4cl2:pyeval "[[tokenizer.convert_ids_to_tokens(inputids), inputids],predicted]"))
 
 ;;https://stackoverflow.com/questions/46826218/pytorch-how-to-get-the-shape-of-a-tensor-as-a-list-of-int
 (defun safe-subseq (str start end)
@@ -147,20 +147,22 @@ for k in range(top):
 	 (output (elt thing 1)))
     ;;FIXME::hack to shuffle data, fix python instead?
     (let ((paired-input (map 'list 'list (aref input 0) (aref input 1)))
-	  (paired-outputs (apply 'mapcar 'list
-				 (map 'list (lambda (x)
-					      (map 'list 'list (aref x 0)
-						   (aref x 1)
-						   (map 'list 'roundfloat
-							(aref x 2))))
-				      output)))
-	  )
+	  (fixed-outputs
+	    (map 'list 'create-prediction
+		 (map 'list (lambda (index)
+			      (map 'list (lambda (tok)
+					   (list (gettoken (aref tok 0))
+						 (aref tok 1)))
+				   index))
+		      output))))
+      ;;#+nil
       (let ((mask (getf (mask-id) :mask)))
-	(remove-if-not
-	 (lambda (x)
-	   (= mask (second (first x))))
-	 (mapcar 'cons paired-input
-		 paired-outputs))))))
+	(mapcar 'rest
+		(remove-if-not
+		 (lambda (x)
+		   (= mask (second (first x))))
+		 (mapcar 'cons paired-input
+			 fixed-outputs)))))))
 #+nil
 (defun onlymasks (&optional (str *teststr*))
   (write-string str)
@@ -201,18 +203,66 @@ for k in range(top):
 ;;python3.6 run_generation.py  --model_type=xlm --model_name_or_path=xlm ;doesnt work
 ;;python3.6 run_generation.py  --model_type=transfo-xl --model_name_or_path=trasnfo-xl
 
+(defun create-prediction (list-of-tokens)
+  (make-prediction  :tokens (coerce list-of-tokens 'vector)))
+(struct-to-clos:struct->class
+    (defstruct prediction
+      tokens))
+
+(set-pprint-dispatch
+ 'prediction
+ (lambda (stream o)
+   (format stream "~%====")
+   (terpri stream)
+   (loop :for tokpair :across (prediction-tokens o) :do
+     (destructuring-bind (tok probability) tokpair
+       (let* ((str (token-string tok))
+	      (strlen (length str)))
+	 (write-string str stream)
+	 (loop :repeat (+ 1 (- *longest-token* strlen)) :do
+	   (write-char #\Space stream)))
+       (loop :repeat (min probability 64) :do
+	 (write-char #\* stream))
+       (terpri stream))))
+ )
+
+(struct-to-clos:struct->class
+    (defstruct token
+      id
+      string
+      partialp))
+(set-pprint-dispatch 'token
+		     (lambda (Stream o)
+		       (format stream "'~a'" (token-string o)))
+ )
+(defparameter *tokens* nil)
+(defparameter *longest-token* nil)
+(defun gettoken (n)
+  (aref *tokens* n))
 (defun alltokens ()
   (py4cl2:pyexec
    "
 what = []
 for i in tokenizer.get_vocab():
    what.append(i)")
-  (sort 
-   (remove-if 'partialp
-	      (coerce (py4cl2:pyeval "what")
-		      'list
-		      ))
-   'string<))
+  (let ((ids (py4cl2:pyeval "tokenizer.convert_tokens_to_ids(what)"))
+	(tokens (py4cl2:pyeval "what")))
+    (setf *tokens* (make-array (length tokens)))
+    (map 'nil
+	 (lambda (id name)
+	   (setf (aref *tokens* id)
+		 (make-token :id id :string name :partialp (partialp name))))
+	 ids tokens)
+    #+nil
+    (sort 
+     (remove-if 'partialp
+		(coerce tokens
+			'list
+			))
+     'string<)))
+
+(defun longest-token ()
+  (reduce 'max *tokens* :key (lambda (x) (length (token-string x))) :initial-value 0))
 
 (/ (* 24000 (* 128 128 4)) 1024 1024 1024 1.0)
 
