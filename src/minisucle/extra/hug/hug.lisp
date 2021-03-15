@@ -249,9 +249,12 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 		       (format stream "'~a'" (token-string o)))
  )
 (defparameter *tokens* nil)
+(defparameter *str->token* (make-hash-table :test 'equal))
 (defparameter *longest-token* nil)
-(defun gettoken (n)
+(defmethod gettoken ((n fixnum))
   (aref *tokens* n))
+(defmethod gettoken ((n string))
+  (gethash n *str->token*))
 (defun alltokens ()
   (py4cl2:pyexec
    "
@@ -266,13 +269,11 @@ for i in tokenizer.get_vocab():
 	   (setf (aref *tokens* id)
 		 (make-token :id id :string name :partialp (partialp name))))
 	 ids tokens)
-    #+nil
-    (sort 
-     (remove-if 'partialp
-		(coerce tokens
-			'list
-			))
-     'string<)))
+
+    (loop :for token :across *tokens* :do
+      (setf (gethash (token-string token)
+		     *str->token*)
+	    token))))
 
 (defun longest-token ()
   (reduce 'max *tokens* :key (lambda (x) (length (token-string x))) :initial-value 0))
@@ -356,30 +357,42 @@ for i in tokenizer.get_vocab():
 			    nil)))
       (assert (not (null realindex)))
       (setf (elt words realindex) (token-string token)))))
+
+(defun banned-tokens ()
+  (mapcar 'gettoken
+	  '("?" "." "(" ")" ";" ":")))
+
 ;;FIXME::may be quadratic?
 (defun find-best-index (hs)
   (let ((max 0)
-	;;(min most-positive-fixnum)
-	(index 0)
-	(token nil)
-	(maskindex 0))
+	(min most-positive-fixnum)
+	
+	(maxindex 0)
+	(maxtoken nil)
+
+	(minindex 0)
+	(mintoken nil)
+	
+	(maskindex 0)
+
+	(banned (banned-tokens)))
     (with-slots (words predictions) hs
       (loop :for p :in predictions :do
 	(when (maskp p)
 	  (loop :for pair :across (prediction-tokens p) :do
 	    (destructuring-bind (tok prob) pair
-	      ;;#+nil
-	      (when (> prob max)
-		(setf max prob
-		      index maskindex
-		      token tok))
-	      #+nil
-	      (when (< prob min)
-		(setf min prob
-		      index maskindex
-		      token tok))))
+	      (when (not (member tok banned))
+		(when (> prob max)
+		  (setf max prob
+			maxindex maskindex
+			maxtoken tok))	      
+		(when (< prob min)
+		  (setf min prob
+			minindex maskindex
+			mintoken tok)))))
 	  (incf maskindex))))
-    (values index token)))
+    ;;(values minindex mintoken)
+    (values maxindex maxtoken)))
 
 
 (defmethod maskp ((obj token))
