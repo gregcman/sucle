@@ -60,18 +60,21 @@ len = list(inputs.input_ids.size())[1]
 # print(len)
 outputs = model(**inputs)
 predictions = outputs[0]
+# print(predictions[0])
 sorted_preds, sorted_idx = predictions[0].sort(dim=-1, descending=True)
+# print(sorted_preds)
 # print(sorted_idx.size())
 
+acc = []
 inputids = inputs.input_ids[0].tolist()
-acc = [[tokenizer.convert_ids_to_tokens(inputids), inputids]]
 for k in range(top):
    predicted_index = [sorted_idx[i, k].item() for i in range(0,len)]
+   predicted_pred = [sorted_preds[i, k].item() for i in range(0,len)]
    predicted_token = tokenizer.convert_ids_to_tokens(predicted_index)
-   acc.append([predicted_token,predicted_index])"
+   acc.append([predicted_token,predicted_index,predicted_pred])"
    )
 
-  (py4cl2:pyeval "acc"))
+  (py4cl2:pyeval "[[tokenizer.convert_ids_to_tokens(inputids), inputids],acc]"))
 
 ;;https://stackoverflow.com/questions/46826218/pytorch-how-to-get-the-shape-of-a-tensor-as-a-list-of-int
 (defun safe-subseq (str start end)
@@ -130,8 +133,35 @@ for k in range(top):
 (defun mask (n)
   (with-output-to-string (str)
     (loop :repeat n :do
-       (write-string +mask+ str))))
+      (write-string +mask+ str))))
 
+(defun roundfloat (f)
+  (let ((n 4.0))
+    (/ (round (* f n))
+       n)))
+
+(defun onlymasks3 (&optional (str *teststr*))
+  (write-string str)
+  (let* ((thing (results str))
+	 (input (elt thing 0))
+	 (output (elt thing 1)))
+    ;;FIXME::hack to shuffle data, fix python instead?
+    (let ((paired-input (map 'list 'list (aref input 0) (aref input 1)))
+	  (paired-outputs (apply 'mapcar 'list
+				 (map 'list (lambda (x)
+					      (map 'list 'list (aref x 0)
+						   (aref x 1)
+						   (map 'list 'roundfloat
+							(aref x 2))))
+				      output)))
+	  )
+      (let ((mask (getf (mask-id) :mask)))
+	(remove-if-not
+	 (lambda (x)
+	   (= mask (second (first x))))
+	 (mapcar 'cons paired-input
+		 paired-outputs))))))
+#+nil
 (defun onlymasks (&optional (str *teststr*))
   (write-string str)
   (let ((thing (results str)))
@@ -142,19 +172,26 @@ for k in range(top):
       (mapcar (lambda (item)
 		(remove nil
 			(map 'list
-			     (lambda (a b c d)
+			     (lambda (a b c d e)
 			       (declare (ignorable a))
 			       (when (= b mask)
-				 (list c d)))
+				 (list c d e)))
 			     (aref input 0)
 			     (aref input 1)
 			     (aref item 0)
-			     (aref item 1))))
+			     (aref item 1)
+			     (aref item 2))))
 	      rest))))
+#+nil
 (defun onlymasks2 (&optional (str *teststr*))
-  (apply 'mapcar 'list (mapcar (lambda (x)
-				 (mapcar 'first x))
-			       (onlymasks str))))
+  (mapcar (lambda (x)
+		   (mapcar 'first x))
+	  (onlymasks str))
+   
+  (apply 'mapcar 'list
+	 (mapcar (lambda (x)
+		   (mapcar 'first x))
+		 (onlymasks str))))
 
 ;;(onlymasks "[[X O X][[MASK] [MASK] [MASK]] [[MASK] [MASK] [MASK]]]")
 
@@ -180,3 +217,23 @@ for i in tokenizer.get_vocab():
 (/ (* 24000 (* 128 128 4)) 1024 1024 1024 1.0)
 
 (/ (* 512 512 512 4) (* 1024 1024 1024 1.0))
+
+(defun whatmadeof (&optional (string "man"))
+  (onlymasks2 (format nil "A ~a is made of [MASK] [MASK], [MASK] [MASK], [MASK] [MASK], and [MASK] [MASK]."
+		      string)))
+(defun join (&optional (list '( 1 2 3 4 )))
+  (format nil "~{~A~^, ~}" list))
+(defun maskn (items &optional (andp t))
+  (let ((items (mapcar 'mask items)))
+    (when andp
+      (symbol-macrolet ((laststr (car (last items))))
+	(setf laststr (format nil "and ~a." laststr))))
+    (join items)))
+
+(defun whatmadeof2 (&optional (string "man") (mask '(2 2 2 2)))
+  (onlymasks2 (format nil "~a is made of ~a" string (maskn mask))))
+
+(defun cmd (&optional (obj "man") (question "is made of") (mask '(2 2 2 2)))
+  (onlymasks2 (format nil "~a ~a ~a" obj question (maskn mask))))
+(defun cm (&optional (thing "man is made of") (mask '(2 2 2 2)))
+  (onlymasks2 (format nil "~a ~a" thing (maskn mask))))
