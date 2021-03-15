@@ -253,6 +253,7 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 (defparameter *longest-token* nil)
 (defmethod gettoken ((n fixnum))
   (aref *tokens* n))
+(defmethod gettoken ((n token)) n)
 (defmethod gettoken ((n string))
   (gethash n *str->token*))
 (defun alltokens ()
@@ -329,6 +330,7 @@ for i in tokenizer.get_vocab():
 		     (half-sentence-words hs))))
 
 (defun foo (&rest words)
+  (ban-tokens)
   (let* ((hs (create-half-sentence words))
 	 (timeout (spaces-left hs)))
     (tagbody
@@ -339,9 +341,10 @@ for i in tokenizer.get_vocab():
 	   (multiple-value-bind (i tok) (find-best-index hs)
 	     ;;(print (list i tok))
 	     ;;(print (elt pred i))
-	     (fulfill i tok hs))
-	   (and (<= 0 (decf timeout))
-		(go :loop)))))
+	     (when tok
+	       (fulfill i tok hs)
+	       (and (<= 0 (decf timeout))
+		    (go :loop)))))))
     (format nil "~a" (serialize-hs hs))
     hs))
 
@@ -358,9 +361,21 @@ for i in tokenizer.get_vocab():
       (assert (not (null realindex)))
       (setf (elt words realindex) (token-string token)))))
 
-(defun banned-tokens ()
-  (mapcar 'gettoken
-	  '("?" "." "(" ")" ";" ":")))
+(defun ban-tokens ()
+  (map nil 'ban '("?" "." "(" ")" ";" ":" "|" "!" "-" "[UNK]" "\"" "'" "..."))
+  (map nil 'ban (test5)))
+
+(defun test5 ()
+  (remove-if (lambda (x)
+	       (every (lambda (char)
+			(typep char 'standard-char))
+		      (token-string x)))
+	     (coerce *tokens* 'list)))
+(defparameter *banned* (make-hash-table :test 'eq))
+(defun ban (x)
+  (setf (gethash (gettoken x) *banned*) t))
+(defun bannedp (x)
+  (gethash (gettoken x) *banned*))
 
 ;;FIXME::may be quadratic?
 (defun find-best-index (hs)
@@ -373,15 +388,13 @@ for i in tokenizer.get_vocab():
 	(minindex 0)
 	(mintoken nil)
 	
-	(maskindex 0)
-
-	(banned (banned-tokens)))
+	(maskindex 0))
     (with-slots (words predictions) hs
       (loop :for p :in predictions :do
 	(when (maskp p)
 	  (loop :for pair :across (prediction-tokens p) :do
 	    (destructuring-bind (tok prob) pair
-	      (when (not (member tok banned))
+	      (when (not (bannedp tok))
 		(when (> prob max)
 		  (setf max prob
 			maxindex maskindex
@@ -392,7 +405,11 @@ for i in tokenizer.get_vocab():
 			mintoken tok)))))
 	  (incf maskindex))))
     ;;(values minindex mintoken)
-    (values maxindex maxtoken)))
+    (values maxindex maxtoken)
+    ))
+
+;;TODO: correctly render partial tokens
+;;Ban all non ascii characters?
 
 
 (defmethod maskp ((obj token))
@@ -413,3 +430,8 @@ for i in tokenizer.get_vocab():
 		    (otherwise (list x))))
 		words))
   (apply 'foo words))
+
+(defun footest ()
+  (mapcar 'serialize-hs
+	  (mapcar 'foo2
+		  (alexandria:iota 15))))
