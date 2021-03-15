@@ -323,14 +323,14 @@ for i in tokenizer.get_vocab():
 (defmethod spaces-left ((hs half-sentence))
   (count nil (half-sentence-words hs)))
 (defun create-half-sentence (&optional words)
-  (make-half-sentence :words words))
+  (make-half-sentence :words (coerce words 'vector)))
 (defparameter *hs* (create-half-sentence '("The man is " nil " which means that " nil ".")))
 
 (defun serialize-hs (&optional (hs *hs*))
   (tokens->string
-   (mapcar (lambda (item)
-	     (or item +mask+))
-	   (half-sentence-words hs))))
+   (map 'list (lambda (item)
+		(or item +mask+))
+	(half-sentence-words hs))))
 (defparameter *cancel* t)
 (defun foo (&rest words)
   (setf *cancel* nil)
@@ -366,10 +366,14 @@ for i in tokenizer.get_vocab():
       (setf (elt words realindex) (token-string token)))))
 
 (defun ban-tokens ()
-  (map nil 'ban '("?" "." "(" ")" ";" ":" "|" "!" "-" "[UNK]" "\"" "'" "..." "#" "/" "`"))
-  (map nil 'ban '("+" "=" "^" "%" "$" "@" "<" ">"))
+  (ban "[UNK]")
+  (map nil 'ban '("." "?" "!")) ;;we do not want the sentence to end abruptly.
+  (map nil 'ban '(":" ";")) ;;we do not want the sentence to end abruptly.
+  ;(map nil 'ban '("?" "." "(" ")" ";" ":" "|" "!" "-" "\"" "'" "..." "#" "/" "`"))
+  ;(map nil 'ban '("+" "=" "^" "%" "$" "@" "<" ">"))
   ;(map nil 'ban '("," "the" "on" "of" "and"))
-  (map nil 'ban (test5)))
+  ;(map nil 'ban (test5))
+  )
 
 (defun test5 ()
   (remove-if (lambda (x)
@@ -449,3 +453,15 @@ for i in tokenizer.get_vocab():
 (defun tokens->string (&optional (strings '("dirt" "asdfasdfsadf" "##s")))
   (setf (py4cl2:pyeval "temp") strings)
   (py4cl2:pyeval "tokenizer.convert_tokens_to_string(temp)"))
+
+
+;;(f a ups box if made of the following materials ":" 10 ".")
+;;(f in order to win 2 ", one must do" 2 "," 2 "," and 2 ".")
+;;(f a cybernetic matrix is made of the following materials ": cybernetic lace," 12 ".")
+;;(f ocean "," shore "," 6 bayside "," urban outfitters 6 "," gap "," outback steakhouse ".")
+;;(f what 2 life 2 stone 2)
+;;(f "All the following are required to manufacture a banana:" 10 ".")
+;;(f "The black ball is next to the green mountain. The pole is" 2 "meters away from the black ball and" 2 "meters away from the green mountain.")
+
+;;(f "The black ball is next to the green mountain. The pole is" 3 "away from the black ball and" 3 "away from the green mountain.")
+;;(f "The green mountain is next to the black ball. The pole is" 3 "away from the black ball and" 3 "away from the green mountain.")
