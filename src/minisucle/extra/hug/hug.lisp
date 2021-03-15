@@ -219,7 +219,7 @@ for i in tokenizer.get_vocab():
 (/ (* 512 512 512 4) (* 1024 1024 1024 1.0))
 
 (defun whatmadeof (&optional (string "man"))
-  (onlymasks2 (format nil "A ~a is made of [MASK] [MASK], [MASK] [MASK], [MASK] [MASK], and [MASK] [MASK]."
+  (onlymasks3 (format nil "A ~a is made of [MASK] [MASK], [MASK] [MASK], [MASK] [MASK], and [MASK] [MASK]."
 		      string)))
 (defun join (&optional (list '( 1 2 3 4 )))
   (format nil "~{~A~^, ~}" list))
@@ -231,9 +231,9 @@ for i in tokenizer.get_vocab():
     (join items)))
 
 (defun whatmadeof2 (&optional (string "man") (mask '(2 2 2 2)))
-  (onlymasks2 (format nil "~a is made of ~a" string (maskn mask))))
+  (onlymasks3 (format nil "~a is made of ~a" string (maskn mask))))
 
 (defun cmd (&optional (obj "man") (question "is made of") (mask '(2 2 2 2)))
-  (onlymasks2 (format nil "~a ~a ~a" obj question (maskn mask))))
+  (onlymasks3 (format nil "~a ~a ~a" obj question (maskn mask))))
 (defun cm (&optional (thing "man is made of") (mask '(2 2 2 2)))
-  (onlymasks2 (format nil "~a ~a" thing (maskn mask))))
+  (onlymasks3 (format nil "~a ~a" thing (maskn mask))))
