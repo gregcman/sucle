@@ -74,7 +74,7 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 "
    )
 
-  (py4cl2:pyeval "[[tokenizer.convert_ids_to_tokens(inputids), inputids],predicted]"))
+  (py4cl2:pyeval "[inputids,predicted]"))
 
 ;;https://stackoverflow.com/questions/46826218/pytorch-how-to-get-the-shape-of-a-tensor-as-a-list-of-int
 (defun safe-subseq (str start end)
@@ -146,16 +146,19 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 	 (input (elt thing 0))
 	 (output (elt thing 1)))
     ;;FIXME::hack to shuffle data, fix python instead?
-    (let ((paired-input (map 'list 'list (aref input 0) (aref input 1)))
-	  (fixed-outputs
-	    (map 'list 'create-prediction
-		 (map 'list (lambda (index)
-			      (map 'list (lambda (tok)
-					   (list (gettoken (aref tok 0))
-						 (aref tok 1)))
-				   index))
-		      output))))
+    (let* ((input-tokens (map 'list 'gettoken input))
+	   (fixed-outputs
+	     (map 'list 'create-prediction
+		  input-tokens
+		  (map 'list (lambda (index)
+			       (map 'list (lambda (tok)
+					    (list (gettoken (aref tok 0))
+						  (aref tok 1)))
+				    index))
+		       output))))
+      fixed-outputs
       ;;#+nil
+      #+nil
       (let ((mask (getf (mask-id) :mask)))
 	(mapcar 'rest
 		(remove-if-not
@@ -203,18 +206,26 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 ;;python3.6 run_generation.py  --model_type=xlm --model_name_or_path=xlm ;doesnt work
 ;;python3.6 run_generation.py  --model_type=transfo-xl --model_name_or_path=trasnfo-xl
 
-(defun create-prediction (list-of-tokens)
-  (make-prediction  :tokens (coerce list-of-tokens 'vector)))
+(defun create-prediction (original-token list-of-tokens)
+  (make-prediction :tokens (coerce list-of-tokens 'vector)
+		   :original-token original-token))
 (struct-to-clos:struct->class
     (defstruct prediction
+      original-token
       tokens))
 
 (set-pprint-dispatch
  'prediction
  (lambda (stream o)
-   (format stream "~%====")
-   (terpri stream)
+   (format stream "~%=====")
+   (let* ((str (with-output-to-string (str)
+		 (write (prediction-original-token o) :stream str)))
+	  (len (length str)))
+     (format stream "~a" str)
+     (loop :repeat (- 50 len) :do
+       (write-char #\= stream)))
    (loop :for tokpair :across (prediction-tokens o) :do
+     (terpri stream)
      (destructuring-bind (tok probability) tokpair
        (let* ((str (token-string tok))
 	      (strlen (length str)))
@@ -222,8 +233,7 @@ predicted = [[[sorted_idx[i, k].item(),sorted_preds[i, k].item()] for k in range
 	 (loop :repeat (+ 1 (- *longest-token* strlen)) :do
 	   (write-char #\Space stream)))
        (loop :repeat (min probability 64) :do
-	 (write-char #\* stream))
-       (terpri stream))))
+	 (write-char #\* stream)))))
  )
 
 (struct-to-clos:struct->class
@@ -275,9 +285,12 @@ for i in tokenizer.get_vocab():
   (format nil "~{~A~^, ~}" list))
 (defun maskn (items &optional (andp t))
   (let ((items (mapcar 'mask items)))
-    (when andp
-      (symbol-macrolet ((laststr (car (last items))))
-	(setf laststr (format nil "and ~a." laststr))))
+    (symbol-macrolet ((laststr (car (last items))))
+      (when (and (not (= 1 (length items)))
+		 andp)
+	(setf laststr (format nil "and ~a" laststr)))
+      ;;add a period
+      (setf laststr (format nil "~a." laststr)))
     (join items)))
 
 (defun whatmadeof2 (&optional (string "man") (mask '(2 2 2 2)))
@@ -287,3 +300,24 @@ for i in tokenizer.get_vocab():
   (onlymasks3 (format nil "~a ~a ~a" obj question (maskn mask))))
 (defun cm (&optional (thing "man is made of") (mask '(2 2 2 2)))
   (onlymasks3 (format nil "~a ~a" thing (maskn mask))))
+(setf (symbol-function 'c) (function onlymasks3))
+
+(struct-to-clos:struct->class
+    (defstruct half-sentence
+      words
+      predictions))
+;;words looks like '("word" nil "thing" nil)
+;;nil represents the mask
+
+(defun create-half-sentence (&optional words)
+  (make-half-sentence :words words))
+(defparameter *hs* (create-half-sentence '("The man is " nil " which means that " nil ".")))
+(setf (symbol-function 'chs) (function create-half-sentence))
+(defun serialize-hs (&optional (hs *hs*))
+  (with-output-to-string (str)
+    (dolist (item (half-sentence-words hs))
+      (write-string (or item +mask+) str))))
+
+(defun foo (&rest words)
+  (let ((hs (create-half-sentence words)))
+    (c (serialize-hs))))
