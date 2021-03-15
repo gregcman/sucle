@@ -362,7 +362,8 @@ for i in tokenizer.get_vocab():
       (setf (elt words realindex) (token-string token)))))
 
 (defun ban-tokens ()
-  (map nil 'ban '("?" "." "(" ")" ";" ":" "|" "!" "-" "[UNK]" "\"" "'" "..."))
+  (map nil 'ban '("?" "." "(" ")" ";" ":" "|" "!" "-" "[UNK]" "\"" "'" "..." "#"))
+  ;(map nil 'ban '("," "the" "on" "of" "and"))
   (map nil 'ban (test5)))
 
 (defun test5 ()
@@ -406,6 +407,7 @@ for i in tokenizer.get_vocab():
 	  (incf maskindex))))
     ;;(values minindex mintoken)
     (values maxindex maxtoken)
+    ;;(values nil nil)
     ))
 
 ;;TODO: correctly render partial tokens
@@ -434,4 +436,4 @@ for i in tokenizer.get_vocab():
 (defun footest ()
   (mapcar 'serialize-hs
 	  (mapcar 'foo2
-		  (alexandria:iota 15))))
+		  (alexandria:iota 5 :start 20))))
