@@ -5,7 +5,7 @@
   :depends-on
   (#:sucle-serialize
    #:sqlite
-   #:base64
+   #:cl-base64
    #:uiop
    #:lparallel
    ;;For one macro in 'database'
@@ -13,7 +13,7 @@
   :serial t
   :components
   ((:file "database")
-   (:file "crud"))) 
+   (:file "crud")))
 
 
 
