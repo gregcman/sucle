@@ -91,14 +91,10 @@
 ;;[FIXME]:can possibly create filenames that are illegal.
 ;;use base64 instead? how to mix the two?
 ;;
-(defparameter *base-64-string*
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 (defun string-base64 (string)
-  (let ((base64::*base64* *base-64-string*))
-    (base64:base64-encode string)))
+  (base64:string-to-base64-string string :uri t))
 (defun base64-string (string)
-  (let ((base64::*base64* *base-64-string*))
-    (base64:base64-decode string)))
+  (base64:base64-string-to-string string :uri t))
 (defun commentify (&optional (string "test"))
   (concatenate 'string ";" string))
 (defun un-commentify (&optional (string ";test"))
@@ -116,7 +112,7 @@
 				     directory)))
   ;;FIXME::This probably won't work on windows.
   ;;https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
-  
+
   ;;Check that they both point to files in same directory
   ;;If they are, then it is safe
   (if (equal (pathname-directory base64-path)
@@ -129,7 +125,7 @@
 (defun crud_read_file-pile (lisp-object &aux (path *path*))
   (multiple-value-bind (file-path base64) (%check-safe-string lisp-object path)
     ;;if both are valid, prefer the base64 one.
-    ;;if only base64 is valid, just use that.  
+    ;;if only base64 is valid, just use that.
     (sucle-serialize:load
      (cond (file-path
 	    (if (probe-file base64)
