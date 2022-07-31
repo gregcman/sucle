@@ -465,3 +465,5 @@ for i in tokenizer.get_vocab():
 
 ;;(f "The black ball is next to the green mountain. The pole is" 3 "away from the black ball and" 3 "away from the green mountain.")
 ;;(f "The green mountain is next to the black ball. The pole is" 3 "away from the black ball and" 3 "away from the green mountain.")
+;;(f "A man lives in a" 2 "on a planet" 2 ".")
+;;(f "A man lives in a" 2 "on a planet" 2 "." "The house is located:" 10 ".")

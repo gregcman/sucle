@@ -8,6 +8,7 @@
   :serial t
   :depends-on
   (#:alexandria
-   #:py4cl2)
+   #:py4cl2
+   #:uncommon-lisp)
   :components ((:file "package")
                (:file "hug")))
